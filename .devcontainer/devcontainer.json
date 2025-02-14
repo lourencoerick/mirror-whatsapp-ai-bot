@@ -1,0 +1,39 @@
+{
+    "name": "Whatsapp Bot",
+    "dockerFile": "../Dockerfile",
+    "mounts": [
+	    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+    ],
+    "context": "..",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "pylint.enabled": true,
+                
+                "bitoAI.codeCompletion.enableCommentToCode": true,
+                "bitoAI.codeCompletion.enableAutoCompletion": true,
+
+                "conventionalCommits.scopes": [
+                ]
+  
+            },
+            "extensions": [
+                "ms-vscode-remote.vscode-remote-extensionpack",
+                "ms-azuretools.vscode-docker",
+                "ms-python.python",
+                "eamodio.gitlens",
+                "ms-python.pylint",
+                "vivaxy.vscode-conventional-commits",
+                "Bito.Bito",
+                "ms-python.black-formatter",
+                "ms-toolsai.jupyter"
+            ]
+            
+        }
+    },
+    "remoteUser": "vscode",
+	"features": {
+		"git": "latest"
+	}
+}
+
