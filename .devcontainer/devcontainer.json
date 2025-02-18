@@ -1,21 +1,19 @@
 {
     "name": "Whatsapp Bot",
-    "dockerFile": "../Dockerfile",
+    "dockerComposeFile": "../docker-compose.dev.yml",
+    "service": "backend",
+    "workspaceFolder": "/workspace",
     "mounts": [
-	    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+        "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+        "source=.,target=/workspace,type=bind,consistency=cached"
     ],
-    "context": "..",
     "customizations": {
         "vscode": {
             "settings": {
                 "pylint.enabled": true,
-                
                 "bitoAI.codeCompletion.enableCommentToCode": true,
                 "bitoAI.codeCompletion.enableAutoCompletion": true,
-
-                "conventionalCommits.scopes": [
-                ]
-  
+                "conventionalCommits.scopes": []
             },
             "extensions": [
                 "ms-vscode-remote.vscode-remote-extensionpack",
@@ -26,14 +24,14 @@
                 "vivaxy.vscode-conventional-commits",
                 "Bito.Bito",
                 "ms-python.black-formatter",
-                "ms-toolsai.jupyter"
+                "ms-toolsai.jupyter",
+                "humao.rest-client"
             ]
-            
         }
     },
+    "postCreateCommand": "ls -lah && [ -f my_fastapi_project/requirements.txt ] && pip install -r my_fastapi_project/requirements.txt || echo 'requirements.txt not found, skipping...'",
     "remoteUser": "vscode",
-	"features": {
-		"git": "latest"
-	}
+    "features": {
+        "git": "latest"
+    }
 }
-
