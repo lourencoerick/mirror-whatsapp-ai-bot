@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "whatsapp-ai-bot"
+version = "0.1.0"
+description = "WhatsApp AI Bot Backend"
+authors = [
+    {name = "Erick Lourenco", email = "lourenco.erick@gmail.com"},
+]
+requires-python = ">=3.9"
+dependencies = [
+    "sqlalchemy",
+    "pydantic",
+    "pydantic-settings",
+    "psycopg2-binary",
+    "alembic",
+]
+
+[tool.setuptools]
+package-dir = {"" = "app"}
