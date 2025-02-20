@@ -5,40 +5,60 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+    container_name: whatsapp_bot_backend_dev
     volumes:
       - .:/workspace:cached
     command: sleep infinity
     networks:
       - chatbot-network
     environment:
-      DATABASE_URL: postgresql://user:password@database:5432/chatbotdb
+      DATABASE_URL: postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@database:5432/${POSTGRES_DB:-chatbotdb}
       REDIS_URL: redis://redis:6379/0
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   database:
-    image: postgres:17.3
+    image: postgres:17.3-alpine
+    container_name: whatsapp_bot_db_dev
     restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: chatbotdb
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-chatbotdb}
     ports:
-      - "5433:5432"
+      - "5432:5432"
     networks:
       - chatbot-network
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
+    container_name: whatsapp_bot_redis_dev
     restart: always
     ports:
-      - "6380:6379"
+      - "6379:6379"
     networks:
       - chatbot-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   chatbot-network:
+    name: whatsapp_bot_network_dev
     driver: bridge
 
 volumes:
   postgres_data:
+    name: whatsapp_bot_postgres_data_dev
