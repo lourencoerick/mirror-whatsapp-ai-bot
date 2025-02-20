@@ -4,7 +4,7 @@ from sqlalchemy import Column, DateTime
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.sql import func
 
-from ..database import Base
+from app.database import Base
 
 
 class BaseModel(Base):
