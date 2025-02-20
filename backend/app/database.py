@@ -8,7 +8,7 @@ from .config import get_settings
 
 settings = get_settings()
 
-# Criar engine do SQLAlchemy com pooling otimizado
+# Creating SQLAlchemy engine with optimized pooling
 engine = create_engine(
     settings.DATABASE_URL,
     poolclass=QueuePool,
@@ -19,10 +19,9 @@ engine = create_engine(
     echo=settings.DEBUG,
 )
 
-# Sessão local para thread atual
+# Local Session
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base declarativa para modelos
 Base = declarative_base()
 
 

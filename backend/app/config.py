@@ -8,18 +8,19 @@ class Settings(BaseSettings):
     Configurações da aplicação usando Pydantic BaseSettings.
     Carrega automaticamente variáveis de ambiente.
     """
+
     # Database
     DATABASE_URL: str
-    
+
     # Redis
     REDIS_URL: str
-    
+
     # Application
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = False
-    
+
     class Config:
-        env_file = ".env"
+        env_file = "../../.env"
         case_sensitive = True
 
 
