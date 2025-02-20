@@ -8,3 +8,7 @@ python-dotenv>=1.0.0
 
 # Utility
 pydantic>=2.5.0
+
+python-dotenv
+
+pydantic-settings
