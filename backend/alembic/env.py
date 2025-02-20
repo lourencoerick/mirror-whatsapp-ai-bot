@@ -7,6 +7,7 @@ from sqlalchemy import pool
 from alembic import context
 
 from app.database import Base
+from app.models.models import TestModel
 
 from dotenv import load_dotenv
 
