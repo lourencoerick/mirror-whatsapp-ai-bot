@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Column, DateTime, Integer, String, BigInteger
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.sql import func
 
@@ -16,6 +16,7 @@ class BaseModel(Base):
     __abstract__ = True
 
     # Common fields for all tables
+    id = Column(BigInteger, primary_key=True)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
@@ -45,15 +46,3 @@ class BaseModel(Base):
         """
         attrs = ", ".join(f"{key}={value!r}" for key, value in self.to_dict().items())
         return f"{self.__class__.__name__}({attrs})"
-
-
-class TestModel(BaseModel):
-    """
-    Simple model for database testing.
-    """
-
-    __tablename__ = "test_models"  # Explicit table name
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(255), nullable=False)
-    value = Column(Integer, nullable=True)
