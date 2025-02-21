@@ -26,4 +26,4 @@ jobs:
 
     - name: Run tests
       run: |
-        python /backend/app/tests/test_health.py
+        python backend/app/tests/test_health.py
