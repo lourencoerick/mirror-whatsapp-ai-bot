@@ -12,3 +12,9 @@ pydantic>=2.5.0
 python-dotenv
 
 pydantic-settings
+
+fastapi
+uvicorn
+httpx
+pytest
+pytest-asyncio
