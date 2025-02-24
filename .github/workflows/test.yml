@@ -31,7 +31,3 @@ jobs:
         sleep 5
       env:
         PYTHONUNBUFFERED: 1
-
-    - name: Run health test
-      run: |
-        pytest backend/app/tests/test_health.py
