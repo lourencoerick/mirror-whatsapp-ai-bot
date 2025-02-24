@@ -2,13 +2,10 @@ const AUTH0_DOMAIN = "dev-dhatrtlc6w4vn5rv.us.auth0.com";
 const CLIENT_ID = "zqSnOLtR342KZKIICSZ0zRJKK5UkPCIc";
 const REDIRECT_URI = "http://localhost:3001/callback";
 
-
 async function exchangeCodeForToken() {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get("code");
     const code_verifier = localStorage.getItem("code_verifier");
-    // const code_verifier = sessionStorage.getItem("code_verifier"); // ✅ Retrieve from `sessionStorage`
-
 
     if (!code) {
         console.error("No authorization code found in URL");
