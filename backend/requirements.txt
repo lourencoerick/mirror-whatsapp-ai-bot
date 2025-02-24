@@ -5,16 +5,20 @@ psycopg2-binary>=2.9.9
 
 # Environment and Configuration
 python-dotenv>=1.0.0
-
-# Utility
-pydantic>=2.5.0
-
-python-dotenv
-
 pydantic-settings
 
-fastapi
+# FastAPI and Web Framework
+fastapi[all]
 uvicorn
+
+# Authentication and Security
+python-jose[cryptography]
+authlib
+
+# Testing
 httpx
 pytest
 pytest-asyncio
+
+# Utility
+pydantic>=2.5.0
