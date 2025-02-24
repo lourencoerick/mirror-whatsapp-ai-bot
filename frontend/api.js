@@ -34,7 +34,7 @@ async function callUserInfoAPI() {
 }
 
 async function callProtectedAPI() {
-    const accessToken = sessionStorage.getItem("access_token");
+    const accessToken = localStorage.getItem("access_token");
     if (!accessToken) {
         console.error("No access token found, please log in first.");
         return;
