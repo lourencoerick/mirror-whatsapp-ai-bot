@@ -16,9 +16,9 @@ python-jose[cryptography]
 authlib
 
 # Testing
-httpx
-pytest
-pytest-asyncio
+httpx==0.24.1
+pytest==8.3.4
+pytest-asyncio==0.23.8
 
 # Utility
 pydantic>=2.5.0
