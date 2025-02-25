@@ -15,6 +15,7 @@ requests
 # Authentication and Security
 python-jose[cryptography]
 authlib
+PyJWT>=2.8.0
 
 # Testing
 httpx==0.24.1
