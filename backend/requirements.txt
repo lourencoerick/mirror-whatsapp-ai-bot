@@ -10,6 +10,7 @@ pydantic-settings
 # FastAPI and Web Framework
 fastapi[all]
 uvicorn
+requests
 
 # Authentication and Security
 python-jose[cryptography]
