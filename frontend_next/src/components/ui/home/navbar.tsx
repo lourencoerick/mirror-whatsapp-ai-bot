@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ExperimentButton } from '@/components/ui/icon-button';
+import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
 import { Menu, X } from 'lucide-react';
 import { inter } from '@/components/ui/fonts';
 
@@ -55,9 +55,9 @@ export default function Navbar() {
                 </Button>
               </Link>
               <Link href="/experimente">
-                <ExperimentButton variant="default" size="lg">
-                  Experimente Agora
-                </ExperimentButton>
+                <InteractiveHoverButton>
+                  Começar Agora
+                </InteractiveHoverButton>
               </Link>
             </div>
           </div>
