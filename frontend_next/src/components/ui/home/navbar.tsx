@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
+import { NavBarMenu, MobileNavBarMenu } from "@/components/ui/home/navbar-menu"
 import { Menu, X } from 'lucide-react';
 import { inter } from '@/components/ui/fonts';
 
@@ -33,18 +34,10 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop navigation */}
-          <div className="hidden md:flex items-center ml-auto">
+          <div className="hidden md:flex items-center flex-grow">
             {/* Navigation sections */}
-            <div className="flex space-x-6">
-              <Link href="#hero" className="text-sm font-medium text-foreground hover:text-muted-foreground">
-                Hero Section
-              </Link>
-              <Link href="#beneficios" className="text-sm font-medium text-foreground hover:text-muted-foreground">
-                Benefícios
-              </Link>
-              <Link href="#produto" className="text-sm font-medium text-foreground hover:text-muted-foreground">
-                Produto
-              </Link>
+            <div className="flex space-x-6 flex-grow ml-4">
+              <NavBarMenu/>
             </div>
 
             {/* Buttons */}
@@ -65,7 +58,7 @@ export default function Navbar() {
           {/* Mobile menu button */}
           <div className="flex md:hidden">
             <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}
             </Button>
           </div>
         </div>
@@ -74,29 +67,9 @@ export default function Navbar() {
       {/* Mobile menu */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-background border-t border-muted">
-          <div className="pt-2 pb-3 space-y-1">
-            <Link
-              href="#hero"
-              className="block px-4 py-2 text-base font-medium text-foreground hover:bg-muted text-center"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Hero Section
-            </Link>
-            <Link
-              href="#beneficios"
-              className="block px-4 py-2 text-base font-medium text-foreground hover:bg-muted text-center"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Benefícios
-            </Link>
-            <Link
-              href="#produto"
-              className="block px-4 py-2 text-base font-medium text-foreground hover:bg-muted text-center"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Produto
-            </Link>
-          </div>
+          <div className="pt-2 pb-3 space-y-1 ">
+            <MobileNavBarMenu onClose={() => setMobileMenuOpen(false)} />
+          </div> 
 
           {/* Mobile buttons */}
           <div className="pt-4 pb-3 border-t border-muted">
@@ -107,12 +80,13 @@ export default function Navbar() {
                 </Button>
               </Link>
               <Link href="/experimente" onClick={() => setMobileMenuOpen(false)} className="block">
-                <Button variant="default" size="sm" className="w-full">
+                <InteractiveHoverButton size="sm" className="w-full">
                   Experimente Agora
-                </Button>
+                </InteractiveHoverButton>
               </Link>
             </div>
           </div>
+
         </div>
       )}
     </header>
