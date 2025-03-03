@@ -6,11 +6,13 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
 import { NavBarMenu, MobileNavBarMenu } from "@/components/ui/home/navbar-menu"
-import { Menu, X } from 'lucide-react';
+import { Menu, X, MoonIcon, SunIcon } from 'lucide-react';
 import { inter } from '@/components/ui/fonts';
+import { useTheme } from 'next-themes';
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   return (
     <header className="bg-background shadow-sm">
@@ -37,11 +39,11 @@ export default function Navbar() {
           <div className="hidden md:flex items-center flex-grow">
             {/* Navigation sections */}
             <div className="flex space-x-6 flex-grow ml-4">
-              <NavBarMenu/>
+              <NavBarMenu />
             </div>
 
             {/* Buttons */}
-            <div className="flex space-x-2 ml-8">
+            <div className="flex space-x-2 ml-8 items-center">
               <Link href="/login">
                 <Button variant="outline" size="lg">
                   Login
@@ -52,8 +54,24 @@ export default function Navbar() {
                   Começar Agora
                 </InteractiveHoverButton>
               </Link>
+
+              {/* <div className="mt-8 flex justify-center md:justify-start"> */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                >
+                  {theme === "light" ? (
+                    <MoonIcon />
+                  ) : (
+                    <SunIcon  />
+                  )}
+                </Button>
+              {/* </div> */}
             </div>
           </div>
+
+
 
           {/* Mobile menu button */}
           <div className="flex md:hidden">
@@ -69,7 +87,7 @@ export default function Navbar() {
         <div className="md:hidden bg-background border-t border-muted">
           <div className="pt-2 pb-3 space-y-1 ">
             <MobileNavBarMenu onClose={() => setMobileMenuOpen(false)} />
-          </div> 
+          </div>
 
           {/* Mobile buttons */}
           <div className="pt-4 pb-3 border-t border-muted">
