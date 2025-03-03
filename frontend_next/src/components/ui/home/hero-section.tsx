@@ -8,7 +8,7 @@ import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-b
 export default function HeroSection() {
 
   return (
-    <section className="py-20 bg-background text-foreground">
+    <section className="pt-20 pb-10 bg-background text-foreground">
       <div className="container mx-auto px-4 flex flex-col md:flex-row items-center">
         <div className="w-full md:w-7/10 text-center md:text-left">
           <TypingAnimation
@@ -16,7 +16,7 @@ export default function HeroSection() {
             as="h1"
             style={{ whiteSpace: "pre-line" }}
           >
-            {`I.A. que vende.\nDados que decidem.\nResultados que escalam.`}
+            {`I.A. que vende.\nDados que decidem.\nResultados que escalam`}
           </TypingAnimation>
           <p className="text-xl md:text-3xl mb-8">
             <span className="font-bold">
