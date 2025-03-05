@@ -66,11 +66,10 @@ const steps = [
 
 export default function HowDoesItWorkSection() {
     return (
-        // <Button variant="contained">Hello world</Button>
-        
         <div className="bg-background text-background-foreground">
-            <h1 className="text-4xl text-center mt-12 mb-10">Como Funciona</h1>
-            <div className="flex flex-row gap-8 p-8">
+            <h1 className="text-4xl text-center mt-12">Como Funciona</h1>
+            <h2 className="text-xl text-center mt-2 mb-5">Transforme o <span className='font-bold'>WhatsApp no seu melhor canal de vendas</span> em apenas 4 passos, veja como é simples:</h2>
+            <div className="flex flex-col items-center md:flex-row gap-8 p-8">
                 {steps.map(({ step, title, titleSize, icon, description, descriptionMargin}, index) => (
                     <StepCard key={index} step={step} title={title} titleSize={titleSize} icon={icon} description={description} descriptionMargin={descriptionMargin}/>
                 ))}
