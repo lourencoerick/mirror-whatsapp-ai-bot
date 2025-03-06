@@ -1,4 +1,7 @@
+"use client";
+
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Element } from "react-scroll";
 
 const faqItems = [
     {
@@ -46,7 +49,7 @@ const faqItems = [
 
 export default function FaqSection() {
     return (
-        <section className="bg-secondary text-secondary-foreground  items-center justify-center px-10 md:px-60 py-10">
+        <Element name="faq" className="bg-secondary text-secondary-foreground  items-center justify-center px-10 md:px-60 py-10">
             <h1 className="text-3xl md:text-4xl mb-6 text-center">Perguntas Frequentes</h1>
             <Accordion type="single" collapsible className="space-y-4">
                 {faqItems.map(item => (
@@ -60,6 +63,6 @@ export default function FaqSection() {
                     </AccordionItem>
                 ))}
             </Accordion>
-        </section>
+        </Element>
     );
 }

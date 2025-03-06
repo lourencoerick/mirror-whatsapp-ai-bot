@@ -1,5 +1,7 @@
-import { BetaSignupButton } from "@/components/ui/experiment-button";
+"use client";
 
+import { Element } from "react-scroll";
+import { BetaSignupButton } from "@/components/ui/experiment-button";
 import { AnimatedListDemo } from "@/components/ui/home/messages-poping-up";
 import { Safari } from "@/components/magicui/safari";
 
@@ -32,7 +34,7 @@ const content = {
 
 export default function BenefitsSection() {
     return (
-        <section className="min-h-screen bg-secondary text-secondary-foreground flex flex-col items-center px-6">
+        <Element name="beneficios" className="min-h-screen bg-secondary text-secondary-foreground flex flex-col items-center px-6">
             <h1 className="text-3xl md:text-4xl text-center mt-8 mb-10 md:mb-20">Você pode continuar sobrecarregado... ou deixar a I.A. vender para você</h1>
             <div className="flex flex-col gap-20 md:gap-30">
                 <div id="first-argument">
@@ -102,6 +104,6 @@ export default function BenefitsSection() {
                     </div>
                 </div>
             </div>
-        </section>
+        </Element>
     );
 }

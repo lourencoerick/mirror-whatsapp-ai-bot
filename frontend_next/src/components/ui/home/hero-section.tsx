@@ -1,5 +1,6 @@
 "use client";
 
+import { Element } from "react-scroll";
 import { Button } from "@/components/ui/button";
 import { TypingAnimation } from "@/components/magicui/typing-animation";
 import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
@@ -8,7 +9,7 @@ import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-b
 export default function HeroSection() {
 
   return (
-    <section className="pt-20 pb-10 bg-background text-foreground">
+    <Element name="hero" className="pt-20 pb-10 bg-background text-foreground">
       <div className="container mx-auto px-4 flex flex-col md:flex-row items-center">
         <div className="w-full md:w-7/10 text-center md:text-left">
           <TypingAnimation
@@ -39,6 +40,6 @@ export default function HeroSection() {
           </div>
         </div>
       </div>
-    </section>
+    </Element>
   );
 }
