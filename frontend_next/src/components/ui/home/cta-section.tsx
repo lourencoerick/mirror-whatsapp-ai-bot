@@ -1,5 +1,4 @@
 import { BetaSignupButton } from "@/components/ui/experiment-button";
-import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
 
 export default function CTASection() {
     return (
