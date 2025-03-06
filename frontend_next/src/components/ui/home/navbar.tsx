@@ -55,7 +55,6 @@ export default function Navbar() {
                 </InteractiveHoverButton>
               </Link>
 
-              {/* <div className="mt-8 flex justify-center md:justify-start"> */}
                 <Button
                   variant="outline"
                   size="sm"
@@ -67,7 +66,6 @@ export default function Navbar() {
                     <SunIcon  />
                   )}
                 </Button>
-              {/* </div> */}
             </div>
           </div>
 
