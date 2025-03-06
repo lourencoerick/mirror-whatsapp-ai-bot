@@ -15,7 +15,7 @@ export default function Navbar() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="bg-background shadow-sm md:mt-2">
+    <header className="sticky top-0 z-50 backdrop-blur bg-background shadow-sm md:mt-2">
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main navigation container */}
         <div className="flex justify-between h-16 items-center">
@@ -44,11 +44,11 @@ export default function Navbar() {
 
             {/* Buttons */}
             <div className="flex space-x-2 ml-8 items-center">
-              <Link href="/login">
+              {/* <Link href="/login">
                 <Button variant="outline" size="lg">
                   Login
                 </Button>
-              </Link>
+              </Link> */}
               <BetaSignupButton />
 
               <Button
@@ -86,11 +86,11 @@ export default function Navbar() {
           {/* Mobile buttons */}
           <div className="pt-4 pb-3 border-t border-muted">
             <div className="px-4 space-y-2">
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block">
+              {/* <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block">
                 <Button variant="outline" size="sm" className="w-full">
                   Login
                 </Button>
-              </Link>
+              </Link> */}
               <BetaSignupButton onClick={() => setMobileMenuOpen(false)} className="block w-full"  />
             </div>
           </div>
