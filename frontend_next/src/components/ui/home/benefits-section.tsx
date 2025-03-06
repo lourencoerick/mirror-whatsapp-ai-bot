@@ -1,4 +1,5 @@
-import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
+import { BetaSignupButton } from "@/components/ui/experiment-button";
+
 import { AnimatedListDemo } from "@/components/ui/home/messages-poping-up";
 import { Safari } from "@/components/magicui/safari";
 
@@ -41,14 +42,14 @@ export default function BenefitsSection() {
                                 <h2 className="max-w-lg text-2xl md:text-4xl text-start leading-relaxed">{content.firstArgument.title}</h2>
                                 <p className="max-w-lg text-md md:text-lg mt-2">{content.firstArgument.description}</p>
                             </div>
-                            <InteractiveHoverButton className="hidden md:block max-w-lg text-md">{content.firstArgument.buttonText}</InteractiveHoverButton>
+                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.firstArgument.buttonText}</BetaSignupButton>
                         </div>
                         <div className="max-w-lg flex flex-col justify-center items-center">
                             <video className="rounded-xl" preload="none" autoPlay muted loop>
                                 <source src={content.firstArgument.videoSrc} type="video/mp4" />
                                 {content.firstArgument.videoAlt}
                             </video>
-                            <InteractiveHoverButton className="block md:hidden w-full md:max-w-sm text-lg mt-10">{content.firstArgument.buttonText}</InteractiveHoverButton>
+                            <BetaSignupButton className="block md:hidden w-full md:max-w-sm text-lg mt-10">{content.firstArgument.buttonText}</BetaSignupButton>
                         </div>
                     </div>
                 </div>
@@ -67,9 +68,16 @@ export default function BenefitsSection() {
                                 <h2 className="max-w-lg text-2xl md:text-4xl text-start leading-relaxed">{content.secondArgument.title}</h2>
                                 <p className="max-w-lg text-md md:text-lg mt-2" dangerouslySetInnerHTML={{ __html: content.secondArgument.description }}></p>
                             </div>
-                            <InteractiveHoverButton className="hidden md:block max-w-lg text-md">{content.secondArgument.buttonText}</InteractiveHoverButton>
+                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.secondArgument.buttonText}</BetaSignupButton>
+                            
                         </div>
-                        <InteractiveHoverButton className="order-3 block md:hidden max-w-lg text-md">{content.secondArgument.buttonText}</InteractiveHoverButton>
+                        <div className="order-3"> 
+                            <BetaSignupButton className="block md:hidden max-w-lg text-lg mx-auto">{content.secondArgument.buttonText}</BetaSignupButton>
+                        </div>
+
+
+                        
+                        
                     </div>
                 </div>
 
@@ -85,10 +93,12 @@ export default function BenefitsSection() {
                                     ))}
                                 </ul>
                             </div>
-                            <InteractiveHoverButton className="hidden md:block max-w-lg text-md">{content.thirdArgument.buttonText}</InteractiveHoverButton>
+                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.thirdArgument.buttonText}</BetaSignupButton>
                         </div>
                         <AnimatedListDemo />
-                        <InteractiveHoverButton className="order-3 block md:hidden max-w-lg text-md mb-10">{content.thirdArgument.buttonText}</InteractiveHoverButton>
+                        
+                        <BetaSignupButton className="block md:hidden max-w-lg text-lg mx-auto mb-10 md:mb-0">{content.secondArgument.buttonText}</BetaSignupButton>
+
                     </div>
                 </div>
             </div>

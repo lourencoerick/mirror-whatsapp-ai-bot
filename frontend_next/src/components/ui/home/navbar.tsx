@@ -4,11 +4,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
 import { NavBarMenu, MobileNavBarMenu } from "@/components/ui/home/navbar-menu"
 import { Menu, X, MoonIcon, SunIcon } from 'lucide-react';
 import { inter } from '@/components/ui/fonts';
 import { useTheme } from 'next-themes';
+import { BetaSignupButton } from "@/components/ui/experiment-button";
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -49,23 +49,19 @@ export default function Navbar() {
                   Login
                 </Button>
               </Link>
-              <Link href="/experimente">
-                <InteractiveHoverButton>
-                  Começar Agora
-                </InteractiveHoverButton>
-              </Link>
+              <BetaSignupButton />
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                >
-                  {theme === "light" ? (
-                    <MoonIcon />
-                  ) : (
-                    <SunIcon  />
-                  )}
-                </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              >
+                {theme === "light" ? (
+                  <MoonIcon />
+                ) : (
+                  <SunIcon />
+                )}
+              </Button>
             </div>
           </div>
 
@@ -95,11 +91,7 @@ export default function Navbar() {
                   Login
                 </Button>
               </Link>
-              <Link href="/experimente" onClick={() => setMobileMenuOpen(false)} className="block">
-                <InteractiveHoverButton size="sm" className="w-full">
-                  Experimente Agora
-                </InteractiveHoverButton>
-              </Link>
+              <BetaSignupButton onClick={() => setMobileMenuOpen(false)} className="block w-full"  />
             </div>
           </div>
 
