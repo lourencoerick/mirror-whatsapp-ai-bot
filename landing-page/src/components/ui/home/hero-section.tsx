@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { TypingAnimation } from "@/components/magicui/typing-animation";
 import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
 import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
+import { Link as ScrollLink } from "react-scroll";
+import { BetaSignupButton } from "@/components/ui/experiment-button";
+
 
 export default function HeroSection() {
 
@@ -27,16 +30,28 @@ export default function HeroSection() {
             <span className="font-bold">você foca no crescimento.</span>
           </p>
           <div className="flex flex-col md:flex-row justify-center md:justify-start gap-4">
-            <InteractiveHoverButton>Começar Agora</InteractiveHoverButton>
-            <Button variant="outline" size="lg">
-              Saber Mais
-            </Button>
+            <BetaSignupButton>Começar Agora</BetaSignupButton>
+
+            <ScrollLink
+              activeClass="active"
+              to="beneficios"
+              spy={true}
+              smooth={true}
+              offset={-50} // ajuste se tiver header fixo
+              duration={500}
+              className="cursor-pointer"
+
+            >
+              <Button variant="outline" size="lg">
+                Saber Mais
+              </Button>
+            </ScrollLink>
           </div>
         </div>
 
         <div className="w-full md:w-3/10 mt-8 md:mt-0 flex justify-center relative hidden md:block">
           <div className="relative z-10 w-full aspect-[12/16] lambda-shape">
-              <InteractiveGridPattern />
+            <InteractiveGridPattern />
           </div>
         </div>
       </div>
