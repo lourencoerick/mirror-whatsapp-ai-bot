@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { Link as ScrollLink } from "react-scroll";
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -12,9 +13,9 @@ import {
 
 
 const sections = [
-  { label: "Por que contratar Vendedor I.A.?", href: "/docs" },
-  { label: "Como funciona", href: "/docs" },
-  { label: "FAQ", href: "/docs" },
+  { label: "Por que contratar Vendedor I.A.?", href: "beneficios" },
+  { label: "Como funciona", href: "como-funciona" },
+  { label: "FAQ", href: "faq" },
 ]
 
 export function NavBarMenu() {
@@ -23,15 +24,24 @@ export function NavBarMenu() {
       <NavigationMenuList>
         {sections.map((section) => (
           <NavigationMenuItem key={section.label}>
-            <Link href={section.href} legacyBehavior passHref>
+            <ScrollLink
+              activeClass="active"
+              to={section.href}
+              spy={true}
+              smooth={true}
+              offset={-10} // ajuste se tiver header fixo
+              duration={500}
+              className="cursor-pointer"
+
+            >
               <NavigationMenuLink className={navigationMenuTriggerStyle()}>
                 {section.label}
               </NavigationMenuLink>
-            </Link>
+            </ScrollLink>
           </NavigationMenuItem>
         ))}
       </NavigationMenuList>
-    </NavigationMenu>
+    </NavigationMenu >
   )
 }
 
@@ -43,14 +53,18 @@ export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
   return (
     <div className="flex flex-col">
       {sections.map((section) => (
-        <Link
+        <ScrollLink
           key={section.label}
-          href={section.href}
-          className="block px-4 py-2 text-base font-medium text-foreground hover:bg-muted text-center"
-          onClick={onClose}
-        >
+          activeClass="active"
+          to={section.href}
+          spy={true}
+          smooth={true}
+          offset={-200} // ajuste se tiver header fixo
+          duration={500}
+          className="block px-4 py-2 text-base font-medium text-foreground hover:bg-muted text-center cursor-pointer"
+          onClick={onClose}>
           {section.label}
-        </Link>
+        </ScrollLink>
       ))}
     </div>
   )
