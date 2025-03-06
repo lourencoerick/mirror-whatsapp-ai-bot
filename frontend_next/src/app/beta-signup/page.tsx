@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { TypingAnimation } from "@/components/magicui/typing-animation";
 import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
-import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
 import { inter } from '@/components/ui/fonts';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { MoonIcon, SunIcon, ArrowLeft } from 'lucide-react';
@@ -94,7 +93,7 @@ const BetaSignupForm = () => {
   
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-md">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-md mx-auto md:mx-0">
         <FormField
           control={form.control}
           name="name"
