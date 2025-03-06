@@ -2,8 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
 
-interface BetaSignupButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {}
+export type BetaSignupButtonProps = React.ComponentProps<typeof InteractiveHoverButton>;
 
 export const BetaSignupButton = React.forwardRef<
   HTMLButtonElement,
