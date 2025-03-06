@@ -29,7 +29,7 @@ const steps = [
         icon: <Handshake className="inline align-middle text-muted-foreground" size={25} />,
         description: (
             <>
-                
+
                 <span className="font-bold">Compartilhe a essência do seu negócio</span>, descrevendo sua marca, missão e valores.{' '}
                 <br /><br />Adicione também seu <span className="font-bold">catálogo de produtos e serviços</span> para um onboarding completo.
             </>
@@ -40,7 +40,7 @@ const steps = [
         step: 3,
         title: 'Dê o sinal verde – seu vendedor I.A está pronto',
         titleSize: "text-lg",
-        icon: <WhatsAppIcon className="inline align-middle text-muted-foreground" size={30} />,
+        icon: <WhatsAppIcon className="inline align-middle text-muted-foreground w-8 h-8" />,
         description: (
             <>
                 Seu novo funcionário I.A está pronto para assumir a <span className="font-bold">operação de vendas 24/7</span>.{' '}
@@ -48,7 +48,7 @@ const steps = [
             </>
         ),
         descriptionMargin: "mt-6"
-    },    
+    },
     {
         step: 4,
         title: 'Monitore. Otimize. Venda Mais.',
@@ -58,13 +58,13 @@ const steps = [
             <>
                 No painel de controle, você pode <span className="font-bold">acompanhar conversões e vendas via WhatsApp</span>,{' '}
                 bem como <span className="font-bold">analisar as conversas</span> entre os leads e seu vendedor I.A.
-       
+
             </>
         ),
         descriptionMargin: "mt-6"
-    },   
+    },
 
-    
+
 ];
 
 export default function HowDoesItWorkSection() {
@@ -73,11 +73,11 @@ export default function HowDoesItWorkSection() {
             <h1 className="text-3xl md:text-4xl text-center mt-12">Como Funciona</h1>
             <h2 className="text-lg md:text-xl text-center mt-2 mb-5 px-4">Transforme o <span className='font-bold'>WhatsApp no seu melhor canal de vendas</span> em apenas 4 passos, veja como é simples:</h2>
             <div className="flex flex-col items-center md:flex-row gap-8 p-8">
-                {steps.map(({ step, title, titleSize, icon, description, descriptionMargin}, index) => (
-                    <StepCard key={index} step={step} title={title} titleSize={titleSize} icon={icon} description={description} descriptionMargin={descriptionMargin}/>
+                {steps.map(({ step, title, titleSize, icon, description, descriptionMargin }, index) => (
+                    <StepCard key={index} step={step} title={title} titleSize={titleSize} icon={icon} description={description} descriptionMargin={descriptionMargin} />
                 ))}
             </div>
         </Element>
-        
+
     );
 }

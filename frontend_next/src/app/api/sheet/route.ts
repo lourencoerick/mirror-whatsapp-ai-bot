@@ -5,18 +5,24 @@ export async function POST(request: Request) {
   try {
     const reqBody = await request.json();
 
+    const spreadsheetId = process.env.SPREADSHEET_ID;
+    const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY;
+
+    if (!spreadsheetId || !serviceAccountEmail || !privateKey) {
+      throw new Error("Define the necessary env vars: SPREADSHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY");
+    }
+
     const serviceAccountAuth = new JWT({
-      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY,
+      email: serviceAccountEmail,
+      key: privateKey,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
-    const doc = new GoogleSpreadsheet(process.env.SPREADSHEET_ID, serviceAccountAuth);
+    const doc = new GoogleSpreadsheet(spreadsheetId, serviceAccountAuth);
     await doc.loadInfo();
 
     const sheet = doc.sheetsByIndex[0];
-
-    // Define a header row explicitamente sem checar se já foi carregada
     await sheet.setHeaderRow(["name", "email", "timestamp"]);
 
     const { name, email } = reqBody;
@@ -31,11 +37,14 @@ export async function POST(request: Request) {
       JSON.stringify({ result: 'success' }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
-  } catch (error: any) {
-    console.error('Erro ao enviar dados para o Google Sheets:', error);
+  } catch (error: Error | unknown) {
+    console.error('Error to try sending the data to the google sheets:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
     return new Response(
-      JSON.stringify({ result: 'error', error: error.message }),
+      JSON.stringify({ result: 'error', error: errorMessage }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }
+
