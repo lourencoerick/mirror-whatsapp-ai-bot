@@ -32,7 +32,7 @@ const content = {
 export default function BenefitsSection() {
     return (
         <section className="min-h-screen bg-secondary text-secondary-foreground flex flex-col items-center px-6">
-            <h1 className="text-2xl md:text-4xl text-center mt-8 mb-10 md:mb-20">Você pode continuar sobrecarregado... ou deixar a I.A. vender para você</h1>
+            <h1 className="text-3xl md:text-4xl text-center mt-8 mb-10 md:mb-20">Você pode continuar sobrecarregado... ou deixar a I.A. vender para você</h1>
             <div className="flex flex-col gap-30">
                 <div id="first-argument">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10 justify-center">
