@@ -1,3 +1,5 @@
+frontend_vercel/
+shadcn-nextjs-boilerplate/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
