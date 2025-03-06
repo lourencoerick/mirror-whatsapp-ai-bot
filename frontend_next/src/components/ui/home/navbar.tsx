@@ -15,8 +15,8 @@ export default function Navbar() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <header className="bg-background shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="bg-background shadow-sm md:mt-2">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main navigation container */}
         <div className="flex justify-between h-16 items-center">
           {/* Logo, vertical separator, and company name */}
@@ -80,11 +80,11 @@ export default function Navbar() {
             </Button>
           </div>
         </div>
-      </div>
+      </nav>
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-background border-t border-muted">
+        <nav className="md:hidden bg-background border-t border-muted">
           <div className="pt-2 pb-3 space-y-1 ">
             <MobileNavBarMenu onClose={() => setMobileMenuOpen(false)} />
           </div>
@@ -105,7 +105,7 @@ export default function Navbar() {
             </div>
           </div>
 
-        </div>
+        </nav>
       )}
     </header>
   );
