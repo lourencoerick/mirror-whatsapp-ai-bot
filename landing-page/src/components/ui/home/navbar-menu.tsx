@@ -28,7 +28,7 @@ export function NavBarMenu() {
               to={section.href}
               spy={true}
               smooth={true}
-              offset={-10} // ajuste se tiver header fixo
+              offset={-50} // ajuste se tiver header fixo
               duration={500}
               className="cursor-pointer"
 
@@ -58,7 +58,7 @@ export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
           to={section.href}
           spy={true}
           smooth={true}
-          offset={-200} // ajuste se tiver header fixo
+          offset={-250} // ajuste se tiver header fixo
           duration={500}
           className="block px-4 py-2 text-base font-medium text-foreground hover:bg-muted text-center cursor-pointer"
           onClick={onClose}>
