@@ -4,7 +4,6 @@ import { Element } from "react-scroll";
 import { Button } from "@/components/ui/button";
 import { TypingAnimation } from "@/components/magicui/typing-animation";
 import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
-import { InteractiveHoverButton } from "@/components/magicui/interactive-hover-button";
 import { Link as ScrollLink } from "react-scroll";
 import { BetaSignupButton } from "@/components/ui/experiment-button";
 
