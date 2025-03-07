@@ -26,7 +26,7 @@ export default function HeroSection() {
             <span className="font-bold">
               Seu negócio vendendo mais, sem contratar mais.
             </span><br />
-            Nossos <span className="font-bold">vendedores I.A.</span> automatizam suas conversas no <span className="whitespace-nowrap"><WhatsAppIcon /> WhatsApp</span> para que você{" "}
+            Nossos <span className="font-bold">vendedores I.A.</span> automatizam suas conversas no <span className="whitespace-nowrap">WhatsApp <WhatsAppIcon /></span> para que você{" "}
             <span className="font-bold">aumente suas conversões e foque no crescimento de seu negócio.</span>
           </p>
           <div className="flex flex-col md:flex-row justify-center md:justify-start gap-4">
