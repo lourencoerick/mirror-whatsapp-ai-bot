@@ -6,6 +6,7 @@ import { TypingAnimation } from "@/components/magicui/typing-animation";
 import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
 import { Link as ScrollLink } from "react-scroll";
 import { BetaSignupButton } from "@/components/ui/experiment-button";
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 
 
 export default function HeroSection() {
@@ -25,8 +26,8 @@ export default function HeroSection() {
             <span className="font-bold">
               Seu negócio vendendo mais, sem contratar mais.
             </span><br />
-            Nossos <span className="font-bold">vendedores I.A.</span> cuidam das conversas enquanto{" "}
-            <span className="font-bold">você foca no crescimento.</span>
+            Nossos <span className="font-bold">vendedores I.A.</span> automatizam suas conversas no <span className="whitespace-nowrap"><WhatsAppIcon /> WhatsApp</span> para que você{" "}
+            <span className="font-bold">aumente suas conversões e foque no crescimento de seu negócio.</span>
           </p>
           <div className="flex flex-col md:flex-row justify-center md:justify-start gap-4">
             <BetaSignupButton>Começar Agora</BetaSignupButton>
