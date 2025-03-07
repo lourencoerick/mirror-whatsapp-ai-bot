@@ -3,7 +3,8 @@
 import { Element } from "react-scroll";
 import { BetaSignupButton } from "@/components/ui/experiment-button";
 import { AnimatedListDemo } from "@/components/ui/home/messages-poping-up";
-import { Safari } from "@/components/magicui/safari";
+// import { Safari } from "@/components/magicui/safari";
+import Image from "next/image";
 
 const content = {
     firstArgument: {
@@ -62,11 +63,20 @@ export default function BenefitsSection() {
                 <div id="second-argument" className="">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10 justify-center">
                         <div className="order-2 md:order-1 relative">
-                            <Safari
+                            {/* <Safari
                                 url={content.secondArgument.imageAlt}
                                 className="w-full md:max-w-lg h-fit object-cover mx-auto"
                                 imageSrc={content.secondArgument.imageSrc}
-                            />
+                            /> */}
+
+                            <Image
+                                alt="ahhaa"
+                                className="w-full md:max-w-lg h-fit object-cover mx-auto"
+                                src="/dashboard.png"
+                                width={1000} 
+                                height={500}
+                            />                            
+                            
                         </div>
                         <div className="order-1 md:order-2">
                             <div className="flex flex-col mb-5">
