@@ -74,7 +74,7 @@ export default function HowDoesItWorkSection() {
             <h2 className="text-lg md:text-xl text-center mt-2 mb-5 px-4">Transforme o <span className='font-bold'>WhatsApp no seu melhor canal de vendas</span> em apenas 4 passos, veja como é simples:</h2>
             {/* <div className="flex flex-col items-center sm:grid-cols-2 md:flex-row gap-8 p-8"> */}
             <div className="mx-auto">
-            <div className="flex flex-col items-center justify-center place-items-center sm:grid sm:grid-cols-2 lg:flex lg:flex-row gap-8 p-8">
+            <div className="flex flex-col items-center justify-center place-items-center sm:grid sm:grid-cols-2 xl:flex xl:flex-row gap-8 p-8">
                 {steps.map(({ step, title, titleSize, icon, description, descriptionMargin }, index) => (
                     <StepCard key={index} step={step} title={title} titleSize={titleSize} icon={icon} description={description} descriptionMargin={descriptionMargin} />
                 ))}
