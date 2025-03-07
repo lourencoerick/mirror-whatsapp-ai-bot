@@ -50,7 +50,7 @@ export default function HeroSection() {
 
         <div className="w-full md:w-3/10 mt-8 md:mt-0 flex justify-center relative hidden md:block">
           <div className="relative z-10 w-full aspect-[12/16] lambda-shape">
-            <InteractiveGridPattern />
+            <InteractiveGridPattern height={25} width={25} />
           </div>
         </div>
       </div>
