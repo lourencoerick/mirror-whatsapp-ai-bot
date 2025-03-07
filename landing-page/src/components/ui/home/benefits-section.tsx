@@ -102,7 +102,7 @@ export default function BenefitsSection() {
                         </div>
                         <AnimatedListDemo />
                         
-                        <BetaSignupButton className="block md:hidden max-w-lg text-md mx-auto mb-10 md:mb-0">{content.secondArgument.mobileButtonText}</BetaSignupButton>
+                        <BetaSignupButton className="block md:hidden max-w-lg text-md mx-auto mb-10 md:mb-0">{content.thirdArgument.mobileButtonText}</BetaSignupButton>
 
                     </div>
                 </div>

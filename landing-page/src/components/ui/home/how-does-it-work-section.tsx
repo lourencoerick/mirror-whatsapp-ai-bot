@@ -11,7 +11,7 @@ const steps = [
     {
         step: 1,
         title: 'Crie sua conta',
-        titleSize: "text-2xl",
+        titleSize: "text-xl md:text-2xl",
         icon: <LogIn className="inline align-middle text-muted-foreground" size={25} />,
         description: (
             <>
@@ -25,7 +25,7 @@ const steps = [
     {
         step: 2,
         title: 'Apresente sua marca ao seu novo vendedor I.A.',
-        titleSize: "text-lg",
+        titleSize: "text-md md:text-lg",
         icon: <Handshake className="inline align-middle text-muted-foreground" size={25} />,
         description: (
             <>
@@ -39,7 +39,7 @@ const steps = [
     {
         step: 3,
         title: 'Dê o sinal verde – seu vendedor I.A está pronto',
-        titleSize: "text-lg",
+        titleSize: "text-md md:text-lg",
         icon: <WhatsAppIcon className="inline align-middle text-muted-foreground w-8 h-8" />,
         description: (
             <>
@@ -52,7 +52,7 @@ const steps = [
     {
         step: 4,
         title: 'Monitore. Otimize. Venda Mais.',
-        titleSize: "text-lg",
+        titleSize: "text-md md:text-lg",
         icon: <Gauge className="inline align-middle text-muted-foreground" size={25} />,
         description: (
             <>
