@@ -30,7 +30,7 @@ export interface AnimatedListProps extends ComponentPropsWithoutRef<"div"> {
 }
 
 export const AnimatedList = React.memo(
-  ({ children, className, delay = 1000, ...props }: AnimatedListProps) => {
+  ({ children, className, delay = 2750, ...props }: AnimatedListProps) => {
     const [index, setIndex] = useState(0);
     const childrenArray = useMemo(
       () => React.Children.toArray(children),
