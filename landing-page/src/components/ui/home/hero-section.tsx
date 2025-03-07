@@ -15,13 +15,13 @@ export default function HeroSection() {
       <div className="container mx-auto px-4 flex flex-col md:flex-row items-center">
         <div className="w-full md:w-7/10 text-center md:text-left">
           <TypingAnimation
-            className="text-4xl md:text-7xl font-normal mb-4 typing-container"
+            className="text-4xl lg:text-7xl font-normal mb-4 typing-container"
             as="h1"
             style={{ whiteSpace: "pre-line" }}
           >
             {`I.A. que vende.\nDados que decidem.\nResultados que escalam`}
           </TypingAnimation>
-          <p className="text-xl md:text-3xl mb-8">
+          <p className="text-xl lg:text-3xl mb-8">
             <span className="font-bold">
               Seu negócio vendendo mais, sem contratar mais.
             </span><br />

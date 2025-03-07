@@ -36,7 +36,7 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop navigation */}
-          <div className="hidden md:flex items-center flex-grow">
+          <div className="hidden lg:flex items-center flex-grow">
             {/* Navigation sections */}
             <div className="flex space-x-6 flex-grow ml-4">
               <NavBarMenu />
@@ -67,36 +67,53 @@ export default function Navbar() {
 
 
 
+
           {/* Mobile menu button */}
-          <div className="flex md:hidden">
-            <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-              {mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}
+          <div className="flex lg:hidden items-center gap-x-4">
+            <BetaSignupButton className='hidden sm:block'/>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            >
+              {theme === "light" ? (
+                <MoonIcon />
+              ) : (
+                <SunIcon />
+              )}
             </Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}
+          </Button>
+
         </div>
-      </nav>
+      </div>
+    </nav>
 
-      {/* Mobile menu */}
-      {mobileMenuOpen && (
-        <nav className="md:hidden bg-background border-t border-muted">
-          <div className="pt-2 pb-3 space-y-1 ">
-            <MobileNavBarMenu onClose={() => setMobileMenuOpen(false)} />
-          </div>
+      {/* Mobile menu */ }
+  {
+    mobileMenuOpen && (
+      <nav className="lg:hidden bg-background border-t border-muted">
+        <div className="pt-2 pb-3 space-y-1 ">
+          <MobileNavBarMenu onClose={() => setMobileMenuOpen(false)} />
+        </div>
 
-          {/* Mobile buttons */}
-          <div className="pt-4 pb-3 border-t border-muted">
-            <div className="px-4 space-y-2">
-              {/* <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block">
+        {/* Mobile buttons */}
+        <div className="pt-4 pb-3 border-t border-muted">
+          <div className="px-4 space-y-2">
+            {/* <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="block">
                 <Button variant="outline" size="sm" className="w-full">
                   Login
                 </Button>
               </Link> */}
-              <BetaSignupButton onClick={() => setMobileMenuOpen(false)} className="block w-full"  />
-            </div>
+            <BetaSignupButton onClick={() => setMobileMenuOpen(false)} className="block w-full block sm:hidden" />
           </div>
+        </div>
 
-        </nav>
-      )}
-    </header>
+      </nav>
+    )
+  }
+    </header >
   );
 }
