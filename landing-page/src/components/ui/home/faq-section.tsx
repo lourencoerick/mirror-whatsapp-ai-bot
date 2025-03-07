@@ -49,9 +49,9 @@ const faqItems = [
 
 export default function FaqSection() {
     return (
-        <Element name="faq" className="bg-secondary text-secondary-foreground  items-center justify-center px-10 md:px-60 py-10">
+        <Element name="faq" className="bg-secondary text-secondary-foreground  items-center justify-center px-10 py-10 ">
             <h1 className="text-3xl md:text-4xl mb-6 text-center">Perguntas Frequentes</h1>
-            <Accordion type="single" collapsible className="space-y-4">
+            <Accordion type="single" collapsible className="space-y-4 max-w-4xl mx-auto">
                 {faqItems.map(item => (
                     <AccordionItem key={item.value} value={item.value}>
                         <AccordionTrigger className="text-lg md:text-xl">

@@ -47,7 +47,7 @@ export default function BenefitsSection() {
                                 <h2 className="max-w-lg text-2xl md:text-4xl text-start leading-relaxed">{content.firstArgument.title}</h2>
                                 <p className="max-w-lg text-md md:text-lg mt-2">{content.firstArgument.description}</p>
                             </div>
-                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.firstArgument.buttonText}</BetaSignupButton>
+                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.firstArgument.mobileButtonText}</BetaSignupButton>
                         </div>
                         <div className="max-w-lg flex flex-col justify-center items-center">
                             <video className="rounded-xl" preload="none" autoPlay muted loop controls={false} >
@@ -60,8 +60,8 @@ export default function BenefitsSection() {
                 </div>
 
                 <div id="second-argument" className="">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 justify-center">
-                        <div className="order-2 md:order-1 relative">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10  items-center justify-center">
+                        <div className="order-2 md:order-1  border-2">
                             <Image
                                 alt={content.secondArgument.imageAlt}
                                 className="w-full md:max-w-lg h-fit object-cover mx-auto"
@@ -75,7 +75,7 @@ export default function BenefitsSection() {
                                 <h2 className="max-w-lg text-2xl md:text-4xl text-start leading-relaxed">{content.secondArgument.title}</h2>
                                 <p className="max-w-lg text-md md:text-lg mt-2" dangerouslySetInnerHTML={{ __html: content.secondArgument.description }}></p>
                             </div>
-                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.secondArgument.buttonText}</BetaSignupButton>
+                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.secondArgument.mobileButtonText}</BetaSignupButton>
                             
                         </div>
                         <div className="order-3"> 
