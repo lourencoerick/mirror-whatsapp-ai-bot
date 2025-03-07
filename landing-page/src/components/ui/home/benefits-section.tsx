@@ -37,15 +37,15 @@ const content = {
 
 export default function BenefitsSection() {
     return (
-        <Element name="beneficios" className="min-h-screen bg-secondary text-secondary-foreground flex flex-col items-center px-6">
-            <h1 className="text-3xl md:text-4xl text-center mt-8 mb-10 md:mb-20">Você pode continuar sobrecarregado... ou deixar a I.A. vender para você</h1>
-            <div className="flex flex-col gap-20 md:gap-30">
+        <Element name="beneficios" className="min-h-screen bg-secondary text-secondary-foreground flex flex-col items-center justify-center px-6">
+            <h1 className="text-3xl lg:text-4xl text-center mt-8 mb-10 md:mb-20">Você pode continuar sobrecarregado... ou deixar a I.A. vender para você</h1>
+            <div className="flex flex-col gap-20 md:gap-30 items-center">
                 <div id="first-argument">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 justify-center">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 justify-center ">
                         <div>
                             <div className="flex flex-col md:mt-5 mb-5">
-                                <h2 className="max-w-lg text-2xl md:text-4xl text-start leading-relaxed">{content.firstArgument.title}</h2>
-                                <p className="max-w-lg text-md md:text-lg mt-2">{content.firstArgument.description}</p>
+                                <h2 className="max-w-lg text-2xl lg:text-4xl text-start leading-relaxed">{content.firstArgument.title}</h2>
+                                <p className="max-w-lg text-md lg:text-lg mt-2">{content.firstArgument.description}</p>
                             </div>
                             <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.firstArgument.mobileButtonText}</BetaSignupButton>
                         </div>
@@ -71,9 +71,9 @@ export default function BenefitsSection() {
                             />                            
                         </div>
                         <div className="order-1 md:order-2">
-                            <div className="flex flex-col mb-5">
-                                <h2 className="max-w-lg text-2xl md:text-4xl text-start leading-relaxed">{content.secondArgument.title}</h2>
-                                <p className="max-w-lg text-md md:text-lg mt-2" dangerouslySetInnerHTML={{ __html: content.secondArgument.description }}></p>
+                            <div className="flex flex-col mb-5 items-center">
+                                <h2 className="max-w-lg text-2xl lg:text-4xl text-start leading-relaxed">{content.secondArgument.title}</h2>
+                                <p className="max-w-lg text-md lg:text-lg mt-2" dangerouslySetInnerHTML={{ __html: content.secondArgument.description }}></p>
                             </div>
                             <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.secondArgument.mobileButtonText}</BetaSignupButton>
                             
@@ -92,8 +92,8 @@ export default function BenefitsSection() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10 justify-center">
                         <div>
                             <div className="flex flex-col md:mt-5 mb-5">
-                                <h2 className="max-w-lg text-2xl md:text-4xl text-start leading-relaxed">{content.thirdArgument.title}</h2>
-                                <p className="max-w-lg text-md md:text-lg mt-2" dangerouslySetInnerHTML={{ __html: content.thirdArgument.description }}></p>
+                                <h2 className="max-w-lg text-2xl lg:text-4xl text-start leading-relaxed">{content.thirdArgument.title}</h2>
+                                <p className="max-w-lg text-md lg:text-lg mt-2" dangerouslySetInnerHTML={{ __html: content.thirdArgument.description }}></p>
                                 <ul className="list-disc pl-5 space-y-2">
                                     {content.thirdArgument.listItems.map((item, index) => (
                                         <li key={index}>{item}</li>
