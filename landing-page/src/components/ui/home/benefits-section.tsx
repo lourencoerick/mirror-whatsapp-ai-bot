@@ -10,6 +10,7 @@ const content = {
         title: "Lambda Labs desenvolveu vendedores I.A. que não apenas respondem, mas persuadem.",
         description: "Fazendo uso de qualificação automática de leads, contorno de objeções e fechamento inteligente – enquanto você foca no crescimento.",
         buttonText: "Quero os melhores vendedores em minha operação",
+        mobileButtonText: "Quero os melhores vendedores",
         videoSrc: "/jess.mp4",
         videoAlt: "Your browser does not support the video tag.",
     },
@@ -17,6 +18,7 @@ const content = {
         title: "Na dúvida, confie nos números – e venda com mais segurança.",
         description: `Na Lambda Labs, você tem à disposição um <span class="font-bold">painel de métricas completo</span> e a possibilidade de rodar testes constantemente. Isso significa entender, em tempo real, <span class="font-bold">o que gera resultados e o que precisa ser ajustado</span>.`,
         buttonText: "Quero descobrir o que funciona com meus leads",
+        mobileButtonText: "Quero testar o que funciona",
         imageSrc: "/dashboard.png",
         imageAlt: "app.lambdalabs.com.br",
     },
@@ -29,6 +31,7 @@ const content = {
             "O WhatsApp não para, mas você precisa respirar.",
         ],
         buttonText: "Quero automatizar minhas vendas",
+        mobileButtonText: "Quero automatizar minhas vendas",
     },
 };
 
@@ -47,11 +50,11 @@ export default function BenefitsSection() {
                             <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.firstArgument.buttonText}</BetaSignupButton>
                         </div>
                         <div className="max-w-lg flex flex-col justify-center items-center">
-                            <video className="rounded-xl" preload="none" autoPlay muted loop>
+                            <video className="rounded-xl" preload="none" autoPlay muted loop controls={false} >
                                 <source src={content.firstArgument.videoSrc} type="video/mp4" />
                                 {content.firstArgument.videoAlt}
                             </video>
-                            <BetaSignupButton className="block md:hidden w-full md:max-w-sm text-lg mt-10">{content.firstArgument.buttonText}</BetaSignupButton>
+                            <BetaSignupButton className="block md:hidden w-full md:max-w-sm text-md mt-10">{content.firstArgument.mobileButtonText}</BetaSignupButton>
                         </div>
                     </div>
                 </div>
@@ -61,7 +64,7 @@ export default function BenefitsSection() {
                         <div className="order-2 md:order-1 relative">
                             <Safari
                                 url={content.secondArgument.imageAlt}
-                                className="max-w-md md:max-w-lg h-fit object-cover mx-auto"
+                                className="w-full md:max-w-lg h-fit object-cover mx-auto"
                                 imageSrc={content.secondArgument.imageSrc}
                             />
                         </div>
@@ -74,7 +77,7 @@ export default function BenefitsSection() {
                             
                         </div>
                         <div className="order-3"> 
-                            <BetaSignupButton className="block md:hidden max-w-lg text-lg mx-auto">{content.secondArgument.buttonText}</BetaSignupButton>
+                            <BetaSignupButton className="block md:hidden max-w-lg text-md mx-auto">{content.secondArgument.mobileButtonText}</BetaSignupButton>
                         </div>
 
 
@@ -99,7 +102,7 @@ export default function BenefitsSection() {
                         </div>
                         <AnimatedListDemo />
                         
-                        <BetaSignupButton className="block md:hidden max-w-lg text-lg mx-auto mb-10 md:mb-0">{content.secondArgument.buttonText}</BetaSignupButton>
+                        <BetaSignupButton className="block md:hidden max-w-lg text-md mx-auto mb-10 md:mb-0">{content.secondArgument.mobileButtonText}</BetaSignupButton>
 
                     </div>
                 </div>
