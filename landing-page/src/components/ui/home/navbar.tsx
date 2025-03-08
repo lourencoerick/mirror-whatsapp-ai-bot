@@ -30,7 +30,7 @@ export default function Navbar() {
             />
             {/* Vertical separator */}
             <div className="h-8 border-l border-muted mx-2" />
-            <span className={`${inter.className} text-2xl font-bold tracking-wide text-foreground`}>
+            <span className={`${inter.className} text-lg sm:text-2xl font-bold tracking-wide text-foreground`}>
               Lambda Labs
             </span>
           </Link>
