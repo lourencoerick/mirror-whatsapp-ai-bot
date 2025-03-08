@@ -70,8 +70,8 @@ const steps = [
 export default function HowDoesItWorkSection() {
     return (
         <Element name="como-funciona" className="bg-background text-background-foreground ">
-            <h1 className="text-3xl md:text-4xl text-center mt-12">Como Funciona</h1>
-            <h2 className="text-lg md:text-xl text-center mt-2 mb-5 px-4">Transforme o <span className='font-bold'>WhatsApp no seu melhor canal de vendas</span> em apenas 4 passos, veja como é simples:</h2>
+            <h2 className="text-3xl md:text-4xl text-center mt-12">Como Funciona</h2>
+            <h3 className="text-lg md:text-xl text-center mt-2 mb-5 px-4">Transforme o <span className='font-bold'>WhatsApp no seu melhor canal de vendas</span> em apenas 4 passos, veja como é simples:</h3>
             {/* <div className="flex flex-col items-center sm:grid-cols-2 md:flex-row gap-8 p-8"> */}
             <div className="mx-auto">
             <div className="flex flex-col items-center justify-center place-items-center sm:grid sm:grid-cols-2 xl:flex xl:flex-row gap-8 p-8">
