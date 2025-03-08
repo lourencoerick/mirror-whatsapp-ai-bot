@@ -141,7 +141,7 @@ const BetaSignupNavbar = () => {
             className="w-10 h-auto"
           />
           <div className="h-8 border-l border-muted mx-2" />
-          <span className={`${inter.className} text-2xl font-bold tracking-wide text-foreground`}>
+          <span className={`${inter.className} text-lg sm:text-2xl font-bold tracking-wide text-foreground`}>
             Lambda Labs
           </span>
         </Link>
@@ -149,7 +149,7 @@ const BetaSignupNavbar = () => {
         <div className="flex space-x-2 ml-8 items-center">
           <Button asChild variant={"outline"} size={"lg"}>
             <Link href="/" className="text-2xl hover:text-muted-foreground">
-              <ArrowLeft className="inline" />Voltar
+              <ArrowLeft className="inline" /><span className="hidden sm:block">Voltar</span>
             </Link>
           </Button>
 
