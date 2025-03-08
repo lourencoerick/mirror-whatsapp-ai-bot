@@ -24,7 +24,7 @@ const steps = [
     },
     {
         step: 2,
-        title: 'Apresente sua marca ao seu novo vendedor I.A.',
+        title: 'Apresente sua marca ao seu novo vendedor IA',
         titleSize: "text-md md:text-lg",
         icon: <Handshake className="inline align-middle text-muted-foreground" size={25} />,
         description: (
@@ -57,7 +57,7 @@ const steps = [
         description: (
             <>
                 No painel de controle, você pode <span className="font-bold">acompanhar conversões e vendas via WhatsApp</span>,{' '}
-                bem como <span className="font-bold">analisar as conversas</span> entre os leads e seu vendedor I.A.
+                bem como <span className="font-bold">analisar as conversas</span> entre os leads e seu vendedor IA
 
             </>
         ),

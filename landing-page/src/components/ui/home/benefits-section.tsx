@@ -7,7 +7,7 @@ import Image from "next/image";
 
 const content = {
     firstArgument: {
-        title: "Lambda Labs desenvolveu vendedores I.A. que não apenas respondem, mas persuadem.",
+        title: "Lambda Labs desenvolveu vendedores IA que não apenas respondem, mas persuadem.",
         description: "Fazendo uso de qualificação automática de leads, contorno de objeções e fechamento inteligente – enquanto você foca no crescimento.",
         buttonText: "Quero os melhores vendedores em minha operação",
         mobileButtonText: "Quero os melhores vendedores",
@@ -38,7 +38,7 @@ const content = {
 export default function BenefitsSection() {
     return (
         <Element name="beneficios" className="min-h-screen bg-secondary text-secondary-foreground flex flex-col items-center justify-center px-6">
-            <h2 className="text-3xl lg:text-4xl text-center mt-8 mb-10 md:mb-20">Você pode continuar sobrecarregado... ou deixar a I.A. vender para você</h2>
+            <h2 className="text-3xl lg:text-4xl text-center mt-8 mb-10 md:mb-20">Você pode continuar sobrecarregado... ou deixar a IA vender para você</h2>
             <div className="flex flex-col gap-20 md:gap-30 items-center">
                 <div id="first-argument">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10 justify-center ">

@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Lambda Labs",
-  description: "Lambda Labs desenvolveu vendedores I.A. que não apenas respondem, mas persuadem, para um atendimento eficaz e automático.",
+  description: "Lambda Labs desenvolveu vendedores IA que não apenas respondem, mas persuadem, para um atendimento eficaz e automático.",
 };
 
 export default function RootLayout({

@@ -20,13 +20,13 @@ export default function HeroSection() {
             as="h1"
             style={{ whiteSpace: "pre-line" }}
           >
-            {`I.A. que vende.\nDados que decidem.\nResultados que escalam`}
+            {`IA que vende.\nDados que decidem.\nResultados que escalam`}
           </TypingAnimation>
           <p className="text-lg sm:text-xl lg:text-3xl mb-8">
             <span className="font-bold">
               Seu negócio vendendo mais, sem contratar mais.
             </span><br />
-            Nossos <span className="font-bold">vendedores I.A.</span> automatizam suas conversas no <span className="whitespace-nowrap">WhatsApp <WhatsAppIcon /></span> para que você{" "}
+            Nossos <span className="font-bold">vendedores IA</span> automatizam suas conversas no <span className="whitespace-nowrap">WhatsApp <WhatsAppIcon /></span> para que você{" "}
             <span className="font-bold">aumente suas conversões e foque no crescimento de seu negócio.</span>
           </p>
           <div className="flex flex-col md:flex-row justify-center md:justify-start gap-4">
