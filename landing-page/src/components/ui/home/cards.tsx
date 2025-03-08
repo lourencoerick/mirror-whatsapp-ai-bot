@@ -17,7 +17,7 @@ export default function StepCard({ step, title, titleSize = "text-2xl", icon, de
                 <div className="w-10 h-10 border-2 rounded-full bg-card flex items-center justify-center text-card-primary font-bold text-xl flex-none">
                     {step}
                 </div>
-                <h3 className={`${titleSize} font-bold`}>{title}</h3>
+                <p className={`${titleSize} font-bold`}>{title}</p>
             </div>
             <div>
                 {icon && description && <p className={`text-base ${descriptionMargin} text-md md:text-md leading-relaxed`}>{icon} {description}</p>}
