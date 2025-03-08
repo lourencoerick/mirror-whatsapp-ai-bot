@@ -92,7 +92,7 @@ export default function BenefitsSection() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10 justify-center">
                         <div>
                             <div className="flex flex-col md:mt-5 mb-5">
-                                <h3> className="max-w-lg text-2xl lg:text-4xl text-start leading-relaxed">{content.thirdArgument.title}</h3>
+                                <h3 className="max-w-lg text-2xl lg:text-4xl text-start leading-relaxed">{content.thirdArgument.title}</h3>
                                 <p className="max-w-lg text-md lg:text-lg mt-2" dangerouslySetInnerHTML={{ __html: content.thirdArgument.description }}></p>
                                 <ul className="list-disc pl-5 space-y-2">
                                     {content.thirdArgument.listItems.map((item, index) => (
