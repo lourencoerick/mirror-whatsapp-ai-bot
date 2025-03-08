@@ -12,7 +12,7 @@ import {
 
 
 const sections = [
-  { label: "Por que contratar Vendedor I.A.?", href: "beneficios" },
+  { label: "Por que contratar Vendedor IA?", href: "beneficios" },
   { label: "Como funciona", href: "como-funciona" },
   { label: "FAQ", href: "faq" },
 ]

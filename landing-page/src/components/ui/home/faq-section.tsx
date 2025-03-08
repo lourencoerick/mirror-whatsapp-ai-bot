@@ -6,37 +6,37 @@ import { Element } from "react-scroll";
 const faqItems = [
     {
         value: "item-1",
-        question: "Preciso saber programar para usar o Vendedor I.A.?",
-        answer: "Não! Nosso Vendedor I.A. é fácil de configurar e funciona sem código. Em poucos minutos, ele já pode começar a atender seus clientes no WhatsApp."
+        question: "Preciso saber programar para usar o Vendedor IA?",
+        answer: "Não! Nosso Vendedor IA é fácil de configurar e funciona sem código. Em poucos minutos, ele já pode começar a atender seus clientes no WhatsApp."
     },
     {
         value: "item-2",
-        question: "O Vendedor I.A. realmente pode aumentar minhas vendas?",
+        question: "O Vendedor IA realmente pode aumentar minhas vendas?",
         answer: "Sim! Ele responde seus clientes imediatamente, mantém conversas engajadas e nunca deixa uma mensagem sem resposta – aumentando suas chances de conversão."
     },
     {
         value: "item-3",
-        question: "Como o Vendedor I.A. aprende sobre minha empresa?",
+        question: "Como o Vendedor IA aprende sobre minha empresa?",
         answer: "Você compartilha com ele informações sobre sua marca, valores e produtos. Assim, ele entende como representar seu negócio da melhor forma e oferecer um atendimento mais personalizado."
     },
     {
         value: "item-4",
-        question: "Posso conectar o Vendedor I.A. ao meu WhatsApp Business?",
+        question: "Posso conectar o Vendedor IA ao meu WhatsApp Business?",
         answer: "Sim! Basta fazer login com o Facebook e conectar sua conta do WhatsApp Business. O processo é rápido e seguro."
     },
     {
         value: "item-5",
-        question: "O que acontece se eu não gostar do Vendedor I.A.?",
+        question: "O que acontece se eu não gostar do Vendedor IA?",
         answer: "Sem problemas! Você pode testar gratuitamente e cancelar a qualquer momento, sem compromisso."
     },
     {
         value: "item-6",
-        question: "O Vendedor I.A. atende apenas pelo WhatsApp?",
+        question: "O Vendedor IA atende apenas pelo WhatsApp?",
         answer: "Sim, no momento ele é especializado em atendimento via WhatsApp, garantindo a melhor experiência para você e seus clientes."
     },
     {
         value: "item-7",
-        question: "Quanto tempo leva para configurar o Vendedor I.A.?",
+        question: "Quanto tempo leva para configurar o Vendedor IA?",
         answer: "Em menos de 15 minutos ele já estará pronto para atender seus clientes."
     },
     {
