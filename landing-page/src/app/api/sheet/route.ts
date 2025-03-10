@@ -1,5 +1,7 @@
 import { GoogleSpreadsheet } from 'google-spreadsheet';
 import { JWT } from 'google-auth-library';
+import { sendConfirmationEmail } from './send-confirmation-email';
+
 
 export async function POST(request: Request) {
   try {
@@ -32,6 +34,16 @@ export async function POST(request: Request) {
       email,
       timestamp: new Date().toISOString(),
     });
+
+    // Send the confirmation email
+    try {
+      await sendConfirmationEmail({
+        to: email,
+        first_name: name,
+      });
+    } catch (error) {
+      console.error('Error sending confirmation email:', error);
+    }
 
     return new Response(
       JSON.stringify({ result: 'success' }),
