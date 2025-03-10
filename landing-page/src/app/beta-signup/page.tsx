@@ -59,6 +59,22 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 const BetaSignupForm = () => {
+  function gtag_report_conversion(url?: string) {
+    const callback = function () {
+      if (url) {
+        window.location.href = url;
+      }
+    };
+
+    if (typeof (window as any).gtag !== "undefined") { // eslint-disable-line @typescript-eslint/no-explicit-any
+      (window as any).gtag("event", "conversion", {  // eslint-disable-line @typescript-eslint/no-explicit-any
+        send_to: "AW-16914772618/VzaiCJzk26gaEIrly4E_",
+        event_callback: callback,
+      });  
+    }
+    return false;
+  }
+
   // Integração do Zod com React Hook Form via zodResolver
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -120,7 +136,7 @@ const BetaSignupForm = () => {
             </FormItem>
           )}
         />
-        <Button type="submit">Inscrever-se</Button>
+        <Button type="submit" onClick={() => gtag_report_conversion()}>Inscrever-se</Button>
       </form>
     </Form>
   );
