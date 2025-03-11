@@ -5,7 +5,6 @@ import { Link as ScrollLink } from "react-scroll";
 import {
   NavigationMenu,
   NavigationMenuItem,
-  NavigationMenuLink,
   NavigationMenuList,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
@@ -30,12 +29,10 @@ export function NavBarMenu() {
               smooth={true}
               offset={-50} // ajuste se tiver header fixo
               duration={500}
-              className="cursor-pointer"
+              className={`${navigationMenuTriggerStyle()} cursor-pointer`} // "cursor-pointer"
 
             >
-              <NavigationMenuLink className={navigationMenuTriggerStyle()}>
                 {section.label}
-              </NavigationMenuLink>
             </ScrollLink>
           </NavigationMenuItem>
         ))}
