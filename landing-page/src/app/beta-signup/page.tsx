@@ -1,7 +1,6 @@
 'use client';
 import Image from "next/image";
 import Link from "next/link";
-import { useTheme } from 'next-themes';
 import { useForm, ControllerRenderProps } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,8 +11,11 @@ import { TypingAnimation } from "@/components/magicui/typing-animation";
 import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
 import { inter } from '@/components/ui/fonts';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { MoonIcon, SunIcon, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import ThemeToggleButton  from "@/components/ui/home/theme-toggle-button"
+
 
 export default function BetaSignupPage() {
   return (
@@ -59,6 +61,8 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 const BetaSignupForm = () => {
+  const router = useRouter();
+
   function gtag_report_conversion(url?: string) {
     const callback = function () {
       if (url) {
@@ -97,6 +101,7 @@ const BetaSignupForm = () => {
   
       if (result.result === "success") {
         toast.success("Cadastro realizado com sucesso!");
+        router.push('/'); // Redirect to home
       } else {
         toast.error("Ocorreu um erro ao enviar seus dados.");
       }
@@ -143,7 +148,6 @@ const BetaSignupForm = () => {
 };
 
 const BetaSignupNavbar = () => {
-  const { theme, setTheme } = useTheme();
 
   return (
     <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -169,13 +173,8 @@ const BetaSignupNavbar = () => {
             </Link>
           </Button>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-          >
-            {theme === "light" ? <MoonIcon /> : <SunIcon />}
-          </Button>
+          <ThemeToggleButton />
+           
         </div>
       </div>
     </nav>
