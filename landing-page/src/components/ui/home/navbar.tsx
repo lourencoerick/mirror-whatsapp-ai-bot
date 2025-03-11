@@ -2,39 +2,14 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { NavBarMenu, MobileNavBarMenu } from "@/components/ui/home/navbar-menu";
-import { Menu, X, MoonIcon, SunIcon } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { inter } from '@/components/ui/fonts';
-import { useTheme } from 'next-themes';
 import { BetaSignupButton } from "@/components/ui/experiment-button";
+import ThemeToggleButton  from "@/components/ui/home/theme-toggle-button"
 
-/**
- * Component to toggle the theme between "light" and "dark".
- */
-function ThemeToggleButton() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-    >
-      {mounted ? (
-        theme === "light" ? <MoonIcon /> : <SunIcon />
-      ) : (
-        <div className="w-6 h-6" /> // Placeholder to 
-      )}
-    </Button>  
-  );
-}
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
