@@ -30,12 +30,10 @@ export function NavBarMenu() {
               smooth={true}
               offset={-50} // ajuste se tiver header fixo
               duration={500}
-              className="cursor-pointer"
+              className={`${navigationMenuTriggerStyle()} cursor-pointer`} // "cursor-pointer"
 
             >
-              <NavigationMenuLink className={navigationMenuTriggerStyle()}>
                 {section.label}
-              </NavigationMenuLink>
             </ScrollLink>
           </NavigationMenuItem>
         ))}
