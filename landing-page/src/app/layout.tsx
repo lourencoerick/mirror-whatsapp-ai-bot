@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Vendedor IA: Automatize suas vendas 24/7 | Lambda Labs',
   description:
     'Transforme o atendimento do seu negócio com o Vendedor IA da Lambda Labs. Automatize o WhatsApp, qualifique leads e acompanhe as vendas em tempo real.',
@@ -42,30 +42,6 @@ export const metadata = {
       'Aumente suas conversões com o Vendedor IA. Automatize seu atendimento no WhatsApp e foque no crescimento do seu negócio.',
   },
 };
-
-export default function Page() {
-  return (
-    <main>
-      <h1>Bem-vindo à Lambda Labs</h1>
-      <p>
-        Automatize seu atendimento e aumente suas vendas com nosso Vendedor IA.
-      </p>
-    </main>
-  );
-}
-
-
-export default function Page() {
-  return (
-    <main>
-      <h1>Bem-vindo à Lambda Labs</h1>
-      <p>
-        Automatize seu atendimento e aumente suas vendas com nosso Vendedor IA.
-      </p>
-    </main>
-  );
-}
-
 
 export default function RootLayout({
   children,

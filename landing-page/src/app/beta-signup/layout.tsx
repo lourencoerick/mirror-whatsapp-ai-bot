@@ -1,4 +1,6 @@
-export const metadata = {
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
     title: 'Transforme Suas Vendas: Cadastre-se na Beta do Vendedor IA | Lambda Labs',
     description:
       'Participe da versão beta do Vendedor IA e experimente a automação de vendas pelo WhatsApp. Cadastre-se e revolucione suas conversões!',
