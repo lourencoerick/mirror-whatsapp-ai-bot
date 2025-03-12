@@ -16,31 +16,6 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import ThemeToggleButton  from "@/components/ui/home/theme-toggle-button"
 
-export const metadata = {
-  title: 'Transforme Suas Vendas: Cadastre-se na Beta do Vendedor IA | Lambda Labs',
-  description:
-    'Experimente a nova era das vendas automatizadas com a versão beta do Vendedor IA. Cadastre-se agora e revolucione seu atendimento pelo WhatsApp.',
-  icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
-  },
-  openGraph: {
-    title: 'Transforme Suas Vendas: Cadastre-se na Beta do Vendedor IA | Lambda Labs',
-    description:
-      'Descubra como a versão beta do Vendedor IA pode impulsionar suas vendas automatizando conversas no WhatsApp e otimizando seu atendimento.',
-    url: 'https://www.lambdalabs.com.br/beta-signup',
-    siteName: 'Lambda Labs',
-    locale: 'pt_BR',
-    type: 'website',
-  },
-  twitter: {
-    title: 'Transforme Suas Vendas: Cadastre-se na Beta do Vendedor IA | Lambda Labs',
-    description:
-      'Participe da versão beta do Vendedor IA e descubra como automatizar suas vendas pelo WhatsApp, transformando seu atendimento.',
-  },
-};
-
 
 export default function BetaSignupPage() {
   return (
