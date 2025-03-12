@@ -18,10 +18,54 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Lambda Labs",
-  description: "Lambda Labs desenvolveu vendedores IA que não apenas respondem, mas persuadem, para um atendimento eficaz e automático.",
+export const metadata = {
+  title: 'Vendedor IA: Automatize suas vendas 24/7 | Lambda Labs',
+  description:
+    'Transforme o atendimento do seu negócio com o Vendedor IA da Lambda Labs. Automatize o WhatsApp, qualifique leads e acompanhe as vendas em tempo real.',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  openGraph: {
+    title: 'Vendedor IA: Automatize suas vendas 24/7 | Lambda Labs',
+    description:
+      'Descubra como o Vendedor IA pode aumentar suas vendas automatizando conversas no WhatsApp e otimizando o atendimento ao cliente.',
+    url: 'https://www.lambdalabs.com.br/',
+    siteName: 'Lambda Labs',
+    locale: 'pt_BR',
+    type: 'website',
+  },
+  twitter: {
+    title: 'Vendedor IA: Automatize suas vendas 24/7 | Lambda Labs',
+    description:
+      'Aumente suas conversões com o Vendedor IA. Automatize seu atendimento no WhatsApp e foque no crescimento do seu negócio.',
+  },
 };
+
+export default function Page() {
+  return (
+    <main>
+      <h1>Bem-vindo à Lambda Labs</h1>
+      <p>
+        Automatize seu atendimento e aumente suas vendas com nosso Vendedor IA.
+      </p>
+    </main>
+  );
+}
+
+
+export default function Page() {
+  return (
+    <main>
+      <h1>Bem-vindo à Lambda Labs</h1>
+      <p>
+        Automatize seu atendimento e aumente suas vendas com nosso Vendedor IA.
+      </p>
+    </main>
+  );
+}
+
 
 export default function RootLayout({
   children,
