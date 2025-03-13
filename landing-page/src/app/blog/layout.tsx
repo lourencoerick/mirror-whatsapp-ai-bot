@@ -5,7 +5,7 @@ import 'remark-github-blockquote-alert/alert.css'
 import { Space_Grotesk } from 'next/font/google'
 import { Analytics, AnalyticsConfig } from 'pliny/analytics'
 import { SearchProvider, SearchConfig } from 'pliny/search'
-import Header from '@/components/ui/blog/Header'
+// import Header from '@/components/ui/blog/Header'
 import SectionContainer from '@/components/ui/blog/SectionContainer'
 import Footer from '@/components/ui/blog/Footer'
 import siteMetadata from '@/data/siteMetadata'
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     url: './',
     siteName: siteMetadata.title,
     images: [siteMetadata.socialBanner],
-    locale: 'en_US',
+    locale: 'pt_BR',
     type: 'website',
   },
   alternates: {
@@ -58,7 +58,7 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function BlogLayout({ children }: { children: React.ReactNode }) {
   const basePath = process.env.BASE_PATH || ''
 
   return (
@@ -99,7 +99,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Analytics analyticsConfig={siteMetadata.analytics as AnalyticsConfig} />
           <SectionContainer>
             <SearchProvider searchConfig={siteMetadata.search as SearchConfig}>
-              <Header />
+              {/* <Header /> */}
               <main className="mb-auto">{children}</main>
             </SearchProvider>
             <Footer />

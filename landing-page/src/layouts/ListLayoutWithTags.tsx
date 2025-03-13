@@ -23,13 +23,11 @@ interface ListLayoutProps {
 
 function Pagination({ totalPages, currentPage }: PaginationProps) {
   const pathname = usePathname()
-  const segments = pathname.split('/')
-  const lastSegment = segments[segments.length - 1]
+  // const segments = pathname.split('/')
+  // const lastSegment = segments[segments.length - 1]
   const basePath = pathname
     .replace(/^\//, '') // Remove leading slash
     .replace(/\/page\/\d+$/, '') // Remove any trailing /page
-  console.log(pathname)
-  console.log(basePath)
   const prevPage = currentPage - 1 > 0
   const nextPage = currentPage + 1 <= totalPages
 
@@ -79,7 +77,6 @@ export default function ListLayoutWithTags({
   const sortedTags = tagKeys.sort((a, b) => tagCounts[b] - tagCounts[a])
 
   const displayPosts = initialDisplayPosts.length > 0 ? initialDisplayPosts : posts
-  console.log("Tag:", sortedTags); // Isso aparecerá no console do navegador
 
 
   return (
@@ -116,7 +113,6 @@ export default function ListLayoutWithTags({
                           href={`/blog/tags/${slug(t)}`}
                           className="hover:text-primary-500 dark:hover:text-primary-500 px-3 py-2 text-sm font-medium text-gray-500 uppercase dark:text-gray-300"
                           aria-label={`View posts tagged ${t}`}
-                          onClick={() => console.log(`Clicou na tag: ${slug(t)}`)}
                         >
 
                           {`${t} (${tagCounts[t]})`}
