@@ -1,6 +1,6 @@
 /** @type {import("pliny/config").PlinyConfig } */
 const siteMetadata = {
-  title: 'Lambda Labs - Automação Inteligente de Vendas',
+  title: 'Automatize suas vendas com IA 24/7 | Lambda Labs',
   author: 'Erick',
   headerTitle: 'Lambda Labs',
   description: 'Venda mais no WhatsApp com IA: automatize, qualifique leads e atenda melhor.',
