@@ -41,18 +41,6 @@ export function NavBarMenu() {
     }
   };
 
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const handleClick = (section: Section): void => {
-    if (homeSectionsLabels.includes(section.label) && pathname !== "/") {
-      router.push(`/#${section.href}`);
-    }
-    else {
-      router.push(`/${section.href}`);
-    }
-  };
-
   return (
     <NavigationMenu>
       <NavigationMenuList>
@@ -67,17 +55,12 @@ export function NavBarMenu() {
               duration={500}
               className={`${navigationMenuTriggerStyle()} cursor-pointer`}
               onClick={() => handleClick(section)}
-              className={`${navigationMenuTriggerStyle()} cursor-pointer`}
-              onClick={() => handleClick(section)}
             >
-              {section.label}
               {section.label}
             </ScrollLink>
           </NavigationMenuItem>
         ))}
       </NavigationMenuList>
-    </NavigationMenu>
-  );
     </NavigationMenu>
   );
 }
@@ -87,15 +70,6 @@ interface MobileNavBarMenuProps {
 }
 
 export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const handleClick = (section: Section): void => {
-    if (homeSectionsLabels.includes(section.label) && pathname !== "/") {
-      router.push(`/#${section.href}`);
-    }
-  };
-
   const router = useRouter();
   const pathname = usePathname();
 
@@ -115,14 +89,8 @@ export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
           spy={true}
           smooth={true}
           offset={-250}
-          offset={-250}
           duration={500}
           className="block px-4 py-2 text-base font-medium text-foreground hover:bg-muted text-center cursor-pointer"
-          onClick={() => {
-            handleClick(section);
-            onClose();
-          }}
-        >
           onClick={() => {
             handleClick(section);
             onClose();
@@ -132,6 +100,5 @@ export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
         </ScrollLink>
       ))}
     </div>
-  );
   );
 }
