@@ -1,22 +1,46 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { Link as ScrollLink } from "react-scroll";
 import {
   NavigationMenu,
   NavigationMenuItem,
   NavigationMenuList,
   navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu"
+} from "@/components/ui/navigation-menu";
 
+type Section = {
+  label: string;
+  href: string;
+};
 
-const sections = [
+const sections: Section[] = [
   { label: "Por que contratar Vendedor IA?", href: "beneficios" },
   { label: "Como funciona", href: "como-funciona" },
   { label: "FAQ", href: "faq" },
-]
+  { label: "Blog", href: "blog" },
+];
+
+const homeSectionsLabels: string[] = [
+  "Por que contratar Vendedor IA?",
+  "Como funciona",
+  "FAQ",
+];
 
 export function NavBarMenu() {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleClick = (section: Section): void => {
+    if (homeSectionsLabels.includes(section.label) && pathname !== "/") {
+      router.push(`/#${section.href}`);
+    }
+    else {
+      router.push(`/${section.href}`);
+    }
+  };
+
   return (
     <NavigationMenu>
       <NavigationMenuList>
@@ -27,25 +51,34 @@ export function NavBarMenu() {
               to={section.href}
               spy={true}
               smooth={true}
-              offset={-50} // ajuste se tiver header fixo
+              offset={-50}
               duration={500}
-              className={`${navigationMenuTriggerStyle()} cursor-pointer`} // "cursor-pointer"
-
+              className={`${navigationMenuTriggerStyle()} cursor-pointer`}
+              onClick={() => handleClick(section)}
             >
-                {section.label}
+              {section.label}
             </ScrollLink>
           </NavigationMenuItem>
         ))}
       </NavigationMenuList>
-    </NavigationMenu >
-  )
+    </NavigationMenu>
+  );
 }
 
 interface MobileNavBarMenuProps {
-  onClose: () => void
+  onClose: () => void;
 }
 
 export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleClick = (section: Section): void => {
+    if (homeSectionsLabels.includes(section.label) && pathname !== "/") {
+      router.push(`/#${section.href}`);
+    }
+  };
+
   return (
     <div className="flex flex-col">
       {sections.map((section) => (
@@ -55,13 +88,17 @@ export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
           to={section.href}
           spy={true}
           smooth={true}
-          offset={-250} // ajuste se tiver header fixo
+          offset={-250}
           duration={500}
           className="block px-4 py-2 text-base font-medium text-foreground hover:bg-muted text-center cursor-pointer"
-          onClick={onClose}>
+          onClick={() => {
+            handleClick(section);
+            onClose();
+          }}
+        >
           {section.label}
         </ScrollLink>
       ))}
     </div>
-  )
+  );
 }
