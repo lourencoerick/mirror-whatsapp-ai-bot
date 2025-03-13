@@ -4,7 +4,7 @@ import siteMetadata from '@/data/siteMetadata'
 import ListLayout from '@/layouts/ListLayoutWithTags'
 import { allBlogs } from 'contentlayer/generated'
 import tagData from '@/app/tag-data.json'
-import { genPageMetadata } from '@/app/seo'
+import { genPageMetadata } from '@/components/seo'
 import { Metadata } from 'next'
 
 const POSTS_PER_PAGE = 5

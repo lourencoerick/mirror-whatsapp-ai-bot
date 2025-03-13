@@ -1,7 +1,6 @@
 import '@/css/prism.css'
 import 'katex/dist/katex.css'
 
-import PageTitle from '@/components/ui/blog/PageTitle'
 import { components } from '@/components/ui/blog/MDXComponents'
 import { MDXLayoutRenderer } from 'pliny/mdx-components'
 import { sortPosts, coreContent, allCoreContent } from 'pliny/utils/contentlayer'
@@ -56,7 +55,7 @@ export async function generateMetadata(props: {
       title: post.title,
       description: post.summary,
       siteName: siteMetadata.title,
-      locale: 'en_US',
+      locale: 'pt_BR',
       type: 'article',
       publishedTime: publishedAt,
       modifiedTime: modifiedAt,
