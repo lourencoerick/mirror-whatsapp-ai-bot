@@ -1,4 +1,5 @@
 import NavBar from "@/components/ui/home/navbar";
+import CTASection from "@/components/ui/home/cta-section";
 
 export default function HomeLayout({
     children,
@@ -11,6 +12,7 @@ export default function HomeLayout({
             <div className="bg-background text-foreground w-full px-10 lg:px-30">
                 {children}
             </div>
+            <CTASection bgColor="bg-secondary" hideLambda={true}/>
         </>
     );
 }
