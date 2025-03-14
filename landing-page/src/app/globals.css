@@ -143,6 +143,10 @@
 
 @layer utilities {
   .prose {
+    & p {
+      @apply text-foreground;
+    }
+
     & a {
       color: var(--color-muted-foreground);
       &:hover {
