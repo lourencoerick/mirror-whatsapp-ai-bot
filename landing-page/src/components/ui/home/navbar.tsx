@@ -24,7 +24,7 @@ export default function Navbar() {
           <Link href="/" className="flex items-center space-x-2">
             <Image
               src="/logo.png"
-              alt="Lambda Labs"
+              alt={`Logo da ${siteMetadata.headerTitle}`}
               width={100}
               height={30}
               className="w-10 h-auto"
