@@ -72,11 +72,13 @@ interface MobileNavBarMenuProps {
 
 export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
   const router = useRouter();
-  const pathname = usePathname();
 
   const handleClick = (section: Section): void => {
-    if (homeSectionsLabels.includes(section.label) && pathname !== "/") {
+    if (homeSectionsLabels.includes(section.label)) {
       router.push(`/#${section.href}`);
+    }
+    else {
+      router.push(`/${section.href}`);
     }
   };
 
