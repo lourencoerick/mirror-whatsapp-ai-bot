@@ -9,6 +9,7 @@ import { Menu, X } from 'lucide-react';
 import { inter } from '@/components/ui/fonts';
 import { BetaSignupButton } from "@/components/ui/experiment-button";
 import ThemeToggleButton  from "@/components/ui/home/theme-toggle-button"
+import siteMetadata from '@/data/siteMetadata';
 
 
 export default function Navbar() {
@@ -23,7 +24,7 @@ export default function Navbar() {
           <Link href="/" className="flex items-center space-x-2">
             <Image
               src="/logo.png"
-              alt="Lambda Labs"
+              alt={`Logo da ${siteMetadata.headerTitle}`}
               width={100}
               height={30}
               className="w-10 h-auto"
@@ -31,7 +32,7 @@ export default function Navbar() {
             {/* Vertical separator */}
             <div className="h-8 border-l border-muted mx-2" />
             <span className={`${inter.className} text-lg sm:text-2xl font-bold tracking-wide text-foreground`}>
-              Lambda Labs
+              {`${siteMetadata.headerTitle}`}
             </span>
           </Link>
 

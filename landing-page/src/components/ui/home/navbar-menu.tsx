@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Link as ScrollLink } from "react-scroll";
 import {
   NavigationMenu,
@@ -19,6 +19,7 @@ const sections: Section[] = [
   { label: "Por que contratar Vendedor IA?", href: "beneficios" },
   { label: "Como funciona", href: "como-funciona" },
   { label: "FAQ", href: "faq" },
+  // { label: "Blog", href: "blog" },
 ];
 
 const homeSectionsLabels: string[] = [
@@ -71,11 +72,13 @@ interface MobileNavBarMenuProps {
 
 export function MobileNavBarMenu({ onClose }: MobileNavBarMenuProps) {
   const router = useRouter();
-  const pathname = usePathname();
 
   const handleClick = (section: Section): void => {
-    if (homeSectionsLabels.includes(section.label) && pathname !== "/") {
+    if (homeSectionsLabels.includes(section.label)) {
       router.push(`/#${section.href}`);
+    }
+    else {
+      router.push(`/${section.href}`);
     }
   };
 

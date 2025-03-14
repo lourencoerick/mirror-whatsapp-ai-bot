@@ -1,8 +1,17 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+
 public/sitemap.xml
 public/sitemap-0.xml
 public/robots.txt
+
+# Contentlayer
+.contentlayer
+# rss feed
+/public/feed.xml
+
+# search
+/public/search.json
 
 # dependencies
 /node_modules
