@@ -1,13 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { ReactNode } from 'react'
 import Image from '@/components/ui/blog/Image'
 import Bleed from 'pliny/ui/Bleed'
 import { CoreContent } from 'pliny/utils/contentlayer'
 import type { Blog } from 'contentlayer/generated'
-import Comments from '@/components/ui/blog/Comments'
 import Link from '@/components/ui/blog/Link'
 import PageTitle from '@/components/ui/blog/PageTitle'
 import SectionContainer from '@/components/ui/blog/SectionContainer'
-import siteMetadata from '@/data/siteMetadata'
 import ScrollTopAndComment from '@/components/ui/blog/ScrollTopAndComment'
 
 interface LayoutProps {
