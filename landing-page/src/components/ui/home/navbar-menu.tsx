@@ -19,7 +19,7 @@ const sections: Section[] = [
   { label: "Por que contratar Vendedor IA?", href: "beneficios" },
   { label: "Como funciona", href: "como-funciona" },
   { label: "FAQ", href: "faq" },
-  { label: "Blog", href: "blog" },
+  // { label: "Blog", href: "blog" },
 ];
 
 const homeSectionsLabels: string[] = [
