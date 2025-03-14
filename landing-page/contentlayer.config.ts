@@ -27,6 +27,8 @@ import rehypePresetMinify from 'rehype-preset-minify'
 import siteMetadata from './data/siteMetadata'
 import { allCoreContent, sortPosts } from 'pliny/utils/contentlayer.js'
 import prettier from 'prettier'
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
 const root = process.cwd()
 const isProduction = process.env.NODE_ENV === 'production'
@@ -48,7 +50,7 @@ const computedFields: ComputedFields = {
   readingTime: { type: 'json', resolve: (doc) => readingTime(doc.body.raw) },
   slug: {
     type: 'string',
-    resolve: (doc) => doc._raw.flattenedPath.replace('blog/article/', '') //.replace(/^([^/]+\/){2}/, '').replace(/^.+?(\/)/, ''),
+    resolve: (doc) => doc._raw.flattenedPath.replace('blog/article/', '')
   },
   path: {
     type: 'string',
