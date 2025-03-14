@@ -36,7 +36,7 @@ function Pagination({ totalPages, currentPage }: PaginationProps) {
       <nav className="flex justify-between">
         {!prevPage && (
           <button className="cursor-auto disabled:opacity-50" disabled={!prevPage}>
-            Previous
+            Anterior
           </button>
         )}
         {prevPage && (
@@ -44,7 +44,7 @@ function Pagination({ totalPages, currentPage }: PaginationProps) {
             href={currentPage - 1 === 1 ? `/${basePath}/` : `/${basePath}/page/${currentPage - 1}`}
             rel="prev"
           >
-            Previous
+            Anterior
           </Link>
         )}
         <span>
@@ -52,12 +52,12 @@ function Pagination({ totalPages, currentPage }: PaginationProps) {
         </span>
         {!nextPage && (
           <button className="cursor-auto disabled:opacity-50" disabled={!nextPage}>
-            Next
+            Próxima
           </button>
         )}
         {nextPage && (
           <Link href={`/${basePath}/page/${currentPage + 1}`} rel="next">
-            Next
+            Próxima
           </Link>
         )}
       </nav>
@@ -84,20 +84,20 @@ export default function ListLayoutWithTags({
       <div>
         <div className="pt-6 pb-6">
           <h1 className="text-3xl leading-9 font-extrabold tracking-tight text-gray-900 sm:hidden sm:text-4xl sm:leading-10 md:text-6xl md:leading-14 dark:text-gray-100">
-            {title}
+            {title}ahahahahah
           </h1>
         </div>
         <div className="flex sm:space-x-24">
           <div className="hidden h-full max-h-screen max-w-[280px] min-w-[280px] flex-wrap overflow-auto rounded-sm bg-gray-50 pt-5 shadow-md sm:flex dark:bg-gray-900/70 dark:shadow-gray-800/40">
             <div className="px-6 py-4">
-              {pathname.startsWith('/blog') ? (
-                <h3 className="text-primary-500 font-bold uppercase">All Posts</h3>
+              {!pathname.startsWith('/blog/tags') ? (
+                <h3 className="text-foreground font-bold uppercase">Artigos</h3>
               ) : (
                 <Link
                   href={`/blog`}
-                  className="hover:text-primary-500 dark:hover:text-primary-500 font-bold text-gray-700 uppercase dark:text-gray-300"
+                  className="text-foreground hover:text-muted-foreground font-bold uppercase "
                 >
-                  All Posts
+                  Todos os artigos
                 </Link>
               )}
               <ul>
@@ -105,16 +105,16 @@ export default function ListLayoutWithTags({
                   return (
                     <li key={t} className="my-3">
                       {decodeURI(pathname.split('/tags/')[1]) === slug(t) ? (
-                        <h3 className="text-primary-500 inline px-3 py-2 text-sm font-bold uppercase">
+                        <h3 className="text-accent-foreground inline px-3 py-2 text-sm font-bold uppercase">
                           {`${t} (${tagCounts[t]})`}
                         </h3>
                       ) : (
                         <Link
                           href={`/blog/tags/${slug(t)}`}
-                          className="hover:text-primary-500 dark:hover:text-primary-500 px-3 py-2 text-sm font-medium text-gray-500 uppercase dark:text-gray-300"
+                          className="text-muted-foreground hover:text-accent-foreground px-3 py-2 text-sm font-medium uppercase "
                           aria-label={`View posts tagged ${t}`}
                         >
-
+                            
                           {`${t} (${tagCounts[t]})`}
                         </Link>
                       )}
