@@ -38,12 +38,12 @@ const steps = [
     },
     {
         step: 3,
-        title: 'Dê o sinal verde – seu vendedor I.A está pronto',
+        title: 'Dê o sinal verde – seu vendedor IA está pronto',
         titleSize: "text-md md:text-lg",
         icon: <WhatsAppIcon className="inline align-middle text-muted-foreground w-8 h-8" />,
         description: (
             <>
-                Seu novo funcionário I.A está pronto para assumir a <span className="font-bold">operação de vendas 24/7</span>.{' '}
+                Seu novo funcionário IA está pronto para assumir a <span className="font-bold">operação de vendas 24/7</span>.{' '}
                 <br /><br />Habilite-o e <span className="font-bold">nunca mais deixe um lead sem resposta</span>.
             </>
         ),
