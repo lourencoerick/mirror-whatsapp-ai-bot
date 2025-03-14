@@ -78,12 +78,12 @@
   }
 }
 
-@layer utilities {
+/* @layer utilities {
   .prose {
     & a {
-      color: var(--color-primary-500);
+      color: var(--color-gray-400);
       &:hover {
-        color: var(--color-primary-600);
+        color: var(--color-muted-foreground);
       }
       & code {
         color: var(--color-primary-400);
@@ -115,7 +115,7 @@
       color: var(--color-gray-100);
     }
   }
-}
+} */
 
 .task-list-item::before {
   @apply hidden;
