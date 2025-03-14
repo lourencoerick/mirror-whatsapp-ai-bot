@@ -144,7 +144,7 @@
 @layer utilities {
   .prose {
     & p {
-      @apply text-foreground;
+      color: var(--color-foreground);
     }
 
     & a {
