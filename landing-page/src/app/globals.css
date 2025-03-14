@@ -139,3 +139,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+
+@layer utilities {
+  .prose {
+    & a {
+      color: var(--color-muted-foreground);
+      &:hover {
+        color: var(--color-accent-foreground);
+      }
+      & code {
+        color: var(--color-primary-400);
+      }
+    }
+    & :where(h1, h2) {
+      font-weight: 700;
+      letter-spacing: var(--tracking-tight);
+    }
+    & h3 {
+      font-weight: 600;
+    }
+    & :where(code):not(pre code) {
+      color: var(--color-indigo-500);
+    }
+  }
+}
