@@ -30,7 +30,6 @@
       "@/data/*": [
         "./data/*"
       ],
-      // "@/layouts/*": ["layouts/*"],
       "@/css/*": ["./src/styles/css/*"],
       "contentlayer/generated": [
         ".contentlayer/generated"
