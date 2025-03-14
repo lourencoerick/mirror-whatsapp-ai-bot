@@ -40,18 +40,13 @@ export default function PostMinimal({ content, next, prev, children }: LayoutPro
             </div>
           </div>
           <div className="prose dark:prose-invert max-w-none py-4">{children}</div>
-          {siteMetadata.comments && (
-            <div className="pt-6 pb-6 text-center text-gray-700 dark:text-gray-300" id="comment">
-              <Comments slug={slug} />
-            </div>
-          )}
           <footer>
             <div className="flex flex-col text-sm font-medium sm:flex-row sm:justify-between sm:text-base">
               {prev && prev.path && (
                 <div className="pt-4 xl:pt-8">
                   <Link
                     href={`/${prev.path}`}
-                    className="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400"
+                    className="text-accent-foreground hover:text-muted-foreground"
                     aria-label={`Previous post: ${prev.title}`}
                   >
                     &larr; {prev.title}
@@ -59,10 +54,10 @@ export default function PostMinimal({ content, next, prev, children }: LayoutPro
                 </div>
               )}
               {next && next.path && (
-                <div className="pt-4 xl:pt-8">
+                <div className="pt-4 xl:pt-8 pb-2">
                   <Link
                     href={`/${next.path}`}
-                    className="text-primary-500 hover:text-primary-600 dark:hover:text-primary-400"
+                    className="text-accent-foreground hover:text-muted-foreground"
                     aria-label={`Next post: ${next.title}`}
                   >
                     {next.title} &rarr;
