@@ -14,7 +14,7 @@ export function genPageMetadata({ title, description, image, url, ...rest }: Pag
     title,
     description: description || siteMetadata.description,
     openGraph: {
-      title: `${title} | ${siteMetadata.title}`,
+      title: `${title} | ${siteMetadata.headerTitle}`,
       description: description || siteMetadata.description,
       url:  url ? `${siteMetadata.siteUrl}${url}` : siteMetadata.siteUrl,
       siteName: siteMetadata.title,
