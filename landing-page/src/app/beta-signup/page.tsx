@@ -16,7 +16,6 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import ThemeToggleButton  from "@/components/ui/home/theme-toggle-button"
 
-
 export default function BetaSignupPage() {
   return (
     <main className="bg-background text-foreground shadow-sm md:mt-2">
