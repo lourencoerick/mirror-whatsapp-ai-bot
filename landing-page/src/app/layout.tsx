@@ -93,12 +93,23 @@ export default function RootLayout({
           src="https://www.googletagmanager.com/gtag/js?id=AW-16914772618"
           strategy="afterInteractive"
         />
-        <Script id="google-analytics" strategy="afterInteractive">
+        <Script id="google-analytics-ads-conversion" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'AW-16914772618');
+          `}
+        </Script>
+        {/* <!-- Google tag (gtag.js) --> */}
+        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-8N395BDYFG" strategy="afterInteractive" />
+        <Script id="google-analytics" strategy="afterInteractive" >
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+
+            gtag('config', 'G-8N395BDYFG');
           `}
         </Script>
       </head>
