@@ -14,7 +14,7 @@ import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import ThemeToggleButton  from "@/components/ui/home/theme-toggle-button"
+import ThemeToggleButton from "@/components/ui/home/theme-toggle-button"
 
 export default function BetaSignupPage() {
   return (
@@ -73,7 +73,7 @@ const BetaSignupForm = () => {
       (window as any).gtag("event", "conversion", {  // eslint-disable-line @typescript-eslint/no-explicit-any
         send_to: "AW-16914772618/VzaiCJzk26gaEIrly4E_",
         event_callback: callback,
-      });  
+      });
     }
     return false;
   }
@@ -97,7 +97,7 @@ const BetaSignupForm = () => {
         body: JSON.stringify(data),
       });
       const result = await response.json();
-  
+
       if (result.result === "success") {
         toast.success("Cadastro realizado com sucesso!");
         router.push('/'); // Redirect to home
@@ -110,7 +110,7 @@ const BetaSignupForm = () => {
       toast.error("Erro ao enviar os dados para o Google Sheets.");
     }
   }
-  
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-md mx-auto md:mx-0">
@@ -147,7 +147,8 @@ const BetaSignupForm = () => {
 };
 
 const BetaSignupNavbar = () => {
-
+  const router = useRouter();
+  
   return (
     <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between h-16 items-center">
@@ -166,14 +167,13 @@ const BetaSignupNavbar = () => {
         </Link>
 
         <div className="flex space-x-2 ml-8 items-center">
-          <Button asChild variant={"outline"} size={"lg"}>
-            <Link href="/" className="text-2xl hover:text-muted-foreground">
-              <ArrowLeft className="inline" /><span className="hidden sm:block">Voltar</span>
-            </Link>
+          <Button variant={"outline"} size={"lg"} onClick={() => router.back()}>
+            <ArrowLeft className="inline" />
+            <span className="hidden sm:block">Voltar</span>
           </Button>
 
           <ThemeToggleButton />
-           
+
         </div>
       </div>
     </nav>

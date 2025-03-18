@@ -10,10 +10,10 @@ export default function HomeLayout({
     return (
         <>
             <NavBar />
-            <div className="bg-background text-foreground w-full px-10 lg:px-30 mb-1 ">
+            <div className="bg-secondary text-foreground w-full px-10 lg:px-30 mb-0 ">
                 {children}
             </div>
-            <CTASection bgColor="bg-secondary" hideLambda={true} buttonFontSize="text-md md:text-lg"/>
+            <CTASection bgColor="bg-background" hideLambda={true} buttonFontSize="text-md md:text-lg"/>
         </>
     );
 }

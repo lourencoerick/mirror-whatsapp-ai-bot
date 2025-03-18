@@ -50,7 +50,7 @@ const computedFields: ComputedFields = {
   readingTime: { type: 'json', resolve: (doc) => readingTime(doc.body.raw) },
   slug: {
     type: 'string',
-    resolve: (doc) => doc._raw.flattenedPath.replace('blog/article/', '')
+    resolve: (doc) => doc._raw.flattenedPath.replace('blog/article/', '').replace('authors/', '')
   },
   path: {
     type: 'string',
