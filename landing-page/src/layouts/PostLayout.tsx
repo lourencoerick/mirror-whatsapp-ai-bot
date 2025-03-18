@@ -66,7 +66,7 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
                         <Image
                           src={author.avatar}
                           width={38}
-                          height={38}
+                          height={50}
                           alt="avatar"
                           className="h-10 w-10 rounded-full"
                         />
@@ -74,16 +74,16 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
                       <dl className="text-sm leading-5 font-medium whitespace-nowrap">
                         <dt className="sr-only">Nome</dt>
                         <dd className="text-gray-900 dark:text-gray-100">{author.name}</dd>
-                        <dt className="sr-only">Twitter</dt>
+                        <dt className="sr-only">Linkedin</dt>
                         <dd>
-                          {author.twitter && (
+                          {author.linkedin && (
                             <Link
-                              href={author.twitter}
+                              href={author.linkedin}
                               className="text-muted-foreground hover:text-accent-foreground"
                             >
-                              {author.twitter
-                                .replace('https://twitter.com/', '@')
-                                .replace('https://x.com/', '@')}
+                              {author.linkedin
+                                .replace('https://www.linkedin.com/in/', '@')
+                              }
                             </Link>
                           )}
                         </dd>
@@ -95,7 +95,7 @@ export default function PostLayout({ content, authorDetails, next, prev, childre
             </dl>
             <div className="divide-y divide-gray-200 xl:col-span-3 xl:row-span-2 xl:pb-0 dark:divide-gray-700">
               <div className="prose dark:prose-invert max-w-none pt-10 pb-8">{children}</div>
-            </div> 
+            </div>
             <footer>
               <div className="divide-gray-200 text-sm leading-5 font-medium xl:col-start-1 xl:row-start-2 xl:divide-y dark:divide-gray-700">
                 {tags && (
