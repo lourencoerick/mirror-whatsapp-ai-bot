@@ -53,7 +53,7 @@ export default function Navbar() {
           <div className="flex lg:hidden items-center gap-x-4">
             <BetaSignupButton className='hidden sm:block' />
             <ThemeToggleButton />
-            <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Expande o menu">
               {mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}
             </Button>
           </div>
