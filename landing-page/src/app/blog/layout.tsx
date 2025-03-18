@@ -1,7 +1,6 @@
 import NavBar from "@/components/ui/home/navbar";
 import CTASection from "@/components/ui/home/cta-section";
 import "@/app/globals.css";
-import { Divide } from "lucide-react";
 
 export default function HomeLayout({
     children,
