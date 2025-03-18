@@ -21,6 +21,8 @@ export default function ThemeToggleButton() {
         variant="outline"
         size="sm"
         onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+        className="cursor-pointer"
+        aria-label="Troca o tema de cor da página"
       >
         {mounted ? (
           theme === "light" ? <MoonIcon /> : <SunIcon />

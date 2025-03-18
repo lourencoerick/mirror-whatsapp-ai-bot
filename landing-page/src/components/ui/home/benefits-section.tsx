@@ -47,14 +47,14 @@ export default function BenefitsSection() {
                                 <h3 className="max-w-lg text-2xl lg:text-4xl text-start leading-relaxed">{content.firstArgument.title}</h3>
                                 <p className="max-w-lg text-md lg:text-lg mt-2">{content.firstArgument.description}</p>
                             </div>
-                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.firstArgument.mobileButtonText}</BetaSignupButton>
+                            <BetaSignupButton className="hidden md:block max-w-lg text-md" aria-label="Inscrição Beta - Beneficio 1">{content.firstArgument.mobileButtonText}</BetaSignupButton>
                         </div>
                         <div className="max-w-lg flex flex-col justify-center items-center">
                             <video className="rounded-xl" preload="none" autoPlay muted loop controls={false} >
                                 <source src={content.firstArgument.videoSrc} type="video/mp4" />
                                 {content.firstArgument.videoAlt}
                             </video>
-                            <BetaSignupButton className="block md:hidden w-full md:max-w-sm text-md mt-10">{content.firstArgument.mobileButtonText}</BetaSignupButton>
+                            <BetaSignupButton className="block md:hidden w-full md:max-w-sm text-md mt-10" aria-label="Inscrição Beta - Beneficio 1">{content.firstArgument.mobileButtonText}</BetaSignupButton>
                         </div>
                     </div>
                 </div>
@@ -75,11 +75,11 @@ export default function BenefitsSection() {
                                 <h3 className="max-w-lg text-2xl lg:text-4xl text-start leading-relaxed">{content.secondArgument.title}</h3>
                                 <p className="max-w-lg text-md lg:text-lg mt-2" dangerouslySetInnerHTML={{ __html: content.secondArgument.description }}></p>
                             </div>
-                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.secondArgument.mobileButtonText}</BetaSignupButton>
+                            <BetaSignupButton className="hidden md:block max-w-lg text-md" aria-label="Inscrição Beta - Beneficio 2">{content.secondArgument.mobileButtonText}</BetaSignupButton>
                             
                         </div>
                         <div className="order-3"> 
-                            <BetaSignupButton className="block md:hidden max-w-lg text-md mx-auto">{content.secondArgument.mobileButtonText}</BetaSignupButton>
+                            <BetaSignupButton className="block md:hidden max-w-lg text-md mx-auto" aria-label="Inscrição Beta - Beneficio 2">{content.secondArgument.mobileButtonText}</BetaSignupButton>
                         </div>
 
 
@@ -100,11 +100,11 @@ export default function BenefitsSection() {
                                     ))}
                                 </ul>
                             </div>
-                            <BetaSignupButton className="hidden md:block max-w-lg text-md">{content.thirdArgument.buttonText}</BetaSignupButton>
+                            <BetaSignupButton className="hidden md:block max-w-lg text-md" aria-label="Inscrição Beta - Beneficio 3">{content.thirdArgument.buttonText}</BetaSignupButton>
                         </div>
                         <AnimatedListDemo />
                         
-                        <BetaSignupButton className="block md:hidden max-w-lg text-md mx-auto mb-10 md:mb-0">{content.thirdArgument.mobileButtonText}</BetaSignupButton>
+                        <BetaSignupButton className="block md:hidden max-w-lg text-md mx-auto mb-10 md:mb-0" aria-label="Inscrição Beta - Beneficio 3">{content.thirdArgument.mobileButtonText}</BetaSignupButton>
 
                     </div>
                 </div>

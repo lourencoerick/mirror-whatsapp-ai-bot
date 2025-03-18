@@ -30,7 +30,7 @@ export default function HeroSection() {
             <span className="font-bold">aumente suas conversões e foque no crescimento de seu negócio.</span>
           </p>
           <div className="flex flex-col md:flex-row justify-center md:justify-start gap-4">
-            <BetaSignupButton>Começar Agora</BetaSignupButton>
+            <BetaSignupButton aria-label="Inscrição Beta - Hero Section">Começar Agora</BetaSignupButton>
 
             <ScrollLink
               href="#beneficios"
@@ -43,7 +43,7 @@ export default function HeroSection() {
               className="cursor-pointer"
 
             >
-              <Button variant="outline" size="lg">
+              <Button variant="outline" size="lg" className="cursor-pointer">
                 Saber Mais
               </Button>
             </ScrollLink>
