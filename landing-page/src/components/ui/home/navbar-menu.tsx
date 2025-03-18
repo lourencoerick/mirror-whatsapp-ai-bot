@@ -31,7 +31,7 @@ const homeSectionsLabels: string[] = [
 export function NavBarMenu() {
   const router = useRouter();
 
-  
+
   const handleClick = (section: Section): void => {
     if (homeSectionsLabels.includes(section.label)) {
       router.push(`/#${section.href}`);
@@ -47,18 +47,19 @@ export function NavBarMenu() {
       <NavigationMenuList>
         {sections.map((section) => (
           <NavigationMenuItem key={section.label}>
-            <ScrollLink
-              activeClass="active"
-              to={section.href}
-              spy={true}
-              smooth={true}
-              offset={-50}
-              duration={500}
-              className={`${navigationMenuTriggerStyle()} cursor-pointer`}
-              onClick={() => handleClick(section)}
-            >
-              {section.label}
-            </ScrollLink>
+              <ScrollLink
+                href={homeSectionsLabels.includes(section.label) ? `#${section.href}` : `/${section.href}`}
+                activeClass="active"
+                to={section.href}
+                spy={true}
+                smooth={true}
+                offset={-50}
+                duration={500}
+                className={`${navigationMenuTriggerStyle()} cursor-pointer`}
+                onClick={() => handleClick(section)}
+              >
+                {section.label}
+              </ScrollLink>
           </NavigationMenuItem>
         ))}
       </NavigationMenuList>
