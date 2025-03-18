@@ -25,7 +25,8 @@
                 "Bito.Bito",
                 "ms-python.black-formatter",
                 "ms-toolsai.jupyter",
-                "humao.rest-client"
+                "humao.rest-client",
+                "cirlorm.mobileview"
             ]
         }
     },
