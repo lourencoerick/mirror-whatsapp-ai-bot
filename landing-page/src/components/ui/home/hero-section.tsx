@@ -33,6 +33,7 @@ export default function HeroSection() {
             <BetaSignupButton>Começar Agora</BetaSignupButton>
 
             <ScrollLink
+              href="#beneficios"
               activeClass="active"
               to="beneficios"
               spy={true}
