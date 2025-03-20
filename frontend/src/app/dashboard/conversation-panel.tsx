@@ -9,9 +9,7 @@ const ConversationPanel = (props: Props) => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 pt-4 gap-2 items-center">
 
-      {/* <div className="flex border-2 border-red-400"> */}
       <Search placeholder="Pesquisar..." />
-      {/* </div> */}
 
       <div className="flex flex-row justify-between items-center w-full px-2">
         <span className='text-lg font-semibold'>Conversas</span>
