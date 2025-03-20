@@ -22,13 +22,20 @@ import { usePathname } from 'next/navigation'
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
-  }
-  
-  export default function DashboardLayout({
+}
+
+export default function DashboardLayout({
     children
-  }: DashboardLayoutProps)   {
+}: DashboardLayoutProps) {
     const pathname = usePathname()
     const isConversationsRoute = pathname.includes('/conversations')
+
+    const segments = pathname.split('/').filter(Boolean);
+
+    console.log(pathname, segments)
+    // const formattedSegment = segment
+    // .replace(/-/g, ' ')
+    // .replace(/\b\w/g, (char) => char.toUpperCase());
 
     return (
         <SidebarProvider>
@@ -44,20 +51,27 @@ interface DashboardLayoutProps {
                         />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbItem className="hidden md:block">
-                                    <BreadcrumbLink href="#">
-                                        Building Your Application
-                                    </BreadcrumbLink>
-                                </BreadcrumbItem>
-                                <BreadcrumbSeparator className="hidden md:block" />
+                                {
+                                    segments.slice(0, -1).map((segment, index) => (
+                                        <>
+                                            <BreadcrumbItem key={index} className="hidden md:block">
+                                                <BreadcrumbLink href={`/${segments.slice(0, index + 1).join('/')}`}>
+                                                    {segment.replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase())}
+                                                </BreadcrumbLink>
+                                            </BreadcrumbItem>
+                                            <BreadcrumbSeparator className="hidden md:block" />
+                                        </>
+                                    ))
+
+                                }
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                                    <BreadcrumbPage>{segments.at(-1)}</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>
                 </header>
-                <div className="flex flex-col flex-1 gap-4 p-4 pt-0 overflow-none"> 
+                <div className="flex flex-col flex-1 gap-4 p-4 pt-0 overflow-none">
                     {children}
                 </div>
             </SidebarInset>
