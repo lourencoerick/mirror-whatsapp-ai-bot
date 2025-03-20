@@ -1,6 +1,9 @@
-import React from 'react'
-import ConversationItem from './conversation-item'
+'use client';
 
+import React from 'react'
+
+import { useParams } from 'next/navigation';
+import ConversationItem from './conversation-item';
 const mockedConversations = [
   {
     id: '1',
@@ -43,7 +46,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/men/5.jpg'
   },
   {
-    id: '1',
+    id: '11',
     phoneNumber: '+55 11 98765-4321',
     name: 'João Silva',
     lastMessage: 'Oi, como você está?',
@@ -51,7 +54,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/men/1.jpg'
   },
   {
-    id: '2',
+    id: '12',
     phoneNumber: '+55 21 91234-5678',
     name: 'Maria Oliveira',
     lastMessage: 'Enviado o documento que pediu!',
@@ -59,7 +62,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/women/2.jpg'
   },
   {
-    id: '3',
+    id: '13',
     phoneNumber: '+1 305 555-0198',
     name: 'Carlos Eduardo',
     lastMessage: 'Vamos marcar a reunião para amanhã?',
@@ -67,7 +70,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/men/3.jpg'
   },
   {
-    id: '4',
+    id: '14',
     phoneNumber: '+33 6 22 33 44 55',
     name: 'Sophie Martin',
     lastMessage: 'Bonjour! Ça va?',
@@ -75,7 +78,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/women/4.jpg'
   },
   {
-    id: '5',
+    id: '15',
     phoneNumber: '+49 152 12345678',
     name: 'Lukas Schmidt',
     lastMessage: 'Vielen Dank! Bis später!',
@@ -83,7 +86,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/men/5.jpg'
   },
   {
-    id: '1',
+    id: '21',
     phoneNumber: '+55 11 98765-4321',
     name: 'João Silva',
     lastMessage: 'Oi, como você está?',
@@ -91,7 +94,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/men/1.jpg'
   },
   {
-    id: '2',
+    id: '22',
     phoneNumber: '+55 21 91234-5678',
     name: 'Maria Oliveira',
     lastMessage: 'Enviado o documento que pediu!',
@@ -99,7 +102,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/women/2.jpg'
   },
   {
-    id: '3',
+    id: '23',
     phoneNumber: '+1 305 555-0198',
     name: 'Carlos Eduardo',
     lastMessage: 'Vamos marcar a reunião para amanhã?',
@@ -107,7 +110,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/men/3.jpg'
   },
   {
-    id: '4',
+    id: '24',
     phoneNumber: '+33 6 22 33 44 55',
     name: 'Sophie Martin',
     lastMessage: 'Bonjour! Ça va?',
@@ -115,7 +118,7 @@ const mockedConversations = [
     imageUrl: 'https://randomuser.me/api/portraits/women/4.jpg'
   },
   {
-    id: '5',
+    id: '25',
     phoneNumber: '+49 152 12345678',
     name: 'Lukas Schmidt',
     lastMessage: 'Vielen Dank! Bis später!',
@@ -127,14 +130,21 @@ const mockedConversations = [
 
 type Props = {}
 
-const ConversationsList: React.FC = (props: Props) => {
+const ConversationsList: React.FC = () => {
+  const params = useParams();
+  const conversationId = params?.conversationId as string | undefined;
+  console.log(params);
   return (
-    <div className="">
+    <div className="w-full">
       {mockedConversations.map(conversation => (
-        <ConversationItem key={conversation.id} {...conversation} />
+        <ConversationItem
+          key={conversation.id}
+          {...conversation}
+          isSelected={conversation.id === conversationId}
+        />
       ))}
     </div>
-  )
-}
+  );
+};
 
-export default ConversationsList
+export default ConversationsList;
