@@ -18,7 +18,7 @@ authlib
 PyJWT>=2.8.0
 
 # Testing
-httpx==0.24.1
+httpx==0.25.2
 pytest==8.3.4
 pytest-asyncio==0.23.8
 
