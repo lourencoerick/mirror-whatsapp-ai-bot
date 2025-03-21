@@ -3,7 +3,9 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
+from app.api import webhook
 from dotenv import load_dotenv
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -31,6 +33,8 @@ app.add_middleware(
 
 # Include the authentication router
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+
+app.include_router(webhook.router)
 
 
 @app.get("/")
