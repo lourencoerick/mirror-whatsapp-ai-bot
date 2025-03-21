@@ -1,0 +1,3 @@
+# app/services/queue/redis_queue.py
+class RedisQueue:
+    def enqueue(self, message: dict): ...
