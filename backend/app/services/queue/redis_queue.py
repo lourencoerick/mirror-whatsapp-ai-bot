@@ -1,13 +1,16 @@
 import redis
 import json
+import os
 from app.services.queue.iqueue import IQueue
 
 
 class RedisQueue(IQueue):
     """Redis-backed implementation of IQueue."""
 
-    def __init__(self, host="localhost", port=6379, db=0, queue_name="message_queue"):
-        self.client = redis.Redis(host=host, port=port, db=db)
+    def __init__(self, queue_name="message_queue"):
+        host = os.getenv("REDIS_HOST", "localhost")
+        port = int(os.getenv("REDIS_PORT", "6379"))
+        self.client = redis.Redis(host=host, port=port, db=0)
         self.queue_name = queue_name
 
     def enqueue(self, message: dict) -> None:
