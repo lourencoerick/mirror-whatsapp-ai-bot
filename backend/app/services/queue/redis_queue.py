@@ -13,12 +13,12 @@ load_dotenv()
 class RedisQueue(IQueue):
     """Redis-backed implementation of IQueue."""
 
-    def __init__(self):
+    def __init__(self, queue_name: str = "message_queue"):
         host = os.getenv("REDIS_HOST", "localhost")
         port = int(os.getenv("REDIS_PORT", "6379"))
         db = int(os.getenv("REDIS_DB", "0"))
         self.client = redis.Redis(host=host, port=port, db=db)
-        self.queue_name = os.getenv("REDIS_QUEUE_NAME", "message_queue")
+        self.queue_name = queue_name
         logger.info(f"Connected to Redis at {host}:{port} (db={db})")
 
     def enqueue(self, message: dict) -> None:
