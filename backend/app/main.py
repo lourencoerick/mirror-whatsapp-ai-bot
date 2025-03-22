@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
-from app.api import webhook
+from app.api import webhook_routes
 from app.api import message_routes
 from app.api import dev_routes
 
@@ -40,7 +40,7 @@ app.include_router(dev_routes.router)
 # Include the authentication router
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 
-app.include_router(webhook.router)
+app.include_router(webhook_routes.router)
 
 app.include_router(message_routes.router)
 
