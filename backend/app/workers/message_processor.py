@@ -16,62 +16,59 @@ class MessageProcessor:
     ):
         self.input_queue = RedisQueue(queue_name=input_queue_name)
         self.output_queue = RedisQueue(queue_name=output_queue_name)
-        logger.info("[init] MessageProcessor initialized.")
+        logger.info("[MessageProcessor:init] Initialized")
 
     def process_message(self, message: Dict) -> Optional[Dict]:
         """
-        Given a raw message from the queue, apply business logic
-        and return a response payload.
+        Process a parsed WhatsApp message and return a response.
         """
         try:
-            text = message.get("text")
-            phone_number = message.get("phone_number")
-            message_id = message.get("message_id")
+            content = message.get("content")
+            contact_id = message.get("contact_id")
+            source_id = message.get("source_id")
 
-            if not all([text, phone_number, message_id]):
-                logger.warning("[process] Incomplete message payload")
+            if not all([content, contact_id, source_id]):
+                logger.warning("[MessageProcessor:process] Missing required fields")
                 return None
 
-            response = {
-                "to": phone_number,
-                "original_message_id": message_id,
-                "response_text": f"Bot: You said '{text}'",
+            return {
+                "to": contact_id,
+                "original_message_id": source_id,
+                "response_text": f"🤖 Auto-reply: '{content}'",
                 "timestamp": time.time(),
             }
 
-            return response
-
         except Exception:
-            logger.exception("[process] Failed to generate response")
+            logger.exception("[MessageProcessor:process] Unexpected failure")
             return None
 
     def run(self):
         """
-        Main loop: consume, process and enqueue.
-
-        We do not use sleep here because BRPOP is a blocking call.
-        The process remains idle until a message is available.
+        Blocking main loop: waits for new message, processes it, and enqueues response.
         """
-        logger.info("[worker] Starting main loop...")
+        logger.info("[MessageProcessor:run] Starting main loop")
 
         while True:
             try:
                 logger.debug("[queue] Waiting for message...")
-                message = self.input_queue.dequeue()
-                logger.debug(f"[queue] Message dequeued: {message}")
+                raw = self.input_queue.dequeue()
 
-                response = self.process_message(message)
+                if not raw:
+                    logger.debug("[queue] Empty queue slot")
+                    continue
+
+                logger.debug(f"[queue] Message dequeued: {raw}")
+                response = self.process_message(raw)
 
                 if response:
                     self.output_queue.enqueue(response)
-                    logger.debug(f"[queue:response] Response enqueued: {response}")
+                    logger.debug(f"[queue] Response enqueued: {response}")
                 else:
-                    logger.warning("[worker] Skipped empty or invalid response")
+                    logger.warning("[MessageProcessor:run] Skipped invalid message")
 
             except Exception:
-                logger.exception("[worker:error] Unhandled exception in main loop")
+                logger.exception("[MessageProcessor:run] Fatal error in main loop")
 
 
 if __name__ == "__main__":
-    processor = MessageProcessor()
-    processor.run()
+    MessageProcessor().run()
