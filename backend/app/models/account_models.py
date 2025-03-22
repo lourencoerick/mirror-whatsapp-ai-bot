@@ -9,6 +9,13 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
+from app.models.subscription_models import Subscription
+from app.models.webhook_event_models import Webhook
+from app.models.agent_models import AgentBotInbox
+
+# from app.models.conversation_models import Conversation
+# from app.models.contact_models import Contact
+# from app.models.auth_models import User
 
 
 class Account(BaseModel):
@@ -62,6 +69,8 @@ class AccountUser(BaseModel):
     role = Column(Integer, nullable=True)
     inviter_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
 
-    account = relationship("Account", back_populates="account_users")
-    user = relationship("User", back_populates="account_users")
+    account = relationship(
+        "Account", back_populates="account_users", foreign_keys=[account_id]
+    )
+    user = relationship("User", back_populates="account_users", foreign_keys=[user_id])
     inviter_user = relationship("User", foreign_keys=[inviter_id])
