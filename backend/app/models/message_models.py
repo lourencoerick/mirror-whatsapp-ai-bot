@@ -11,6 +11,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
+from app.models.account_models import Account
+from app.models.inbox_models import Inbox
+from app.models.conversation_models import Conversation
+from app.models.contact_models import Contact
+from app.models.auth_models import User
 
 
 class Message(BaseModel):

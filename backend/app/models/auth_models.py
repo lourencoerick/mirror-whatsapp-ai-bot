@@ -48,7 +48,10 @@ class User(BaseModel):
 
     # Relationships
     account_users = relationship(
-        "AccountUser", back_populates="user", cascade="all, delete-orphan"
+        "AccountUser",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="[AccountUser.user_id]",
     )
     messages = relationship(
         "Message", back_populates="user", cascade="all, delete-orphan"
