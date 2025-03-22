@@ -2,7 +2,7 @@ from typing import Dict, Optional
 from loguru import logger
 
 
-def parse_evolution_webhook(payload: Dict) -> Optional[Dict]:
+def parse_evolution_message(payload: Dict) -> Optional[Dict]:
     """
     Parses incoming webhook payload from Evolution API into internal message format.
 
