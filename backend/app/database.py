@@ -25,7 +25,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-@contextmanager
 def get_db() -> Generator:
     """
     Context manager para sessões do banco de dados.
@@ -37,7 +36,6 @@ def get_db() -> Generator:
     db = SessionLocal()
     try:
         yield db
-        db.commit()
     except Exception:
         db.rollback()
         raise
