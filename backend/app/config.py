@@ -9,11 +9,9 @@ class Settings(BaseSettings):
     Carrega automaticamente variáveis de ambiente.
     """
 
-    # Database
-    DATABASE_URL: str
+    DATABASE_URL: str = "postgresql://user:password@localhost:5432/chatbotdb"
 
-    # Redis
-    REDIS_URL: str
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     # Application
     APP_NAME: str = "WhatsApp AI Bot"
