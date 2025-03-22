@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException, status
 from app.services.queue.iqueue import IQueue
 from app.services.queue.redis_queue import RedisQueue
 from app.services.parser.whatsapp_parser import parse_whatsapp_message
-from app.services.parser.evolution_webhook import parse_evolution_webhook
+from app.services.parser.evolution_parser import parse_evolution_message
 from loguru import logger
 
 router = APIRouter()
@@ -12,11 +12,12 @@ queue: IQueue = RedisQueue()
 @router.post("/webhook/whatsapp", status_code=status.HTTP_202_ACCEPTED)
 async def whatsapp_webhook(request: Request):
     """
-    Receives incoming WhatsApp messages via webhook and enqueues them for async processing.
+    Webhook to handle messages from WhatsApp (official API).
+    Parses and enqueues each message for asynchronous processing.
     """
     try:
         payload = await request.json()
-        logger.debug(f"[webhook] Received raw payload: {payload}")
+        logger.debug(f"[webhook] Raw WhatsApp payload: {payload}")
 
         parsed_messages = parse_whatsapp_message(payload)
 
@@ -25,41 +26,41 @@ async def whatsapp_webhook(request: Request):
 
         for message in parsed_messages:
             queue.enqueue(message)
-            logger.info(f"[webhook] Enqueued message: {message.get('source_id')}")
+            logger.info(
+                f"[webhook] Enqueued WhatsApp message: {message.get('source_id')}"
+            )
 
         return {"status": "messages enqueued", "count": len(parsed_messages)}
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.exception("[webhook] Unexpected error during processing")
+    except Exception:
+        logger.exception("[webhook] Error while handling WhatsApp payload")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @router.post("/webhook/evolution_whatsapp", status_code=status.HTTP_202_ACCEPTED)
 async def evolution_whatsapp_webhook(request: Request):
     """
-    Receives incoming WhatsApp messages via webhook and enqueues them for async processing.
+    Webhook to handle messages from Evolution API (unofficial WhatsApp).
+    Parses and enqueues a single message for processing.
     """
     try:
         payload = await request.json()
-        logger.debug(f"[webhook] Received raw payload: {payload}")
+        logger.debug(f"[webhook] Raw Evolution payload: {payload}")
 
-        parsed_message = parse_evolution_webhook(payload)
+        message = parse_evolution_message(payload)
 
-        if not parsed_message:
-            raise HTTPException(status_code=400, detail="No valid messages found")
+        if not message:
+            raise HTTPException(status_code=400, detail="No valid message found")
 
-        queue.enqueue(parsed_message)
-        logger.info(f"[webhook] Enqueued message: {parsed_message.get('source_id')}")
+        queue.enqueue(message)
+        logger.info(f"[webhook] Enqueued Evolution message: {message.get('source_id')}")
 
-        return {
-            "status": "message enqueued",
-            "source_id": parsed_message.get("source_id"),
-        }
+        return {"status": "message enqueued", "source_id": message.get("source_id")}
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.exception("[webhook] Unexpected error during processing")
+    except Exception:
+        logger.exception("[webhook] Error while handling Evolution payload")
         raise HTTPException(status_code=500, detail="Internal Server Error")
