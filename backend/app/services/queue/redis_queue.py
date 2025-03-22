@@ -1,34 +1,53 @@
-import redis
 import json
-import os
+from redis import Redis
+from typing import Optional
 from loguru import logger
-from dotenv import load_dotenv
-
+from app.config import get_settings
 from app.services.queue.iqueue import IQueue
+from app.config import get_settings
 
-
-load_dotenv()
+settings = get_settings()
 
 
 class RedisQueue(IQueue):
-    """Redis-backed implementation of IQueue."""
+    """
+    Redis-backed message queue for async processing.
 
-    def __init__(self, queue_name: str = "message_queue"):
-        host = os.getenv("REDIS_HOST", "localhost")
-        port = int(os.getenv("REDIS_PORT", "6379"))
-        db = int(os.getenv("REDIS_DB", "0"))
-        self.client = redis.Redis(host=host, port=port, db=db)
+    Uses a simple list-based queue with JSON serialization.
+    """
+
+    def __init__(self, queue_name: str = "messages"):
         self.queue_name = queue_name
-        logger.info(f"Connected to Redis at {host}:{port} (db={db})")
+        self.client = Redis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            db=0,
+            decode_responses=True,
+        )
+        logger.debug(
+            f"[RedisQueue] Connected to Redis at {settings.REDIS_HOST}:{settings.REDIS_PORT}"
+        )
 
     def enqueue(self, message: dict) -> None:
-        """Push a message onto the queue."""
-        self.client.lpush(self.queue_name, json.dumps(message))
-        logger.debug(f"[enqueue] Message enqueued: {message}")
+        """Push a message to the Redis queue."""
+        serialized = json.dumps(message)
+        self.client.lpush(self.queue_name, serialized)
+        logger.debug(f"[RedisQueue] Enqueued message: {serialized}")
 
-    def dequeue(self) -> dict:
-        """Pop a message from the queue."""
-        _, raw = self.client.brpop(self.queue_name)
-        message = json.loads(raw)
-        logger.debug(f"[dequeue] Message dequeued: {message}")
-        return message
+    def dequeue(self) -> Optional[dict]:
+        """Pop a message from the queue (FIFO)."""
+        result = self.client.brpop(self.queue_name, timeout=1)
+        if result is None:
+            logger.debug("[RedisQueue] Queue is empty.")
+            return None
+
+        _, raw = result
+        try:
+            deserialized = json.loads(raw)
+            logger.debug(f"[RedisQueue] Dequeued message: {deserialized}")
+            return deserialized
+        except json.JSONDecodeError as e:
+            logger.error(
+                f"[RedisQueue] Failed to deserialize message: {raw} | Error: {e}"
+            )
+            return None
