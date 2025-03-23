@@ -1,5 +1,6 @@
 import pytest
 from app.workers.message_processor import MessageProcessor
+from app.api.schemas.response_schema import ResponseMessage
 
 
 @pytest.fixture
@@ -15,62 +16,47 @@ def valid_message():
         "account_id": 1,
         "inbox_id": 1,
         "conversation_id": 1,
-        "contact_id": 99,
+        "contact_id": "5511999999999",
         "source_id": "wamid.999",
         "status": 1,
         "content_type": 1,
         "private": False,
+        "provider": "evolution",
     }
 
 
 def test_handle_valid_message(processor, valid_message):
     response = processor.process_message(valid_message)
 
-    assert response is not None
-    assert response["to"] == 99
-    assert response["original_message_id"] == "wamid.999"
-    assert "response_text" in response
+    assert isinstance(response, ResponseMessage)
+    assert response.to == valid_message["contact_id"]
+    assert response.original_message_id == valid_message["source_id"]
 
 
 def test_missing_required_fields_skips_processing(processor):
     incomplete_message = {
         "content": "Oi",
         "account_id": 1,
-        # missing 'contact_id', 'source_id'
+        # missing 'contact_id' and 'source_id'
     }
 
     result = processor.process_message(incomplete_message)
     assert result is None
 
 
-def test_invalid_json_skips_processing(processor):
-    # Simulate message coming in malformed (like a broken payload)
-    broken_message = "{'not': 'a dict'}"
-
-    # Normally Redis returns dict via JSON.loads. So invalid JSON would be handled earlier.
-    # But we simulate it reaching the processor anyway:
-    result = (
-        processor.process_message(broken_message)
-        if isinstance(broken_message, dict)
-        else None
-    )
-    assert result is None
-
-
-def test_dequeue_none_does_nothing():
-    # Simulate behavior if Redis returns None (queue is empty)
-    processor = MessageProcessor()
+def test_invalid_input_type_skips_processing(processor):
+    # Should simulate broken input
     result = processor.process_message(None)
     assert result is None
 
 
-def test_processor_response_format(processor, valid_message):
+def test_processor_response_schema(processor, valid_message):
     result = processor.process_message(valid_message)
-
-    assert isinstance(result, dict)
-    assert set(result.keys()) == {
+    assert isinstance(result, ResponseMessage)
+    assert result.model_dump().keys() == {
         "to",
         "original_message_id",
         "response_text",
+        "provider",
         "timestamp",
     }
