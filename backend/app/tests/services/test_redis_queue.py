@@ -1,24 +1,45 @@
 import json
 import pytest
-from loguru import logger
+from unittest.mock import MagicMock
 from app.services.queue.redis_queue import RedisQueue
-from app.config import get_settings
-from redis import Redis
 
 
 @pytest.fixture
-def redis_queue() -> RedisQueue:
-    settings = get_settings()
-    redis = Redis(
-        host=settings.REDIS_HOST, port=settings.REDIS_PORT, decode_responses=True
-    )
-    redis.flushdb()
-    return RedisQueue()
+def fake_redis():
+    # Create a fake Redis object to simulate Redis with an internal queue
+    fake = MagicMock()
+    fake.queue = []
+
+    # Simulate the behavior of lpush (inserts at the beginning of the list)
+    def lpush(queue_name, item):
+        fake.queue.insert(0, item)
+
+    fake.lpush.side_effect = lpush
+
+    # Simulate the behavior of brpop (removes from the end of the list, ensuring FIFO)
+    def brpop(queue_name, timeout=0):
+        if fake.queue:
+            return (queue_name, fake.queue.pop())
+        return None
+
+    fake.brpop.side_effect = brpop
+
+    # Optionally, simulate flushdb if needed
+    fake.flushdb.side_effect = lambda: fake.queue.clear()
+
+    return fake
 
 
 @pytest.fixture
-def sample_message():
-    return {
+def redis_queue(fake_redis):
+    # Create an instance of RedisQueue and inject fake_redis
+    queue = RedisQueue()
+    queue.redis = fake_redis
+    return queue
+
+
+def test_enqueue_and_dequeue(redis_queue):
+    message = {
         "account_id": 1,
         "content": "Test message",
         "inbox_id": 1,
@@ -26,21 +47,17 @@ def sample_message():
         "contact_id": 10,
         "direction": "in",
     }
-
-
-def test_enqueue_and_dequeue(redis_queue, sample_message):
-    logger.info("[TEST] Testing enqueue → dequeue...")
-    redis_queue.enqueue(sample_message)
+    redis_queue.enqueue(message)
     result = redis_queue.dequeue()
 
     assert result is not None
-    assert result["content"] == sample_message["content"]
-    assert result["conversation_id"] == sample_message["conversation_id"]
-    assert redis_queue.dequeue() is None  # should now be empty
+    assert result["content"] == message["content"]
+    assert result["conversation_id"] == message["conversation_id"]
+    # After dequeuing the only item, the queue should be empty
+    assert redis_queue.dequeue() is None
 
 
 def test_queue_order(redis_queue):
-    logger.info("[TEST] Testing FIFO order...")
     messages = [
         {"id": 1, "text": "first"},
         {"id": 2, "text": "second"},
@@ -49,7 +66,8 @@ def test_queue_order(redis_queue):
     for msg in messages:
         redis_queue.enqueue(msg)
 
-    for expected in messages:  # because lpush + brpop = FIFO
+    # Check if the dequeue order is FIFO
+    for expected in messages:
         actual = redis_queue.dequeue()
         assert actual["id"] == expected["id"]
         assert actual["text"] == expected["text"]
