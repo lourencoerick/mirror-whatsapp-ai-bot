@@ -24,7 +24,7 @@ jobs:
         pip install pytest
 
     - name: Set PYTHONPATH
-      run: echo "PYTHONPATH=backend/app" >> $GITHUB_ENV
+      run: echo "PYTHONPATH=$GITHUB_WORKSPACE/backend/app" >> $GITHUB_ENV
 
     - name: Run unit tests
       run: pytest backend/app/tests --ignore=backend/app/tests/workers --disable-warnings
