@@ -36,7 +36,7 @@ def send_message(message: dict) -> None:
             "apikey": settings.EVOLUTION_API_KEY,
             "Content-Type": "application/json",
         }
-        url = f"https://{settings.EVOLUTION_SERVER_URL}/message/sendText/{settings.EVOLUTION_INSTANCE}"
+        url = f"{settings.EVOLUTION_SERVER_URL}/message/sendText/{settings.EVOLUTION_INSTANCE}"
 
         response = httpx.post(url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
