@@ -4,9 +4,9 @@ from unittest.mock import MagicMock
 from app.services.queue.redis_queue import RedisQueue
 
 
+# Fixture to create a fake Redis object with an internal queue
 @pytest.fixture
 def fake_redis():
-    # Create a fake Redis object to simulate Redis with an internal queue
     fake = MagicMock()
     fake.queue = []
 
@@ -24,20 +24,26 @@ def fake_redis():
 
     fake.brpop.side_effect = brpop
 
-    # Optionally, simulate flushdb if needed
+    # Optionally, simulate flushdb to clear the queue
     fake.flushdb.side_effect = lambda: fake.queue.clear()
 
     return fake
 
 
+# Fixture to create an instance of RedisQueue with fake Redis injected.
+# We use monkeypatch to override the Redis class in the module.
 @pytest.fixture
-def redis_queue(fake_redis):
-    # Create an instance of RedisQueue and inject fake_redis
+def redis_queue(monkeypatch, fake_redis):
+    # Patch the Redis class in the module so that any call to Redis(...) returns fake_redis
+    monkeypatch.setattr(
+        "app.services.queue.redis_queue.Redis", lambda *args, **kwargs: fake_redis
+    )
+    # Now, when we instantiate RedisQueue, it won't try to connect to um servidor real.
     queue = RedisQueue()
-    queue.redis = fake_redis
     return queue
 
 
+# Unit test for enqueue and dequeue functionality
 @pytest.mark.unit
 def test_enqueue_and_dequeue(redis_queue):
     message = {
@@ -58,6 +64,7 @@ def test_enqueue_and_dequeue(redis_queue):
     assert redis_queue.dequeue() is None
 
 
+# Unit test to ensure FIFO order of the queue
 @pytest.mark.unit
 def test_queue_order(redis_queue):
     messages = [
@@ -68,7 +75,7 @@ def test_queue_order(redis_queue):
     for msg in messages:
         redis_queue.enqueue(msg)
 
-    # Check if the dequeue order is FIFO
+    # Check that the dequeue order is FIFO
     for expected in messages:
         actual = redis_queue.dequeue()
         assert actual["id"] == expected["id"]
