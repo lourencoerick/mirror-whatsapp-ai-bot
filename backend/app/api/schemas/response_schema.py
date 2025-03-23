@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal
 import time
 import re
@@ -20,7 +20,7 @@ class ResponseMessage(BaseModel):
         description="Unix timestamp of the response",
     )
 
-    @validator("to")
+    @field_validator("to")
     def validate_phone_number(cls, v):
         if not re.match(r"^\d{10,15}$", v):
             raise ValueError(
@@ -28,7 +28,7 @@ class ResponseMessage(BaseModel):
             )
         return v
 
-    class Config:
+    class ConfigDict:
         extra = "forbid"
         json_schema_extra = {
             "example": {
