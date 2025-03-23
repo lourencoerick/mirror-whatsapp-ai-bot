@@ -1,6 +1,6 @@
 name: Run Tests
 
-on: [push, pull_request]
+on: [push]
 
 jobs:
   test:
@@ -25,13 +25,8 @@ jobs:
         pip install -r backend/requirements.txt
         pip install pytest
 
-    - name: Start FastAPI server
-      run: |
-        export PYTHONPATH=backend
-        nohup uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 &
-      env:
-        PYTHONUNBUFFERED: 1
+    - name: Set PYTHONPATH
+      run: echo "PYTHONPATH=backend/app" >> $GITHUB_ENV
 
-    - name: Run health test
-      run: |
-        pytest backend/app/tests/test_health.py
+    - name: Run all tests
+      run: pytest backend/app/tests --disable-warnings
