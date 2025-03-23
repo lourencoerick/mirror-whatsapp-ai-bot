@@ -26,6 +26,7 @@ def valid_message_payload():
     }
 
 
+@pytest.mark.integration
 def test_create_message_success(valid_message_payload):
     response = client.post("/messages", json=valid_message_payload)
 
@@ -38,6 +39,7 @@ def test_create_message_success(valid_message_payload):
     assert isinstance(response_data["message_id"], int)
 
 
+@pytest.mark.integration
 def test_create_message_without_optional_fields():
     minimal_payload = {
         "content": "Olá!",
@@ -55,6 +57,7 @@ def test_create_message_without_optional_fields():
     assert "message_id" in response.json()
 
 
+@pytest.mark.integration
 def test_create_message_with_invalid_direction(valid_message_payload):
     invalid_payload = valid_message_payload.copy()
     invalid_payload["direction"] = "invalid"

@@ -18,6 +18,7 @@ def valid_evolution_message():
     }
 
 
+@pytest.mark.unit
 def test_dispatches_to_evolution_sender(mock_queue, valid_evolution_message):
     """Should call evolution sender when provider is 'evolution'."""
     raw = json.dumps(valid_evolution_message)
@@ -33,6 +34,7 @@ def test_dispatches_to_evolution_sender(mock_queue, valid_evolution_message):
         mock_send.assert_called_once_with(valid_evolution_message)
 
 
+@pytest.mark.unit
 def test_logs_warning_on_unknown_provider(mock_queue):
     """Should warn when provider is not recognized."""
     message = {"provider": "unknown"}
@@ -50,6 +52,7 @@ def test_logs_warning_on_unknown_provider(mock_queue):
         assert "Unknown provider" in mock_log.call_args[0][0]
 
 
+@pytest.mark.unit
 def test_handles_malformed_json(mock_queue):
     """Should log and skip when JSON is invalid."""
     mock_queue.dequeue.return_value = "{bad_json"
@@ -66,6 +69,7 @@ def test_handles_malformed_json(mock_queue):
         assert "malformed JSON" in mock_log.call_args[0][0]
 
 
+@pytest.mark.unit
 def test_logs_unexpected_exception_on_message_processing(mock_queue):
     """Should log unexpected exception during one message processing."""
     mock_queue.dequeue.side_effect = Exception("boom")

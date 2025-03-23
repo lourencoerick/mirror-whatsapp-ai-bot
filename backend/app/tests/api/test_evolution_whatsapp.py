@@ -23,6 +23,7 @@ def valid_evolution_payload():
     }
 
 
+@pytest.mark.integration
 def test_webhook_evolution_valid_payload(valid_evolution_payload):
     response = client.post("/webhook/evolution_whatsapp", json=valid_evolution_payload)
     assert response.status_code == 202
@@ -30,6 +31,7 @@ def test_webhook_evolution_valid_payload(valid_evolution_payload):
     assert response.json()["source_id"] == "wamid.12345"
 
 
+@pytest.mark.integration
 def test_webhook_evolution_invalid_structure():
     payload = {"invalid": "structure"}
     response = client.post("/webhook/evolution_whatsapp", json=payload)
@@ -37,6 +39,7 @@ def test_webhook_evolution_invalid_structure():
     assert response.json()["detail"] == "No valid message found"
 
 
+@pytest.mark.integration
 def test_webhook_evolution_empty_body():
     response = client.post("/webhook/evolution_whatsapp", data={})
     assert (

@@ -20,3 +20,9 @@ dependencies = [
 
 [tool.setuptools]
 package-dir = {"" = "app"}
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: mark a unit test",
+    "integration: mark an integration test",
+]

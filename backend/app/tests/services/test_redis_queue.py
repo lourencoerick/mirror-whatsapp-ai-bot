@@ -38,6 +38,7 @@ def redis_queue(fake_redis):
     return queue
 
 
+@pytest.mark.unit
 def test_enqueue_and_dequeue(redis_queue):
     message = {
         "account_id": 1,
@@ -57,6 +58,7 @@ def test_enqueue_and_dequeue(redis_queue):
     assert redis_queue.dequeue() is None
 
 
+@pytest.mark.unit
 def test_queue_order(redis_queue):
     messages = [
         {"id": 1, "text": "first"},

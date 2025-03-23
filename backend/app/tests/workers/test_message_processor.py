@@ -25,6 +25,7 @@ def valid_message():
     }
 
 
+@pytest.mark.unit
 def test_handle_valid_message(processor, valid_message):
     response = processor.process_message(valid_message)
 
@@ -33,6 +34,7 @@ def test_handle_valid_message(processor, valid_message):
     assert response.original_message_id == valid_message["source_id"]
 
 
+@pytest.mark.unit
 def test_missing_required_fields_skips_processing(processor):
     incomplete_message = {
         "content": "Oi",
@@ -44,12 +46,14 @@ def test_missing_required_fields_skips_processing(processor):
     assert result is None
 
 
+@pytest.mark.unit
 def test_invalid_input_type_skips_processing(processor):
     # Should simulate broken input
     result = processor.process_message(None)
     assert result is None
 
 
+@pytest.mark.unit
 def test_processor_response_schema(processor, valid_message):
     result = processor.process_message(valid_message)
     assert isinstance(result, ResponseMessage)
