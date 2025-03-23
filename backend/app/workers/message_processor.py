@@ -11,7 +11,7 @@ load_dotenv()
 class MessageProcessor:
     def __init__(
         self,
-        input_queue_name: str = "message_queue",
+        input_queue_name: str = "ready_for_processing_queue",
         output_queue_name: str = "response_queue",
     ):
         self.input_queue = RedisQueue(queue_name=input_queue_name)
@@ -32,10 +32,11 @@ class MessageProcessor:
                 return None
 
             return {
-                "to": contact_id,
-                "original_message_id": source_id,
-                "response_text": f"🤖 Auto-reply: '{content}'",
-                "timestamp": time.time(),
+                # "to": contact_id,
+                # "original_message_id": source_id,
+                "text": f"🤖 Auto-reply: '{content}'",
+                "number": "5511941986775",
+                "provider": "evolution",
             }
 
         except Exception:
