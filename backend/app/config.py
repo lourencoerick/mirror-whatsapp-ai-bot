@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True
 
-    class Config:
+    class ConfigDict:
         env_file = "../.env"
         case_sensitive = True
         extra = "allow"
