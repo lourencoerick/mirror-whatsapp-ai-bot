@@ -34,12 +34,17 @@ class ResponseSender:
                 return
 
             logger.debug(f"[queue] Message dequeued: {raw_message}")
-            message = json.loads(raw_message)
+            message = (
+                raw_message
+                if isinstance(raw_message, dict)
+                else json.loads(raw_message)
+            )
 
             provider = message.get("provider")
             if provider == "whatsapp":
                 send_whatsapp_message(message)
             elif provider == "evolution":
+                logger.debug(f"[worker] sending message to evolution")
                 send_evolution_message(message)
             else:
                 logger.warning(f"[worker] Unknown provider: {provider}")
