@@ -51,3 +51,9 @@ class RedisQueue(IQueue):
                 f"[RedisQueue] Failed to deserialize message: {raw} | Error: {e}"
             )
             return None
+
+    def clear(self):
+        """
+        Clear all items from the queue.
+        """
+        self.client.delete(self.queue_name)
