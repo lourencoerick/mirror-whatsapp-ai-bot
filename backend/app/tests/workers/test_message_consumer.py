@@ -38,6 +38,7 @@ def valid_message():
     }
 
 
+@pytest.mark.unit
 def test_handle_valid_message(
     mock_db, mock_log_message, mock_input_queue, mock_output_queue, valid_message
 ):
@@ -55,6 +56,7 @@ def test_handle_valid_message(
     mock_log_message.assert_called_once()
 
 
+@pytest.mark.unit
 def test_run_skips_invalid_json(mock_input_queue, mock_output_queue):
     mock_input_queue.dequeue = MagicMock(
         side_effect=["{invalid_json", KeyboardInterrupt]
@@ -72,6 +74,7 @@ def test_run_skips_invalid_json(mock_input_queue, mock_output_queue):
     assert any("malformed JSON" in str(c[0]) for c in mock_log.call_args_list)
 
 
+@pytest.mark.unit
 def test_handle_message_with_invalid_schema_logs_warning(
     mock_db, mock_input_queue, mock_output_queue
 ):
@@ -86,6 +89,7 @@ def test_handle_message_with_invalid_schema_logs_warning(
         assert "Invalid message payload" in mock_log.call_args[0][0]
 
 
+@pytest.mark.unit
 def test_handle_message_log_failure(
     mock_db, mock_log_message, mock_input_queue, mock_output_queue, valid_message
 ):
