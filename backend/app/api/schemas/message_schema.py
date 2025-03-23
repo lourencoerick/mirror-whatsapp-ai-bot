@@ -14,4 +14,4 @@ class MessageCreate(BaseModel):
     status: Optional[int] = None
     content_attributes: Optional[Dict] = None
     content_type: Optional[int] = None
-    private: Optional[bool] = False
+    private: Optional[int] = 0
