@@ -1,64 +1,68 @@
-from typing import Optional, Dict
+import json
+from typing import Optional
 from loguru import logger
-from dotenv import load_dotenv
-
 from app.services.queue.redis_queue import RedisQueue
-
-# Load environment variables from .env file.
-# NOTE: Not currently used in this file, but kept for future configuration (e.g., queue names, API keys).
-load_dotenv()
+from app.services.sender.whatsapp_sender import send_message as send_whatsapp_message
+from app.services.sender.evolution_sender import send_message as send_evolution_message
 
 
 class ResponseSender:
     """
-    Worker responsible for sending response messages to the external messaging platform.
-    Currently, it simulates the behavior and logs the output.
+    Worker responsible for consuming response messages from a Redis queue
+    and dispatching them to the appropriate external provider.
     """
 
     def __init__(self, queue_name: str = "response_queue"):
+        """
+        Initialize the ResponseSender with a given Redis queue name.
+
+        Args:
+            queue_name (str): Name of the Redis queue to consume messages from.
+        """
         self.queue = RedisQueue(queue_name=queue_name)
         logger.info("[init] ResponseSender initialized.")
 
-    def is_valid_message(self, message: Dict) -> bool:
-        """Validate required fields for sending."""
-        required_fields = ["to", "response_text"]
-        for field in required_fields:
-            if field not in message or not message[field]:
-                logger.warning(f"[validate] Missing or empty field: {field}")
-                return False
-        return True
+    def _process_one_message(self) -> None:
+        """
+        Process a single message from the response queue.
+        This method is testable in isolation.
+        """
+        try:
+            logger.debug("[queue] Waiting for message...")
+            raw_message: Optional[str] = self.queue.dequeue()
+            if not raw_message:
+                return
 
-    def send_to_platform(self, message: Dict) -> None:
-        """
-        Simulates sending a message. Replace with actual API call.
-        """
-        logger.info(
-            f"[send] Sending message to {message['to']}: {message['response_text']}"
-        )
-        # Future: requests.post(...)
+            logger.debug(f"[queue] Message dequeued: {raw_message}")
+            message = (
+                raw_message
+                if isinstance(raw_message, dict)
+                else json.loads(raw_message)
+            )
+
+            provider = message.get("provider")
+            if provider == "whatsapp":
+                send_whatsapp_message(message)
+            elif provider == "evolution":
+                logger.debug(f"[worker] sending message to evolution")
+                send_evolution_message(message)
+            else:
+                logger.warning(f"[worker] Unknown provider: {provider}")
+
+        except json.JSONDecodeError:
+            logger.warning("[worker] Received malformed JSON.")
+        except Exception:
+            logger.exception("[worker] Unexpected failure during send.")
 
     def run(self) -> None:
         """
-        Main loop to consume messages from queue and send them.
-        Uses BRPOP under the hood (blocking).
+        Starts the infinite loop that listens for messages from the queue
+        and sends them via the appropriate provider.
         """
         logger.info("[worker] ResponseSender main loop started.")
 
         while True:
-            try:
-                logger.debug("[queue] Waiting for message...")
-                message: Optional[Dict] = self.queue.dequeue()
-                logger.debug(f"[queue] Message dequeued: {message}")
-
-                if self.is_valid_message(message):
-                    self.send_to_platform(message)
-                else:
-                    logger.warning("[worker] Skipping invalid message.")
-
-            except Exception:
-                logger.exception(
-                    "[worker:error] Unexpected failure during message send."
-                )
+            self._process_one_message()
 
 
 if __name__ == "__main__":

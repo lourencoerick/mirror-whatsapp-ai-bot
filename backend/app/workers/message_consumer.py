@@ -1,10 +1,10 @@
 import json
 import time
-from typing import Optional
+from typing import Optional, Union
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import SessionLocal
 from app.services.logging.message_logger import log_message
 from app.services.queue.redis_queue import RedisQueue
 from app.api.schemas.message_schema import MessageCreate
@@ -13,35 +13,49 @@ from app.api.schemas.message_schema import MessageCreate
 class MessageConsumer:
     def __init__(
         self,
-        queue_name: str = "message_queue",
-        redis_queue: Optional[RedisQueue] = None,
+        input_queue_name: str = "message_queue",
+        output_queue_name: str = "ready_for_processing_queue",
     ):
-        self.queue = redis_queue or RedisQueue()
-        self.queue_name = queue_name
+        self.input_queue = RedisQueue(queue_name=input_queue_name)
+        self.output_queue = RedisQueue(queue_name=output_queue_name)
+        logger.info("[MessageConsumer:init] Initialized")
 
     def run(self):
         logger.info("[consumer] Starting message consumer...")
 
         while True:
             try:
-                raw = self.queue.dequeue()
-                if not raw:
+                raw_message: Optional[Union[str, dict]] = self.input_queue.dequeue()
+                if not raw_message:
                     continue
 
-                logger.debug(f"[consumer] Raw message dequeued: {raw}")
-                data = json.loads(raw)
+                logger.debug(f"[consumer] Raw message dequeued: {raw_message}")
+                data = (
+                    raw_message
+                    if isinstance(raw_message, dict)
+                    else json.loads(raw_message)
+                )
 
                 start_time = time.time()
-                with get_db() as db:
+                db: Session = SessionLocal()
+                try:
                     self._handle_message(db, data)
+                    db.commit()
+                    self.output_queue.enqueue(json.dumps(data))
+                except Exception:
+                    db.rollback()
+                    raise
+                finally:
+                    db.close()
+
                 elapsed = time.time() - start_time
                 logger.debug(f"[consumer] Processed in {elapsed:.2f}s")
 
             except json.JSONDecodeError:
                 logger.warning("[consumer] Received malformed JSON.")
-            except Exception:
+            except Exception as e:
                 logger.exception(
-                    "[consumer] Unexpected failure while processing message"
+                    f"[consumer] Unexpected failure: {type(e).__name__} - {e}"
                 )
 
     def _handle_message(self, db: Session, data: dict):

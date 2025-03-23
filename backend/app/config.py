@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
 
+    EVOLUTION_API_KEY: str = "your-api-key"
+    EVOLUTION_SERVER_URL: str = "localhost:8080"
+    EVOLUTION_INSTANCE: str = "680df327-c714-40a3-aec5-86ccbb57fa19"
+
     # App
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True

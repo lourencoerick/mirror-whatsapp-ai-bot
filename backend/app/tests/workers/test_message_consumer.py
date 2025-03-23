@@ -11,7 +11,12 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_redis_queue():
+def mock_input_queue():
+    return MagicMock(spec=RedisQueue)
+
+
+@pytest.fixture
+def mock_output_queue():
     return MagicMock(spec=RedisQueue)
 
 
@@ -34,19 +39,46 @@ def valid_message():
 
 
 def test_handle_valid_message(
-    mock_db, mock_log_message, mock_redis_queue, valid_message
+    mock_db, mock_log_message, mock_input_queue, mock_output_queue, valid_message
 ):
     mock_log_message.return_value = MagicMock(id=123)
 
-    consumer = MessageConsumer(redis_queue=mock_redis_queue)
+    consumer = MessageConsumer(
+        input_queue_name="message_queue",
+        output_queue_name="ready_for_processing_queue",
+    )
+    consumer.input_queue = mock_input_queue
+    consumer.output_queue = mock_output_queue
+
     consumer._handle_message(db=mock_db, data=valid_message)
 
     mock_log_message.assert_called_once()
 
 
-def test_handle_message_with_invalid_schema_logs_warning(mock_db, mock_redis_queue):
-    invalid_data = {"foo": "bar"}  # missing required fields
-    consumer = MessageConsumer(redis_queue=mock_redis_queue)
+def test_run_skips_invalid_json(mock_input_queue, mock_output_queue):
+    mock_input_queue.dequeue = MagicMock(
+        side_effect=["{invalid_json", KeyboardInterrupt]
+    )
+    consumer = MessageConsumer()
+    consumer.input_queue = mock_input_queue
+    consumer.output_queue = mock_output_queue
+
+    with patch("app.workers.message_consumer.logger.warning") as mock_log:
+        try:
+            consumer.run()
+        except KeyboardInterrupt:
+            pass
+
+    assert any("malformed JSON" in str(c[0]) for c in mock_log.call_args_list)
+
+
+def test_handle_message_with_invalid_schema_logs_warning(
+    mock_db, mock_input_queue, mock_output_queue
+):
+    invalid_data = {"foo": "bar"}
+    consumer = MessageConsumer()
+    consumer.input_queue = mock_input_queue
+    consumer.output_queue = mock_output_queue
 
     with patch("app.workers.message_consumer.logger.warning") as mock_log:
         consumer._handle_message(db=mock_db, data=invalid_data)
@@ -54,28 +86,13 @@ def test_handle_message_with_invalid_schema_logs_warning(mock_db, mock_redis_que
         assert "Invalid message payload" in mock_log.call_args[0][0]
 
 
-def test_run_skips_invalid_json(mock_redis_queue):
-    mock_redis_queue.dequeue = MagicMock(
-        side_effect=["{invalid_json", KeyboardInterrupt]
-    )
-    consumer = MessageConsumer(redis_queue=mock_redis_queue)
-
-    with patch("app.workers.message_consumer.logger.warning") as mock_log:
-        with patch("app.workers.message_consumer.get_db") as mock_get_db:
-            mock_get_db.return_value.__enter__.return_value = MagicMock()
-            try:
-                consumer.run()  # Vai rodar 1x, depois lançar KeyboardInterrupt
-            except KeyboardInterrupt:
-                pass
-
-    assert any("malformed JSON" in str(c[0]) for c in mock_log.call_args_list)
-
-
 def test_handle_message_log_failure(
-    mock_db, mock_log_message, mock_redis_queue, valid_message
+    mock_db, mock_log_message, mock_input_queue, mock_output_queue, valid_message
 ):
     mock_log_message.return_value = None
-    consumer = MessageConsumer(redis_queue=mock_redis_queue)
+    consumer = MessageConsumer()
+    consumer.input_queue = mock_input_queue
+    consumer.output_queue = mock_output_queue
 
     with patch("app.workers.message_consumer.logger.warning") as mock_log:
         consumer._handle_message(db=mock_db, data=valid_message)

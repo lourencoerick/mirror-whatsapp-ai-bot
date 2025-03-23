@@ -13,6 +13,10 @@ def parse_evolution_message(payload: Dict) -> Optional[Dict]:
         Optional[Dict]: Parsed message ready for enqueueing, or None if invalid.
     """
     try:
+        event = payload.get("event", "")
+        if event not in ["messages.upsert"]:
+            logger.warning(f"[parse] Invalid event type: {event}")
+            return None
         data = payload.get("data", {})
         key = data.get("key", {})
         message_content = data.get("message", {}).get("conversation")
@@ -34,13 +38,13 @@ def parse_evolution_message(payload: Dict) -> Optional[Dict]:
             "content": message_content,
             "direction": direction,
             "source_id": key.get("id"),
-            "contact_id": contact_number,
+            "contact_id": 2,  # Placeholder for now
             "account_id": 1,  # Placeholder for now
             "inbox_id": 1,  # Placeholder for now
             "conversation_id": 1,  # Placeholder for now
             "status": 1,
             "content_type": 1,  # Assuming 1 = text
-            "private": False,
+            "private": 0,
             "content_attributes": {
                 "provider": "evolution",
                 "sender": payload.get("sender"),

@@ -4,41 +4,34 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_webhook_valid_payload(monkeypatch):
-    # Mock queue enqueue
-    monkeypatch.setattr("app.api.webhook.queue.enqueue", lambda msg: True)
+def test_evolution_webhook_valid(monkeypatch):
+    # Simula enfileiramento da mensagem com sucesso
+    monkeypatch.setattr("app.api.webhook_routes.queue.enqueue", lambda msg: True)
 
     payload = {
-        "object": "whatsapp_business_account",
-        "entry": [
-            {
-                "id": "123456789",
-                "changes": [
-                    {
-                        "value": {
-                            "messages": [
-                                {
-                                    "from": "5561999999999",
-                                    "id": "ABGG1234XYZ",
-                                    "timestamp": "1692467200",
-                                    "text": {"body": "Hello"},
-                                    "type": "text",
-                                }
-                            ]
-                        }
-                    }
-                ],
-            }
-        ],
+        "event": "messages.upsert",
+        "sender": "evolution",
+        "data": {
+            "instanceId": "minha-instancia",
+            "messageType": "chat",
+            "messageTimestamp": 1711234567,
+            "message": {"conversation": "Oi! Teste webhook"},
+            "key": {
+                "id": "MSG123",
+                "remoteJid": "5511941986775@s.whatsapp.net",
+                "fromMe": False,
+            },
+        },
     }
 
-    response = client.post("/webhook/whatsapp", json=payload)
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"
+    response = client.post("/webhook/evolution_whatsapp", json=payload)
+    assert response.status_code == 202
+    assert response.json() == {"status": "message enqueued", "source_id": "MSG123"}
 
 
-def test_webhook_invalid_payload():
-    payload = {"invalid": "structure"}
-    response = client.post("/webhook/whatsapp", json=payload)
-    print(response.json())
+def test_evolution_webhook_invalid():
+    payload = {"invalid": "data"}
+
+    response = client.post("/webhook/evolution_whatsapp", json=payload)
     assert response.status_code == 400
+    assert response.json() == {"detail": "No valid message found"}
