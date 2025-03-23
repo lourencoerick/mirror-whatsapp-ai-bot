@@ -6,7 +6,7 @@ from app.services.parser.evolution_parser import parse_evolution_message
 from loguru import logger
 
 router = APIRouter()
-queue: IQueue = RedisQueue()
+queue: IQueue = RedisQueue(queue_name="message_queue")
 
 
 @router.post("/webhook/whatsapp", status_code=status.HTTP_202_ACCEPTED)
