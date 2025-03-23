@@ -26,6 +26,4 @@ jobs:
     - name: Run unit tests (no infra)
       run: |
         export PYTHONPATH=backend
-        pytest backend/app/tests \
-          --ignore=backend/app/tests/workers \
-          --disable-warnings
+        pytest backend/app/tests -m unit --disable-warnings
