@@ -1,70 +1,73 @@
 import json
 import time
-from typing import Optional, Union
+from typing import Optional
 from loguru import logger
-from sqlalchemy.orm import Session
-
-from app.database import SessionLocal
-from app.services.logging.message_logger import log_message
+from dotenv import load_dotenv
 from app.services.queue.redis_queue import RedisQueue
-from app.api.schemas.message_schema import MessageCreate
+from app.api.schemas.response_message import ResponseMessage
+
+load_dotenv()
 
 
-class MessageConsumer:
+class MessageProcessor:
     def __init__(
         self,
-        queue_name: str = "message_queue",
-        redis_queue: Optional[RedisQueue] = None,
+        input_queue_name: str = "ready_for_processing_queue",
+        output_queue_name: str = "response_queue",
     ):
-        self.queue = redis_queue or RedisQueue()
-        self.queue_name = queue_name
+        self.input_queue = RedisQueue(queue_name=input_queue_name)
+        self.output_queue = RedisQueue(queue_name=output_queue_name)
+        logger.info("[processor:init] Initialized")
+
+    def process_message(self, message: ResponseMessage) -> Optional[ResponseMessage]:
+        try:
+            if not all([message.text, message.number, message.original_message_id]):
+                logger.warning("[processor:process] Missing required fields")
+                return None
+
+            return ResponseMessage(
+                to=message.number,
+                original_message_id=message.original_message_id,
+                response_text=f"🤖 Auto-reply: '{message.text}'",
+                provider=message.provider,
+                timestamp=time.time(),
+            )
+
+        except Exception:
+            logger.exception("[processor:process] Unexpected failure")
+            return None
 
     def run(self):
-        logger.info("[consumer] Starting message consumer...")
+        logger.info("[processor:run] Starting main loop")
 
         while True:
             try:
-                raw_message: Optional[Union[str, dict]] = self.queue.dequeue()
-                if not raw_message:
+                logger.debug("[queue] Waiting for message...")
+                raw = self.input_queue.dequeue()
+
+                if not raw:
+                    logger.debug("[queue] Empty queue slot")
                     continue
 
-                logger.debug(f"[consumer] Raw message dequeued: {raw_message}")
-                data = (
-                    raw_message
-                    if isinstance(raw_message, dict)
-                    else json.loads(raw_message)
-                )
+                logger.debug(f"[queue] Message dequeued: {raw}")
 
-                start_time = time.time()
-                db: Session = SessionLocal()
                 try:
-                    self._handle_message(db, data)
-                    db.commit()
-                except Exception:
-                    db.rollback()
-                    raise
-                finally:
-                    db.close()
+                    parsed = ResponseMessage.model_validate_json(raw)
+                except Exception as e:
+                    logger.warning(f"[processor:parse] Invalid message format: {e}")
+                    continue
 
-                elapsed = time.time() - start_time
-                logger.debug(f"[consumer] Processed in {elapsed:.2f}s")
+                response = self.process_message(parsed)
 
-            except json.JSONDecodeError:
-                logger.warning("[consumer] Received malformed JSON.")
-            except Exception as e:
-                logger.exception(
-                    f"[consumer] Unexpected failure: {type(e).__name__} - {e}"
-                )
+                if response:
+                    self.output_queue.enqueue(response.model_dump_json())
+                    logger.debug(f"[queue] Response enqueued: {response}")
+                else:
+                    logger.warning("[processor:run] Skipped invalid message")
 
-    def _handle_message(self, db: Session, data: dict):
-        try:
-            message_data = MessageCreate(**data)
-        except Exception as e:
-            logger.warning(f"[consumer] Invalid message payload: {e}")
-            return
+            except Exception:
+                logger.exception("[processor:run] Fatal error in main loop")
 
-        saved = log_message(db=db, **message_data.model_dump())
-        if saved:
-            logger.info(f"[consumer] Message logged successfully: {saved.id}")
-        else:
-            logger.warning("[consumer] Failed to save message")
+
+if __name__ == "__main__":
+    MessageProcessor().run()
