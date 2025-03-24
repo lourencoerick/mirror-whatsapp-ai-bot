@@ -1,18 +1,19 @@
 from sqlalchemy.orm import Session
-from app.models.account_models import Account
-from app.models.inbox_models import Inbox
-from app.models.contact_models import Contact
-from app.models.conversation_models import Conversation
-from app.models.auth_models import User
+from app.database import SessionLocal
+
+# ⛔️ Remova os imports diretos que causam conflito
 
 
 def setup_test_data(db: Session):
-    """
-    Seed essential records to support Message creation tests.
+    from app.models.account_models import Account
+    from app.models.inbox_models import Inbox
+    from app.models.contact_models import Contact
+    from app.models.conversation_models import Conversation
+    from app.models.auth_models import User
+    from app.models.message_models import Message
 
-    This function ensures all foreign key dependencies are resolved before
-    message creation. Useful for integration tests or dev bootstrapping.
-    """
+    print("Hello from setup_test_data.py")
+
     # Create account
     account = Account(id=1, name="Test Account")
     db.merge(account)
@@ -32,9 +33,13 @@ def setup_test_data(db: Session):
     inbox = Inbox(id=1, name="Test Inbox", account_id=1, channel_id=1)
     db.merge(inbox)
 
-    # Create contact
-    contact = Contact(id=1, account_id=1)
-    db.merge(contact)
+    # Create contact 1
+    contact1 = Contact(id=1, account_id=1)
+    db.merge(contact1)
+
+    # Create contact 2
+    contact1 = Contact(id=2, account_id=1)
+    db.merge(contact1)
 
     # Create conversation
     conversation = Conversation(
@@ -49,3 +54,8 @@ def setup_test_data(db: Session):
     db.merge(conversation)
 
     db.commit()
+
+
+if __name__ == "__main__":
+    db: Session = SessionLocal()
+    setup_test_data(db=db)

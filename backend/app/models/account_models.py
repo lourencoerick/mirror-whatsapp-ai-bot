@@ -8,12 +8,10 @@ from sqlalchemy import (
     BigInteger,
     Enum,
 )
+import enum
+
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
-from app.models.subscription_models import Subscription
-from app.models.webhook_event_models import Webhook
-from app.models.agent_models import AgentBotInbox
-import enum
 
 
 class UserRole(enum.Enum):
