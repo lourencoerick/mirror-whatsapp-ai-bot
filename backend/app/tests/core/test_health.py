@@ -2,6 +2,7 @@ import httpx
 import pytest
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_health_check():
     async with httpx.AsyncClient() as client:

@@ -22,18 +22,21 @@ class MessageProcessor:
 
     def process_message(self, message: dict) -> Optional[ResponseMessage]:
         try:
-            content = message.get("content")
-            contact_id = message.get("contact_id")
-            source_id = message.get("source_id")
-            provider = message.get("provider", "evolution")
+            logger.debug(f"[MessageProcessor:process] message recieved: {message}")
+            provider = "evolution"
 
-            if not all([content, contact_id, source_id]):
+            data = message.get("data")
+            content = data.get("message").get("conversation")
+            to_phone_number = data.get("key").get("remoteJid").split("@")[0]
+            message_id = data.get("key").get("id")
+
+            if not all([data, to_phone_number]):
                 logger.warning("[MessageProcessor:process] Missing required fields")
                 return None
 
             return ResponseMessage(
-                to=str(contact_id),
-                original_message_id=source_id,
+                to=str(to_phone_number),
+                original_message_id=message_id,
                 response_text=f"🤖 Auto-reply: '{content}'",
                 provider=provider,
             )

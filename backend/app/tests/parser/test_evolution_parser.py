@@ -2,6 +2,7 @@ import pytest
 from app.services.parser.evolution_parser import parse_evolution_message
 
 
+@pytest.mark.unit
 def test_parse_valid_evolution_payload():
     payload = {
         "event": "messages.upsert",
@@ -27,6 +28,7 @@ def test_parse_valid_evolution_payload():
     assert result["content_attributes"]["provider"] == "evolution"
 
 
+@pytest.mark.unit
 def test_parse_evolution_payload_without_message():
     payload = {
         "event": "messages.upsert",
@@ -40,6 +42,7 @@ def test_parse_evolution_payload_without_message():
     assert result is None
 
 
+@pytest.mark.unit
 def test_parse_invalid_payload_format():
     payload = {"not": "valid"}
 

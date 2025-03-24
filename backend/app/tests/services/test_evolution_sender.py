@@ -11,7 +11,7 @@ def valid_message():
         "text": "Test message",
     }
 
-
+@pytest.mark.unit
 def test_send_message_success(valid_message):
     """Should send message successfully and log info."""
     with patch("httpx.post") as mock_post:
@@ -23,7 +23,7 @@ def test_send_message_success(valid_message):
         mock_post.assert_called_once()
         assert mock_response.raise_for_status.called
 
-
+@pytest.mark.unit
 def test_send_message_http_error_logged(valid_message):
     """Should raise and log HTTP error if status is 4xx/5xx."""
     with patch("httpx.post") as mock_post:
@@ -44,7 +44,7 @@ def test_send_message_http_error_logged(valid_message):
                 mock_log.assert_called()
                 assert "HTTP error" in mock_log.call_args[0][0]
 
-
+@pytest.mark.unit
 def test_send_message_retry_on_request_error(valid_message):
     """Should retry 3 times on connection-level failure."""
     with patch("httpx.post", side_effect=RequestError("Connection error")) as mock_post:
@@ -53,7 +53,7 @@ def test_send_message_retry_on_request_error(valid_message):
 
         assert mock_post.call_count == 3
 
-
+@pytest.mark.unit
 def test_send_message_unexpected_exception(valid_message):
     """Should catch and log unexpected exception."""
     with patch("httpx.post", side_effect=ValueError("unexpected error")):

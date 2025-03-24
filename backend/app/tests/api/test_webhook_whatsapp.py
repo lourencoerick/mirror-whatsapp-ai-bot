@@ -1,9 +1,11 @@
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
 
 
+@pytest.mark.integration
 def test_evolution_webhook_valid(monkeypatch):
     # Simula enfileiramento da mensagem com sucesso
     monkeypatch.setattr("app.api.webhook_routes.queue.enqueue", lambda msg: True)
@@ -29,6 +31,7 @@ def test_evolution_webhook_valid(monkeypatch):
     assert response.json() == {"status": "message enqueued", "source_id": "MSG123"}
 
 
+@pytest.mark.integration
 def test_evolution_webhook_invalid():
     payload = {"invalid": "data"}
 

@@ -46,6 +46,7 @@ def monkeypatch_queue(monkeypatch):
     return webhook_routes.queue
 
 
+@pytest.mark.integration
 def test_webhook_evolution_with_mock(monkeypatch_queue, valid_evolution_payload):
     response = client.post("/webhook/evolution_whatsapp", json=valid_evolution_payload)
 

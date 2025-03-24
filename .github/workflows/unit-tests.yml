@@ -1,20 +1,18 @@
-name: Run Tests
+name: Unit Tests
 
 on: [push, pull_request]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         python-version: [3.11]
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+    - uses: actions/checkout@v2
 
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
@@ -25,13 +23,7 @@ jobs:
         pip install -r backend/requirements.txt
         pip install pytest
 
-    - name: Start FastAPI server
+    - name: Run unit tests (no infra)
       run: |
         export PYTHONPATH=backend
-        nohup uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 &
-      env:
-        PYTHONUNBUFFERED: 1
-
-    - name: Run health test
-      run: |
-        pytest backend/app/tests/test_health.py
+        pytest backend/app/tests -m unit --disable-warnings

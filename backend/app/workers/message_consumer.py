@@ -41,7 +41,7 @@ class MessageConsumer:
                 try:
                     self._handle_message(db, data)
                     db.commit()
-                    self.output_queue.enqueue(json.dumps(data))
+                    self.output_queue.enqueue(raw_message)
                 except Exception:
                     db.rollback()
                     raise
