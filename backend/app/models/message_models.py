@@ -1,11 +1,10 @@
 from sqlalchemy import (
     Column,
     Integer,
-    BigInteger,
     Text,
     String,
     JSON,
-    SmallInteger,
+    Boolean,
     ForeignKey,
     Index,
 )
@@ -28,16 +27,17 @@ class Message(BaseModel):
         Index("messages_source_id_index", "source_id"),
         Index("messages_contact_id_index", "contact_id"),
     )
+    id = Column(Integer, primary_key=True, autoincrement=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     content = Column(Text, nullable=True)
     inbox_id = Column(Integer, ForeignKey("inboxes.id"), nullable=False)
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
-    message_type = Column(Integer, nullable=False)
-    private = Column(SmallInteger, nullable=True)
+    message_type = Column(String(50), nullable=False)  # e.g., "in", "out"
+    private = Column(Boolean, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    status = Column(Integer, nullable=True)
+    status = Column(String(50), nullable=True)  # e.g., "received", "processed"
     source_id = Column(String(255), nullable=True)
-    content_type = Column(Integer, nullable=True)
+    content_type = Column(String(50), nullable=True)  # e.g., "text", "image"
     content_attributes = Column(JSON, nullable=True)
     contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=True)
 
