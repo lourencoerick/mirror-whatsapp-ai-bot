@@ -1,17 +1,20 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Literal
+from pydantic import BaseModel
+from typing import Optional, Literal
+from datetime import datetime
 
 
 class MessageCreate(BaseModel):
-    content: str
-    direction: Literal["in", "out"]
-    account_id: int
     inbox_id: int
+    contact_id: int
     conversation_id: int
-    contact_id: Optional[int] = None
-    user_id: Optional[int] = None
-    source_id: Optional[str] = None
-    status: Optional[int] = None
-    content_attributes: Optional[Dict] = None
-    content_type: Optional[int] = None
-    private: Optional[int] = 0
+
+    source_id: str  # external ID of the message
+    content: Optional[str] = None
+    direction: Literal["in", "out"]
+    content_type: Literal["text", "image", "audio", "file", "video", "conversation"] = (
+        "text"
+    )
+    status: Literal["received", "processed", "failed"] = "received"
+
+    message_timestamp: datetime  # the moment when the user sent the message
+    content_attributes: Optional[dict] = {}
