@@ -1,19 +1,19 @@
-"""create chatbot models
+"""Initial migration
 
-Revision ID: 3e44287f6054
-Revises: 0e79765c725f
-Create Date: 2025-02-20 22:54:19.024759
+Revision ID: d95bdcd2f6f3
+Revises: 
+Create Date: 2025-03-24 13:08:19.146574
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
-revision: str = '3e44287f6054'
-down_revision: Union[str, None] = '0e79765c725f'
+revision: str = 'd95bdcd2f6f3'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -24,6 +24,9 @@ def upgrade() -> None:
     sa.Column('owner_type', sa.String(length=255), nullable=True),
     sa.Column('owner_id', sa.BigInteger(), nullable=True),
     sa.Column('token', sa.String(length=255), nullable=True),
+    sa.Column('expires_at', sa.DateTime(), nullable=True),
+    sa.Column('revoked', sa.Boolean(), nullable=False),
+    sa.Column('scopes', sa.String(length=255), nullable=True),
     sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
@@ -32,9 +35,9 @@ def upgrade() -> None:
     )
     op.create_index('access_tokens_owner_type_owner_id_index', 'access_tokens', ['owner_type', 'owner_id'], unique=False)
     op.create_table('accounts',
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
-    sa.Column('locale', sa.Integer(), nullable=True),
+    sa.Column('locale', sa.String(length=5), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.PrimaryKeyConstraint('id')
@@ -49,7 +52,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('users',
-    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('provider', sa.String(length=255), nullable=False),
     sa.Column('uid', sa.String(length=255), nullable=False),
     sa.Column('encrypted_password', sa.String(length=255), nullable=False),
@@ -79,11 +82,11 @@ def upgrade() -> None:
     )
     op.create_index('users_email_index', 'users', ['email'], unique=False)
     op.create_table('account_users',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('account_id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
-    sa.Column('role', sa.Integer(), nullable=True),
+    sa.Column('role', sa.Enum('ADMIN', 'AGENT', 'VIEWER', 'BOT', name='userrole'), nullable=True),
     sa.Column('inviter_id', sa.BigInteger(), nullable=True),
-    sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ),
@@ -95,15 +98,15 @@ def upgrade() -> None:
     op.create_index('account_users_account_id_index', 'account_users', ['account_id'], unique=False)
     op.create_index('account_users_user_id_index', 'account_users', ['user_id'], unique=False)
     op.create_table('contacts',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('account_id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=True),
     sa.Column('email', sa.String(length=255), nullable=True),
     sa.Column('phone_number', sa.String(length=255), nullable=True),
     sa.Column('pubsub_token', sa.String(length=255), nullable=True),
     sa.Column('identifier', sa.String(length=255), nullable=True),
-    sa.Column('source_id', sa.BigInteger(), nullable=True),
+    sa.Column('source_id', sa.String(length=255), nullable=True),
     sa.Column('additional_attributes', sa.JSON(), nullable=True),
-    sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ),
@@ -114,12 +117,12 @@ def upgrade() -> None:
     )
     op.create_index('contacts_account_id_index', 'contacts', ['account_id'], unique=False)
     op.create_table('inboxes',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('account_id', sa.Integer(), nullable=False),
     sa.Column('channel_id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('channel_type', sa.String(length=255), nullable=True),
-    sa.Column('enable_auto_assignment', sa.SmallInteger(), nullable=True),
-    sa.Column('id', sa.BigInteger(), nullable=False),
+    sa.Column('enable_auto_assignment', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ),
@@ -154,10 +157,10 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('contact_inboxes',
-    sa.Column('contact_id', sa.Integer(), nullable=True),
-    sa.Column('inbox_id', sa.Integer(), nullable=True),
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('contact_id', sa.Integer(), nullable=False),
+    sa.Column('inbox_id', sa.Integer(), nullable=False),
     sa.Column('source_id', sa.String(length=255), nullable=False),
-    sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['contact_id'], ['contacts.id'], ),
@@ -167,14 +170,15 @@ def upgrade() -> None:
     )
     op.create_index('contact_inboxes_source_id_index', 'contact_inboxes', ['source_id'], unique=False)
     op.create_table('inbox_members',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('inbox_id', sa.Integer(), nullable=False),
-    sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['inbox_id'], ['inboxes.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('user_id', 'inbox_id', name='inbox_members_user_id_inbox_id_unique')
     )
     op.create_index('inbox_members_inbox_id_index', 'inbox_members', ['inbox_id'], unique=False)
     op.create_table('webhooks',
@@ -191,18 +195,18 @@ def upgrade() -> None:
     sa.UniqueConstraint('account_id', 'url', name='webhooks_account_id_url_unique')
     )
     op.create_table('conversations',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('account_id', sa.Integer(), nullable=False),
     sa.Column('inbox_id', sa.Integer(), nullable=False),
+    sa.Column('contact_id', sa.Integer(), nullable=True),
+    sa.Column('contact_inbox_id', sa.Integer(), nullable=True),
     sa.Column('status', sa.Integer(), nullable=False),
     sa.Column('assignee_id', sa.Integer(), nullable=True),
-    sa.Column('contact_id', sa.BigInteger(), nullable=True),
     sa.Column('display_id', sa.Integer(), nullable=False),
     sa.Column('user_last_seen_at', sa.DateTime(), nullable=True),
     sa.Column('agent_last_seen_at', sa.DateTime(), nullable=True),
-    sa.Column('locked', sa.SmallInteger(), nullable=True),
-    sa.Column('contact_inbox_id', sa.Integer(), nullable=True),
+    sa.Column('locked', sa.Boolean(), nullable=True),
     sa.Column('additional_attributes', sa.JSON(), nullable=True),
-    sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ),
@@ -236,19 +240,19 @@ def upgrade() -> None:
     op.create_index('events_name_index', 'events', ['name'], unique=False)
     op.create_index('events_user_id_index', 'events', ['user_id'], unique=False)
     op.create_table('messages',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('account_id', sa.Integer(), nullable=False),
     sa.Column('content', sa.Text(), nullable=True),
     sa.Column('inbox_id', sa.Integer(), nullable=False),
     sa.Column('conversation_id', sa.Integer(), nullable=False),
-    sa.Column('message_type', sa.Integer(), nullable=False),
-    sa.Column('private', sa.SmallInteger(), nullable=True),
+    sa.Column('message_type', sa.String(length=50), nullable=False),
+    sa.Column('private', sa.Boolean(), nullable=True),
     sa.Column('user_id', sa.Integer(), nullable=True),
-    sa.Column('status', sa.Integer(), nullable=True),
+    sa.Column('status', sa.String(length=50), nullable=True),
     sa.Column('source_id', sa.String(length=255), nullable=True),
-    sa.Column('content_type', sa.Integer(), nullable=True),
+    sa.Column('content_type', sa.String(length=50), nullable=True),
     sa.Column('content_attributes', sa.JSON(), nullable=True),
     sa.Column('contact_id', sa.Integer(), nullable=True),
-    sa.Column('id', sa.BigInteger(), nullable=False),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['account_id'], ['accounts.id'], ),
@@ -264,20 +268,11 @@ def upgrade() -> None:
     op.create_index('messages_inbox_id_index', 'messages', ['inbox_id'], unique=False)
     op.create_index('messages_source_id_index', 'messages', ['source_id'], unique=False)
     op.create_index('messages_user_id_index', 'messages', ['user_id'], unique=False)
-    op.drop_table('test_models')
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
-    op.create_table('test_models',
-    sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
-    sa.Column('name', sa.VARCHAR(length=255), autoincrement=False, nullable=False),
-    sa.Column('value', sa.INTEGER(), autoincrement=False, nullable=True),
-    sa.Column('created_at', postgresql.TIMESTAMP(), server_default=sa.text('now()'), autoincrement=False, nullable=False),
-    sa.Column('updated_at', postgresql.TIMESTAMP(), server_default=sa.text('now()'), autoincrement=False, nullable=False),
-    sa.PrimaryKeyConstraint('id', name='test_models_pkey')
-    )
     op.drop_index('messages_user_id_index', table_name='messages')
     op.drop_index('messages_source_id_index', table_name='messages')
     op.drop_index('messages_inbox_id_index', table_name='messages')
