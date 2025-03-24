@@ -6,26 +6,30 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
     BigInteger,
+    Enum,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 from app.models.subscription_models import Subscription
 from app.models.webhook_event_models import Webhook
 from app.models.agent_models import AgentBotInbox
+import enum
 
-# from app.models.conversation_models import Conversation
-# from app.models.contact_models import Contact
-# from app.models.auth_models import User
+
+class UserRole(enum.Enum):
+    ADMIN = "admin"
+    AGENT = "agent"
+    VIEWER = "viewer"
+    BOT = "bot"
 
 
 class Account(BaseModel):
     __tablename__ = "accounts"
-    # Para a tabela accounts, o id é INTEGER conforme DDL
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False)
-    locale = Column(Integer, nullable=True)
 
-    # Relacionamentos
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    locale = Column(String(5), nullable=True)
+
     account_users = relationship(
         "AccountUser", back_populates="account", cascade="all, delete-orphan"
     )
@@ -64,9 +68,11 @@ class AccountUser(BaseModel):
         Index("account_users_account_id_index", "account_id"),
         Index("account_users_user_id_index", "user_id"),
     )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    role = Column(Integer, nullable=True)
+    role = Column(Enum(UserRole), nullable=True)
     inviter_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
 
     account = relationship(

@@ -8,6 +8,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
     BigInteger,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -15,8 +16,7 @@ from app.models.base import BaseModel
 
 class User(BaseModel):
     __tablename__ = "users"
-    # Conforme o DDL, o id é INTEGER nesta tabela
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     __table_args__ = (
         UniqueConstraint("provider", "uid", name="users_provider_uid_unique"),
         UniqueConstraint(
@@ -71,3 +71,6 @@ class AccessToken(BaseModel):
     owner_type = Column(String(255), nullable=True)
     owner_id = Column(BigInteger, nullable=True)
     token = Column(String(255), nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+    revoked = Column(Boolean, default=False, nullable=False)
+    scopes = Column(String(255), nullable=True)

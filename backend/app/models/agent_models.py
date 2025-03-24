@@ -5,6 +5,7 @@ from app.models.base import BaseModel
 
 class AgentBot(BaseModel):
     __tablename__ = "agent_bots"
+    __table_args__ = {"extend_existing": True}
     name = Column(String(255), nullable=True)
     description = Column(String(255), nullable=True)
     outgoing_url = Column(String(255), nullable=True)
@@ -16,6 +17,7 @@ class AgentBot(BaseModel):
 
 class AgentBotInbox(BaseModel):
     __tablename__ = "agent_bot_inboxes"
+    __table_args__ = {"extend_existing": True}
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     inbox_id = Column(Integer, ForeignKey("inboxes.id"), nullable=True)
     agent_bot_id = Column(Integer, ForeignKey("agent_bots.id"), nullable=True)
