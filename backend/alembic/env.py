@@ -8,7 +8,7 @@ from alembic import context
 
 from dotenv import load_dotenv
 
-from app.database import Base
+
 from app.database import Base
 from app.models.auth_models import User, AccessToken
 from app.models.account_models import Account, AccountUser
