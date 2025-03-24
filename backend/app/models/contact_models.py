@@ -1,7 +1,6 @@
 from sqlalchemy import (
     Column,
     Integer,
-    BigInteger,
     String,
     JSON,
     ForeignKey,
@@ -14,6 +13,7 @@ from app.models.base import BaseModel
 
 class Contact(BaseModel):
     __tablename__ = "contacts"
+    id = Column(Integer, primary_key=True, autoincrement=True)
     __table_args__ = (
         UniqueConstraint(
             "account_id", "identifier", name="contacts_account_id_identifier_unique"
@@ -30,7 +30,7 @@ class Contact(BaseModel):
     phone_number = Column(String(255), nullable=True)
     pubsub_token = Column(String(255), nullable=True)
     identifier = Column(String(255), nullable=True)
-    source_id = Column(BigInteger, nullable=True)
+    source_id = Column(String(255), nullable=True)
     additional_attributes = Column(JSON, nullable=True)
 
     account = relationship("Account", back_populates="contacts")
@@ -47,14 +47,15 @@ class Contact(BaseModel):
 
 class ContactInbox(BaseModel):
     __tablename__ = "contact_inboxes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
     __table_args__ = (
         UniqueConstraint(
             "inbox_id", "source_id", name="contact_inboxes_inbox_id_source_id_unique"
         ),
         Index("contact_inboxes_source_id_index", "source_id"),
     )
-    contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=True)
-    inbox_id = Column(Integer, ForeignKey("inboxes.id"), nullable=True)
+    contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=False)
+    inbox_id = Column(Integer, ForeignKey("inboxes.id"), nullable=False)
     source_id = Column(String(255), nullable=False)
 
     contact = relationship("Contact", back_populates="contact_inboxes")
