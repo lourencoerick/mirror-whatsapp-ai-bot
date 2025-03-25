@@ -1,7 +1,39 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
+from typing import List
 from loguru import logger
 from app.models.message import Message
 from app.api.schemas.message import MessageCreate
+
+
+def find_messages_by_conversation(
+    db: Session,
+    conversation_id: int,
+    limit: int = 20,
+    offset: int = 0,
+    account_id: int = None,
+) -> List[Message]:
+    """
+    Retrieve messages belonging to a specific conversation, filtered by account.
+
+    Args:
+        db (Session): SQLAlchemy database session.
+        conversation_id (int): The ID of the conversation.
+        limit (int): Max number of messages to return (default: 20).
+        offset (int): How many messages to skip (for pagination).
+        account_id (int): The account context to enforce RLS isolation.
+
+    Returns:
+        List[Message]: A list of messages ordered by message timestamp ascending.
+    """
+    return (
+        db.query(Message)
+        .filter_by(account_id=account_id, conversation_id=conversation_id)
+        .order_by(desc(Message.sent_at))
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
 
 
 def get_or_create_message(db: Session, message_data: MessageCreate) -> Message:

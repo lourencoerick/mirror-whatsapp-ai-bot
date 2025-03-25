@@ -19,3 +19,12 @@ class MessageCreate(BaseModel):
 
     message_timestamp: datetime  # the moment when the user sent the message
     content_attributes: Optional[dict] = {}
+
+
+class MessageRead(BaseModel):
+    id: int
+    content: Optional[str]
+    direction: str
+    message_type: str
+    content_type: Optional[str]
+    sent_at: Optional[datetime]
