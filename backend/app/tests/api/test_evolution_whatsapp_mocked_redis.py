@@ -30,9 +30,11 @@ def valid_evolution_payload():
                 "id": "wamid.12345",
             },
             "pushName": "LL",
-            "message": {"conversation": "Mensagem de teste"},
+            "message": {"conversation": "Olá, isso é um teste!"},
             "messageType": "conversation",
-            "messageTimestamp": 1742607528,
+            "messageTimestamp": 1742771256,
+            "instanceId": "680df327-c714-40a3-aec5-86ccbb57fa19",
+            "source": "ios",
         },
     }
 
@@ -55,5 +57,5 @@ def test_webhook_evolution_with_mock(monkeypatch_queue, valid_evolution_payload)
     assert len(monkeypatch_queue.messages) == 1
 
     message = monkeypatch_queue.dequeue()
-    assert message["content"] == "Mensagem de teste"
+    assert message["content"] == "Olá, isso é um teste!"
     assert message["source_id"] == "wamid.12345"
