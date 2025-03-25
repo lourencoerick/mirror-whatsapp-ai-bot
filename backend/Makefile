@@ -46,3 +46,6 @@ ifndef m
 	$(error Usage: make db-revision m="message")
 endif
 	alembic revision --autogenerate -m "$(m)"
+
+db-reset: ## Reset database
+	psql -U user -d chatbotdb -h database -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
