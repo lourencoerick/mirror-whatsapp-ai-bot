@@ -2,8 +2,8 @@ import json
 from typing import Optional
 from loguru import logger
 from app.services.queue.redis_queue import RedisQueue
-from app.services.sender.whatsapp_sender import send_message as send_whatsapp_message
-from app.services.sender.evolution_sender import send_message as send_evolution_message
+from app.services.sender.whatsapp import send_message as send_whatsapp_message
+from app.services.sender.evolution import send_message as send_evolution_message
 
 
 class ResponseSender:

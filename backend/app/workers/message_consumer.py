@@ -8,7 +8,7 @@ from app.database import SessionLocal
 from app.services.repository.message import get_or_create_message
 from app.services.repository.conversation import find_by_id as conversation_find_by_id
 from app.services.queue.redis_queue import RedisQueue
-from app.api.schemas.message_schema import MessageCreate
+from app.api.schemas.message import MessageCreate
 from app.services.helper.conversation import update_last_message_snapshot
 
 

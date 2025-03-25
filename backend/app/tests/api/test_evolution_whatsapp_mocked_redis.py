@@ -48,7 +48,7 @@ def valid_evolution_payload():
 
 @pytest.fixture
 def monkeypatch_queue(monkeypatch):
-    from app.api import webhook_routes
+    from app.api.routes import webhook as webhook_routes
 
     # Substitui a fila real pela mockada
     webhook_routes.queue = MockQueue()

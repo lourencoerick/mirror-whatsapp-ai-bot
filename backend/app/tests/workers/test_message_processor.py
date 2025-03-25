@@ -1,6 +1,6 @@
 import pytest
 from app.workers.message_processor import MessageProcessor
-from app.api.schemas.response_schema import ResponseMessage
+from app.api.schemas.response import ResponseMessage
 
 
 @pytest.fixture

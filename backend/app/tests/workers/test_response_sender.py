@@ -24,7 +24,7 @@ def test_dispatches_to_evolution_sender(mock_queue, valid_evolution_message):
     raw = json.dumps(valid_evolution_message)
     mock_queue.dequeue.return_value = raw
 
-    with patch("app.services.sender.evolution_sender.send_message") as mock_send:
+    with patch("app.services.sender.evolution.send_message") as mock_send:
         sender = ResponseSender()
         sender.queue = mock_queue
         with patch("app.workers.response_sender.logger"):

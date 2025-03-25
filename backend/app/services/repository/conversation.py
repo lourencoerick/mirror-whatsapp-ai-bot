@@ -6,7 +6,7 @@ from loguru import logger
 from app.middleware.account_context import get_account_id
 from app.models.conversation import Conversation
 from app.models.contact__inbox import ContactInbox
-from app.api.schemas.message_schema import MessageCreate
+from app.api.schemas.message import MessageCreate
 
 
 def find_by_id(db: Session, conversation_id: int) -> Optional[Conversation]:
