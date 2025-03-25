@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
+from app.middleware.account_context import AccountContextMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
 from app.api import webhook_routes
@@ -19,6 +20,9 @@ app = FastAPI()
 # Get the frontend domain from environment variables
 frontend_domain = os.getenv("FRONTEND_DOMAIN", "http://localhost:3001")
 secret_key = os.getenv("SECRET_KEY", "my_secret_key")
+
+
+app.add_middleware(AccountContextMiddleware)
 
 # Add session middleware
 app.add_middleware(

@@ -3,7 +3,14 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services.queue.iqueue import IQueue
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    from app.main import app
+
+    client_app = TestClient(app)
+    client_app.headers.update({"X-Account-ID": "1"})
+    return client_app
 
 
 # Simulador (mock) de fila para testes
@@ -49,7 +56,9 @@ def monkeypatch_queue(monkeypatch):
 
 
 @pytest.mark.integration
-def test_webhook_evolution_with_mock(monkeypatch_queue, valid_evolution_payload):
+def test_webhook_evolution_with_mock(
+    client, monkeypatch_queue, valid_evolution_payload
+):
     response = client.post("/webhook/evolution_whatsapp", json=valid_evolution_payload)
 
     assert response.status_code == 202
