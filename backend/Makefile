@@ -25,9 +25,9 @@ setup-env: ## Install requirements
 
 test-unit: ## Run unit tests
 ifdef vv
-	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) --ignore=$(TEST_DIR)/workers --disable-warnings -vv
+	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) -m unit --disable-warnings -vv
 else
-	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) --ignore=$(TEST_DIR)/workers --disable-warnings
+	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) -m unit --disable-warnings
 endif
 
 test-integration: ## Run integration tests
