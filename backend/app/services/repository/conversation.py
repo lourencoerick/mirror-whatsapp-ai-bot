@@ -5,6 +5,20 @@ from app.models.conversation import Conversation
 from app.api.schemas.message_schema import MessageCreate
 
 
+def find_by_id(db: Session, conversation_id: int) -> Optional[Conversation]:
+    """
+    Retrieves a conversation by ID.
+    """
+    conversation = db.query(Conversation).filter_by(id=conversation_id).first()
+
+    if conversation:
+        logger.debug(f"[conversation] Found conversation {conversation.id}")
+    else:
+        logger.warning(f"[conversation] Not found: {conversation_id}")
+
+    return conversation
+
+
 def find_conversation(
     db: Session, account_id: int, inbox_id: int, contact_inbox_id: int
 ) -> Optional[Conversation]:
