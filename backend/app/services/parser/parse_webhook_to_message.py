@@ -65,6 +65,7 @@ def parse_webhook_to_message(
 
     # Step 5 - Finalize message DTO
     message_create = MessageCreate(
+        account_id=account_id,
         content=parsed["content"],
         direction=parsed["direction"],
         source_id=parsed["source_id"],

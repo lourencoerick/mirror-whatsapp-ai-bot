@@ -4,6 +4,7 @@ from datetime import datetime
 
 
 class MessageCreate(BaseModel):
+    account_id: int
     inbox_id: int
     contact_id: int
     conversation_id: int
