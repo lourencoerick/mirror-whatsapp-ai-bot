@@ -27,6 +27,10 @@ def update_last_message_snapshot(conversation: Conversation, message: Message) -
         conversation.additional_attributes = {}
 
     conversation.additional_attributes["last_message"] = snapshot
+
+    if message.contact and message.contact.name:
+        conversation.additional_attributes["contact_name"] = message.contact.name
+
     conversation.last_message_at = message.message_timestamp
 
     logger.debug(

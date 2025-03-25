@@ -5,6 +5,7 @@ from app.middleware.account_context import AccountContextMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
 from app.api import webhook_routes
+from app.api.routes import conversation as conversation_routes
 from app.api import dev_routes
 
 
@@ -44,6 +45,8 @@ app.include_router(dev_routes.router)
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 
 app.include_router(webhook_routes.router)
+
+app.include_router(conversation_routes.router)
 
 
 @app.get("/")
