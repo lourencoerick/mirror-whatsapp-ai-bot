@@ -1,4 +1,4 @@
-import json
+from datetime import datetime
 import pytest
 from unittest.mock import patch, MagicMock
 from app.workers.message_consumer import MessageConsumer
@@ -21,8 +21,8 @@ def mock_output_queue():
 
 
 @pytest.fixture
-def mock_log_message():
-    with patch("app.workers.message_consumer.log_message") as mocked:
+def mock_get_or_create_message():
+    with patch("app.workers.message_consumer.get_or_create_message") as mocked:
         yield mocked
 
 
@@ -33,16 +33,26 @@ def valid_message():
         "direction": "in",
         "account_id": 1,
         "inbox_id": 1,
-        "conversation_id": 1,
         "contact_id": 1,
+        "conversation_id": 1,
+        "source_id": "msg-123",
+        "message_timestamp": datetime.utcnow().isoformat(),
+        "content_type": "text",
+        "status": "received",
+        "private": False,
+        "content_attributes": {},
     }
 
 
 @pytest.mark.unit
 def test_handle_valid_message(
-    mock_db, mock_log_message, mock_input_queue, mock_output_queue, valid_message
+    mock_db,
+    mock_get_or_create_message,
+    mock_input_queue,
+    mock_output_queue,
+    valid_message,
 ):
-    mock_log_message.return_value = MagicMock(id=123)
+    mock_get_or_create_message.return_value = MagicMock(id=123)
 
     consumer = MessageConsumer(
         input_queue_name="message_queue",
@@ -53,7 +63,7 @@ def test_handle_valid_message(
 
     consumer._handle_message(db=mock_db, data=valid_message)
 
-    mock_log_message.assert_called_once()
+    mock_get_or_create_message.assert_called_once()
 
 
 @pytest.mark.unit
@@ -91,9 +101,13 @@ def test_handle_message_with_invalid_schema_logs_warning(
 
 @pytest.mark.unit
 def test_handle_message_log_failure(
-    mock_db, mock_log_message, mock_input_queue, mock_output_queue, valid_message
+    mock_db,
+    mock_get_or_create_message,
+    mock_input_queue,
+    mock_output_queue,
+    valid_message,
 ):
-    mock_log_message.return_value = None
+    mock_get_or_create_message.return_value = None
     consumer = MessageConsumer()
     consumer.input_queue = mock_input_queue
     consumer.output_queue = mock_output_queue
