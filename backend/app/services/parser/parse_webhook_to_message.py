@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.services.parser.evolution_parser import parse_evolution_message
 from app.services.repository.inbox import find_by_channel_id
-from app.services.repository.contact import upsert_contact
+from app.services.repository.contact import upsert_contact, get_or_create_contact_inbox
 from app.services.repository.conversation import get_or_create_conversation
 from app.api.schemas.message_schema import MessageCreate
 
@@ -41,15 +41,18 @@ def parse_webhook_to_message(
         logger.error(f"[parser] Inbox not found for channel_id {channel_id}")
         return None
 
-    # Step 3 - Contact (upsert)
-    contact, contact_inbox = upsert_contact(
+    # Step 3 - Contact (upsert) & ContactInbox
+    contact = upsert_contact(
         db=db,
         account_id=account_id,
-        inbox_id=inbox.id,
-        source_id=source_id,
         phone_number=contact_phone,
         name=contact_name,
     )
+
+    contact_inbox = get_or_create_contact_inbox(
+        db=db, contact_id=contact.id, inbox_id=inbox.id, source_id=source_id
+    )
+
     logger.info(f"[parser] contact: {contact}, contact_inbox {contact_inbox}")
 
     # Step 4 - Conversation (get or create)
