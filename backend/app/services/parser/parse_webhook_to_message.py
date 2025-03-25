@@ -53,8 +53,6 @@ def parse_webhook_to_message(
         db=db, contact_id=contact.id, inbox_id=inbox.id, source_id=source_id
     )
 
-    logger.info(f"[parser] contact: {contact}, contact_inbox {contact_inbox}")
-
     # Step 4 - Conversation (get or create)
     conversation = get_or_create_conversation(
         db=db,
