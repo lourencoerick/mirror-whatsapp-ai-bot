@@ -3,10 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.models.account import Account
 from app.models.user import User
-from models.inbox import Inbox
+from app.models.inbox import Inbox
 from app.models.contact import Contact
 from app.models.contact__inbox import ContactInbox
-from models.conversation import Conversation
+from app.models.conversation import Conversation
 
 
 def setup_initial_data(db: Session):
