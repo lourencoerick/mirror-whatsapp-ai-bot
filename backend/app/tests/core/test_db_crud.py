@@ -17,6 +17,15 @@ def create_table(cursor):
     )
 
 
+def drop_table(cursor):
+    # Create a table named test_table if it does not already exist.
+    cursor.execute(
+        """
+        DROP TABLE test_table;
+        """
+    )
+
+
 def insert_data(cursor, name):
     # Insert a record into test_table and return the generated id.
     cursor.execute("INSERT INTO test_table (name) VALUES (%s) RETURNING id", (name,))
@@ -93,6 +102,10 @@ def test_crud_operations():
         # Try to read the deleted data
         data = read_data(cursor, inserted_id)
         print(f"Data after deletion: {data}")
+
+        drop_table(cursor)
+        connection.commit()
+        print("Table droped successfully.")
 
     except Exception as e:
         print(f"Error during CRUD operations: {e}")
