@@ -53,3 +53,7 @@ endif
 
 db-reset: ## Reset database
 	psql -U user -d chatbotdb -h database -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+
+db-load: ## Load demo data to the database
+	PYTHONPATH=./ $(PYTHON) scripts/setup_onboarding.py
+	
