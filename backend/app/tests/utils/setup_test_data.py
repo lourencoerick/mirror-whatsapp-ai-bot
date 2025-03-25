@@ -5,12 +5,12 @@ from app.database import SessionLocal
 
 
 def setup_test_data(db: Session):
-    from app.models.account_models import Account
-    from app.models.inbox_models import Inbox
-    from app.models.contact_models import Contact
-    from app.models.conversation_models import Conversation
-    from app.models.auth_models import User
-    from app.models.message_models import Message
+    from app.models.account import Account
+    from app.models.inbox import Inbox
+    from app.models.contact import Contact
+    from app.models.conversation import Conversation
+    from app.models.user import User
+    from app.models.message import Message
 
     print("Hello from setup_test_data.py")
 

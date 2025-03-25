@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import Optional
 from loguru import logger
-from app.models.conversation_models import Conversation
+from app.models.conversation import Conversation
 from app.api.schemas.message_schema import MessageCreate
 
 
