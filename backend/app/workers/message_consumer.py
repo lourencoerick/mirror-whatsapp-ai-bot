@@ -5,7 +5,7 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.services.logging.message_logger import log_message
+from app.services.repository.message import get_or_create_message
 from app.services.queue.redis_queue import RedisQueue
 from app.api.schemas.message_schema import MessageCreate
 
@@ -42,6 +42,9 @@ class MessageConsumer:
                     self._handle_message(db, data)
                     db.commit()
                     self.output_queue.enqueue(raw_message)
+                    logger.debug(
+                        f"[consumer] Enqueue raw_message in output_queue {raw_message}s"
+                    )
                 except Exception:
                     db.rollback()
                     raise
@@ -65,7 +68,7 @@ class MessageConsumer:
             logger.warning(f"[consumer] Invalid message payload: {e}")
             return
 
-        saved = log_message(db=db, **message_data.model_dump())
+        saved = get_or_create_message(db=db, message_data=message_data)
         if saved:
             logger.info(f"[consumer] Message logged successfully: {saved.id}")
         else:

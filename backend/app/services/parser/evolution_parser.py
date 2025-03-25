@@ -1,62 +1,52 @@
 from typing import Dict, Optional
 from loguru import logger
+from app.api.schemas.message_schema import MessageCreate
 
 
 def parse_evolution_message(payload: Dict) -> Optional[Dict]:
     """
-    Parses incoming webhook payload from Evolution API into internal message format.
-
-    Args:
-        payload (Dict): Raw webhook from Evolution.
+    Parses the incoming Evolution webhook and extracts raw message info.
 
     Returns:
-        Optional[Dict]: Parsed message ready for enqueueing, or None if invalid.
+        Dict with message content and metadata, or None if invalid.
     """
     try:
         event = payload.get("event", "")
-        if event not in ["messages.upsert"]:
-            logger.warning(f"[parse] Invalid event type: {event}")
+        if event != "messages.upsert":
+            logger.warning(f"[evolution_parser] Unsupported event: {event}")
             return None
+
         data = payload.get("data", {})
         key = data.get("key", {})
-        message_content = data.get("message", {}).get("conversation")
+        content = data.get("message", {}).get("conversation")
+        source_id = key.get("id")
+        remote_jid = key.get("remoteJid")
+        timestamp = data.get("messageTimestamp")
 
-        if not message_content or not key.get("id") or not key.get("remoteJid"):
-            logger.warning("[parse] Missing required fields in payload")
+        if not content or not source_id or not remote_jid or not timestamp:
+            logger.warning("[evolution_parser] Missing required message fields")
             return None
 
-        # Extract direction: true = fromMe (outgoing), false = incoming
-        direction = "out" if key.get("fromMe", False) else "in"
-
-        # Remove domain from contact JID (e.g., "5511941986775@s.whatsapp.net")
-        raw_contact = key.get("remoteJid", "")
-        contact_number = (
-            raw_contact.split("@")[0] if "@" in raw_contact else raw_contact
-        )
+        direction = "out" if key.get("fromMe") else "in"
+        content_type = data.get("messageType", "text")
 
         parsed = {
-            "content": message_content,
+            "content": content,
             "direction": direction,
-            "source_id": key.get("id"),
-            "contact_id": 2,  # Placeholder for now
-            "account_id": 1,  # Placeholder for now
-            "inbox_id": 1,  # Placeholder for now
-            "conversation_id": 1,  # Placeholder for now
-            "status": 1,
-            "content_type": 1,  # Assuming 1 = text
-            "private": 0,
+            "source_id": source_id,
+            "remote_jid": remote_jid,
+            "message_timestamp": timestamp,
+            "content_type": content_type,
             "content_attributes": {
                 "provider": "evolution",
-                "sender": payload.get("sender"),
                 "instance_id": data.get("instanceId"),
-                "message_type": data.get("messageType"),
-                "timestamp": data.get("messageTimestamp"),
+                "sender": payload.get("sender"),
+                "raw_message_type": data.get("messageType"),
             },
         }
 
-        logger.debug(f"[parse] Parsed message: {parsed}")
         return parsed
 
     except Exception:
-        logger.exception("[parse] Failed to parse Evolution webhook")
+        logger.exception("[evolution_parser] Failed to parse webhook")
         return None

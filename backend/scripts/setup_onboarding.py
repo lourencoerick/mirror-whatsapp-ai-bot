@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.account_models import Account
 from app.models.auth_models import User
 from app.models.inbox_models import Inbox
-from app.models.contact_models import Contact
+from app.models.contact_models import Contact, ContactInbox
 from app.models.conversation_models import Conversation
 
 
@@ -27,8 +27,8 @@ def setup_initial_data(db: Session):
     inbox = Inbox(
         id=1,
         account_id=1,
-        channel_id=1,
-        name="WhatsApp Inbox",
+        channel_id="680df327-c714-40a3-aec5-86ccbb57fa19",
+        name="Evolution Inbox",
         channel_type="evolution",
     )
     db.merge(inbox)
@@ -38,14 +38,18 @@ def setup_initial_data(db: Session):
     )
     db.merge(contact)
 
+    contact_inbox = ContactInbox(
+        id=1, contact_id=contact.id, inbox_id=inbox.id, source_id="teste"
+    )
+
+    db.merge(contact_inbox)
+
     conversation = Conversation(
         id=1,
         account_id=1,
         inbox_id=1,
-        status=0,
-        display_id=1000,
-        contact_id=1,
-        contact_inbox_id=None,
+        status="open",
+        contact_inbox_id=contact_inbox.id,
     )
     db.merge(conversation)
 

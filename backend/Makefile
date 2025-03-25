@@ -24,7 +24,11 @@ setup-env: ## Install requirements
 	$(PYTHON) -m pip install -r requirements.txt
 
 test-unit: ## Run unit tests
-	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) --ignore=$(TEST_DIR)/workers --disable-warnings -vv
+ifdef vv
+	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) -m unit --disable-warnings -vv
+else
+	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) -m unit --disable-warnings
+endif
 
 test-integration: ## Run integration tests
 	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) -m integration --disable-warnings
@@ -46,3 +50,6 @@ ifndef m
 	$(error Usage: make db-revision m="message")
 endif
 	alembic revision --autogenerate -m "$(m)"
+
+db-reset: ## Reset database
+	psql -U user -d chatbotdb -h database -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"

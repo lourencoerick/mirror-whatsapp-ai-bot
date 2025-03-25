@@ -17,7 +17,7 @@ class Inbox(BaseModel):
     __table_args__ = (Index("inboxes_account_id_index", "account_id"),)
 
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    channel_id = Column(Integer, nullable=False)
+    channel_id = Column(String(255), nullable=False)
     name = Column(String(255), nullable=False)
     channel_type = Column(String(255), nullable=True)
     enable_auto_assignment = Column(Boolean, nullable=True)

@@ -1,4 +1,5 @@
 import json
+import datetime
 from redis import Redis
 from typing import Optional
 from loguru import logger
@@ -7,6 +8,12 @@ from app.services.queue.iqueue import IQueue
 from app.config import get_settings
 
 settings = get_settings()
+
+
+def default_converter(o):
+    if isinstance(o, datetime.datetime):
+        return o.isoformat()
+    raise TypeError(f"The type {type(o)} is not serializable")
 
 
 class RedisQueue(IQueue):
@@ -30,7 +37,7 @@ class RedisQueue(IQueue):
 
     def enqueue(self, message: dict) -> None:
         """Push a message to the Redis queue."""
-        serialized = json.dumps(message)
+        serialized = json.dumps(message, default=default_converter)
         self.client.lpush(self.queue_name, serialized)
         logger.debug(f"[RedisQueue] Enqueued message: {serialized}")
 

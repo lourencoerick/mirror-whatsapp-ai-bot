@@ -37,9 +37,6 @@ class Contact(BaseModel):
     contact_inboxes = relationship(
         "ContactInbox", back_populates="contact", cascade="all, delete-orphan"
     )
-    conversations = relationship(
-        "Conversation", back_populates="contact", cascade="all, delete-orphan"
-    )
     messages = relationship(
         "Message", back_populates="contact", cascade="all, delete-orphan"
     )
@@ -60,3 +57,4 @@ class ContactInbox(BaseModel):
 
     contact = relationship("Contact", back_populates="contact_inboxes")
     inbox = relationship("Inbox", back_populates="contact_inboxes")
+    conversation = relationship("Conversation", back_populates="contact_inbox")
