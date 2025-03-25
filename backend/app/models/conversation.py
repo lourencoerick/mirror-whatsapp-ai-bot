@@ -38,6 +38,7 @@ class Conversation(BaseModel):
     agent_last_seen_at = Column(DateTime, nullable=True)
     locked = Column(Boolean, nullable=True)
 
+    last_message_at = Column(DateTime, nullable=True, index=True)
     additional_attributes = Column(JSON, nullable=True)
 
     account = relationship("Account", back_populates="conversations")
