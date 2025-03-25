@@ -27,7 +27,13 @@
                 "ms-toolsai.jupyter",
                 "humao.rest-client",
                 "cirlorm.mobileview",
+                "bradlc.vscode-tailwindcss",
+                "Prisma.prisma",
+                "esbenp.prettier-vscode",
+                "ritwickdey.LiveServer",
+                "naumovs.color-highlight",
                 "ms-vscode.makefile-tools"
+
             ]
         }
     },
