@@ -16,11 +16,11 @@ from app.models.base import BaseModel
 class Conversation(BaseModel):
     __tablename__ = "conversations"
     __table_args__ = (
-        UniqueConstraint(
-            "account_id",
-            "display_id",
-            name="conversations_account_id_display_id_unique",
-        ),
+        # UniqueConstraint(
+        #     "account_id",
+        #     "display_id",
+        #     name="conversations_account_id_display_id_unique",
+        # ),
         Index("conversations_account_id_index", "account_id"),
         Index("conversations_contact_inbox_id_index", "contact_inbox_id"),
     )

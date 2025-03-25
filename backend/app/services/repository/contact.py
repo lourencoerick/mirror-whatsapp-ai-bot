@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 from typing import Optional
 from loguru import logger
-from app.models.contact_models import Contact, ContactInbox
+from app.models.contact import Contact
+from app.models.contact__inbox import ContactInbox
 
 
 def find_by_phone(db: Session, account_id: int, phone_number: str) -> Optional[Contact]:

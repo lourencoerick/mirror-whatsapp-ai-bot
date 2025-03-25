@@ -1,11 +1,12 @@
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from app.models.account_models import Account
-from app.models.auth_models import User
-from app.models.inbox_models import Inbox
-from app.models.contact_models import Contact, ContactInbox
-from app.models.conversation_models import Conversation
+from app.models.account import Account
+from app.models.user import User
+from app.models.inbox import Inbox
+from app.models.contact import Contact
+from app.models.contact__inbox import ContactInbox
+from app.models.conversation import Conversation
 
 
 def setup_initial_data(db: Session):

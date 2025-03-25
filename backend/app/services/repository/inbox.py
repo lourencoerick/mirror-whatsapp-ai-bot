@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import Optional
 from loguru import logger
-from app.models.inbox_models import Inbox
+from app.models.inbox import Inbox
 
 
 def find_by_channel_id(
