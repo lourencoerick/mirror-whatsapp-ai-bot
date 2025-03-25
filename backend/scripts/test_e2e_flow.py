@@ -7,8 +7,8 @@ from app.services.queue.redis_queue import RedisQueue
 from app.workers.message_consumer import MessageConsumer
 from app.workers.message_processor import MessageProcessor
 from app.workers.response_sender import ResponseSender
-from app.api.schemas.response_schema import ResponseMessage
-from app.services.sender import evolution_sender
+from app.api.schemas.response import ResponseMessage
+from app.services.sender import evolution as evolution_sender
 from app.database import SessionLocal
 
 client = TestClient(app)

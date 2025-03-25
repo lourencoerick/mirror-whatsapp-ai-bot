@@ -4,9 +4,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.middleware.account_context import AccountContextMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth import router as auth_router
-from app.api import webhook_routes
+from app.api.routes import webhook as webhook_routes
 from app.api.routes import conversation as conversation_routes
-from app.api import dev_routes
+from app.api.routes import dev as dev_routes
 
 
 from dotenv import load_dotenv

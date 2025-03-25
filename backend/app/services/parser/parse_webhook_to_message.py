@@ -6,7 +6,7 @@ from app.services.parser.evolution_parser import parse_evolution_message
 from app.services.repository.inbox import find_by_channel_id
 from app.services.repository.contact import upsert_contact, get_or_create_contact_inbox
 from app.services.repository.conversation import get_or_create_conversation
-from app.api.schemas.message_schema import MessageCreate
+from app.api.schemas.message import MessageCreate
 
 
 def parse_webhook_to_message(

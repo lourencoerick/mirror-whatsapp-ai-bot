@@ -5,7 +5,7 @@ from loguru import logger
 from dotenv import load_dotenv
 
 from app.services.queue.redis_queue import RedisQueue
-from app.api.schemas.response_schema import ResponseMessage
+from app.api.schemas.response import ResponseMessage
 
 load_dotenv()
 

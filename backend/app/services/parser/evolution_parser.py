@@ -1,6 +1,6 @@
 from typing import Dict, Optional
 from loguru import logger
-from app.api.schemas.message_schema import MessageCreate
+from app.api.schemas.message import MessageCreate
 
 
 def parse_evolution_message(payload: Dict) -> Optional[Dict]:

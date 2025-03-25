@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from httpx import RequestError, HTTPStatusError, Response
-from app.services.sender import evolution_sender
+from app.services.sender import evolution as evolution_sender
 
 
 @pytest.fixture
@@ -10,6 +10,7 @@ def valid_message():
         "number": "5511999999999",
         "text": "Test message",
     }
+
 
 @pytest.mark.unit
 def test_send_message_success(valid_message):
@@ -22,6 +23,7 @@ def test_send_message_success(valid_message):
 
         mock_post.assert_called_once()
         assert mock_response.raise_for_status.called
+
 
 @pytest.mark.unit
 def test_send_message_http_error_logged(valid_message):
@@ -38,11 +40,12 @@ def test_send_message_http_error_logged(valid_message):
                 "Bad Request", request=request, response=response
             ),
         ):
-            with patch("app.services.sender.evolution_sender.logger.error") as mock_log:
+            with patch("app.services.sender.evolution.logger.error") as mock_log:
                 with pytest.raises(HTTPStatusError):
                     evolution_sender.send_message(valid_message)
                 mock_log.assert_called()
                 assert "HTTP error" in mock_log.call_args[0][0]
+
 
 @pytest.mark.unit
 def test_send_message_retry_on_request_error(valid_message):
@@ -53,11 +56,12 @@ def test_send_message_retry_on_request_error(valid_message):
 
         assert mock_post.call_count == 3
 
+
 @pytest.mark.unit
 def test_send_message_unexpected_exception(valid_message):
     """Should catch and log unexpected exception."""
     with patch("httpx.post", side_effect=ValueError("unexpected error")):
-        with patch("app.services.sender.evolution_sender.logger.exception") as mock_log:
+        with patch("app.services.sender.evolution.logger.exception") as mock_log:
             with pytest.raises(ValueError):
                 evolution_sender.send_message(valid_message)
             mock_log.assert_called()

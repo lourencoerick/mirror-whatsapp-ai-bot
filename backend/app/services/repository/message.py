@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from loguru import logger
 from app.models.message import Message
-from app.api.schemas.message_schema import MessageCreate
+from app.api.schemas.message import MessageCreate
 
 
 def get_or_create_message(db: Session, message_data: MessageCreate) -> Message:
