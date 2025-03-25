@@ -31,7 +31,7 @@
                 "Prisma.prisma",
                 "esbenp.prettier-vscode",
                 "ritwickdey.LiveServer",
-                "naumovs.color-highlight"
+                "naumovs.color-highlight",
                 "ms-vscode.makefile-tools"
 
             ]
