@@ -24,7 +24,11 @@ setup-env: ## Install requirements
 	$(PYTHON) -m pip install -r requirements.txt
 
 test-unit: ## Run unit tests
+ifdef vv
 	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) --ignore=$(TEST_DIR)/workers --disable-warnings -vv
+else
+	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) --ignore=$(TEST_DIR)/workers --disable-warnings
+endif
 
 test-integration: ## Run integration tests
 	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) -m integration --disable-warnings
