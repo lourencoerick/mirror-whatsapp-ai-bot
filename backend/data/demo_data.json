@@ -1,0 +1,120 @@
+{
+    "accounts": [
+      {
+        "id": 1,
+        "name": "Demo Account",
+        "locale": "pt-BR"
+      }
+    ],
+    "users": [
+      {
+        "id": 1,
+        "name": "Bot User",
+        "provider": "internal",
+        "uid": "bot_user_1",
+        "encrypted_password": "secret",
+        "sign_in_count": 0
+      }
+    ],
+    "inboxes": [
+      {
+        "id": 1,
+        "account_id": 1,
+        "channel_id": "abc-123",
+        "name": "Inbox A",
+        "channel_type": "evolution"
+      },
+      {
+        "id": 2,
+        "account_id": 1,
+        "channel_id": "xyz-789",
+        "name": "Inbox B",
+        "channel_type": "evolution"
+      }
+    ],
+    "contacts": [
+      {
+        "id": 1,
+        "account_id": 1,
+        "name": "Alice",
+        "identifier": "5511988881111"
+      },
+      {
+        "id": 2,
+        "account_id": 1,
+        "name": "Bob",
+        "identifier": "5511999992222"
+      }
+    ],
+    "contact_inboxes": [
+      {
+        "id": 1,
+        "contact_id": 1,
+        "inbox_id": 1,
+        "source_id": "source-alice"
+      },
+      {
+        "id": 2,
+        "contact_id": 2,
+        "inbox_id": 2,
+        "source_id": "source-bob"
+      }
+    ],
+    "conversations": [
+      {
+        "id": 1,
+        "account_id": 1,
+        "inbox_id": 1,
+        "contact_inbox_id": 1,
+        "status": "open"
+      },
+      {
+        "id": 2,
+        "account_id": 1,
+        "inbox_id": 2,
+        "contact_inbox_id": 2,
+        "status": "open"
+      }
+    ],
+    "messages": [
+      {
+        "account_id": 1,
+        "inbox_id": 1,
+        "contact_id": 1,
+        "conversation_id": 1,
+        "message_type": "in",
+        "direction": "in",
+        "content": "Oi!",
+        "content_type": "text",
+        "source_id": "msg-001",
+        "sent_at": "2025-03-25T22:15:11.699095",
+        "status": "received"
+      },
+      {
+        "account_id": 1,
+        "inbox_id": 1,
+        "contact_id": 1,
+        "conversation_id": 1,
+        "message_type": "out",
+        "direction": "out",
+        "content": "Ol\u00e1, como posso ajudar?",
+        "content_type": "text",
+        "source_id": "msg-002",
+        "sent_at": "2025-03-25T22:17:11.699095",
+        "status": "sent"
+      },
+      {
+        "account_id": 1,
+        "inbox_id": 2,
+        "contact_id": 2,
+        "conversation_id": 2,
+        "message_type": "in",
+        "direction": "in",
+        "content": "Tenho uma d\u00favida",
+        "content_type": "text",
+        "source_id": "msg-003",
+        "sent_at": "2025-03-25T22:20:11.699095",
+        "status": "received"
+      }
+    ]
+  }
