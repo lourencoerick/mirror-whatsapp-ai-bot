@@ -1,7 +1,7 @@
 import api from '@/lib/api';
 
 interface SendMessagePayload {
-  conversationId: string;
+  // conversationId: string;
   content: string;
 }
 
