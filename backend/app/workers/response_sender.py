@@ -1,70 +1,90 @@
 import json
-from typing import Optional
 from loguru import logger
+from sqlalchemy.orm import Session
+from app.database import SessionLocal
 from app.services.queue.redis_queue import RedisQueue
-from app.services.sender.whatsapp import send_message as send_whatsapp_message
-from app.services.sender.evolution import send_message as send_evolution_message
+from app.services.sender.evolution import send_message as evolution_send_message
+from app.services.repository import message as message_repo
+import httpx
 
 
 class ResponseSender:
     """
-    Worker responsible for consuming response messages from a Redis queue
-    and dispatching them to the appropriate external provider.
+    Background worker responsible for sending messages to external providers (e.g., Evolution).
+    It listens to the `ready_for_sending_queue`, fetches the message by ID, and attempts delivery.
     """
 
     def __init__(self, queue_name: str = "response_queue"):
         """
-        Initialize the ResponseSender with a given Redis queue name.
+        Initializes the Redis queue listener.
 
         Args:
-            queue_name (str): Name of the Redis queue to consume messages from.
+            queue_name (str): The name of the Redis queue to consume from.
         """
         self.queue = RedisQueue(queue_name=queue_name)
-        logger.info("[init] ResponseSender initialized.")
+        logger.info(f"[sender:init] ResponseSender initialized queue: {queue_name}")
 
-    def _process_one_message(self) -> None:
+    def run(self):
         """
-        Process a single message from the response queue.
-        This method is testable in isolation.
+        Starts the infinite loop to consume and process messages from the queue.
         """
-        try:
-            logger.debug("[queue] Waiting for message...")
-            raw_message: Optional[str] = self.queue.dequeue()
-            if not raw_message:
-                return
-
-            logger.debug(f"[queue] Message dequeued: {raw_message}")
-            message = (
-                raw_message
-                if isinstance(raw_message, dict)
-                else json.loads(raw_message)
-            )
-
-            provider = message.get("provider")
-            if provider == "whatsapp":
-                send_whatsapp_message(message)
-            elif provider == "evolution":
-                logger.debug(f"[worker] sending message to evolution")
-                send_evolution_message(message)
-            else:
-                logger.warning(f"[worker] Unknown provider: {provider}")
-
-        except json.JSONDecodeError:
-            logger.warning("[worker] Received malformed JSON.")
-        except Exception:
-            logger.exception("[worker] Unexpected failure during send.")
-
-    def run(self) -> None:
-        """
-        Starts the infinite loop that listens for messages from the queue
-        and sends them via the appropriate provider.
-        """
-        logger.info("[worker] ResponseSender main loop started.")
+        logger.info("[sender] Listening for messages to send...")
 
         while True:
-            self._process_one_message()
+            try:
+                payload = self.queue.dequeue()
+                if not payload:
+                    continue
+
+                logger.debug(f"[sender] Raw data dequeued: {payload}")
+                # payload = json.loads(raw_data)
+                message_id = payload.get("message_id")
+
+                if not message_id:
+                    logger.warning("[sender] Payload missing 'message_id'")
+                    continue
+
+                with SessionLocal() as db:
+                    self._handle_message(db, message_id)
+                    db.commit()
+
+            except Exception as e:
+                logger.exception(f"[sender] Fatal error in loop: {e}")
+
+    def _handle_message(self, db: Session, message_id: int):
+        """
+        Handles delivery of a specific message by ID.
+
+        Args:
+            db (Session): Active SQLAlchemy database session.
+            message_id (int): The ID of the message to be delivered.
+        """
+        message = message_repo.find_by_id(db, message_id)
+        if not message:
+            logger.warning(f"[sender] Message ID {message_id} not found in database")
+            return
+
+        try:
+            response = evolution_send_message(message)
+            external_id = response.get("key").get("id")
+            status = response.get("status", "pending").lower()
+            if external_id:
+                message.source_id = external_id
+            message.status = status
+
+            logger.info(
+                f"[sender] Message {message.id} delivered successfully "
+                f"(external_id={external_id}, status={status})"
+                f"response: {response}"
+            )
+
+        except httpx.HTTPError as e:
+            message.status = "failed"
+            logger.warning(f"[sender] HTTP error for message {message.id}: {e}")
+        except Exception as e:
+            message.status = "failed"
+            logger.exception(f"[sender] Unexpected error for message {message.id}: {e}")
 
 
 if __name__ == "__main__":
-    sender = ResponseSender()
-    sender.run()
+    ResponseSender().run()
