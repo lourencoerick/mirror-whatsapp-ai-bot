@@ -6,16 +6,19 @@ import {
   ChatBubbleMessage,
 } from '@/components/ui/chat/chat-bubble';
 import { ChatMessageList } from '@/components/ui/chat/chat-message-list';
-import { ChatInput } from '@/components/ui/chat/chat-input';
-import { Button } from '@/components/ui/button';
-import { CornerDownLeft, Mic, Paperclip } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useRef, useEffect, useState } from 'react';
 import { useMessages } from '@/hooks/use-messages';
+import { useSendMessage } from "@/hooks/use-send-message";
+
+
+import { ChatMessage } from "@/components/ui/chat/chat-message";
+import { ChatInputBox } from "@/components/ui/chat/chat-input-box";
 
 const ChatPage = () => {
   const { conversationId } = useParams();
   const { messages, loading, error } = useMessages(conversationId as string);
+  const { sendMessage, sending, error: sendError } = useSendMessage();
   const [input, setInput] = useState('');
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -23,11 +26,16 @@ const ChatPage = () => {
     setInput(e.target.value);
   };
 
-  const handleSend = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSend = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // future: send message to backend
-    console.log('Sending message:', input);
-    setInput('');
+    if (!input.trim()) return;
+
+    try {
+      await sendMessage(input.trim(), conversationId as string);
+      setInput('');
+    } catch (err) {
+      console.error('Error trying to the send a message:', err);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -59,53 +67,27 @@ const ChatPage = () => {
           )}
 
           {messages.map((message, index) => (
-            <ChatBubble
+            <ChatMessage
               key={index}
-              variant={message.message_type === 'out' ? 'sent' : 'received'}
-            >
-              <ChatBubbleAvatar
-                src=""
-                fallback={message.message_type === 'out' ? '🤖' : '👤'}
-              />
-              <ChatBubbleMessage>{`${message.content}`}</ChatBubbleMessage>
-            </ChatBubble>
+              direction={message.message_type}
+              content={message.content}
+            />
           ))}
         </ChatMessageList>
       </div>
 
       <div className="w-full px-4 pb-4">
-        <form
+        <ChatInputBox
+          value={input}
+          onChange={handleInputChange}
           onSubmit={handleSend}
-          className="relative rounded-lg border bg-background focus-within:ring-1 focus-within:ring-ring"
-        >
-          <ChatInput
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder="Digite sua mensagem..."
-            className="rounded-lg bg-background border-0 shadow-none focus-visible:ring-0"
-          />
-          <div className="flex items-center p-3 pt-0">
-            <Button variant="ghost" size="icon">
-              <Paperclip className="size-4" />
-              <span className="sr-only">Anexar arquivo</span>
-            </Button>
+          onKeyDown={handleKeyDown}
+          disabled={sending || !input.trim()}
+        />
 
-            <Button variant="ghost" size="icon">
-              <Mic className="size-4" />
-              <span className="sr-only">Usar microfone</span>
-            </Button>
-
-            <Button
-              type="submit"
-              disabled={!input}
-              size="sm"
-              className="ml-auto gap-1.5"
-            >
-              Enviar <CornerDownLeft className="size-3.5" />
-            </Button>
-          </div>
-        </form>
+        {sendError && (
+                  <p className="text-red-500 text-xs text-center mt-2">{sendError}</p>
+                )}
       </div>
     </main>
   );
