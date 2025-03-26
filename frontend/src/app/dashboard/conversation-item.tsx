@@ -19,7 +19,7 @@ type Props = {
 const ConversationItem: React.FC<Props> = (props: Props) => {
   return (
 
-    <Link href={`/dashboard/conversations/${props.id}`} className="block border-2 border-red-900 w-full">
+    <Link href={`/dashboard/conversations/${props.id}`} className="block">
       <div
         className={clsx(
           'flex flex-row items-center px-2 gap-2 truncate border-t border-gray-200 h-20',
