@@ -31,11 +31,11 @@ def get_conversations(
                 id=conv.id,
                 phone_number=attrs.get("phone_number", ""),
                 contact_name=attrs.get("contact_name"),
-                last_message_at=attrs.get("last_message_at"),
+                profile_picture_url=attrs.get("profile_picture_url"),
+                last_message_at=conv.last_message_at,
                 last_message=(
                     LastMessage(
                         content=last_message.get("content", ""),
-                        created_at=last_message.get("created_at"),
                     )
                     if last_message
                     else None

@@ -30,6 +30,7 @@ class Contact(BaseModel):
     phone_number = Column(String(255), nullable=True)
     pubsub_token = Column(String(255), nullable=True)
     identifier = Column(String(255), nullable=True)
+    profile_picture_url = Column(String(255), nullable=True)
     source_id = Column(String(255), nullable=True)
     additional_attributes = Column(JSON, nullable=True)
 
