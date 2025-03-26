@@ -8,7 +8,7 @@ import clsx from 'clsx';
 type Props = {
   id: string
   phoneNumber: string
-  name: string
+  contactName: string
   lastMessage: string
   lastMessageTime: string
   imageUrl: string
@@ -19,7 +19,7 @@ type Props = {
 const ConversationItem: React.FC<Props> = (props: Props) => {
   return (
 
-    <Link href={`/dashboard/conversations/${props.id}`} className="block">
+    <Link href={`/dashboard/conversations/${props.id}`} className="block border-2 border-red-900 w-full">
       <div
         className={clsx(
           'flex flex-row items-center px-2 gap-2 truncate border-t border-gray-200 h-20',
@@ -27,14 +27,14 @@ const ConversationItem: React.FC<Props> = (props: Props) => {
         )}
       >
         <Avatar>
-          <AvatarImage src={props.imageUrl} alt={props.name} />
+          <AvatarImage src={props.imageUrl} alt={props.contactName} />
           <AvatarFallback>
             <User />
           </AvatarFallback>
         </Avatar>
         <div className='flex flex-col flex-1'>
           <div className='flex flex-row justify-between gap-2'>
-            <h4 className='text-sm truncate'><span>{`${props.phoneNumber} | ${props.name}`} </span></h4>
+            <h4 className='text-sm truncate'><span>{`${props.phoneNumber} | ${props.contactName}`} </span></h4>
             <p className='text-sm text-muted-foreground truncate'>{props.lastMessageTime}</p>
           </div>
 
