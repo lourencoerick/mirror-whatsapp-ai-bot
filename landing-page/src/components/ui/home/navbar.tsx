@@ -12,7 +12,7 @@ import ThemeToggleButton  from "@/components/ui/home/theme-toggle-button"
 import siteMetadata from '@/data/siteMetadata';
 
 
-export default function Navbar() {
+export default function Navbar({ hideSignupButton = false }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
@@ -44,15 +44,15 @@ export default function Navbar() {
 
             {/* Buttons */}
             <div className="flex space-x-2 ml-8 items-center">
-              <BetaSignupButton />
-              <ThemeToggleButton />
+            {!hideSignupButton && <BetaSignupButton />}
+            <ThemeToggleButton />
             </div>
           </div>
 
           {/* Mobile menu button */}
           <div className="flex lg:hidden items-center gap-x-4">
-            <BetaSignupButton className='hidden sm:block' />
-            <ThemeToggleButton />
+          {!hideSignupButton && <BetaSignupButton className="hidden sm:block" />}
+          <ThemeToggleButton />
             <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Expande o menu">
               {mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}
             </Button>
@@ -70,7 +70,12 @@ export default function Navbar() {
           {/* Mobile buttons */}
           <div className="pt-4 pb-3 border-t border-muted">
             <div className="px-4 space-y-2">
-              <BetaSignupButton onClick={() => setMobileMenuOpen(false)} className="block w-full sm:hidden" />
+            {!hideSignupButton && (
+                <BetaSignupButton
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block w-full sm:hidden"
+                />
+              )}
             </div>
           </div>
         </nav>

@@ -15,11 +15,11 @@ import { ArrowLeft } from 'lucide-react';
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import ThemeToggleButton from "@/components/ui/home/theme-toggle-button"
-
+import Navbar from "@/components/ui/home/navbar"
 export default function BetaSignupPage() {
   return (
     <main className="bg-background text-foreground shadow-sm md:mt-2">
-      <BetaSignupNavbar />
+      <Navbar hideSignupButton={true} />
 
       <div className="container mx-auto px-4 flex flex-col md:flex-row items-center py-10">
         <div className="w-full md:w-7/10 text-center md:text-left">
