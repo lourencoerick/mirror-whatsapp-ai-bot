@@ -20,7 +20,7 @@ load_dotenv()
 app = FastAPI()
 
 # Get the frontend domain from environment variables
-frontend_domain = os.getenv("FRONTEND_DOMAIN", "http://localhost:3001")
+frontend_domain = os.getenv("FRONTEND_DOMAIN", "http://localhost:3000")
 secret_key = os.getenv("SECRET_KEY", "my_secret_key")
 
 
