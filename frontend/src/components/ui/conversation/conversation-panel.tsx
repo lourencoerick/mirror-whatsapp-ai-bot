@@ -24,7 +24,7 @@ const ConversationPanel = (props: Props) => {
       </div>
 
 
-      <div className=" flex flex-col overflow-y-auto">
+      <div className=" flex flex-col overflow-y-auto w-full">
         <ConversationsList />
       </div>
     </ div>

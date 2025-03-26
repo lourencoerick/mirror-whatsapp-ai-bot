@@ -30,6 +30,12 @@ def update_last_message_snapshot(conversation: Conversation, message: Message) -
 
     if message.contact and message.contact.name:
         conversation.additional_attributes["contact_name"] = message.contact.name
+        conversation.additional_attributes["phone_number"] = (
+            message.contact.phone_number
+        )
+        conversation.additional_attributes["profile_picture_url"] = (
+            message.contact.profile_picture_url
+        )
 
     conversation.last_message_at = message.message_timestamp
 

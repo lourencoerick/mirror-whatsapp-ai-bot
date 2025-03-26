@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sidebar"
 
 
-import ConversationPanel from "./conversation-panel"
+import ConversationPanel from "@/components/ui/conversation/conversation-panel"
 import { usePathname } from 'next/navigation'
 
 interface DashboardLayoutProps {
