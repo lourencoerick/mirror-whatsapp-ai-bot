@@ -24,6 +24,30 @@ class ResponseSender:
         self.queue = RedisQueue(queue_name=queue_name)
         logger.info(f"[sender:init] ResponseSender initialized queue: {queue_name}")
 
+    def _process_one_message(self):
+        """
+        Processes one message from the queue: fetches the ID, looks up the message,
+        and attempts delivery to the external provider.
+        """
+        try:
+            payload = self.queue.dequeue()
+            if not payload:
+                return
+
+            logger.debug(f"[sender] Raw data dequeued: {payload}")
+
+            message_id = payload.get("message_id")
+            if not message_id:
+                logger.warning("[sender] Payload missing 'message_id'")
+                return
+
+            with SessionLocal() as db:
+                self._handle_message(db, message_id)
+                db.commit()
+
+        except Exception as e:
+            logger.exception(f"[sender] Unexpected failure: {type(e).__name__} - {e}")
+
     def run(self):
         """
         Starts the infinite loop to consume and process messages from the queue.
@@ -31,25 +55,7 @@ class ResponseSender:
         logger.info("[sender] Listening for messages to send...")
 
         while True:
-            try:
-                payload = self.queue.dequeue()
-                if not payload:
-                    continue
-
-                logger.debug(f"[sender] Raw data dequeued: {payload}")
-                # payload = json.loads(raw_data)
-                message_id = payload.get("message_id")
-
-                if not message_id:
-                    logger.warning("[sender] Payload missing 'message_id'")
-                    continue
-
-                with SessionLocal() as db:
-                    self._handle_message(db, message_id)
-                    db.commit()
-
-            except Exception as e:
-                logger.exception(f"[sender] Fatal error in loop: {e}")
+            self._process_one_message()
 
     def _handle_message(self, db: Session, message_id: int):
         """
@@ -66,7 +72,7 @@ class ResponseSender:
 
         try:
             response = evolution_send_message(message)
-            external_id = response.get("key").get("id")
+            external_id = response.get("key", {}).get("id")
             status = response.get("status", "pending").lower()
             if external_id:
                 message.source_id = external_id
