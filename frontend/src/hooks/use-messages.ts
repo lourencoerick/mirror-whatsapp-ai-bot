@@ -39,7 +39,7 @@ export function useMessages(conversationId: string): {
         const res: AxiosResponse<Message[]> = await api.get(
           `/conversations/${conversationId}/messages`
         );
-        setMessages(res.data);
+        setMessages(res.data.reverse());
       } catch (err: unknown) {
         console.error('Error fetching messages', err);
         setError(true);
