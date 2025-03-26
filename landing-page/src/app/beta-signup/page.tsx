@@ -1,6 +1,5 @@
 'use client';
-import Image from "next/image";
-import Link from "next/link";
+
 import { useForm, ControllerRenderProps } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,12 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { TypingAnimation } from "@/components/magicui/typing-animation";
 import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
-import { inter } from '@/components/ui/fonts';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { ArrowLeft } from 'lucide-react';
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import ThemeToggleButton from "@/components/ui/home/theme-toggle-button"
 import Navbar from "@/components/ui/home/navbar"
 export default function BetaSignupPage() {
   return (
@@ -143,39 +139,5 @@ const BetaSignupForm = () => {
         <Button type="submit" onClick={() => gtag_report_conversion()}>Inscrever-se</Button>
       </form>
     </Form>
-  );
-};
-
-const BetaSignupNavbar = () => {
-  const router = useRouter();
-  
-  return (
-    <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between h-16 items-center">
-        <Link href="/" className="flex items-center space-x-2">
-          <Image
-            src="/logo.png"
-            alt="Lambda Labs"
-            width={100}
-            height={30}
-            className="w-10 h-auto"
-          />
-          <div className="h-8 border-l border-muted mx-2" />
-          <span className={`${inter.className} text-lg sm:text-2xl font-bold tracking-wide text-foreground`}>
-            Lambda Labs
-          </span>
-        </Link>
-
-        <div className="flex space-x-2 ml-8 items-center">
-          <Button variant={"outline"} size={"lg"} onClick={() => router.back()}>
-            <ArrowLeft className="inline" />
-            <span className="hidden sm:block">Voltar</span>
-          </Button>
-
-          <ThemeToggleButton />
-
-        </div>
-      </div>
-    </nav>
   );
 };
