@@ -3,7 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { User } from 'lucide-react'
 import Link from 'next/link';
 import clsx from 'clsx';
-
+import { formatLastMessageAt } from "@/lib/utils/date-utils"
+import { formatPhoneNumber } from "@/lib/utils/phone-utils"
 
 type Props = {
   id: string
@@ -34,8 +35,9 @@ const ConversationItem: React.FC<Props> = (props: Props) => {
         </Avatar>
         <div className='flex flex-col flex-1'>
           <div className='flex flex-row justify-between gap-2'>
-            <h4 className='text-sm truncate'><span>{`${props.phoneNumber} | ${props.contactName}`} </span></h4>
-            <p className='text-sm text-muted-foreground truncate'>{props.lastMessageTime}</p>
+            <h4 className='text-sm truncate'><span>{`${formatPhoneNumber(props.phoneNumber)} | ${props.contactName}`} </span></h4>
+            <p className='text-xs text-muted-foreground truncate'>{formatLastMessageAt(props.lastMessageTime)}</p>
+                        
           </div>
 
           <p className='text-sm text-muted-foreground truncate'>{props.lastMessage}</p>
