@@ -65,7 +65,7 @@ const ChatPage = () => {
             >
               <ChatBubbleAvatar
                 src=""
-                fallback={message.message_type === 'out' ? '👤' : '🤖'}
+                fallback={message.message_type === 'out' ? '🤖' : '👤'}
               />
               <ChatBubbleMessage>{`${message.content}`}</ChatBubbleMessage>
             </ChatBubble>
