@@ -10,6 +10,7 @@ class LastMessage(BaseModel):
 
 class ConversationResponse(BaseModel):
     id: int
+    phone_number: str
     contact_name: Optional[str]
     last_message_at: Optional[datetime]
     last_message: Optional[LastMessage]

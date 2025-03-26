@@ -29,6 +29,7 @@ def get_conversations(
         response.append(
             ConversationResponse(
                 id=conv.id,
+                phone_number=attrs.get("phone_number", ""),
                 contact_name=attrs.get("contact_name"),
                 last_message_at=attrs.get("last_message_at"),
                 last_message=(
