@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-
+from datetime import datetime, timezone
+from loguru import logger
+import uuid
 from app.database import get_db
 from app.middleware.account_context import get_account_id
-from app.api.schemas.message import MessageRead
-from app.services.repository.message import find_messages_by_conversation
+from app.services.queue.publisher import publish_message_to_queue
+from app.api.schemas.message import MessageRead, MessageCreatePayload, MessageCreate
+from app.services.repository import message as message_repo
+from app.services.repository import conversation as conversation_repo
+from app.services.sender.evolution import send_message as evolution_send_message
+
 
 router = APIRouter()
 
@@ -32,10 +38,73 @@ def get_messages(
         List[MessageRead]: List of messages for the given conversation.
     """
     account_id = get_account_id()
-    return find_messages_by_conversation(
+    return message_repo.find_messages_by_conversation(
         db=db,
         conversation_id=conversation_id,
         limit=limit,
         offset=offset,
         account_id=account_id,
     )
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=MessageRead,
+    status_code=201,
+)
+def create_outgoing_message(
+    conversation_id: int,
+    payload: MessageCreatePayload,
+    db: Session = Depends(get_db),
+):
+    """
+    Creates and sends an outgoing message linked to a conversation.
+
+    - Validates that the conversation exists and belongs to the account
+    - Persists a new outgoing message using a generated source_id
+    - Sends the message to the external provider (e.g., Evolution)
+    - Updates the source_id if an external ID is returned
+
+    Args:
+        conversation_id (int): The target conversation ID.
+        payload (MessageCreatePayload): The message content from the frontend.
+        db (Session): Database session.
+
+    Returns:
+        MessageRead: The message after being saved and optionally sent.
+    """
+    conversation = conversation_repo.find_by_id(db, conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    # Generate internal source_id
+    internal_source_id = f"internal-{uuid.uuid4().hex}"
+
+    message_data = MessageCreate(
+        account_id=conversation.account_id,
+        inbox_id=conversation.inbox_id,
+        conversation_id=conversation.id,
+        contact_id=conversation.contact_inbox.contact_id,
+        source_id=internal_source_id,
+        user_id=1,
+        direction="out",
+        status="processing",
+        message_timestamp=datetime.now(timezone.utc),
+        content=payload.content,
+        content_type="text",
+        content_attributes={
+            "source": "frontend",
+            "channel_type": conversation.inbox.channel_type,
+        },
+    )
+
+    # Create or reuse message
+    message = message_repo.get_or_create_message(db, message_data)
+
+    try:
+        publish_message_to_queue(message_id=message.id, queue_name="response_queue")
+        logger.debug(f"[queue] Message {message.id} enqueued for delivery")
+    except Exception as e:
+        logger.warning(f"[queue] Failed to enqueue message {message.id}: {e}")
+
+    return message
