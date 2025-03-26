@@ -1,6 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from datetime import datetime
+
+
+class MessageCreatePayload(BaseModel):
+    """
+    Payload enviado pelo frontend para criar uma nova mensagem de saída.
+    """
+
+    content: str = Field(..., example="Olá, tudo bem?")
 
 
 class MessageCreate(BaseModel):
@@ -8,16 +16,17 @@ class MessageCreate(BaseModel):
     inbox_id: int
     contact_id: int
     conversation_id: int
-
     source_id: str  # external ID of the message
-    content: Optional[str] = None
+    user_id: Optional[int] = None
+
     direction: Literal["in", "out"]
+    status: Literal["received", "sent", "pending", "processing", "failed"] = "received"
+    message_timestamp: datetime  # the moment when the user sent the message
+    private: Optional[bool] = False
+    content: Optional[str] = None
     content_type: Literal["text", "image", "audio", "file", "video", "conversation"] = (
         "text"
     )
-    status: Literal["received", "processed", "failed"] = "received"
-
-    message_timestamp: datetime  # the moment when the user sent the message
     content_attributes: Optional[dict] = {}
 
 

@@ -7,6 +7,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 from app.config import get_settings
+from app.models.message import Message
 
 settings = get_settings()
 
@@ -17,20 +18,20 @@ settings = get_settings()
     retry=retry_if_exception_type(httpx.RequestError),
     reraise=True,
 )
-def send_message(message: dict) -> None:
+def send_message(message: Message) -> dict:
     """
     Sends a text message using the Evolution API via HTTPX.
     Retries up to 3 times in case of connection-level failures.
 
     Args:
-        message (dict): Must contain:
+        message (Message): Must contain:
             - number (str): Recipient phone number
             - text (str): Message content
     """
     try:
         payload = {
-            "number": message["number"],
-            "text": message["text"],
+            "number": "5511941986775",  # message.contact.phone_number,
+            "text": message.content,
         }
         headers = {
             "apikey": settings.EVOLUTION_API_KEY,
@@ -44,6 +45,7 @@ def send_message(message: dict) -> None:
         logger.info(
             f"[evolution_sender] Message sent successfully: {response.status_code} - {response.text}"
         )
+        return response.json()
     except httpx.HTTPStatusError as e:
         logger.error(
             f"[evolution_sender] HTTP error: {e.response.status_code} - {e.response.text}"
