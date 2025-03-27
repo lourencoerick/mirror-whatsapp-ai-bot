@@ -6,7 +6,6 @@ from loguru import logger
 from app.middleware.account_context import get_account_id
 from app.models.conversation import Conversation
 from app.models.contact__inbox import ContactInbox
-from app.api.schemas.message import MessageCreate
 
 
 def find_by_id(db: Session, conversation_id: int) -> Optional[Conversation]:
@@ -140,29 +139,3 @@ def get_or_create_conversation(
 
     logger.debug(f"[conversation] Created conversation (id={conversation.id})")
     return conversation
-
-
-def update_last_message_snapshot(
-    db: Session, conversation: Conversation, message: MessageCreate
-) -> None:
-    """
-    Store a lightweight snapshot of the last message into the conversation's additional_attributes field.
-    """
-    snapshot = {
-        "id": message.source_id,
-        "content": message.content,
-        "timestamp": message.message_timestamp.isoformat(),
-        "content_type": message.content_type,
-        "direction": message.direction,
-    }
-
-    if conversation.additional_attributes is None:
-        conversation.additional_attributes = {}
-
-    conversation.additional_attributes["last_message"] = snapshot
-    db.commit()
-    db.refresh(conversation)
-
-    logger.debug(
-        f"[conversation] Updated last_message snapshot for conversation {conversation.id}"
-    )
