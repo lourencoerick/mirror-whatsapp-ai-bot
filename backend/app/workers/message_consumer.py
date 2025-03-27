@@ -80,7 +80,9 @@ class MessageConsumer:
             )
 
             if conversation:
-                update_last_message_snapshot(conversation, message)
+                update_last_message_snapshot(
+                    db=db, conversation=conversation, message=message
+                )
             else:
                 logger.warning(
                     f"[consumer] Conversation not found: {message.conversation_id}"

@@ -1,9 +1,13 @@
 from loguru import logger
+from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from app.models.message import Message
 from app.models.conversation import Conversation
 
 
-def update_last_message_snapshot(conversation: Conversation, message: Message) -> None:
+def update_last_message_snapshot(
+    db: Session, conversation: Conversation, message: Message
+) -> None:
     """
     Updates the conversation with a snapshot of the last message and its timestamp.
 
@@ -34,8 +38,12 @@ def update_last_message_snapshot(conversation: Conversation, message: Message) -
         conversation.additional_attributes["profile_picture_url"] = (
             message.contact.profile_picture_url
         )
+    flag_modified(conversation, "additional_attributes")
 
     conversation.last_message_at = message.sent_at
+
+    db.commit()
+    db.refresh(conversation)
 
     logger.debug(
         f"[conversation] Updated snapshot and timestamp for conversation {conversation.id}"

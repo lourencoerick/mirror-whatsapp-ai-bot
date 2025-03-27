@@ -12,6 +12,7 @@ from app.services.queue.publisher import publish_message_to_queue
 from app.api.schemas.message import MessageRead, MessageCreatePayload, MessageCreate
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
+from app.services.helper.conversation import update_last_message_snapshot
 from app.services.helper.websocket import publish_to_conversation_ws
 
 router = APIRouter()
@@ -101,6 +102,21 @@ async def create_outgoing_message(
 
     # Create or reuse message
     message = message_repo.get_or_create_message(db, message_data)
+
+    # Update last message in the conversation
+    if message:
+        conversation = conversation_repo.find_by_id(
+            db=db, conversation_id=message.conversation_id
+        )
+
+        if conversation:
+            update_last_message_snapshot(
+                db=db, conversation=conversation, message=message
+            )
+        else:
+            logger.warning(
+                f"[consumer] Conversation not found: {message.conversation_id}"
+            )
 
     try:
         publish_message_to_queue(message_id=message.id, queue_name="response_queue")
