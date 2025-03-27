@@ -20,11 +20,13 @@ export interface Message {
  * @param conversationId - The ID of the conversation to fetch messages for.
  * @returns An object containing:
  *  - `messages`: List of messages sorted by date.
+ *  - `setMessages`: setMessage action ot update messages
  *  - `loading`: Boolean indicating whether data is being fetched.
  *  - `error`: Boolean indicating if an error occurred during fetch.
  */
 export function useMessages(conversationId: string): {
   messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   loading: boolean;
   error: boolean;
 } {
@@ -53,5 +55,5 @@ export function useMessages(conversationId: string): {
     }
   }, [conversationId]);
 
-  return { messages, loading, error };
+  return { messages, setMessages, loading, error };
 }
