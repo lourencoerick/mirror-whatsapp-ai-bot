@@ -1,4 +1,6 @@
 import os
+import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from app.middleware.account_context import AccountContextMiddleware
@@ -8,7 +10,9 @@ from app.api.routes import webhook as webhook_routes
 from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
 from app.api.routes import dev as dev_routes
+from app.api.routes import websocket as ws_routes
 
+from app.services.realtime.redis_pubsub import RedisPubSubBridge
 
 from dotenv import load_dotenv
 
@@ -16,8 +20,17 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+pubsub_bridge = RedisPubSubBridge()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    asyncio.create_task(pubsub_bridge.start())
+    yield
+
+
 # Create an instance of the FastAPI class
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # Get the frontend domain from environment variables
 frontend_domain = os.getenv("FRONTEND_DOMAIN", "http://localhost:3000")
@@ -49,6 +62,8 @@ app.include_router(webhook_routes.router)
 
 app.include_router(conversation_routes.router)
 app.include_router(message_routes.router)
+
+app.include_router(ws_routes.router)
 
 
 @app.get("/")
