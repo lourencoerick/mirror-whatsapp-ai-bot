@@ -19,6 +19,7 @@ import {
 
 import ConversationPanel from "@/components/ui/conversation/conversation-panel"
 import { usePathname } from 'next/navigation'
+import React from "react";
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -41,7 +42,7 @@ export default function DashboardLayout({
         <SidebarProvider>
             <AppSidebar />
             {isConversationsRoute && <ConversationPanel />}
-            <SidebarInset>
+            <SidebarInset className="h-screen overflow-hidden">
                 <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
                     <div className="flex items-center gap-2 px-4">
                         <SidebarTrigger className="-ml-1" />
@@ -53,25 +54,26 @@ export default function DashboardLayout({
                             <BreadcrumbList>
                                 {
                                     segments.slice(0, -1).map((segment, index) => (
-                                        <>
-                                            <BreadcrumbItem key={index} className="hidden md:block">
+                                        <React.Fragment key={index}>
+                                            <BreadcrumbItem className="hidden md:block">
                                                 <BreadcrumbLink href={`/${segments.slice(0, index + 1).join('/')}`}>
                                                     {segment.replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase())}
                                                 </BreadcrumbLink>
                                             </BreadcrumbItem>
                                             <BreadcrumbSeparator className="hidden md:block" />
-                                        </>
+                                        </React.Fragment>
+
                                     ))
 
                                 }
-                                <BreadcrumbItem>
+                                <BreadcrumbItem key={segments.length}>
                                     <BreadcrumbPage>{segments.at(-1)}</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>
                     </div>
                 </header>
-                <div className="flex flex-col flex-1 gap-4 p-4 pt-0 overflow-none">
+                <div className="flex flex-col flex-1 gap-4 p-4 pt-0 overflow-hidden">
                     {children}
                 </div>
             </SidebarInset>
