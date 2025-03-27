@@ -15,9 +15,7 @@ def update_last_message_snapshot(conversation: Conversation, message: Message) -
     snapshot = {
         "id": message.id,
         "content": message.content,
-        "timestamp": (
-            message.message_timestamp.isoformat() if message.message_timestamp else None
-        ),
+        "timestamp": (message.sent_at.isoformat() if message.sent_at else None),
         "direction": message.message_type,
         "content_type": message.content_type,
     }
@@ -37,7 +35,7 @@ def update_last_message_snapshot(conversation: Conversation, message: Message) -
             message.contact.profile_picture_url
         )
 
-    conversation.last_message_at = message.message_timestamp
+    conversation.last_message_at = message.sent_at
 
     logger.debug(
         f"[conversation] Updated snapshot and timestamp for conversation {conversation.id}"
