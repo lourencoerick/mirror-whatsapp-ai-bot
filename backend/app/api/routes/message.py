@@ -1,17 +1,19 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime, timezone
 from loguru import logger
-import uuid
+
 from app.database import get_db
 from app.middleware.account_context import get_account_id
 from app.services.queue.publisher import publish_message_to_queue
 from app.api.schemas.message import MessageRead, MessageCreatePayload, MessageCreate
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
-from app.services.sender.evolution import send_message as evolution_send_message
-
+from app.services.helper.conversation import update_last_message_snapshot
+from app.services.helper.websocket import publish_to_conversation_ws
 
 router = APIRouter()
 
@@ -52,7 +54,7 @@ def get_messages(
     response_model=MessageRead,
     status_code=201,
 )
-def create_outgoing_message(
+async def create_outgoing_message(
     conversation_id: int,
     payload: MessageCreatePayload,
     db: Session = Depends(get_db),
@@ -101,10 +103,37 @@ def create_outgoing_message(
     # Create or reuse message
     message = message_repo.get_or_create_message(db, message_data)
 
+    # Update last message in the conversation
+    if message:
+        conversation = conversation_repo.find_by_id(
+            db=db, conversation_id=message.conversation_id
+        )
+
+        if conversation:
+            update_last_message_snapshot(
+                db=db, conversation=conversation, message=message
+            )
+        else:
+            logger.warning(
+                f"[consumer] Conversation not found: {message.conversation_id}"
+            )
+
     try:
         publish_message_to_queue(message_id=message.id, queue_name="response_queue")
         logger.debug(f"[queue] Message {message.id} enqueued for delivery")
     except Exception as e:
         logger.warning(f"[queue] Failed to enqueue message {message.id}: {e}")
+
+    try:
+        logger.debug(f"[ws] publishing message to the channel....")
+        await publish_to_conversation_ws(
+            conversation_id=conversation.id,
+            data={
+                "type": "new_message",
+                "message": jsonable_encoder(message),
+            },
+        )
+    except Exception as e:
+        logger.warning(f"[ws] Failed to publish message {message.id} to Redis: {e}")
 
     return message

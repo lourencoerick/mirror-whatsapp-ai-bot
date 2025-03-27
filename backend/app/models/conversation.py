@@ -11,6 +11,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
+from sqlalchemy.ext.mutable import MutableDict
 
 
 class Conversation(BaseModel):
@@ -39,7 +40,9 @@ class Conversation(BaseModel):
     locked = Column(Boolean, nullable=True)
 
     last_message_at = Column(DateTime, nullable=True, index=True)
-    additional_attributes = Column(JSON, nullable=True)
+    additional_attributes = Column(
+        MutableDict.as_mutable(JSON), default=dict, nullable=True
+    )
 
     account = relationship("Account", back_populates="conversations")
     inbox = relationship("Inbox", back_populates="conversations")

@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
+
 from app.database import get_db
 from app.services.queue.iqueue import IQueue
 from app.services.queue.redis_queue import RedisQueue
 from app.services.parser.whatsapp_parser import parse_whatsapp_message
 from app.services.parser.parse_webhook_to_message import parse_webhook_to_message
+from app.services.helper.webhook import find_account_id_from_source
 from loguru import logger
 
 router = APIRouter()
@@ -51,7 +54,27 @@ async def evolution_whatsapp_webhook(request: Request, db: Session = Depends(get
         payload = await request.json()
         logger.debug(f"[webhook] Raw Evolution payload: {payload}")
 
-        message = parse_webhook_to_message(db=db, account_id=1, payload=payload)
+        event = payload.get("event", "")
+        instance_id = payload.get("data", {}).get("instanceId")
+        account_id = find_account_id_from_source(instance_id, db)  # sua função custom
+
+        logger.info(f"[webhook] Account {account_id}, event {event} ")
+        if not account_id:
+            logger.warning("[webhook] Account not found for source_id")
+            return {"status": "ignored"}
+        if event not in ["messages.upsert"]:
+            logger.warning("[webhook] Not a treatable event")
+            raise HTTPException(status_code=400, detail="Not a treatable event")
+
+        db.execute(
+            text("SET LOCAL my.app.account_id = :account_id"),
+            {"account_id": account_id},
+        )
+        logger.debug(f"[webhook] SET LOCAL my.app.account_id = {account_id}")
+
+        message = parse_webhook_to_message(
+            db=db, account_id=account_id, payload=payload
+        )
 
         if not message:
             raise HTTPException(status_code=400, detail="No valid message found")

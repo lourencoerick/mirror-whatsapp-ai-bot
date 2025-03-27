@@ -40,8 +40,16 @@ def test_webhook_evolution_valid_payload(client, valid_evolution_payload):
 
 
 @pytest.mark.integration
-def test_webhook_evolution_invalid_structure(client):
+def test_webhook_evolution_not_treatable_event(client):
     payload = {"invalid": "structure"}
+    response = client.post("/webhook/evolution_whatsapp", json=payload)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Not a treatable event"
+
+
+@pytest.mark.integration
+def test_webhook_evolution_invalid_structure(client):
+    payload = {"event": "messages.upsert", "invalid": "structure"}
     response = client.post("/webhook/evolution_whatsapp", json=payload)
     assert response.status_code == 400
     assert response.json()["detail"] == "No valid message found"

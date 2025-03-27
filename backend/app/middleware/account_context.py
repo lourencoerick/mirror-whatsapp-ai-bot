@@ -22,6 +22,11 @@ def get_account_id() -> int:
 class AccountContextMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         try:
+
+            logger.debug(f"[middleware] request url: {request.url}")
+            if "/webhook" in request.url.path:
+                return await call_next(request)
+
             account_id_header = request.headers.get("X-Account-ID")
 
             if not account_id_header:
