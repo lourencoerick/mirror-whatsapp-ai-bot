@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import ReconnectingWebSocket from 'reconnecting-websocket';
 
 interface WebSocketMessage {
   type: string;
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export function ChatWebSocketBridge({ conversationId, onNewMessage }: Props) {
-  const wsRef = useRef<WebSocket | null>(null);
+  const wsRef = useRef<ReconnectingWebSocket | null>(null);
   const onNewMessageRef = useRef(onNewMessage);
 
   useEffect(() => {
@@ -22,16 +23,16 @@ export function ChatWebSocketBridge({ conversationId, onNewMessage }: Props) {
 
   useEffect(() => {
     const url = `${process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000"}/ws/conversations/${conversationId}`;
-    const ws = new WebSocket(url);
+    const ws = new ReconnectingWebSocket(url);
     wsRef.current = ws;
 
     console.log("[WebSocket] Connecting to:", url);
 
-    ws.onopen = () => {
+    ws.addEventListener("open", () => {
       console.log(`[WebSocket] Connected to conversation ${conversationId}`);
-    };
+    });
 
-    ws.onmessage = (event: MessageEvent) => {
+    ws.addEventListener("message", (event: MessageEvent) => {
       try {
         const data: WebSocketMessage = JSON.parse(event.data);
         if (data.type === "new_message" || data.type === "incoming_message") {
@@ -40,15 +41,15 @@ export function ChatWebSocketBridge({ conversationId, onNewMessage }: Props) {
       } catch (err) {
         console.warn("[WebSocket] Invalid message:", err);
       }
-    };
+    });
 
-    ws.onerror = (err) => {
+    ws.addEventListener("error", (err) => {
       console.error("[WebSocket] Error", err);
-    };
+    });
 
-    ws.onclose = () => {
+    ws.addEventListener("close", () => {
       console.log(`[WebSocket] Disconnected from conversation ${conversationId}`);
-    };
+    });
 
     return () => {
       ws.close();
