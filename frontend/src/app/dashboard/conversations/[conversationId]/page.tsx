@@ -8,16 +8,16 @@ import {
 import { ChatMessageList } from '@/components/ui/chat/chat-message-list';
 import { useParams } from 'next/navigation';
 import { useRef, useEffect, useState } from 'react';
-import { useMessages } from '@/hooks/use-messages';
-import { useSendMessage } from "@/hooks/use-send-message";
-
+import { useMessages, Message } from '@/hooks/use-messages';
+import { useSendMessage  } from "@/hooks/use-send-message";
 
 import { ChatMessage } from "@/components/ui/chat/chat-message";
 import { ChatInputBox } from "@/components/ui/chat/chat-input-box";
+import { ChatWebSocketBridge } from '@/components/ui/chat/chat-websocket-bridge';
 
 const ChatPage = () => {
   const { conversationId } = useParams();
-  const { messages, loading, error } = useMessages(conversationId as string);
+  const { messages, setMessages, loading, error } = useMessages(conversationId as string);
   const { sendMessage, sending, error: sendError } = useSendMessage();
   const [input, setInput] = useState('');
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -52,8 +52,12 @@ const ChatPage = () => {
   }, [messages]);
 
   return (
-    <main className="flex w-full max-w-3xl flex-col items-center mx-auto">
-      <div className="flex-1 w-full overflow-y-auto py-6" ref={messagesRef}>
+    <main className="flex flex-col w-full max-w-3xl  items-center mx-auto h-full">
+      <div className="w-full overflow-y-auto" ref={messagesRef}>
+        <ChatWebSocketBridge
+          conversationId={Number(conversationId)}
+          onNewMessage={(message) => setMessages((prev: Message[]) => [...prev, message])}
+        />
         <ChatMessageList>
           {loading && (
             <ChatBubble variant="received">
@@ -86,8 +90,8 @@ const ChatPage = () => {
         />
 
         {sendError && (
-                  <p className="text-red-500 text-xs text-center mt-2">{sendError}</p>
-                )}
+          <p className="text-red-500 text-xs text-center mt-2">{sendError}</p>
+        )}
       </div>
     </main>
   );
