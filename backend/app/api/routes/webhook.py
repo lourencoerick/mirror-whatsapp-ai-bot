@@ -64,7 +64,7 @@ async def evolution_whatsapp_webhook(request: Request, db: Session = Depends(get
             return {"status": "ignored"}
         if event not in ["messages.upsert"]:
             logger.warning("[webhook] Not a treatable event")
-            return {"status": "ignored"}
+            raise HTTPException(status_code=400, detail="Not a treatable event")
 
         db.execute(
             text("SET LOCAL my.app.account_id = :account_id"),
