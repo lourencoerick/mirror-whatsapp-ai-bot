@@ -119,7 +119,12 @@ def get_or_create_conversation(
     """
     Find or create a conversation for a given contact in an inbox.
     """
-    conversation = find_conversation(db, account_id, inbox_id, contact_inbox_id)
+    conversation = find_conversation(
+        db=db,
+        inbox_id=inbox_id,
+        contact_inbox_id=contact_inbox_id,
+        account_id=account_id,
+    )
 
     if conversation:
         return conversation

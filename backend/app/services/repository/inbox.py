@@ -4,6 +4,20 @@ from loguru import logger
 from app.models.inbox import Inbox
 
 
+def find_by_id(
+    db: Session, inbox_id: str, account_id: Optional[int] = None
+) -> Optional[Inbox]:
+
+    inbox = db.query(Inbox).filter_by(account_id=account_id, id=inbox_id).first()
+
+    if inbox:
+        logger.debug(f"[inbox] Found inbox id={inbox_id})")
+    else:
+        logger.info(f"[inbox] No inbox found inbox id={inbox_id}")
+
+    return inbox
+
+
 def find_by_channel_id(
     db: Session, account_id: int, channel_id: str
 ) -> Optional[Inbox]:
