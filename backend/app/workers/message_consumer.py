@@ -3,6 +3,7 @@ import time
 from typing import Optional, Union
 from loguru import logger
 from sqlalchemy.orm import Session
+from fastapi.encoders import jsonable_encoder
 
 from app.database import SessionLocal
 from app.services.repository.message import get_or_create_message
@@ -10,6 +11,7 @@ from app.services.repository.conversation import find_by_id as conversation_find
 from app.services.queue.redis_queue import RedisQueue
 from app.api.schemas.message import MessageCreate
 from app.services.helper.conversation import update_last_message_snapshot
+from app.services.helper.websocket import publish_to_conversation_ws
 
 
 class MessageConsumer:
@@ -22,7 +24,7 @@ class MessageConsumer:
         self.output_queue = RedisQueue(queue_name=output_queue_name)
         logger.info("[MessageConsumer:init] Initialized")
 
-    def run(self):
+    async def run(self):
         logger.info("[consumer] Starting message consumer...")
 
         while True:
@@ -41,7 +43,7 @@ class MessageConsumer:
                 start_time = time.time()
                 db: Session = SessionLocal()
                 try:
-                    self._handle_message(db, data)
+                    await self._handle_message(db, data)
                     db.commit()
                     self.output_queue.enqueue(raw_message)
                     logger.debug(
@@ -63,7 +65,7 @@ class MessageConsumer:
                     f"[consumer] Unexpected failure: {type(e).__name__} - {e}"
                 )
 
-    def _handle_message(self, db: Session, data: dict):
+    async def _handle_message(self, db: Session, data: dict):
         try:
             message_data = MessageCreate(**data)
         except Exception as e:
@@ -85,5 +87,26 @@ class MessageConsumer:
                 )
 
             logger.info(f"[consumer] Message logged successfully: {message.id}")
+
+            try:
+                await publish_to_conversation_ws(
+                    conversation_id=message.conversation_id,
+                    data={
+                        "type": "incoming_message",
+                        "message": jsonable_encoder(message),
+                    },
+                )
+            except Exception as e:
+                logger.warning(
+                    f"[ws] Failed to publish message {message.id} to Redis: {e}"
+                )
+
         else:
             logger.warning("[consumer] Failed to save message")
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    consumer = MessageConsumer()
+    asyncio.run(consumer.run())
