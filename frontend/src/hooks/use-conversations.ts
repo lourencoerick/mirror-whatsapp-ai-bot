@@ -32,7 +32,7 @@ const CONVERSATIONS_LIMIT: number = 10;
  * @returns An object containing the conversations list, loading state, error state,
  * a flag indicating if more conversations exist, and a function to load more.
  */
-export function useInfiniteConversations(inboxId: number): UseInfiniteConversationsResult {
+export function useInfiniteConversations(inboxId: string): UseInfiniteConversationsResult {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [offset, setOffset] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);

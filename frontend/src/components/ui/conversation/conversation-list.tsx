@@ -10,10 +10,9 @@ const ConversationsList: React.FC = () => {
   // Retrieve route parameters using Next.js useParams hook
   const params = useParams();
   // Assume the route provides both inboxId and conversationId
-  const inboxIdParam = params?.inboxId as string | undefined;
+  const inboxId = params?.inboxId as string;
   const conversationId = params?.conversationId as string | undefined;
-  // Convert inboxId to a number (default to 0 if undefined)
-  const inboxId: number = inboxIdParam ? Number(inboxIdParam) : 1;
+
 
   // Use the custom infinite conversations hook
   const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations(inboxId);
@@ -51,6 +50,7 @@ const ConversationsList: React.FC = () => {
           key={conversation.id}
           // Map API fields to the expected props of ConversationItem.
           id={conversation.id.toString()}
+          inboxId={inboxId}
           phoneNumber={conversation.phone_number}
           contactName={conversation.contact_name}
           lastMessage={conversation.last_message?.content ?? ''}

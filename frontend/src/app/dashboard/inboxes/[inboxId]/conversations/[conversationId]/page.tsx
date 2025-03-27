@@ -16,8 +16,8 @@ import { ChatInputBox } from "@/components/ui/chat/chat-input-box";
 import { ChatWebSocketBridge } from '@/components/ui/chat/chat-websocket-bridge';
 
 const ChatPage = () => {
-  const { conversationId } = useParams();
-  const { messages, setMessages, loading, error } = useMessages(conversationId as string);
+  const { inboxId, conversationId } = useParams() as { inboxId: string, conversationId: string };
+  const { messages, setMessages, loading, error } = useMessages(conversationId as string, inboxId as string);
   const { sendMessage, sending, error: sendError } = useSendMessage();
   const [input, setInput] = useState('');
   const messagesRef = useRef<HTMLDivElement>(null);

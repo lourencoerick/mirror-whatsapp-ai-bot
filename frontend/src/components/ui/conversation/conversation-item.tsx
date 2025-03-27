@@ -8,6 +8,7 @@ import { formatPhoneNumber } from "@/lib/utils/phone-utils"
 
 type Props = {
   id: string
+  inboxId: string
   phoneNumber: string
   contactName: string
   lastMessage: string
@@ -20,7 +21,7 @@ type Props = {
 const ConversationItem: React.FC<Props> = (props: Props) => {
   return (
 
-    <Link href={`/dashboard/conversations/${props.id}`} className="block">
+    <Link href={`/dashboard/inboxes/${props.inboxId}/conversations/${props.id}`} className="block">
       <div
         className={clsx(
           'flex flex-row items-center px-2 gap-2 truncate border-t border-gray-200 h-20',
