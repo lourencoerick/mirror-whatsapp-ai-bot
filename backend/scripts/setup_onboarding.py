@@ -1,22 +1,24 @@
+from uuid import uuid4
 from loguru import logger
 from sqlalchemy.orm import Session
 
 from app.models.account import Account
 from app.models.user import User
 from app.models.inbox import Inbox
-from app.models.contact import Contact
-from app.models.contact__inbox import ContactInbox
-from app.models.conversation import Conversation
 
 
 def setup_initial_data(db: Session):
     logger.info("[onboarding] Starting onboarding setup...")
 
-    account = Account(id=1, name="Demo Account", locale="pt-BR")
+    account_id = uuid4()
+    user_id = uuid4()
+    inbox_id = uuid4()
+
+    account = Account(id=account_id, name="Demo Account", locale="pt-BR")
     db.merge(account)
 
     user = User(
-        id=1,
+        id=user_id,
         name="Bot User",
         provider="internal",
         uid="bot_user_1",
@@ -26,33 +28,13 @@ def setup_initial_data(db: Session):
     db.merge(user)
 
     inbox = Inbox(
-        id=1,
-        account_id=1,
+        id=inbox_id,
+        account_id=account_id,
         channel_id="680df327-c714-40a3-aec5-86ccbb57fa19",
         name="Evolution Inbox",
         channel_type="evolution",
     )
     db.merge(inbox)
-
-    contact = Contact(
-        id=1, account_id=1, name="Primeiro Cliente", identifier="5511912345678"
-    )
-    db.merge(contact)
-
-    contact_inbox = ContactInbox(
-        id=1, contact_id=contact.id, inbox_id=inbox.id, source_id="teste"
-    )
-
-    db.merge(contact_inbox)
-
-    conversation = Conversation(
-        id=1,
-        account_id=1,
-        inbox_id=1,
-        status="open",
-        contact_inbox_id=contact_inbox.id,
-    )
-    db.merge(conversation)
 
     db.commit()
     logger.info("[onboarding] Setup completed successfully.")
