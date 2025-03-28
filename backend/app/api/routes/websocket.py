@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
 from typing import Dict, List
@@ -11,7 +12,7 @@ active_connections: Dict[int, List[WebSocket]] = {}
 
 
 @router.websocket("/ws/conversations/{conversation_id}")
-async def websocket_conversation_endpoint(websocket: WebSocket, conversation_id: int):
+async def websocket_conversation_endpoint(websocket: WebSocket, conversation_id: UUID):
     """
     WebSocket endpoint to subscribe to real-time updates for a specific conversation.
 
