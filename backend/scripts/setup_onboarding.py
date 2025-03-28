@@ -1,4 +1,4 @@
-from uuid import uuid4
+from uuid import uuid4, UUID
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -10,9 +10,9 @@ from app.models.inbox import Inbox
 def setup_initial_data(db: Session):
     logger.info("[onboarding] Starting onboarding setup...")
 
-    account_id = uuid4()
-    user_id = uuid4()
-    inbox_id = uuid4()
+    account_id = UUID("11111111-1111-1111-1111-111111111111")
+    user_id = UUID("22222222-2222-2222-2222-222222222222")
+    inbox_id = UUID("33333333-3333-3333-3333-333333333333")
     logger.info(f"Account id: {account_id}\nUser ID: {user_id}\nInbox ID: {inbox_id}")
     account = Account(id=account_id, name="Demo Account", locale="pt-BR")
     db.merge(account)

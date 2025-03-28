@@ -88,7 +88,7 @@ async def create_outgoing_message(
         conversation_id=conversation.id,
         contact_id=conversation.contact_inbox.contact_id,
         source_id=internal_source_id,
-        user_id=uuid4(),
+        user_id=UUID("22222222-2222-2222-2222-222222222222"),
         direction="out",
         status="processing",
         message_timestamp=datetime.now(timezone.utc),
