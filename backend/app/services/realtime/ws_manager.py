@@ -1,70 +1,67 @@
 from uuid import UUID
-from typing import Dict, List
+from typing import Dict, List, Union
 from fastapi import WebSocket
 from loguru import logger
 
 
 class WebSocketManager:
     """
-    Central manager for WebSocket connections, organizado por `conversation_id`.
+    Central manager for WebSocket connections.
 
-    Manages connections, allows message broadcast and romove disconnected connections.
+    Manages connections organized by conversation_id or account_id.
+    Allows message broadcast and removes disconnected connections.
     """
 
     def __init__(self):
-        self.active_connections: Dict[int, List[WebSocket]] = {}
+        self.active_connections: Dict[Union[UUID, str], List[WebSocket]] = {}
 
-    async def connect(self, conversation_id: int, websocket: WebSocket):
-        if conversation_id not in self.active_connections:
-            self.active_connections[conversation_id] = []
-        self.active_connections[conversation_id].append(websocket)
+    async def connect(self, identifier: Union[UUID, str], websocket: WebSocket):
+        if identifier not in self.active_connections:
+            self.active_connections[identifier] = []
+        self.active_connections[identifier].append(websocket)
         logger.info(
-            f"[ws] Client connected to conversation {conversation_id} "
-            f"({len(self.active_connections[conversation_id])} total)"
+            f"[ws] Client connected to {identifier} "
+            f"({len(self.active_connections[identifier])} total)"
         )
         logger.debug(
-            f"[ws] Current conversations: {list(self.active_connections.keys())}"
+            f"[ws] Current identifiers: {list(self.active_connections.keys())}"
         )
 
-    def disconnect(self, conversation_id: UUID, websocket: WebSocket):
-        """
-        Remove uma conexão WebSocket da conversa informada.
-        """
-        connections = self.active_connections.get(conversation_id)
+    def disconnect(self, identifier: Union[UUID, str], websocket: WebSocket):
+        connections = self.active_connections.get(identifier)
         if not connections:
             return
 
         if websocket in connections:
             connections.remove(websocket)
             logger.info(
-                f"[ws] Client disconnected from conversation {conversation_id} "
+                f"[ws] Client disconnected from {identifier} "
                 f"({len(connections)} remaining)"
             )
 
         if not connections:
-            del self.active_connections[conversation_id]
-            logger.debug(
-                f"[ws] No more clients in conversation {conversation_id}, cleaned up."
-            )
+            del self.active_connections[identifier]
+            logger.debug(f"[ws] No more clients in {identifier}, cleaned up.")
 
-    async def broadcast(self, conversation_id: UUID, message: dict):
-        connections = self.active_connections.get(conversation_id, [])
+    async def broadcast(self, identifier: Union[UUID, str], message: dict):
+        connections = self.active_connections.get(identifier, [])
         if not connections:
-            logger.debug(
-                f"[ws] No clients to broadcast in conversation {conversation_id}"
-            )
+            logger.debug(f"[ws] No clients to broadcast in {identifier}")
             return
 
         logger.debug(
-            f"[ws] Broadcasting to {len(connections)} client(s) in conversation {conversation_id}"
+            f"[ws] Broadcasting to {len(connections)} client(s) in {identifier}"
         )
         for connection in connections:
             try:
                 await connection.send_json(message)
             except Exception as e:
                 logger.warning(
-                    f"[ws] Failed to send message to client in conversation {conversation_id}: {e}"
+                    f"[ws] Failed to send message to client in {identifier}: {e}"
                 )
+
+    async def broadcast_conversations(self, account_id: UUID, message: dict):
+        await self.broadcast(account_id, message)
 
 
 manager_instance = WebSocketManager()
