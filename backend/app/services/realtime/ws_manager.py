@@ -8,16 +8,13 @@ class WebSocketManager:
     """
     Central manager for WebSocket connections, organizado por `conversation_id`.
 
-    Gerencia conexões, permite broadcast de mensagens e remove conexões desconectadas.
+    Manages connections, allows message broadcast and romove disconnected connections.
     """
 
     def __init__(self):
         self.active_connections: Dict[int, List[WebSocket]] = {}
 
     async def connect(self, conversation_id: int, websocket: WebSocket):
-        """
-        Aceita e adiciona uma nova conexão WebSocket à conversa indicada.
-        """
         if conversation_id not in self.active_connections:
             self.active_connections[conversation_id] = []
         self.active_connections[conversation_id].append(websocket)
@@ -51,9 +48,6 @@ class WebSocketManager:
             )
 
     async def broadcast(self, conversation_id: UUID, message: dict):
-        """
-        Envia uma mensagem para todos os clientes conectados à conversa.
-        """
         connections = self.active_connections.get(conversation_id, [])
         if not connections:
             logger.debug(
