@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -73,11 +74,13 @@ def start_conversation(
         phone_number=payload.phone_number,
     )
 
+    internal_source_id = f"frontend-{uuid.uuid4().hex}"
+
     contact_inbox = contact_repo.get_or_create_contact_inbox(
         db=db,
         contact_id=contact.id,
         inbox_id=inbox.id,
-        source_id="frontend",
+        source_id=internal_source_id,
     )
 
     conversation: Conversation = conversation_repo.get_or_create_conversation(
