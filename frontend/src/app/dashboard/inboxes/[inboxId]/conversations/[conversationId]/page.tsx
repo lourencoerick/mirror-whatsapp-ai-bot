@@ -56,7 +56,7 @@ const ChatPage = () => {
     <main className="flex flex-col w-full max-w-3xl  items-center mx-auto h-full">
       <div className="w-full overflow-y-auto" ref={messagesRef}>
         <ChatWebSocketBridge
-          conversationId={Number(conversationId)}
+          conversationId={conversationId}
           onNewMessage={(message) => setMessages((prev: Message[]) => [...prev, message])}
         />
         <ChatMessageList>
