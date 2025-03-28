@@ -182,8 +182,8 @@ def find_all_by_user(
     Returns:
         List[Conversation]: Conversations accessible to the user
     """
-    inbox_ids_query = (
-        select(InboxMember.inbox_id).filter(InboxMember.user_id == user_id).subquery()
+    inbox_ids_query = select(InboxMember.inbox_id).filter(
+        InboxMember.user_id == user_id
     )
 
     conversations = (
@@ -197,6 +197,3 @@ def find_all_by_user(
     )
 
     return conversations
-
-
-from sqlalchemy.orm import joinedload
