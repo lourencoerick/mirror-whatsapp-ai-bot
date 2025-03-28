@@ -5,7 +5,7 @@ import Link from 'next/link';
 import clsx from 'clsx';
 import { formatLastMessageAt } from "@/lib/utils/date-utils"
 import { formatPhoneNumber } from "@/lib/utils/phone-utils"
-
+import { truncateText } from "@/lib/utils/text-utils"
 type Props = {
   id: string
   inboxId: string
@@ -34,14 +34,14 @@ const ConversationItem: React.FC<Props> = (props: Props) => {
             <User />
           </AvatarFallback>
         </Avatar>
-        <div className='flex flex-col flex-1'>
+        <div className='flex flex-col flex-1 min-w-0'>
           <div className='flex flex-row justify-between gap-2'>
-            <h4 className='text-sm truncate'><span>{`${formatPhoneNumber(props.phoneNumber)} | ${props.contactName}`} </span></h4>
-            <p className='text-xs text-muted-foreground truncate'>{formatLastMessageAt(props.lastMessageTime)}</p>
+            <h4 className='text-sm truncate'><span>{truncateText(`${formatPhoneNumber(props.phoneNumber)} | ${props.contactName}`, 30)} </span></h4>
+            {props.lastMessageTime && <p className='text-xs text-muted-foreground truncate'>{formatLastMessageAt(props.lastMessageTime)}</p>}
                         
           </div>
 
-          <p className='text-sm text-muted-foreground truncate'>{props.lastMessage}</p>
+          <p className='text-sm text-muted-foreground truncate'>{truncateText(props.lastMessage, 30)}</p>
         </div>
       </div>
     </Link>
