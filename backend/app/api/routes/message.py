@@ -13,7 +13,10 @@ from app.api.schemas.message import MessageRead, MessageCreatePayload, MessageCr
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
 from app.services.helper.conversation import update_last_message_snapshot
-from app.services.helper.websocket import publish_to_conversation_ws
+from app.services.helper.websocket import (
+    publish_to_conversation_ws,
+    publish_to_account_conversations_ws,
+)
 
 router = APIRouter()
 
@@ -136,4 +139,14 @@ async def create_outgoing_message(
     except Exception as e:
         logger.warning(f"[ws] Failed to publish message {message.id} to Redis: {e}")
 
+    try:
+        await publish_to_account_conversations_ws(
+            conversation.account_id,
+            {
+                "type": "conversation_updated",
+                "conversation": jsonable_encoder(conversation),
+            },
+        )
+    except Exception as e:
+        logger.warning(f"[ws] Failed to publish message {message.id} to Redis: {e}")
     return message

@@ -1,5 +1,6 @@
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from typing import List
 from loguru import logger
@@ -16,6 +17,8 @@ from app.services.repository import contact as contact_repo
 from app.services.repository import conversation as conversation_repo
 from app.services.repository import inbox as inbox_repo
 from app.models.conversation import Conversation
+from app.services.helper.websocket import publish_to_account_conversations_ws
+
 
 router = APIRouter()
 
@@ -57,7 +60,7 @@ def get_conversations(
 @router.post(
     "/inboxes/{inbox_id}/conversations", response_model=StartConversationResponse
 )
-def start_conversation(
+async def start_conversation(
     inbox_id: UUID,
     payload: StartConversationRequest,
     db: Session = Depends(get_db),
@@ -89,5 +92,19 @@ def start_conversation(
         inbox_id=inbox.id,
         contact_inbox_id=contact_inbox.id,
     )
+
+    try:
+        logger.debug("[ws] publishing message to the channel....")
+        await publish_to_account_conversations_ws(
+            account_id,
+            {
+                "type": "new_conversation",
+                "conversation": jsonable_encoder(conversation),
+            },
+        )
+    except Exception as e:
+        logger.warning(
+            f"[ws] Failed to publish conversation {conversation.id} to Redis: {e}"
+        )
 
     return StartConversationResponse(conversation_id=conversation.id)
