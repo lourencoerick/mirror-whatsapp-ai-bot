@@ -6,7 +6,7 @@ from typing import Optional, List
 from loguru import logger
 from app.middleware.account_context import get_account_id
 from app.models.conversation import Conversation
-from app.models.contact__inbox import ContactInbox
+from app.models.contact_inbox import ContactInbox
 
 
 def find_by_id(db: Session, conversation_id: UUID) -> Optional[Conversation]:
@@ -134,7 +134,7 @@ def get_or_create_conversation(
         f"[conversation] Creating new conversation for contact_inbox_id {contact_inbox_id}"
     )
 
-    contact__inbox: ContactInbox = (
+    contact_inbox: ContactInbox = (
         db.query(ContactInbox)
         .options(joinedload(ContactInbox.contact))
         .filter_by(
@@ -144,8 +144,8 @@ def get_or_create_conversation(
     )
 
     additional_attributes: dict = {}
-    additional_attributes["contact_name"] = contact__inbox.contact.name
-    additional_attributes["phone_number"] = contact__inbox.contact.phone_number
+    additional_attributes["contact_name"] = contact_inbox.contact.name
+    additional_attributes["phone_number"] = contact_inbox.contact.phone_number
 
     conversation = Conversation(
         account_id=account_id,

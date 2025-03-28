@@ -5,7 +5,7 @@ from app.database import SessionLocal
 from app.models.inbox import Inbox
 from app.models.user import User
 from app.models.account import Account
-from app.models.account__user import AccountUser
+from app.models.account_user import AccountUser
 from uuid import uuid4, UUID
 from loguru import logger
 

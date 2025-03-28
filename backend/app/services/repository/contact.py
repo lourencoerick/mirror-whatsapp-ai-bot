@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from loguru import logger
 from app.models.contact import Contact
-from app.models.contact__inbox import ContactInbox
+from app.models.contact_inbox import ContactInbox
 
 
 def find_by_phone(
