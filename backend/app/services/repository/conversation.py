@@ -119,7 +119,12 @@ def get_or_create_conversation(
     """
     Find or create a conversation for a given contact in an inbox.
     """
-    conversation = find_conversation(db, account_id, inbox_id, contact_inbox_id)
+    conversation = find_conversation(
+        db=db,
+        inbox_id=inbox_id,
+        contact_inbox_id=contact_inbox_id,
+        account_id=account_id,
+    )
 
     if conversation:
         return conversation
@@ -127,11 +132,26 @@ def get_or_create_conversation(
     logger.info(
         f"[conversation] Creating new conversation for contact_inbox_id {contact_inbox_id}"
     )
+
+    contact__inbox: ContactInbox = (
+        db.query(ContactInbox)
+        .options(joinedload(ContactInbox.contact))
+        .filter_by(
+            id=contact_inbox_id,
+        )
+        .first()
+    )
+
+    additional_attributes: dict = {}
+    additional_attributes["contact_name"] = contact__inbox.contact.name
+    additional_attributes["phone_number"] = contact__inbox.contact.phone_number
+
     conversation = Conversation(
         account_id=account_id,
         inbox_id=inbox_id,
         contact_inbox_id=contact_inbox_id,
         status="open",
+        additional_attributes=additional_attributes,
     )
     db.add(conversation)
     db.commit()

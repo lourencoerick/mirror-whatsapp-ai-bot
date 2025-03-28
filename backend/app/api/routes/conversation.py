@@ -1,12 +1,21 @@
-from fastapi import APIRouter, Depends
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from loguru import logger
 
 from app.database import get_db
 from app.middleware.account_context import get_account_id
-from app.api.schemas.conversation import ConversationResponse, LastMessage
-from app.services.repository.conversation import find_conversations_by_inbox
+from app.api.schemas.conversation import (
+    ConversationResponse,
+    LastMessage,
+    StartConversationResponse,
+    StartConversationRequest,
+)
+from app.services.repository import contact as contact_repo
+from app.services.repository import conversation as conversation_repo
+from app.services.repository import inbox as inbox_repo
+from app.models.conversation import Conversation
 
 router = APIRouter()
 
@@ -18,7 +27,7 @@ def get_conversations(
     inbox_id: int, limit: int = 20, offset: int = 0, db: Session = Depends(get_db)
 ):
     logger.info(f"Getting conversations for inbox_id {inbox_id}")
-    conversations = find_conversations_by_inbox(
+    conversations = conversation_repo.find_conversations_by_inbox(
         db=db, inbox_id=inbox_id, limit=limit, offset=offset
     )
 
@@ -43,3 +52,42 @@ def get_conversations(
             )
         )
     return response
+
+
+@router.post(
+    "/inboxes/{inbox_id}/conversations", response_model=StartConversationResponse
+)
+def start_conversation(
+    inbox_id: int,
+    payload: StartConversationRequest,
+    db: Session = Depends(get_db),
+):
+    account_id = get_account_id()
+
+    inbox = inbox_repo.find_by_id(db=db, account_id=account_id, inbox_id=inbox_id)
+    if not inbox or inbox.account_id != account_id:
+        raise HTTPException(status_code=404, detail="Inbox not found or unauthorized")
+
+    contact = contact_repo.upsert_contact(
+        db=db,
+        account_id=account_id,
+        phone_number=payload.phone_number,
+    )
+
+    internal_source_id = f"frontend-{uuid.uuid4().hex}"
+
+    contact_inbox = contact_repo.get_or_create_contact_inbox(
+        db=db,
+        contact_id=contact.id,
+        inbox_id=inbox.id,
+        source_id=internal_source_id,
+    )
+
+    conversation: Conversation = conversation_repo.get_or_create_conversation(
+        db=db,
+        account_id=account_id,
+        inbox_id=inbox.id,
+        contact_inbox_id=contact_inbox.id,
+    )
+
+    return StartConversationResponse(conversation_id=conversation.id)

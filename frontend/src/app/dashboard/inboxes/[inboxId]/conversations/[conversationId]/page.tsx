@@ -9,15 +9,15 @@ import { ChatMessageList } from '@/components/ui/chat/chat-message-list';
 import { useParams } from 'next/navigation';
 import { useRef, useEffect, useState } from 'react';
 import { useMessages, Message } from '@/hooks/use-messages';
-import { useSendMessage  } from "@/hooks/use-send-message";
+import { useSendMessage } from "@/hooks/use-send-message";
 
 import { ChatMessage } from "@/components/ui/chat/chat-message";
 import { ChatInputBox } from "@/components/ui/chat/chat-input-box";
 import { ChatWebSocketBridge } from '@/components/ui/chat/chat-websocket-bridge';
 
 const ChatPage = () => {
-  const { conversationId } = useParams();
-  const { messages, setMessages, loading, error } = useMessages(conversationId as string);
+  const { inboxId, conversationId } = useParams() as { inboxId: string, conversationId: string };
+  const { messages, setMessages, loading, error } = useMessages(inboxId as string, conversationId as string);
   const { sendMessage, sending, error: sendError } = useSendMessage();
   const [input, setInput] = useState('');
   const messagesRef = useRef<HTMLDivElement>(null);
@@ -45,6 +45,7 @@ const ChatPage = () => {
     }
   };
 
+  // Scroll to the bottom when messages update
   useEffect(() => {
     if (messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;

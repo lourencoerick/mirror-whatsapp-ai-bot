@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -14,3 +14,11 @@ class ConversationResponse(BaseModel):
     contact_name: Optional[str]
     last_message_at: Optional[datetime]
     last_message: Optional[LastMessage]
+
+
+class StartConversationRequest(BaseModel):
+    phone_number: str = Field(..., example="+5511988880000")
+
+
+class StartConversationResponse(BaseModel):
+    conversation_id: int

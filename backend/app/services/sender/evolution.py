@@ -30,7 +30,7 @@ def send_message(message: Message) -> dict:
     """
     try:
         payload = {
-            "number": "5511941986775",  # message.contact.phone_number,
+            "number": message.contact.phone_number,
             "text": message.content,
         }
         headers = {
