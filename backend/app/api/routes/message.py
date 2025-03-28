@@ -108,10 +108,6 @@ async def create_outgoing_message(
 
     # Update last message in the conversation
     if message:
-        conversation = conversation_repo.find_by_id(
-            db=db, conversation_id=message.conversation_id
-        )
-
         if conversation:
             update_last_message_snapshot(
                 db=db, conversation=conversation, message=message
