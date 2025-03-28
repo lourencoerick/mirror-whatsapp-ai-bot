@@ -28,11 +28,10 @@ const CONVERSATIONS_LIMIT: number = 10;
  * Custom hook to fetch conversations with infinite scrolling.
  * Uses limit and offset for pagination.
  *
- * @param inboxId - The ID of the inbox to fetch conversations for.
  * @returns An object containing the conversations list, loading state, error state,
  * a flag indicating if more conversations exist, and a function to load more.
  */
-export function useInfiniteConversations(inboxId: string): UseInfiniteConversationsResult {
+export function useInfiniteConversations(): UseInfiniteConversationsResult {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [offset, setOffset] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
@@ -46,7 +45,7 @@ export function useInfiniteConversations(inboxId: string): UseInfiniteConversati
 
     setLoading(true);
     api
-      .get<Conversation[]>(`/inboxes/${inboxId}/conversations`, {
+      .get<Conversation[]>(`/conversations`, {
         params: { limit: CONVERSATIONS_LIMIT, offset: offset },
       })
       .then((response: AxiosResponse<Conversation[]>) => {
@@ -68,7 +67,7 @@ export function useInfiniteConversations(inboxId: string): UseInfiniteConversati
       })
       .finally(() => setLoading(false));
     // Notice: we are not including offset, loading or hasMore in the dependencies.
-  }, [inboxId, loading, hasMore, offset]);
+  }, [ loading, hasMore, offset]);
 
   // Initial load only when inboxId changes. We remove loadMore from dependencies to avoid loop.
   useEffect(() => {
@@ -77,7 +76,7 @@ export function useInfiniteConversations(inboxId: string): UseInfiniteConversati
     setHasMore(true);
     loadMore();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inboxId]);
+  }, []);
 
   return { conversations, loading, error, hasMore, loadMore };
 }

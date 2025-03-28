@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 
 
 const ConversationPanel = () => {
-  const { inboxId, conversationId } = useParams() as { inboxId: string, conversationId: string };
+  const { conversationId } = useParams() as { conversationId: string };
   return (
     <div className="h-screen flex flex-col bg-slate-50 pt-4 gap-2 items-center">
 
@@ -17,7 +17,7 @@ const ConversationPanel = () => {
       <div className="flex flex-row justify-between items-center w-full px-2">
         <span className='text-lg font-semibold'>Conversas</span>
         <div className='flex gap-1'>
-          <StartConversationDialog inboxId={inboxId} />
+          <StartConversationDialog />
           <Button variant="outline" size={"sm"}>
             <Funnel size={15} />
           </Button>
