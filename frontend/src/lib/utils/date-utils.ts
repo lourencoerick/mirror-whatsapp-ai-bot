@@ -8,9 +8,14 @@
  * @param timestamp - The timestamp of the message (as a Date or string convertible to Date).
  * @returns A formatted string representing the message date/time.
  */
-export function formatLastMessageAt(timestamp: Date | string): string {
+export function formatLastMessageAt(utcTimestamp: Date | string): string {
     // Convert the input to a Date object if it's not already
-    const messageDateObj = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+    const messageUtcDateObj = typeof utcTimestamp === 'string' ? new Date(utcTimestamp) : utcTimestamp;
+    
+    // convert the date to local timezone
+    const messageDateObj = new Date(
+      messageUtcDateObj.getTime() - messageUtcDateObj.getTimezoneOffset() * 60000
+    );  
     
     // Get current date and set both dates to midnight for proper day comparison
     const now = new Date();
