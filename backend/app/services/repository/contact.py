@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy.orm import Session
 from typing import Optional
 from loguru import logger
@@ -5,7 +6,9 @@ from app.models.contact import Contact
 from app.models.contact__inbox import ContactInbox
 
 
-def find_by_phone(db: Session, account_id: int, phone_number: str) -> Optional[Contact]:
+def find_by_phone(
+    db: Session, account_id: UUID, phone_number: str
+) -> Optional[Contact]:
     if not all([account_id, phone_number]):
         logger.warning("[contact] Missing required parameters for lookup")
         return None
@@ -28,7 +31,7 @@ def find_by_phone(db: Session, account_id: int, phone_number: str) -> Optional[C
 
 def upsert_contact(
     db: Session,
-    account_id: int,
+    account_id: UUID,
     phone_number: str,
     name: Optional[str] = None,
 ) -> Contact:
@@ -58,9 +61,9 @@ def upsert_contact(
 
 def get_or_create_contact_inbox(
     db: Session,
-    contact_id: int,
-    inbox_id: int,
-    source_id: str,
+    contact_id: UUID,
+    inbox_id: UUID,
+    source_id: UUID,
 ) -> ContactInbox:
     """
     Find or create a ContactInbox association between a contact and an inbox.

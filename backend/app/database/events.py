@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy import event, text
 from sqlalchemy.orm import Session
 from sqlalchemy.engine import Connection, Transaction
@@ -15,8 +16,11 @@ def set_rls_context(
     for use with Row-Level Security (RLS).
     """
     try:
-        account_id: int = get_account_id()
-        connection.execute(text(f"SET LOCAL my.app.account_id = {account_id}"))
+        account_id: UUID = get_account_id()
+        connection.execute(
+            text("SET LOCAL my.app.account_id = :account_id"),
+            {"account_id": str(account_id)},
+        )
         logger.debug(f"[RLS] SET LOCAL my.app.account_id = {account_id}")
     except RuntimeError:
         logger.warning("[RLS] No account_id in context – skipping SET LOCAL")

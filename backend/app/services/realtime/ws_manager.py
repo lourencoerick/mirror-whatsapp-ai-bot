@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import Dict, List
 from fastapi import WebSocket
 from loguru import logger
@@ -28,7 +29,7 @@ class WebSocketManager:
             f"[ws] Current conversations: {list(self.active_connections.keys())}"
         )
 
-    def disconnect(self, conversation_id: int, websocket: WebSocket):
+    def disconnect(self, conversation_id: UUID, websocket: WebSocket):
         """
         Remove uma conexão WebSocket da conversa informada.
         """
@@ -49,7 +50,7 @@ class WebSocketManager:
                 f"[ws] No more clients in conversation {conversation_id}, cleaned up."
             )
 
-    async def broadcast(self, conversation_id: int, message: dict):
+    async def broadcast(self, conversation_id: UUID, message: dict):
         """
         Envia uma mensagem para todos os clientes conectados à conversa.
         """

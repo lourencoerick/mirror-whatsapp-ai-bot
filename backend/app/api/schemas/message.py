@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from datetime import datetime
@@ -12,12 +13,12 @@ class MessageCreatePayload(BaseModel):
 
 
 class MessageCreate(BaseModel):
-    account_id: int
-    inbox_id: int
-    contact_id: int
-    conversation_id: int
+    account_id: UUID
+    inbox_id: UUID
+    contact_id: UUID
+    conversation_id: UUID
     source_id: str  # external ID of the message
-    user_id: Optional[int] = None
+    user_id: Optional[UUID] = None
 
     direction: Literal["in", "out"]
     status: Literal["received", "sent", "pending", "processing", "failed"] = "received"
@@ -31,7 +32,7 @@ class MessageCreate(BaseModel):
 
 
 class MessageRead(BaseModel):
-    id: int
+    id: UUID
     content: Optional[str]
     direction: str
     message_type: str

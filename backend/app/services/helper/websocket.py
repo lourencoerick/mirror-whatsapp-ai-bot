@@ -1,11 +1,12 @@
 import json
+from uuid import UUID
 from redis.asyncio import Redis
 from app.config import get_settings
 
 settings = get_settings()
 
 
-async def publish_to_conversation_ws(conversation_id: int, data: dict):
+async def publish_to_conversation_ws(conversation_id: UUID, data: dict):
     """
     Publish a message to a Redis Pub/Sub channel for WebSocket delivery.
 
@@ -13,7 +14,7 @@ async def publish_to_conversation_ws(conversation_id: int, data: dict):
     to clients connected to a specific conversation.
 
     Args:
-        conversation_id (int): The target conversation ID.
+        conversation_id (UUID): The target conversation ID.
         data (dict): The message payload to be delivered over WebSocket.
     """
     redis = Redis(

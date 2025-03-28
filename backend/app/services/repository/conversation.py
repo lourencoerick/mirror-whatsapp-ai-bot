@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc
@@ -8,7 +9,7 @@ from app.models.conversation import Conversation
 from app.models.contact__inbox import ContactInbox
 
 
-def find_by_id(db: Session, conversation_id: int) -> Optional[Conversation]:
+def find_by_id(db: Session, conversation_id: UUID) -> Optional[Conversation]:
     """
     Retrieves a conversation by ID.
     """
@@ -24,10 +25,10 @@ def find_by_id(db: Session, conversation_id: int) -> Optional[Conversation]:
 
 def find_conversations_by_inbox(
     db: Session,
-    inbox_id: int,
+    inbox_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    account_id: Optional[int] = None,
+    account_id: Optional[UUID] = None,
 ) -> List[Conversation]:
     """
     Retrieve a list of conversations for a specific inbox.
@@ -112,9 +113,9 @@ def find_conversation(
 
 def get_or_create_conversation(
     db: Session,
-    inbox_id: int,
-    contact_inbox_id: int,
-    account_id: Optional[int] = None,
+    inbox_id: UUID,
+    contact_inbox_id: UUID,
+    account_id: Optional[UUID] = None,
 ) -> Conversation:
     """
     Find or create a conversation for a given contact in an inbox.

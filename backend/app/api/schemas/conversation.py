@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
@@ -8,7 +9,7 @@ class LastMessage(BaseModel):
 
 
 class ConversationResponse(BaseModel):
-    id: int
+    id: UUID
     phone_number: str
     profile_picture_url: Optional[str]
     contact_name: Optional[str]
@@ -21,4 +22,4 @@ class StartConversationRequest(BaseModel):
 
 
 class StartConversationResponse(BaseModel):
-    conversation_id: int
+    conversation_id: UUID

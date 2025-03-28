@@ -1,4 +1,5 @@
 import json
+from uuid import UUID
 import datetime
 from redis import Redis
 from typing import Optional
@@ -13,6 +14,8 @@ settings = get_settings()
 def default_converter(o):
     if isinstance(o, datetime.datetime):
         return o.isoformat()
+    if isinstance(o, UUID):
+        return str(o)
     raise TypeError(f"The type {type(o)} is not serializable")
 
 

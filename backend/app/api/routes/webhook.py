@@ -61,14 +61,16 @@ async def evolution_whatsapp_webhook(request: Request, db: Session = Depends(get
         logger.info(f"[webhook] Account {account_id}, event {event} ")
         if not account_id:
             logger.warning("[webhook] Account not found for source_id")
-            return {"status": "ignored"}
-        if event not in ["messages.upsert"]:
+            raise HTTPException(
+                status_code=404, detail="Account not found for source_id"
+            )
+        elif event not in ["messages.upsert"]:
             logger.warning("[webhook] Not a treatable event")
             raise HTTPException(status_code=400, detail="Not a treatable event")
 
         db.execute(
             text("SET LOCAL my.app.account_id = :account_id"),
-            {"account_id": account_id},
+            {"account_id": str(account_id)},
         )
         logger.debug(f"[webhook] SET LOCAL my.app.account_id = {account_id}")
 

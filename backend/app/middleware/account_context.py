@@ -1,3 +1,4 @@
+from uuid import UUID
 import contextvars
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -8,11 +9,11 @@ from loguru import logger
 _account_id_ctx_var = contextvars.ContextVar("account_id", default=None)
 
 
-def set_account_id(account_id: int):
+def set_account_id(account_id: UUID):
     _account_id_ctx_var.set(account_id)
 
 
-def get_account_id() -> int:
+def get_account_id() -> UUID:
     account_id = _account_id_ctx_var.get()
     if account_id is None:
         raise RuntimeError("account_id not set in context")
@@ -36,7 +37,7 @@ class AccountContextMiddleware(BaseHTTPMiddleware):
                 )
 
             try:
-                account_id = int(account_id_header)
+                account_id = UUID(account_id_header)
                 set_account_id(account_id)
                 logger.debug(f"[middleware] Account ID set: {account_id}")
             except ValueError:

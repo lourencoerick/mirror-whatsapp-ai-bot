@@ -1,4 +1,4 @@
-import uuid
+from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
@@ -22,7 +22,7 @@ router = APIRouter()
     "/conversations/{conversation_id}/messages", response_model=List[MessageRead]
 )
 def get_messages(
-    conversation_id: int,
+    conversation_id: UUID,
     limit: int = 20,
     offset: int = 0,
     db: Session = Depends(get_db),
@@ -31,7 +31,7 @@ def get_messages(
     Retrieve a paginated list of messages from a conversation.
 
     Args:
-        conversation_id (int): ID of the conversation.
+        conversation_id (UUID): ID of the conversation.
         limit (int): Max number of messages to return (default: 20).
         offset (int): Number of messages to skip for pagination (default: 0).
         db (Session): Injected database session.
@@ -55,7 +55,7 @@ def get_messages(
     status_code=201,
 )
 async def create_outgoing_message(
-    conversation_id: int,
+    conversation_id: UUID,
     payload: MessageCreatePayload,
     db: Session = Depends(get_db),
 ):
@@ -68,7 +68,7 @@ async def create_outgoing_message(
     - Updates the source_id if an external ID is returned
 
     Args:
-        conversation_id (int): The target conversation ID.
+        conversation_id (UUID): The target conversation ID.
         payload (MessageCreatePayload): The message content from the frontend.
         db (Session): Database session.
 
@@ -80,7 +80,7 @@ async def create_outgoing_message(
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     # Generate internal source_id
-    internal_source_id = f"internal-{uuid.uuid4().hex}"
+    internal_source_id = f"internal-{uuid4().hex}"
 
     message_data = MessageCreate(
         account_id=conversation.account_id,
@@ -88,7 +88,7 @@ async def create_outgoing_message(
         conversation_id=conversation.id,
         contact_id=conversation.contact_inbox.contact_id,
         source_id=internal_source_id,
-        user_id=1,
+        user_id=uuid4(),
         direction="out",
         status="processing",
         message_timestamp=datetime.now(timezone.utc),
