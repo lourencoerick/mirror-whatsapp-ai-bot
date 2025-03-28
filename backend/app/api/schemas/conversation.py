@@ -16,6 +16,9 @@ class ConversationResponse(BaseModel):
     last_message_at: Optional[datetime]
     last_message: Optional[LastMessage]
 
+    class Config:
+        from_attributes = True
+
 
 class StartConversationRequest(BaseModel):
     phone_number: str = Field(..., example="+5511988880000")
