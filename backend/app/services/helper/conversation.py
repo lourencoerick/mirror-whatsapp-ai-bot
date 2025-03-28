@@ -32,7 +32,7 @@ def update_last_message_snapshot(
 
     conversation.additional_attributes["last_message"] = snapshot
 
-    if message.contact and message.contact.name:
+    if message.contact and message.contact.name and message.direction == "in":
         conversation.additional_attributes["contact_name"] = message.contact.name
         conversation.additional_attributes["phone_number"] = (
             message.contact.phone_number
