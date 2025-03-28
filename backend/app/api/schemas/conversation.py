@@ -21,7 +21,7 @@ class ConversationResponse(BaseModel):
 
 
 class StartConversationRequest(BaseModel):
-    phone_number: str = Field(..., example="+5511988880000")
+    phone_number: str = Field(..., example="5511988880000")
 
 
 class StartConversationResponse(BaseModel):
