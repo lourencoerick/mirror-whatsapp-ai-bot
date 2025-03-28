@@ -9,7 +9,7 @@ interface WebSocketMessage {
 }
 
 interface Props {
-  conversationId: number;
+  conversationId: string;
   onNewMessage: (msg: WebSocketMessage['message']) => void;
 }
 

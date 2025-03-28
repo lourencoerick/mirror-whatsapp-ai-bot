@@ -1,3 +1,6 @@
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -12,7 +15,7 @@ from app.models.base import BaseModel
 class Account(BaseModel):
     __tablename__ = "accounts"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     locale = Column(String(5), nullable=True)
 

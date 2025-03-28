@@ -5,8 +5,8 @@ from app.database import SessionLocal
 from app.models.inbox import Inbox
 from app.models.user import User
 from app.models.account import Account
-from app.models.account__user import AccountUser
-from uuid import uuid4
+from app.models.account_user import AccountUser
+from uuid import uuid4, UUID
 from loguru import logger
 
 client = TestClient(app)
@@ -76,4 +76,4 @@ def test_start_conversation_flow(setup_test_data):
     assert response.status_code == 200
     data = response.json()
     assert "conversation_id" in data
-    assert isinstance(data["conversation_id"], int)
+    assert isinstance(UUID(data["conversation_id"]), UUID)

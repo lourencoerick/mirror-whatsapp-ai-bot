@@ -1,3 +1,5 @@
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
     Integer,
@@ -13,7 +15,7 @@ from app.models.base import BaseModel
 
 class Contact(BaseModel):
     __tablename__ = "contacts"
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     __table_args__ = (
         UniqueConstraint(
             "account_id", "identifier", name="contacts_account_id_identifier_unique"
@@ -24,7 +26,7 @@ class Contact(BaseModel):
         UniqueConstraint("pubsub_token", name="contacts_pubsub_token_unique"),
         Index("contacts_account_id_index", "account_id"),
     )
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
     phone_number = Column(String(255), nullable=True)

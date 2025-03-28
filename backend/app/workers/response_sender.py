@@ -1,4 +1,4 @@
-import json
+from uuid import UUID
 from loguru import logger
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
@@ -57,13 +57,13 @@ class ResponseSender:
         while True:
             self._process_one_message()
 
-    def _handle_message(self, db: Session, message_id: int):
+    def _handle_message(self, db: Session, message_id: UUID):
         """
         Handles delivery of a specific message by ID.
 
         Args:
             db (Session): Active SQLAlchemy database session.
-            message_id (int): The ID of the message to be delivered.
+            message_id (UUID): The ID of the message to be delivered.
         """
         message = message_repo.find_by_id(db, message_id)
         if not message:

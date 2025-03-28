@@ -3,14 +3,13 @@
 Revision ID: abc42
 Revises: 4d3e94d2643c
 Create Date: 2025-03-25 11:48:05.798310
-
 """
 
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "abc42"
-down_revision: str = "4d3e94d2643c"
+down_revision: str = "70570557ee45"
 branch_labels = None
 depends_on = None
 
@@ -28,9 +27,9 @@ def disable_rls_policy(table: str, policy: str):
 def upgrade():
     op.execute(
         """
-        CREATE OR REPLACE FUNCTION current_account_id() RETURNS INTEGER AS $$
+        CREATE OR REPLACE FUNCTION current_account_id() RETURNS UUID AS $$
         BEGIN
-            RETURN current_setting('my.app.account_id', true)::integer;
+            RETURN current_setting('my.app.account_id', true)::uuid;
         END;
         $$ LANGUAGE plpgsql STABLE;
         """

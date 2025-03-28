@@ -1,3 +1,5 @@
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
     Integer,
@@ -26,14 +28,16 @@ class Conversation(BaseModel):
         Index("conversations_contact_inbox_id_index", "contact_inbox_id"),
     )
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    inbox_id = Column(Integer, ForeignKey("inboxes.id"), nullable=False)
-    contact_inbox_id = Column(Integer, ForeignKey("contact_inboxes.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    inbox_id = Column(UUID(as_uuid=True), ForeignKey("inboxes.id"), nullable=False)
+    contact_inbox_id = Column(
+        UUID(as_uuid=True), ForeignKey("contact_inboxes.id"), nullable=False
+    )
 
     status = Column(String(50), nullable=False)
-    assignee_id = Column(Integer, nullable=True)
-    display_id = Column(Integer, nullable=True)
+    assignee_id = Column(UUID(as_uuid=True), nullable=True)
+    display_id = Column(String(255), nullable=True)
 
     user_last_seen_at = Column(DateTime, nullable=True)
     agent_last_seen_at = Column(DateTime, nullable=True)

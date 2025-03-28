@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy.orm import Session
 from typing import Optional
 from loguru import logger
@@ -5,7 +6,7 @@ from app.models.inbox import Inbox
 
 
 def find_by_id(
-    db: Session, inbox_id: str, account_id: Optional[int] = None
+    db: Session, inbox_id: UUID, account_id: Optional[UUID] = None
 ) -> Optional[Inbox]:
 
     inbox = db.query(Inbox).filter_by(account_id=account_id, id=inbox_id).first()
@@ -19,7 +20,7 @@ def find_by_id(
 
 
 def find_by_channel_id(
-    db: Session, account_id: int, channel_id: str
+    db: Session, account_id: UUID, channel_id: str
 ) -> Optional[Inbox]:
     """
     Retrieve an inbox by channel_id and account_id.
@@ -43,7 +44,9 @@ def find_by_channel_id(
     return inbox
 
 
-def get_or_create_by_channel_id(db: Session, account_id: int, channel_id: str) -> Inbox:
+def get_or_create_by_channel_id(
+    db: Session, account_id: UUID, channel_id: str
+) -> Inbox:
     """
     Retrieve or create an inbox using channel_id and account_id.
     Logs both cases.

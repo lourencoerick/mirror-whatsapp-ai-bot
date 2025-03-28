@@ -17,7 +17,7 @@ def update_last_message_snapshot(
     """
 
     snapshot = {
-        "id": message.id,
+        "id": str(message.id),
         "content": message.content,
         "timestamp": (message.sent_at.isoformat() if message.sent_at else None),
         "direction": message.message_type,

@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import Dict, Optional
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from app.api.schemas.message import MessageCreate
 
 
 def parse_webhook_to_message(
-    db: Session, account_id: int, payload: Dict
+    db: Session, account_id: UUID, payload: Dict
 ) -> Optional[MessageCreate]:
     """
     Process a raw webhook payload and return a complete MessageCreate DTO.

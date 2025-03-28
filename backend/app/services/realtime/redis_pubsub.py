@@ -1,7 +1,5 @@
-# app/services/realtime/redis_pubsub.py
-
-import asyncio
 import json
+from uuid import UUID
 from redis.asyncio import Redis
 from loguru import logger
 from app.services.realtime.ws_manager import manager_instance
@@ -42,7 +40,7 @@ class RedisPubSubBridge:
 
             try:
                 channel = message["channel"]
-                conversation_id = int(channel.split(":")[-1])
+                conversation_id = UUID(channel.split(":")[-1])
                 data = json.loads(message["data"])
 
                 await manager_instance.broadcast(conversation_id, data)

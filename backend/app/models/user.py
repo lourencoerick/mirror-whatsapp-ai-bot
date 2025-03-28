@@ -1,3 +1,5 @@
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
     Integer,
@@ -13,7 +15,7 @@ from app.models.base import BaseModel
 
 class User(BaseModel):
     __tablename__ = "users"
-    id = Column(Integer, primary_key=True, autoincrement=True)
+
     __table_args__ = (
         UniqueConstraint("provider", "uid", name="users_provider_uid_unique"),
         UniqueConstraint(
@@ -22,6 +24,7 @@ class User(BaseModel):
         UniqueConstraint("pubsub_token", name="users_pubsub_token_unique"),
         Index("users_email_index", "email"),
     )
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     provider = Column(String(255), nullable=False)
     uid = Column(String(255), nullable=False)
     encrypted_password = Column(String(255), nullable=False)

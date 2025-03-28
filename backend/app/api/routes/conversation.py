@@ -1,4 +1,4 @@
-import uuid
+from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -24,7 +24,7 @@ router = APIRouter()
     "/inboxes/{inbox_id}/conversations", response_model=List[ConversationResponse]
 )
 def get_conversations(
-    inbox_id: int, limit: int = 20, offset: int = 0, db: Session = Depends(get_db)
+    inbox_id: UUID, limit: int = 20, offset: int = 0, db: Session = Depends(get_db)
 ):
     logger.info(f"Getting conversations for inbox_id {inbox_id}")
     conversations = conversation_repo.find_conversations_by_inbox(
@@ -58,7 +58,7 @@ def get_conversations(
     "/inboxes/{inbox_id}/conversations", response_model=StartConversationResponse
 )
 def start_conversation(
-    inbox_id: int,
+    inbox_id: UUID,
     payload: StartConversationRequest,
     db: Session = Depends(get_db),
 ):
@@ -74,7 +74,7 @@ def start_conversation(
         phone_number=payload.phone_number,
     )
 
-    internal_source_id = f"frontend-{uuid.uuid4().hex}"
+    internal_source_id = f"frontend-{uuid4().hex}"
 
     contact_inbox = contact_repo.get_or_create_contact_inbox(
         db=db,

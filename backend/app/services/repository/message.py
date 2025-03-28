@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from typing import List, Optional
@@ -6,7 +7,7 @@ from app.models.message import Message
 from app.api.schemas.message import MessageCreate
 
 
-def find_by_id(db: Session, message_id: int) -> Optional[Message]:
+def find_by_id(db: Session, message_id: UUID) -> Optional[Message]:
     """
     Retrieves a message by ID with related contact loaded.
     """
@@ -27,10 +28,10 @@ def find_by_id(db: Session, message_id: int) -> Optional[Message]:
 
 def find_messages_by_conversation(
     db: Session,
-    conversation_id: int,
+    conversation_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    account_id: int = None,
+    account_id: Optional[UUID] = None,
 ) -> List[Message]:
     """
     Retrieve messages belonging to a specific conversation, filtered by account.

@@ -7,7 +7,7 @@ from app.models.account import Account
 from app.models.user import User
 from app.models.inbox import Inbox
 from app.models.contact import Contact
-from app.models.contact__inbox import ContactInbox
+from models.contact_inbox import ContactInbox
 from app.models.conversation import Conversation
 from app.models.message import Message
 from app.database import SessionLocal
