@@ -15,8 +15,17 @@ from app.models.base import BaseModel
 
 class Inbox(BaseModel):
     __tablename__ = "inboxes"
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    __table_args__ = (Index("inboxes_account_id_index", "account_id"),)
+    __table_args__ = (
+        Index("inboxes_account_id_index", "account_id"),
+        UniqueConstraint(
+            "account_id",
+            "channel_id",
+            "channel_type",
+            name="account_inbox_account_id_channel_id_channe_type_unique",
+        ),
+    )
 
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     channel_id = Column(String(255), nullable=False)
