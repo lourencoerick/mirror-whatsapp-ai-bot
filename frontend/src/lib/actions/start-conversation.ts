@@ -32,8 +32,7 @@ export async function startConversation({ phoneNumber, inboxId }: StartConversat
     });
 
     const data = response.data;
-    revalidatePath(`/dashboard/inboxes/${inboxId}`);
-
+    
     return { success: true, conversation_id: data.conversation_id };
   } catch (e) {
     return { success: false, error: (e as Error).message };
