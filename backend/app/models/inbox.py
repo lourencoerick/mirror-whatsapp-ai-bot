@@ -1,3 +1,5 @@
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
     Integer,
@@ -13,10 +15,10 @@ from app.models.base import BaseModel
 
 class Inbox(BaseModel):
     __tablename__ = "inboxes"
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     __table_args__ = (Index("inboxes_account_id_index", "account_id"),)
 
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     channel_id = Column(String(255), nullable=False)
     name = Column(String(255), nullable=False)
     channel_type = Column(String(255), nullable=True)

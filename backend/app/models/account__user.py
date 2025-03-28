@@ -1,3 +1,5 @@
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
 from sqlalchemy import (
     Column,
     Integer,
@@ -8,7 +10,6 @@ from sqlalchemy import (
     Enum,
 )
 import enum
-
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
@@ -30,11 +31,11 @@ class AccountUser(BaseModel):
         Index("account_users_user_id_index", "user_id"),
     )
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     role = Column(Enum(UserRole), nullable=True)
-    inviter_id = Column(BigInteger, ForeignKey("users.id"), nullable=True)
+    inviter_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     account = relationship(
         "Account", back_populates="account_users", foreign_keys=[account_id]

@@ -1,6 +1,8 @@
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 from typing import Any
-from sqlalchemy import Column, DateTime, Integer, String, BigInteger
+from sqlalchemy import Column, DateTime
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.sql import func
 
@@ -15,13 +17,6 @@ class BaseModel(Base):
 
     __abstract__ = True
 
-    # Common fields for all tables
-    id = Column(BigInteger, primary_key=True)
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(
-        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
-    )
-
     @declared_attr
     def __tablename__(cls) -> str:
         """
@@ -29,6 +24,13 @@ class BaseModel(Base):
         Example: UserMessage -> user_messages
         """
         return f"{cls.__name__.lower()}s"
+
+    # Common fields for all tables
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     def to_dict(self) -> dict[str, Any]:
         """

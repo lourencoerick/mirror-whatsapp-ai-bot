@@ -1,3 +1,5 @@
+import uuid
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
     Integer,
@@ -16,10 +18,11 @@ class Webhook(BaseModel):
     __table_args__ = (
         UniqueConstraint("account_id", "url", name="webhooks_account_id_url_unique"),
     )
-    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)
-    inbox_id = Column(Integer, ForeignKey("inboxes.id"), nullable=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=True)
+    inbox_id = Column(UUID(as_uuid=True), ForeignKey("inboxes.id"), nullable=True)
     url = Column(String(255), nullable=True)
-    webhook_type = Column(Integer, nullable=True)
+    webhook_type = Column(String(255), nullable=True)
 
     account = relationship("Account", back_populates="webhooks")
     inbox = relationship("Inbox", back_populates="webhooks")
