@@ -39,6 +39,10 @@ def send_message(message: Message) -> dict:
         }
         url = f"{settings.EVOLUTION_SERVER_URL}/message/sendText/{settings.EVOLUTION_INSTANCE}"
 
+        logger.info(
+            f"[evolution_sender] Sending messsa to : {url}\npayload: {payload}\nheaders: {headers}"
+        )
+
         response = httpx.post(url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
 
