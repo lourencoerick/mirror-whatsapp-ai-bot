@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.account import Account
 from app.models.account__user import AccountUser
 from uuid import uuid4
-
+from loguru import logger
 
 client = TestClient(app)
 
@@ -58,7 +58,7 @@ def setup_test_data():
     db.close()
 
 
-@pytest.mark.unit
+@pytest.mark.integration
 def test_start_conversation_flow(setup_test_data):
     """
     Integration test for starting a conversation by phone number.
@@ -66,7 +66,7 @@ def test_start_conversation_flow(setup_test_data):
     """
     account = setup_test_data["account"]
     inbox = setup_test_data["inbox"]
-
+    logger.debug(f"[test:repo:contact] Account: {account}\n Inbox: {inbox}")
     response = client.post(
         f"/inboxes/{inbox.id}/conversations",
         headers={"X-Account-ID": str(account.id)},
