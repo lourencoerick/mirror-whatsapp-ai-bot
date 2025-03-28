@@ -13,7 +13,7 @@ def setup_initial_data(db: Session):
     account_id = uuid4()
     user_id = uuid4()
     inbox_id = uuid4()
-
+    logger.info(f"Account id: {account_id}\nUser ID: {user_id}\nInbox ID: {inbox_id}")
     account = Account(id=account_id, name="Demo Account", locale="pt-BR")
     db.merge(account)
 
@@ -21,7 +21,7 @@ def setup_initial_data(db: Session):
         id=user_id,
         name="Bot User",
         provider="internal",
-        uid="bot_user_1",
+        uid=uuid4(),
         encrypted_password="secret",
         sign_in_count=0,
     )
