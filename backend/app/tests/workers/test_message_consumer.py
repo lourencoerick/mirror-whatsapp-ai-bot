@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 import pytest
 from unittest.mock import patch, MagicMock
 from app.workers.message_consumer import MessageConsumer
@@ -26,15 +27,21 @@ def mock_get_or_create_message():
         yield mocked
 
 
+account_id = uuid4()
+inbox_id = uuid4()
+contact_id = uuid4()
+conversation_id = uuid4()
+
+
 @pytest.fixture
 def valid_message():
     return {
         "content": "Oi",
         "direction": "in",
-        "account_id": 1,
-        "inbox_id": 1,
-        "contact_id": 1,
-        "conversation_id": 1,
+        "account_id": account_id,
+        "inbox_id": inbox_id,
+        "contact_id": contact_id,
+        "conversation_id": conversation_id,
         "source_id": "msg-123",
         "message_timestamp": datetime.utcnow().isoformat(),
         "content_type": "text",

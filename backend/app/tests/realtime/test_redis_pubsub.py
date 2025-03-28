@@ -1,4 +1,5 @@
 import asyncio
+from uuid import uuid4
 import json
 import pytest
 from unittest.mock import AsyncMock
@@ -30,9 +31,10 @@ def redis_pubsub_bridge():
 @pytest.mark.asyncio
 async def test_start_broadcasts_message(redis_pubsub_bridge, monkeypatch):
     # Create a fake pmessage with valid JSON data.
+    conversation_id = uuid4()
     message = {
         "type": "pmessage",
-        "channel": "ws:conversation:1",
+        "channel": f"ws:conversation:{conversation_id}",
         "data": json.dumps({"text": "Hello"}),
     }
     fake_pubsub = FakePubSub([message])
@@ -47,7 +49,7 @@ async def test_start_broadcasts_message(redis_pubsub_bridge, monkeypatch):
     await redis_pubsub_bridge.start()
 
     # Verify that broadcast was called with conversation_id=1 and the correct data.
-    broadcast_mock.assert_awaited_once_with(1, {"text": "Hello"})
+    broadcast_mock.assert_awaited_once_with(conversation_id, {"text": "Hello"})
 
 
 @pytest.mark.asyncio

@@ -18,9 +18,11 @@ client = TestClient(app)
 
 @pytest.mark.integration
 def test_account_id_header_present():
-    response = client.get("/protected", headers={"X-Account-ID": "123"})
+    response = client.get(
+        "/protected", headers={"X-Account-ID": "123e4567-e89b-12d3-a456-426614174000"}
+    )
     assert response.status_code == 200
-    assert response.json() == {"account_id": 123}
+    assert response.json() == {"account_id": "123e4567-e89b-12d3-a456-426614174000"}
 
 
 @pytest.mark.integration

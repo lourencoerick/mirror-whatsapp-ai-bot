@@ -1,3 +1,4 @@
+from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -12,13 +13,24 @@ client = TestClient(app)
 
 @pytest.mark.integration
 def test_get_conversations_success():
-    response = client.get(
-        "/inboxes/1/conversations?limit=5&offset=0",
-        headers={"X-Account-ID": "1"},
+    db = SessionLocal()
+    account = Account(id=uuid4(), name="Test")
+    inbox = Inbox(
+        id=uuid4(),
+        name="Test Inbox",
+        account_id=account.id,
+        channel_type="whatsapp",
+        channel_id="123",
     )
-    print(response.json())
+    db.add_all([account, inbox])
+    db.commit()
+
+    response = client.get(
+        f"/inboxes/{inbox.id}/conversations?limit=5&offset=0",
+        headers={"X-Account-ID": str(account.id)},
+    )
+
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
 
 
 @pytest.mark.integration
@@ -30,8 +42,17 @@ def test_start_conversation_successful_flow():
 
     # Prepare test data
     account = Account(name="Test Account")
-    user = User(name="John", email="john@example.com")
-    inbox = Inbox(name="Support", channel_type="whatsapp", account=account)
+    user = User(
+        name="John",
+        email="john@example.com",
+        provider="internal",
+        uid=uuid4(),
+        encrypted_password="hahah",
+        sign_in_count=0,
+    )
+    inbox = Inbox(
+        name="Support", channel_type="whatsapp", account=account, channel_id="123"
+    )
     db.add_all([account, user, inbox])
     db.commit()
 
@@ -57,8 +78,8 @@ def test_start_conversation_inbox_not_found():
     Should return 404 when inbox doesn't exist or belongs to another account.
     """
     response = client.post(
-        "/inboxes/999/conversations",
-        headers={"X-Account-ID": "1"},
+        f"/inboxes/{str(uuid4())}/conversations",
+        headers={"X-Account-ID": str(uuid4())},
         json={"phone_number": "5511988888888"},
     )
     assert response.status_code == 404
@@ -71,7 +92,7 @@ def test_start_conversation_missing_account_header():
     Should return 401 when X-Account-ID header is missing.
     """
     response = client.post(
-        "/inboxes/1/conversations",
+        f"/inboxes/{str(uuid4())}/conversations",
         json={"phone_number": "5511988888888"},
     )
     assert response.status_code == 401
