@@ -10,7 +10,6 @@ from app.middleware.account_context import get_account_id
 from app.middleware.user_context import get_user_id_from_header
 from app.api.schemas.conversation import (
     ConversationResponse,
-    LastMessage,
     StartConversationResponse,
     StartConversationRequest,
 )
@@ -19,7 +18,10 @@ from app.services.repository import conversation as conversation_repo
 from app.services.repository import inbox as inbox_repo
 from app.models.conversation import Conversation
 from app.services.helper.websocket import publish_to_account_conversations_ws
-from app.services.helper.conversation import conversations_to_conversations_response
+from app.services.helper.conversation import (
+    conversations_to_conversations_response,
+    parse_conversation_to_conversation_response,
+)
 
 
 router = APIRouter()
@@ -105,7 +107,9 @@ async def start_conversation(
             account_id,
             {
                 "type": "new_conversation",
-                "conversation": jsonable_encoder(conversation),
+                "payload": jsonable_encoder(
+                    parse_conversation_to_conversation_response(conversation)
+                ),
             },
         )
     except Exception as e:

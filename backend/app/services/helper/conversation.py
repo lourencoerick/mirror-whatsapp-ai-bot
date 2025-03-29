@@ -52,26 +52,31 @@ def update_last_message_snapshot(
     )
 
 
+def parse_conversation_to_conversation_response(
+    conversation: List[Conversation],
+) -> List[ConversationResponse]:
+
+    attrs = conversation.additional_attributes or {}
+    last_message = attrs.get("last_message", {})
+    return ConversationResponse(
+        id=conversation.id,
+        updated_at=conversation.updated_at,
+        phone_number=attrs.get("phone_number", ""),
+        contact_name=attrs.get("contact_name"),
+        profile_picture_url=attrs.get("profile_picture_url"),
+        last_message_at=conversation.last_message_at,
+        last_message=(
+            LastMessage(content=last_message.get("content", ""))
+            if last_message
+            else None
+        ),
+    )
+
+
 def conversations_to_conversations_response(
     conversations: List[Conversation],
 ) -> List[ConversationResponse]:
     response = []
     for conv in conversations:
-        attrs = conv.additional_attributes or {}
-        last_message = attrs.get("last_message", {})
-        response.append(
-            ConversationResponse(
-                id=conv.id,
-                updated_at=conv.updated_at,
-                phone_number=attrs.get("phone_number", ""),
-                contact_name=attrs.get("contact_name"),
-                profile_picture_url=attrs.get("profile_picture_url"),
-                last_message_at=conv.last_message_at,
-                last_message=(
-                    LastMessage(content=last_message.get("content", ""))
-                    if last_message
-                    else None
-                ),
-            )
-        )
+        response.append(parse_conversation_to_conversation_response(conv))
     return response

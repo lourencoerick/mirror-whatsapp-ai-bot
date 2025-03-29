@@ -12,7 +12,10 @@ from app.services.queue.publisher import publish_message_to_queue
 from app.api.schemas.message import MessageRead, MessageCreatePayload, MessageCreate
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
-from app.services.helper.conversation import update_last_message_snapshot
+from app.services.helper.conversation import (
+    update_last_message_snapshot,
+    parse_conversation_to_conversation_response,
+)
 from app.services.helper.websocket import (
     publish_to_conversation_ws,
     publish_to_account_conversations_ws,
@@ -140,7 +143,9 @@ async def create_outgoing_message(
             conversation.account_id,
             {
                 "type": "conversation_updated",
-                "payload": jsonable_encoder(conversation),
+                "payload": jsonable_encoder(
+                    parse_conversation_to_conversation_response(conversation)
+                ),
             },
         )
     except Exception as e:
