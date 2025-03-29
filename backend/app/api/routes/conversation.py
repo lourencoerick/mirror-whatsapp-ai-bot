@@ -1,14 +1,15 @@
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from typing import List
 from loguru import logger
 
 from app.database import get_db
 from app.middleware.account_context import get_account_id
+from app.middleware.user_context import get_user_id_from_header
 from app.api.schemas.conversation import (
     ConversationResponse,
-    LastMessage,
     StartConversationResponse,
     StartConversationRequest,
 )
@@ -16,14 +17,44 @@ from app.services.repository import contact as contact_repo
 from app.services.repository import conversation as conversation_repo
 from app.services.repository import inbox as inbox_repo
 from app.models.conversation import Conversation
+from app.services.helper.websocket import publish_to_account_conversations_ws
+from app.services.helper.conversation import (
+    conversations_to_conversations_response,
+    parse_conversation_to_conversation_response,
+)
+
 
 router = APIRouter()
+
+
+@router.get("/conversations", response_model=List[ConversationResponse])
+def get_user_conversations(
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    account_id: UUID = Depends(get_account_id),
+    user_id: UUID = Depends(get_user_id_from_header),
+):
+    """
+    Return all conversations visible to the current user,
+    based on inbox membership.
+    """
+
+    conversations = conversation_repo.find_all_by_user(
+        db=db,
+        user_id=user_id,
+        account_id=account_id,
+        limit=limit,
+        offset=offset,
+    )
+
+    return conversations_to_conversations_response(conversations)
 
 
 @router.get(
     "/inboxes/{inbox_id}/conversations", response_model=List[ConversationResponse]
 )
-def get_conversations(
+def get_inbox_conversations(
     inbox_id: UUID, limit: int = 20, offset: int = 0, db: Session = Depends(get_db)
 ):
     logger.info(f"Getting conversations for inbox_id {inbox_id}")
@@ -31,33 +62,13 @@ def get_conversations(
         db=db, inbox_id=inbox_id, limit=limit, offset=offset
     )
 
-    response = []
-    for conv in conversations:
-        attrs = conv.additional_attributes or {}
-        last_message = attrs.get("last_message", {})
-        response.append(
-            ConversationResponse(
-                id=conv.id,
-                phone_number=attrs.get("phone_number", ""),
-                contact_name=attrs.get("contact_name"),
-                profile_picture_url=attrs.get("profile_picture_url"),
-                last_message_at=conv.last_message_at,
-                last_message=(
-                    LastMessage(
-                        content=last_message.get("content", ""),
-                    )
-                    if last_message
-                    else None
-                ),
-            )
-        )
-    return response
+    return conversations_to_conversations_response(conversations)
 
 
 @router.post(
     "/inboxes/{inbox_id}/conversations", response_model=StartConversationResponse
 )
-def start_conversation(
+async def start_conversation(
     inbox_id: UUID,
     payload: StartConversationRequest,
     db: Session = Depends(get_db),
@@ -89,5 +100,21 @@ def start_conversation(
         inbox_id=inbox.id,
         contact_inbox_id=contact_inbox.id,
     )
+
+    try:
+        logger.debug("[ws] publishing message to the channel....")
+        await publish_to_account_conversations_ws(
+            account_id,
+            {
+                "type": "new_conversation",
+                "payload": jsonable_encoder(
+                    parse_conversation_to_conversation_response(conversation)
+                ),
+            },
+        )
+    except Exception as e:
+        logger.warning(
+            f"[ws] Failed to publish conversation {conversation.id} to Redis: {e}"
+        )
 
     return StartConversationResponse(conversation_id=conversation.id)

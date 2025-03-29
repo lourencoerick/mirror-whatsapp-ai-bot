@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.account import Account
 from app.models.user import User
 from app.models.inbox import Inbox
+from app.models.inbox_member import InboxMember
 
 
 def setup_initial_data(db: Session):
@@ -35,6 +36,9 @@ def setup_initial_data(db: Session):
         channel_type="evolution",
     )
     db.merge(inbox)
+
+    inbox_member = InboxMember(user_id=user_id, inbox_id=inbox.id)
+    db.merge(inbox_member)
 
     db.commit()
     logger.info("[onboarding] Setup completed successfully.")

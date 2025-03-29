@@ -1,7 +1,9 @@
 from loguru import logger
+from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from app.models.message import Message
+from app.api.schemas.conversation import ConversationResponse, LastMessage
 from app.models.conversation import Conversation
 
 
@@ -30,7 +32,7 @@ def update_last_message_snapshot(
 
     conversation.additional_attributes["last_message"] = snapshot
 
-    if message.contact and message.contact.name:
+    if message.contact and message.contact.name and message.direction == "in":
         conversation.additional_attributes["contact_name"] = message.contact.name
         conversation.additional_attributes["phone_number"] = (
             message.contact.phone_number
@@ -48,3 +50,33 @@ def update_last_message_snapshot(
     logger.debug(
         f"[conversation] Updated snapshot and timestamp for conversation {conversation.id}"
     )
+
+
+def parse_conversation_to_conversation_response(
+    conversation: List[Conversation],
+) -> List[ConversationResponse]:
+
+    attrs = conversation.additional_attributes or {}
+    last_message = attrs.get("last_message", {})
+    return ConversationResponse(
+        id=conversation.id,
+        updated_at=conversation.updated_at,
+        phone_number=attrs.get("phone_number", ""),
+        contact_name=attrs.get("contact_name"),
+        profile_picture_url=attrs.get("profile_picture_url"),
+        last_message_at=conversation.last_message_at,
+        last_message=(
+            LastMessage(content=last_message.get("content", ""))
+            if last_message
+            else None
+        ),
+    )
+
+
+def conversations_to_conversations_response(
+    conversations: List[Conversation],
+) -> List[ConversationResponse]:
+    response = []
+    for conv in conversations:
+        response.append(parse_conversation_to_conversation_response(conv))
+    return response

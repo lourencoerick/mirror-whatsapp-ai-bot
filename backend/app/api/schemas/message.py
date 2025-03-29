@@ -5,10 +5,6 @@ from datetime import datetime
 
 
 class MessageCreatePayload(BaseModel):
-    """
-    Payload enviado pelo frontend para criar uma nova mensagem de saída.
-    """
-
     content: str = Field(..., example="Olá, tudo bem?")
 
 
@@ -31,7 +27,7 @@ class MessageCreate(BaseModel):
     content_attributes: Optional[dict] = {}
 
 
-class MessageRead(BaseModel):
+class MessageResponse(BaseModel):
     id: UUID
     content: Optional[str]
     direction: str

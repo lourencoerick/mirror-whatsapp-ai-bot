@@ -9,17 +9,23 @@ from loguru import logger
 from app.database import get_db
 from app.middleware.account_context import get_account_id
 from app.services.queue.publisher import publish_message_to_queue
-from app.api.schemas.message import MessageRead, MessageCreatePayload, MessageCreate
+from app.api.schemas.message import MessageResponse, MessageCreatePayload, MessageCreate
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
-from app.services.helper.conversation import update_last_message_snapshot
-from app.services.helper.websocket import publish_to_conversation_ws
+from app.services.helper.conversation import (
+    update_last_message_snapshot,
+    parse_conversation_to_conversation_response,
+)
+from app.services.helper.websocket import (
+    publish_to_conversation_ws,
+    publish_to_account_conversations_ws,
+)
 
 router = APIRouter()
 
 
 @router.get(
-    "/conversations/{conversation_id}/messages", response_model=List[MessageRead]
+    "/conversations/{conversation_id}/messages", response_model=List[MessageResponse]
 )
 def get_messages(
     conversation_id: UUID,
@@ -37,7 +43,7 @@ def get_messages(
         db (Session): Injected database session.
 
     Returns:
-        List[MessageRead]: List of messages for the given conversation.
+        List[MessageResponse]: List of messages for the given conversation.
     """
     account_id = get_account_id()
     return message_repo.find_messages_by_conversation(
@@ -51,7 +57,7 @@ def get_messages(
 
 @router.post(
     "/conversations/{conversation_id}/messages",
-    response_model=MessageRead,
+    response_model=MessageResponse,
     status_code=201,
 )
 async def create_outgoing_message(
@@ -73,7 +79,7 @@ async def create_outgoing_message(
         db (Session): Database session.
 
     Returns:
-        MessageRead: The message after being saved and optionally sent.
+        MessageResponse: The message after being saved and optionally sent.
     """
     conversation = conversation_repo.find_by_id(db, conversation_id)
     if not conversation:
@@ -105,10 +111,6 @@ async def create_outgoing_message(
 
     # Update last message in the conversation
     if message:
-        conversation = conversation_repo.find_by_id(
-            db=db, conversation_id=message.conversation_id
-        )
-
         if conversation:
             update_last_message_snapshot(
                 db=db, conversation=conversation, message=message
@@ -130,10 +132,22 @@ async def create_outgoing_message(
             conversation_id=conversation.id,
             data={
                 "type": "new_message",
-                "message": jsonable_encoder(message),
+                "payload": jsonable_encoder(message),
             },
         )
     except Exception as e:
         logger.warning(f"[ws] Failed to publish message {message.id} to Redis: {e}")
 
+    try:
+        await publish_to_account_conversations_ws(
+            conversation.account_id,
+            {
+                "type": "conversation_updated",
+                "payload": jsonable_encoder(
+                    parse_conversation_to_conversation_response(conversation)
+                ),
+            },
+        )
+    except Exception as e:
+        logger.warning(f"[ws] Failed to publish message {message.id} to Redis: {e}")
     return message

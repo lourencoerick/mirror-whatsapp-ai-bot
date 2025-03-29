@@ -30,7 +30,10 @@ def parse_webhook_to_message(
     logger.info(f"[parser] channel_id {channel_id}")
     remote_jid = parsed["remote_jid"]
     contact_phone = remote_jid.split("@")[0] if remote_jid else None
-    contact_name = payload.get("data", {}).get("pushName")
+    if parsed["direction"] == "in":
+        contact_name = payload.get("data", {}).get("pushName")
+    else:
+        contact_name = None
 
     if not all([channel_id, contact_phone]):
         logger.error("[parser] Missing channel_id or contact_phone in parsed content")

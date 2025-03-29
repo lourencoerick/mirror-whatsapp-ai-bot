@@ -1,15 +1,7 @@
-// hooks/use-messages.ts
-
 import { useState, useEffect } from 'react';
 import { AxiosResponse } from 'axios';
 import api from '@/lib/api';
-
-export interface Message {
-  id: number;
-  content: string;
-  message_type: 'in' | 'out';
-  sent_at: string;
-}
+import { Message } from "@/types/message"
 
 /**
  * Custom React hook to fetch messages for a given conversation ID.
@@ -18,14 +10,14 @@ export interface Message {
  * and returns the message list along with loading and error state.
  *
  * @param conversationId - The ID of the conversation to fetch messages for.
- * @param inboxId - The ID of the inbox where the conversation is.
+
  * @returns An object containing:
  *  - `messages`: List of messages sorted by date.
  *  - `setMessages`: setMessage action ot update messages
  *  - `loading`: Boolean indicating whether data is being fetched.
  *  - `error`: Boolean indicating if an error occurred during fetch.
  */
-export function useMessages(inboxId: string, conversationId: string): {
+export function useMessages(conversationId: string): {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   loading: boolean;

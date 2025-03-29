@@ -9,6 +9,7 @@ from app.api.auth import router as auth_router
 from app.api.routes import webhook as webhook_routes
 from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
+from app.api.routes import inbox as inbox_routes
 from app.api.routes import dev as dev_routes
 from app.api.routes import websocket as ws_routes
 
@@ -62,6 +63,8 @@ app.include_router(webhook_routes.router)
 
 app.include_router(conversation_routes.router)
 app.include_router(message_routes.router)
+app.include_router(inbox_routes.router)
+
 
 app.include_router(ws_routes.router)
 

@@ -7,6 +7,10 @@ from app.models.account import Account
 from app.models.user import User
 from app.models.account_user import AccountUser
 from app.models.inbox import Inbox
+from app.models.inbox_member import InboxMember
+from app.models.conversation import Conversation
+from app.models.contact_inbox import ContactInbox
+from app.models.contact import Contact
 
 client = TestClient(app)
 
@@ -31,6 +35,69 @@ def test_get_conversations_success():
     )
 
     assert response.status_code == 200
+
+
+@pytest.mark.integration
+def test_get_user_conversations():
+    db = SessionLocal()
+    account_id = uuid4()
+    user_id = uuid4()
+
+    account = Account(id=account_id, name="Test Account")
+    user = User(
+        id=user_id,
+        name="Test User",
+        provider="internal",
+        uid=uuid4(),
+        encrypted_password="x",
+        sign_in_count=1,
+    )
+    inbox = Inbox(
+        id=uuid4(),
+        account_id=account.id,
+        name="Inbox 1",
+        channel_type="whatsapp",
+        channel_id="abc",
+    )
+    contact = Contact(id=uuid4(), account_id=account.id, phone_number="5511999999999")
+    contact_inbox = ContactInbox(
+        id=uuid4(), contact_id=contact.id, inbox_id=inbox.id, source_id="abc"
+    )
+
+    db.add_all([account, user, inbox, contact, contact_inbox])
+    db.commit()
+
+    db.refresh(account)
+    db.refresh(inbox)
+    db.refresh(contact)
+    db.refresh(contact_inbox)
+
+    db.add(AccountUser(account_id=account.id, user_id=user.id))
+    db.add(
+        Conversation(
+            id=uuid4(),
+            account_id=account.id,
+            inbox_id=inbox.id,
+            contact_inbox_id=contact_inbox.id,
+            status="open",
+            additional_attributes={},
+        )
+    )
+    db.add(InboxMember(user_id=user.id, inbox_id=inbox.id))
+    db.commit()
+
+    response = client.get(
+        f"/conversations?limit=5&offset=0",
+        headers={
+            "X-Account-ID": str(account.id),
+            "X-User-ID": str(user.id),
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) >= 1
 
 
 @pytest.mark.integration

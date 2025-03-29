@@ -10,8 +10,14 @@ from app.services.repository.message import get_or_create_message
 from app.services.repository.conversation import find_by_id as conversation_find_by_id
 from app.services.queue.redis_queue import RedisQueue
 from app.api.schemas.message import MessageCreate
-from app.services.helper.conversation import update_last_message_snapshot
-from app.services.helper.websocket import publish_to_conversation_ws
+from app.services.helper.conversation import (
+    update_last_message_snapshot,
+    parse_conversation_to_conversation_response,
+)
+from app.services.helper.websocket import (
+    publish_to_conversation_ws,
+    publish_to_account_conversations_ws,
+)
 
 
 class MessageConsumer:
@@ -95,7 +101,22 @@ class MessageConsumer:
                     conversation_id=message.conversation_id,
                     data={
                         "type": "incoming_message",
-                        "message": jsonable_encoder(message),
+                        "payload": jsonable_encoder(message),
+                    },
+                )
+            except Exception as e:
+                logger.warning(
+                    f"[ws] Failed to publish message {message.id} to Redis: {e}"
+                )
+
+            try:
+                await publish_to_account_conversations_ws(
+                    conversation.account_id,
+                    {
+                        "type": "conversation_updated",
+                        "payload": jsonable_encoder(
+                            parse_conversation_to_conversation_response(conversation)
+                        ),
                     },
                 )
             except Exception as e:

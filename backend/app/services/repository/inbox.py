@@ -1,8 +1,9 @@
 from uuid import UUID
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 from loguru import logger
 from app.models.inbox import Inbox
+from app.models.inbox_member import InboxMember
 
 
 def find_by_id(
@@ -66,3 +67,20 @@ def get_or_create_by_channel_id(
 
     logger.debug(f"[inbox] Created inbox (id={inbox.id}) for channel_id {channel_id}")
     return inbox
+
+
+def find_all_by_user(
+    db: Session,
+    user_id: UUID,
+    account_id: UUID,
+) -> List[Inbox]:
+    """
+    Fetch all inboxes where the user is a member for the given account.
+    """
+    inboxes = (
+        db.query(Inbox)
+        .join(InboxMember, Inbox.id == InboxMember.inbox_id)
+        .filter(InboxMember.user_id == user_id, Inbox.account_id == account_id)
+        .all()
+    )
+    return inboxes

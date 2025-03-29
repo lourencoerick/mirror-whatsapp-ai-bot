@@ -7,5 +7,6 @@ const api = axios.create({
 
 // Set a fixed header for account identification
 api.defaults.headers.common['X-Account-ID'] = '11111111-1111-1111-1111-111111111111';
+api.defaults.headers.common['X-User-ID'] = '22222222-2222-2222-2222-222222222222';
 
 export default api;

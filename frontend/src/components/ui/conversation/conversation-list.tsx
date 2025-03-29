@@ -3,19 +3,19 @@
 import React, { useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import ConversationItem from './conversation-item';
-import { useInfiniteConversations, Conversation } from '@/hooks/use-conversations';
+import { useInfiniteConversations } from '@/hooks/use-conversations';
+import { Conversation } from '@/types/conversation';
 
 
 const ConversationsList: React.FC = () => {
   // Retrieve route parameters using Next.js useParams hook
   const params = useParams();
-  // Assume the route provides both inboxId and conversationId
-  const inboxId = params?.inboxId as string;
+  // Assume the route provides conversationId
   const conversationId = params?.conversationId as string | undefined;
 
 
   // Use the custom infinite conversations hook
-  const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations(inboxId);
+  const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations("11111111-1111-1111-1111-111111111111");
 
   // Create a ref for the element that triggers loading more conversations when visible
   const loaderRef = useRef<HTMLDivElement | null>(null);
@@ -49,14 +49,13 @@ const ConversationsList: React.FC = () => {
         <ConversationItem
           key={conversation.id}
           // Map API fields to the expected props of ConversationItem.
-          id={conversation.id.toString()}
-          inboxId={inboxId}
+          id={conversation.id}
           phoneNumber={conversation.phone_number}
           contactName={conversation.contact_name}
           lastMessage={conversation.last_message?.content ?? ''}
           lastMessageTime={conversation.last_message_at}
           imageUrl={conversation.profile_picture_url}
-          isSelected={conversation.id.toString() === conversationId}
+          isSelected={conversation.id === conversationId}
         />
       ))}
       {error && <div className="p-4 text-red-500">Error loading conversations</div>}

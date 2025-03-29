@@ -5,6 +5,11 @@
  * @returns Formatted phone number or original string if invalid
  */
 export function formatPhoneNumber(phoneNumber: string): string {
+    if (!phoneNumber) {
+      console.warn('formatPhoneNumber: phoneNumber is undefined or empty');
+      return '';
+    }
+
     const cleaned = phoneNumber.replace(/\D/g, ''); // remove non-numeric characters
   
     const match = cleaned.match(/^(\d{2})(\d{2})(\d{5})(\d{4})$/);

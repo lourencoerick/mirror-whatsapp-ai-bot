@@ -12,9 +12,10 @@ class RedisPubSubBridge:
     """
     Redis Pub/Sub bridge for broadcasting WebSocket messages across processes.
 
-    - Subscribes to pattern "ws:conversation:*"
-    - Listens for new messages on Redis channels
-    - Parses the conversation_id from the channel
+    - Subscribes to patterns:
+        - "ws:conversation:*"
+        - "ws:account:*:conversations"
+    - Parses the relevant UUID from the channel
     - Forwards the message to the correct clients via WebSocketManager
 
     This ensures distributed systems (e.g. FastAPI + workers) can all trigger real-time WebSocket delivery.
@@ -30,9 +31,9 @@ class RedisPubSubBridge:
 
     async def start(self):
         pubsub = self.redis.pubsub()
-        await pubsub.psubscribe("ws:conversation:*")
+        await pubsub.psubscribe("ws:conversation:*", "ws:account:*:conversations")
 
-        logger.info("[RedisPubSub] Subscribed to ws:conversation:*")
+        logger.info("[RedisPubSub] Subscribed to ws:* patterns")
 
         async for message in pubsub.listen():
             if message["type"] != "pmessage":
@@ -40,10 +41,19 @@ class RedisPubSubBridge:
 
             try:
                 channel = message["channel"]
-                conversation_id = UUID(channel.split(":")[-1])
                 data = json.loads(message["data"])
+                logger.info(
+                    f"[RedisPubSub] Preparing to broacasting {data} recieved in the channel {channel}"
+                )
 
-                await manager_instance.broadcast(conversation_id, data)
+                if channel.startswith("ws:conversation:"):
+                    conversation_id = UUID(channel.split(":")[-1])
+                    await manager_instance.broadcast(conversation_id, data)
+                elif channel.startswith("ws:account:") and channel.endswith(
+                    ":conversations"
+                ):
+                    account_id = UUID(channel.split(":")[2])
+                    await manager_instance.broadcast(account_id, data)
 
             except Exception as e:
                 logger.warning(f"[RedisPubSub] Failed to handle message: {e}")
