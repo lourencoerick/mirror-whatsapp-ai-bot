@@ -62,6 +62,7 @@ def conversations_to_conversations_response(
         response.append(
             ConversationResponse(
                 id=conv.id,
+                updated_at=conv.updated_at,
                 phone_number=attrs.get("phone_number", ""),
                 contact_name=attrs.get("contact_name"),
                 profile_picture_url=attrs.get("profile_picture_url"),
