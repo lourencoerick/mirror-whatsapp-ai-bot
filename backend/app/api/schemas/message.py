@@ -27,7 +27,7 @@ class MessageCreate(BaseModel):
     content_attributes: Optional[dict] = {}
 
 
-class MessageRead(BaseModel):
+class MessageResponse(BaseModel):
     id: UUID
     content: Optional[str]
     direction: str
