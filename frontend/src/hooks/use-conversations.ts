@@ -79,3 +79,22 @@ export function useInfiniteConversations(accountId: string): UseInfiniteConversa
         return updatedConversations;
       });
     },
+    onConversationUpdate: (updatedConv) => {
+      console.log('Socket event: conversation update received', updatedConv);
+      setConversations((prev) => {
+        console.log('Previous conversations before updating conversation:', prev);
+        const index = prev.findIndex((c) => c.id === updatedConv.id);
+        if (index === -1) {
+          console.log('Conversation to update not found:', updatedConv.id);
+          return prev;
+        }
+        const updated = [...prev];
+        updated[index] = updatedConv;
+        console.log('Updated conversations after updating conversation:', updated);
+        return updated;
+      });
+    },
+  });
+
+  return { conversations, loading, error, hasMore, loadMore };
+}
