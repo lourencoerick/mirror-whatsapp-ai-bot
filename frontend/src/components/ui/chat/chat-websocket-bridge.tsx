@@ -2,15 +2,11 @@
 
 import { useEffect, useRef } from 'react';
 import ReconnectingWebSocket from 'reconnecting-websocket';
-
-interface WebSocketMessage {
-  type: string;
-  message: any;
-}
+import { MessageSocketEvent } from "@/types/message"
 
 interface Props {
   conversationId: string;
-  onNewMessage: (msg: WebSocketMessage['message']) => void;
+  onNewMessage: (msg: MessageSocketEvent['payload']) => void;
 }
 
 export function ChatWebSocketBridge({ conversationId, onNewMessage }: Props) {
@@ -34,9 +30,10 @@ export function ChatWebSocketBridge({ conversationId, onNewMessage }: Props) {
 
     ws.addEventListener("message", (event: MessageEvent) => {
       try {
-        const data: WebSocketMessage = JSON.parse(event.data);
+        const data: MessageSocketEvent = JSON.parse(event.data);
         if (data.type === "new_message" || data.type === "incoming_message") {
-          onNewMessageRef.current(data.message);
+          onNewMessageRef.current(data.payload);
+          console.log(`[WebSocket]: payload recieved: ${data.payload.direction}`)
         }
       } catch (err) {
         console.warn("[WebSocket] Invalid message:", err);

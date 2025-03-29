@@ -8,12 +8,13 @@ import {
 import { ChatMessageList } from '@/components/ui/chat/chat-message-list';
 import { useParams } from 'next/navigation';
 import { useRef, useEffect, useState } from 'react';
-import { useMessages, Message } from '@/hooks/use-messages';
+import { useMessages } from '@/hooks/use-messages';
 import { useSendMessage } from "@/hooks/use-send-message";
 
 import { ChatMessage } from "@/components/ui/chat/chat-message";
 import { ChatInputBox } from "@/components/ui/chat/chat-input-box";
 import { ChatWebSocketBridge } from '@/components/ui/chat/chat-websocket-bridge';
+import { Message } from '@/types/message';
 
 const ChatPage = () => {
   const { conversationId } = useParams() as { conversationId: string };
@@ -74,7 +75,7 @@ const ChatPage = () => {
           {messages.map((message, index) => (
             <ChatMessage
               key={index}
-              direction={message.message_type}
+              direction={message.direction}
               content={message.content}
             />
           ))}

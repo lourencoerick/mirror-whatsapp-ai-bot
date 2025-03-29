@@ -1,15 +1,7 @@
-// hooks/use-messages.ts
-
 import { useState, useEffect } from 'react';
 import { AxiosResponse } from 'axios';
 import api from '@/lib/api';
-
-export interface Message {
-  id: number;
-  content: string;
-  message_type: 'in' | 'out';
-  sent_at: string;
-}
+import { Message } from "@/types/message"
 
 /**
  * Custom React hook to fetch messages for a given conversation ID.
