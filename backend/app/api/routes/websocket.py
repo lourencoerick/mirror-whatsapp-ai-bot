@@ -42,13 +42,13 @@ async def websocket_account_conversations(websocket: WebSocket, account_id: UUID
     await websocket.accept()
     logger.info(f"[ws] WebSocket accepted for account {account_id} (conversation list)")
 
-    await manager_instance.connect_conversations(account_id, websocket)
+    await manager_instance.connect(account_id, websocket)
 
     try:
         while True:
             await websocket.receive_text()  # Optional: receive pings or presence
     except WebSocketDisconnect:
-        manager_instance.disconnect_conversations(account_id, websocket)
+        manager_instance.disconnect(account_id, websocket)
         logger.info(
             f"[ws] WebSocket disconnected from account {account_id} (conversation list)"
         )

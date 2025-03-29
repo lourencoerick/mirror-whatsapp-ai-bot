@@ -42,6 +42,9 @@ class RedisPubSubBridge:
             try:
                 channel = message["channel"]
                 data = json.loads(message["data"])
+                logger.info(
+                    f"[RedisPubSub] Preparing to broacasting {data} recieved in the channel {channel}"
+                )
 
                 if channel.startswith("ws:conversation:"):
                     conversation_id = UUID(channel.split(":")[-1])
@@ -50,7 +53,7 @@ class RedisPubSubBridge:
                     ":conversations"
                 ):
                     account_id = UUID(channel.split(":")[2])
-                    await manager_instance.broadcast_conversations(account_id, data)
+                    await manager_instance.broadcast(account_id, data)
 
             except Exception as e:
                 logger.warning(f"[RedisPubSub] Failed to handle message: {e}")

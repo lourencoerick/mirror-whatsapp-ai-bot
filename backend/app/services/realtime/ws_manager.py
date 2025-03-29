@@ -60,8 +60,5 @@ class WebSocketManager:
                     f"[ws] Failed to send message to client in {identifier}: {e}"
                 )
 
-    async def broadcast_conversations(self, account_id: UUID, message: dict):
-        await self.broadcast(account_id, message)
-
 
 manager_instance = WebSocketManager()
