@@ -129,7 +129,7 @@ async def create_outgoing_message(
             conversation_id=conversation.id,
             data={
                 "type": "new_message",
-                "message": jsonable_encoder(message),
+                "payload": jsonable_encoder(message),
             },
         )
     except Exception as e:
@@ -140,7 +140,7 @@ async def create_outgoing_message(
             conversation.account_id,
             {
                 "type": "conversation_updated",
-                "conversation": jsonable_encoder(conversation),
+                "payload": jsonable_encoder(conversation),
             },
         )
     except Exception as e:

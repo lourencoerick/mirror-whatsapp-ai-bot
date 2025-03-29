@@ -98,7 +98,7 @@ class MessageConsumer:
                     conversation_id=message.conversation_id,
                     data={
                         "type": "incoming_message",
-                        "message": jsonable_encoder(message),
+                        "payload": jsonable_encoder(message),
                     },
                 )
             except Exception as e:
@@ -111,7 +111,7 @@ class MessageConsumer:
                     conversation.account_id,
                     {
                         "type": "conversation_updated",
-                        "conversation": jsonable_encoder(conversation),
+                        "payload": jsonable_encoder(conversation),
                     },
                 )
             except Exception as e:
