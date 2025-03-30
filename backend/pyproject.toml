@@ -26,3 +26,9 @@ markers = [
     "unit: mark a unit test",
     "integration: mark an integration test",
 ]
+
+[tool.pylint.'MESSAGES CONTROL']
+  # Disable the specified messages
+  disable = [
+      "logging-fstring-interpolation",
+  ]
