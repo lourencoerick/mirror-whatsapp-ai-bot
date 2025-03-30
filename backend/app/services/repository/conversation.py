@@ -10,11 +10,17 @@ from app.models.contact_inbox import ContactInbox
 from app.models.inbox_member import InboxMember
 
 
-def find_by_id(db: Session, conversation_id: UUID) -> Optional[Conversation]:
+def find_by_id(
+    db: Session, conversation_id: UUID, account_id: UUID
+) -> Optional[Conversation]:
     """
     Retrieves a conversation by ID.
     """
-    conversation = db.query(Conversation).filter_by(id=conversation_id).first()
+    conversation = (
+        db.query(Conversation)
+        .filter_by(id=conversation_id, account_id=account_id)
+        .first()
+    )
 
     if conversation:
         logger.debug(f"[conversation] Found conversation {conversation.id}")
