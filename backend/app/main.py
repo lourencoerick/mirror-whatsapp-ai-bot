@@ -1,17 +1,21 @@
 import os
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from starlette.middleware.sessions import SessionMiddleware
-from app.middleware.account_context import AccountContextMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.auth import router as auth_router
-from app.api.routes import webhook as webhook_routes
+from loguru import logger
+from app.middleware.account_context import AccountContextMiddleware
+from app.api.routes import auth as auth_routes
 from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
 from app.api.routes import inbox as inbox_routes
 from app.api.routes import dev as dev_routes
 from app.api.routes import websocket as ws_routes
+from app.api.routes.webhooks import webhook as webhook_routes
+from app.api.routes.webhooks import clerk as clerk_routes
+
+from app.core.dependencies.auth import get_auth_context, AuthContext
 
 from app.services.realtime.redis_pubsub import RedisPubSubBridge
 
@@ -57,9 +61,11 @@ app.add_middleware(
 app.include_router(dev_routes.router)
 
 # Include the authentication router
-app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+app.include_router(auth_routes.router, prefix="/auth", tags=["Authentication"])
 
 app.include_router(webhook_routes.router)
+app.include_router(clerk_routes.router)
+
 
 app.include_router(conversation_routes.router)
 app.include_router(message_routes.router)
@@ -83,3 +89,29 @@ async def health_check():
         dict: A dictionary containing the status of the application.
     """
     return {"status": "healthy"}
+
+
+@app.get("/me")
+def get_authenticated_user_context(
+    auth_context: AuthContext = Depends(get_auth_context),
+):
+    """
+    Returns information about the authenticated user and their active context
+    (internal user ID, active account ID, etc.).
+    """
+    internal_user = auth_context.user
+    active_account = auth_context.account
+
+    logger.info(
+        f"Serving /me request for User ID: {internal_user.id}, Account ID: {active_account.id}"
+    )
+
+    return {
+        "message": "Authenticated and context established",
+        "internal_user_id": internal_user.id,
+        "user_name": internal_user.name,
+        "user_email": internal_user.email,
+        "clerk_user_id": internal_user.uid,
+        "active_account_id": active_account.id,
+        "active_account_name": active_account.name,
+    }
