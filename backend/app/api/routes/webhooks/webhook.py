@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Request, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-
 from app.database import get_db
 from app.services.queue.iqueue import IQueue
 from app.services.queue.redis_queue import RedisQueue
@@ -10,11 +9,11 @@ from app.services.parser.parse_webhook_to_message import parse_webhook_to_messag
 from app.services.helper.webhook import find_account_id_from_source
 from loguru import logger
 
-router = APIRouter()
+router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 queue: IQueue = RedisQueue(queue_name="message_queue")
 
 
-@router.post("/webhook/whatsapp", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/whatsapp", status_code=status.HTTP_202_ACCEPTED)
 async def whatsapp_webhook(request: Request):
     """
     Webhook to handle messages from WhatsApp (official API).
@@ -44,7 +43,7 @@ async def whatsapp_webhook(request: Request):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
-@router.post("/webhook/evolution_whatsapp", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/evolution_whatsapp", status_code=status.HTTP_202_ACCEPTED)
 async def evolution_whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Webhook to handle messages from Evolution API (unofficial WhatsApp).
