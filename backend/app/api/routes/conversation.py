@@ -6,7 +6,7 @@ from typing import List
 from loguru import logger
 
 from app.database import get_db
-from app.core.dependencies import get_auth_context, AuthContext
+from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.api.schemas.conversation import (
     ConversationResponse,
     StartConversationResponse,

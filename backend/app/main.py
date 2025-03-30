@@ -5,7 +5,6 @@ from fastapi import FastAPI, Depends
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-from app.middleware.account_context import AccountContextMiddleware
 from app.api.routes import auth as auth_routes
 from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
@@ -41,8 +40,6 @@ app = FastAPI(lifespan=lifespan)
 frontend_domain = os.getenv("FRONTEND_DOMAIN", "http://localhost:3000")
 secret_key = os.getenv("SECRET_KEY", "my_secret_key")
 
-
-app.add_middleware(AccountContextMiddleware)
 
 # Add session middleware
 app.add_middleware(

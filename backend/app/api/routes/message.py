@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from loguru import logger
 
 from app.database import get_db
-from app.core.dependencies import get_auth_context, AuthContext
+from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.queue.publisher import publish_message_to_queue
 from app.api.schemas.message import MessageResponse, MessageCreatePayload, MessageCreate
 from app.services.repository import message as message_repo

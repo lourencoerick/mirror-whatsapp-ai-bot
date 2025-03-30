@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from loguru import logger
 from app.database import get_db
-from app.core.dependencies import get_auth_context, AuthContext
+from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.repository.inbox import find_all_by_user
 from app.api.schemas.inbox import InboxResponse
 

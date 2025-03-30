@@ -4,7 +4,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc, select
 from typing import Optional, List
 from loguru import logger
-from app.middleware.account_context import get_account_id
 from app.models.conversation import Conversation
 from app.models.contact_inbox import ContactInbox
 from app.models.inbox_member import InboxMember
