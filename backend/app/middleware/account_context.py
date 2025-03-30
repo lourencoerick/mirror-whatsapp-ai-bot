@@ -25,7 +25,11 @@ class AccountContextMiddleware(BaseHTTPMiddleware):
         try:
 
             logger.debug(f"[middleware] request url: {request.url}")
-            if "/webhook" in request.url.path:
+            if (
+                "/webhooks" in request.url.path
+                or "/me" in request.url.path
+                or "/auth" in request.url.path
+            ):
                 return await call_next(request)
 
             account_id_header = request.headers.get("X-Account-ID")
