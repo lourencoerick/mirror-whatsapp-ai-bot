@@ -26,10 +26,10 @@ class Settings(BaseSettings):
     EVOLUTION_INSTANCE: str = "680df327-c714-40a3-aec5-86ccbb57fa19"
 
     # --- Clerk ---
-    CLERK_WEBHOOK_SECRET: str
-    CLERK_JWKS_URL: str
-    CLERK_ISSUER: str
-    CLERK_AUDIENCE: str
+    CLERK_WEBHOOK_SECRET: str = "your-secret-key"
+    CLERK_JWKS_URL: str = "clerk-jwks-url"
+    CLERK_ISSUER: str = "clerk-issuer"
+    CLERK_AUDIENCE: str = "clerk-aud"
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True
