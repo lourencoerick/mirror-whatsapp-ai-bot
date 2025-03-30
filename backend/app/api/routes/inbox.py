@@ -5,7 +5,6 @@ from typing import List
 from loguru import logger
 from app.database import get_db
 from app.core.dependencies import get_auth_context, AuthContext
-from app.middleware.user_context import get_user_id_from_header
 from app.services.repository.inbox import find_all_by_user
 from app.api.schemas.inbox import InboxResponse
 

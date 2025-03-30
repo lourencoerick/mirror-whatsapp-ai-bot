@@ -33,9 +33,9 @@ def find_by_id(
 def find_conversations_by_inbox(
     db: Session,
     inbox_id: UUID,
+    account_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    account_id: Optional[UUID] = None,
 ) -> List[Conversation]:
     """
     Retrieve a list of conversations for a specific inbox.
@@ -45,11 +45,10 @@ def find_conversations_by_inbox(
 
     Args:
         db (Session): The database session.
-        inbox_id (int): The identifier for the inbox.
+        inbox_id (UUID): The identifier for the inbox.
         limit (int, optional): The maximum number of records to return (default is 20).
         offset (int, optional): The number of records to skip for pagination (default is 0).
-        account_id (Optional[int], optional): The account identifier. If not provided,
-            it will be retrieved using `get_account_id()`.
+        account_id (UUID): The account identifier
 
     Returns:
         List[Conversation]: A list of Conversation objects.
@@ -59,10 +58,6 @@ def find_conversations_by_inbox(
         SQLAlchemyError: If an error occurs during the database query.
     """
     try:
-        # Retrieve account_id if not provided
-        if account_id is None:
-            account_id = get_account_id()
-
         # Raise an error if account_id remains None after retrieval
         if account_id is None:
             raise ValueError("Account ID could not be determined.")
@@ -121,8 +116,8 @@ def find_conversation(
 def get_or_create_conversation(
     db: Session,
     inbox_id: UUID,
+    account_id: UUID,
     contact_inbox_id: UUID,
-    account_id: Optional[UUID] = None,
 ) -> Conversation:
     """
     Find or create a conversation for a given contact in an inbox.
