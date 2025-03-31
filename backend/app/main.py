@@ -2,9 +2,10 @@ import os
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
-from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
+
+# Import Routers
 from app.api.routes import auth as auth_routes
 from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
@@ -14,81 +15,100 @@ from app.api.routes import websocket as ws_routes
 from app.api.routes.webhooks import webhook as webhook_routes
 from app.api.routes.webhooks import clerk as clerk_routes
 
+# Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
 
+# Import Services/Config
 from app.services.realtime.redis_pubsub import RedisPubSubBridge
+from app.config import get_settings
 
 from dotenv import load_dotenv
-
 
 # Load environment variables from .env file
 load_dotenv()
 
+# --- Initialization ---
 pubsub_bridge = RedisPubSubBridge()
+settings = get_settings()  # Load settings if needed for config below
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Start background tasks like Redis bridge
+    logger.info("Starting Redis PubSub Bridge...")
     asyncio.create_task(pubsub_bridge.start())
     yield
+    # Clean up resources if needed on shutdown
+    logger.info("Stopping Redis PubSub Bridge (if applicable)...")
+    # await pubsub_bridge.stop() # Add stop logic if needed
 
 
-# Create an instance of the FastAPI class
-app = FastAPI(lifespan=lifespan)
+# Create FastAPI app instance
+app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
-# Get the frontend domain from environment variables
+# --- Middleware ---
+# CORS Middleware (Essential for frontend interaction)
 frontend_domain = os.getenv("FRONTEND_DOMAIN", "http://localhost:3000")
-secret_key = os.getenv("SECRET_KEY", "my_secret_key")
-
-
-# Add session middleware
-app.add_middleware(
-    SessionMiddleware, secret_key=secret_key, same_site="lax", https_only=False
-)
-
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_domain],
+    allow_origins=[frontend_domain],  # Restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(dev_routes.router)
 
-# Include the authentication router
-app.include_router(auth_routes.router, prefix="/auth", tags=["Authentication"])
+# --- API Routers (v1) ---
+api_v1_prefix = "/api/v1"
 
-app.include_router(webhook_routes.router)
-app.include_router(clerk_routes.router)
+logger.info(f"Including API routers under prefix: {api_v1_prefix}")
+
+# Core API routes that the frontend will consume
+app.include_router(
+    auth_routes.router, prefix=f"{api_v1_prefix}/auth", tags=["v1 - Auth"]
+)
+app.include_router(
+    conversation_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Conversations"]
+)
+app.include_router(
+    message_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Messages"]
+)
+app.include_router(
+    inbox_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Inboxes"]
+)
 
 
-app.include_router(conversation_routes.router)
-app.include_router(message_routes.router)
-app.include_router(inbox_routes.router)
+# --- Webhook Routers ---
+logger.info("Including Webhook routers")
+app.include_router(clerk_routes.router, prefix="", tags=["Clerk Webhooks"])
+app.include_router(webhook_routes.router, prefix="", tags=["Webhooks"])
+
+# --- WebSocket Router ---
+logger.info("Including WebSocket router")
+app.include_router(ws_routes.router, prefix="", tags=["WebSockets"])
+
+# --- Development/Utility Routers ---
+if settings.DEBUG:
+    logger.info("Including Development routes")
+    app.include_router(dev_routes.router, prefix="/dev", tags=["Development"])
+else:
+    logger.info("Skipping Development routes in non-DEBUG mode")
 
 
-app.include_router(ws_routes.router)
-
-
-@app.get("/")
+# --- Root and Health Check ---
+@app.get("/", tags=["Root"])
 def home():
-    return {"message": "API FastAPI com Auth0"}
+    # Consider removing the Auth0 message if not using Auth0
+    return {"message": f"{settings.APP_NAME} API"}
 
 
-@app.get("/health")
+@app.get("/health", tags=["Health Check"])
 async def health_check():
-    """
-    Health check endpoint to verify if the application is running.
-
-    Returns:
-        dict: A dictionary containing the status of the application.
-    """
+    """Health check endpoint."""
     return {"status": "healthy"}
 
 
-@app.get("/me")
+@app.get(f"{api_v1_prefix}/me", tags=["v1 - Users"])
 def get_authenticated_user_context(
     auth_context: AuthContext = Depends(get_auth_context),
 ):
@@ -98,11 +118,9 @@ def get_authenticated_user_context(
     """
     internal_user = auth_context.user
     active_account = auth_context.account
-
     logger.info(
-        f"Serving /me request for User ID: {internal_user.id}, Account ID: {active_account.id}"
+        f"Serving /api/v1/me request for User ID: {internal_user.id}, Account ID: {active_account.id}"
     )
-
     return {
         "message": "Authenticated and context established",
         "internal_user_id": internal_user.id,
