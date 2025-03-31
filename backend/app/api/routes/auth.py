@@ -1,7 +1,7 @@
 import os
 import json
 import time
-import logging
+from loguru import logger
 import requests
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Security, status
@@ -9,22 +9,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from jwt.algorithms import RSAAlgorithm
 from typing import Dict, Any, Optional, List
+from config import Settings, get_settings
 
 # --- Configuration ---
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)  # Adjust level as needed (e.g., logging.DEBUG)
-logger = logging.getLogger(__name__)
-
+settings = get_settings()
 # Clerk configuration from environment variables
-CLERK_JWKS_URL: Optional[str] = os.getenv("CLERK_JWKS_URL")
-CLERK_ISSUER: Optional[str] = os.getenv("CLERK_ISSUER")
-CLERK_AUDIENCE: Optional[str] = os.getenv(
-    "CLERK_AUDIENCE"
-)  # e.g., 'http://localhost:8000' or your API identifier
+CLERK_JWKS_URL: str = settings.CLERK_JWKS_URL
+CLERK_ISSUER: str = settings.CLERK_ISSUER
+CLERK_AUDIENCE: str = settings.CLERK_AUDIENCE
 
 # Validate essential configuration
 if not CLERK_JWKS_URL:
