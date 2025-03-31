@@ -32,7 +32,7 @@ export function useMessages(conversationId: string): {
       try {
         setLoading(true);
         const res: AxiosResponse<Message[]> = await api.get(
-          `/conversations/${conversationId}/messages`
+          `/api/v1/conversations/${conversationId}/messages`
         );
         setMessages(res.data.reverse());
       } catch (err: unknown) {
