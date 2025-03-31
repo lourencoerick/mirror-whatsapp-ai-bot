@@ -13,12 +13,13 @@ const CONVERSATIONS_LIMIT: number = 10;
  * - Add a new conversation if it does not exist
  * - Update an existing conversation
  *
- * @param accountId - The current authenticated account ID.
+* @param socketIdentifier - The identifier needed to establish the WebSocket connection
+ *                           (e.g., internal account ID).
  *
  * @returns An object containing the conversation list, loading state, error state,
  * a flag indicating if more conversations exist, and a function to load more.
  */
-export function useInfiniteConversations(accountId: string): UseInfiniteConversationsResult {
+export function useInfiniteConversations(socketIdentifier: string): UseInfiniteConversationsResult {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [offset, setOffset] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
@@ -31,7 +32,7 @@ export function useInfiniteConversations(accountId: string): UseInfiniteConversa
 
     setLoading(true);
     api
-      .get<Conversation[]>(`/conversations`, {
+      .get<Conversation[]>(`/api/v1/conversations`, {
         params: { limit: CONVERSATIONS_LIMIT, offset: offset },
       })
       .then((response: AxiosResponse<Conversation[]>) => {
@@ -64,7 +65,7 @@ export function useInfiniteConversations(accountId: string): UseInfiniteConversa
   }, []);
 
   // Integration with WebSocket for real-time updates
-  useConversationSocket(accountId, {
+  useConversationSocket(socketIdentifier, {
     onNewConversation: (newConv) => {
       console.log('Socket event: new conversation received', newConv);
       setConversations((prev) => {
