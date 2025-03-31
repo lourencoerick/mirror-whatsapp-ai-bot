@@ -54,11 +54,17 @@ def get_user_conversations(
     "/inboxes/{inbox_id}/conversations", response_model=List[ConversationResponse]
 )
 def get_inbox_conversations(
-    inbox_id: UUID, limit: int = 20, offset: int = 0, db: Session = Depends(get_db)
+    inbox_id: UUID,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
     logger.info(f"Getting conversations for inbox_id {inbox_id}")
     conversations = conversation_repo.find_conversations_by_inbox(
-        db=db, inbox_id=inbox_id, limit=limit, offset=offset
+        db=db, inbox_id=inbox_id, account_id=account_id, limit=limit, offset=offset
     )
 
     return conversations_to_conversations_response(conversations)

@@ -1,5 +1,5 @@
 from uuid import UUID
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc, select
 from typing import Optional, List
@@ -166,9 +166,9 @@ def get_or_create_conversation(
 def find_all_by_user(
     db: Session,
     user_id: UUID,
+    account_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    account_id: Optional[UUID] = None,
 ) -> List[Conversation]:
     """
     Retrieve all conversations accessible to a given user based on inbox membership.
@@ -182,18 +182,25 @@ def find_all_by_user(
     Returns:
         List[Conversation]: Conversations accessible to the user
     """
-    inbox_ids_query = select(InboxMember.inbox_id).filter(
-        InboxMember.user_id == user_id
+    inbox_ids_subquery = (
+        select(InboxMember.inbox_id)
+        .filter(InboxMember.user_id == user_id)
+        .scalar_subquery()
     )
 
+    logger.debug(f"Founded user inbox ids: {inbox_ids_subquery}")
     conversations = (
         db.query(Conversation)
-        .options(joinedload(Conversation.contact_inbox))
-        .filter(Conversation.inbox_id.in_(inbox_ids_query))
+        .options(
+            selectinload(Conversation.contact_inbox).selectinload(ContactInbox.contact)
+        )
+        .filter(
+            Conversation.account_id == account_id,
+            Conversation.inbox_id.in_(inbox_ids_subquery),
+        )
         .order_by(Conversation.updated_at.desc())
         .limit(limit)
         .offset(offset)
         .all()
     )
-
     return conversations
