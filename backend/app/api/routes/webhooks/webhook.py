@@ -7,6 +7,7 @@ from app.services.queue.redis_queue import RedisQueue
 from app.services.parser.whatsapp_parser import parse_whatsapp_message
 from app.services.parser.parse_webhook_to_message import parse_webhook_to_message
 from app.services.helper.webhook import find_account_id_from_source
+from app.api.schemas.webhook import EvolutionWebhookPayload
 from loguru import logger
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
@@ -44,18 +45,22 @@ async def whatsapp_webhook(request: Request):
 
 
 @router.post("/evolution_whatsapp", status_code=status.HTTP_202_ACCEPTED)
-async def evolution_whatsapp_webhook(request: Request, db: Session = Depends(get_db)):
+async def evolution_whatsapp_webhook(
+    payload: EvolutionWebhookPayload, db: Session = Depends(get_db)
+):
     """
     Webhook to handle messages from Evolution API (unofficial WhatsApp).
     Parses and enqueues a single message for processing.
     """
     try:
-        payload = await request.json()
-        logger.debug(f"[webhook] Raw Evolution payload: {payload}")
+        logger.debug(
+            f"[webhook] Validated Evolution payload: {payload.model_dump_json(indent=2)}"
+        )
 
-        event = payload.get("event", "")
-        instance_id = payload.get("data", {}).get("instanceId")
-        account_id = find_account_id_from_source(instance_id, db)  # sua função custom
+        event = payload.event or ""
+        instance_id = payload.data.instanceId if payload.data else None
+
+        account_id = find_account_id_from_source(instance_id, db)
 
         logger.info(f"[webhook] Account {account_id}, event {event} ")
         if not account_id:
@@ -74,7 +79,7 @@ async def evolution_whatsapp_webhook(request: Request, db: Session = Depends(get
         logger.debug(f"[webhook] SET LOCAL my.app.account_id = {account_id}")
 
         message = parse_webhook_to_message(
-            db=db, account_id=account_id, payload=payload
+            db=db, account_id=account_id, payload=payload.model_dump()
         )
 
         if not message:
