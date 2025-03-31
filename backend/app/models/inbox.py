@@ -1,15 +1,15 @@
 import uuid
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.mutable import MutableDict
 
 from sqlalchemy import (
     Column,
-    Integer,
     String,
     Boolean,
     ForeignKey,
     Index,
     UniqueConstraint,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -34,7 +34,7 @@ class Inbox(BaseModel):
     name = Column(String(255), nullable=False)
     channel_type = Column(String(255), nullable=False)
     enable_auto_assignment = Column(Boolean, nullable=True)
-    channel_details = Column(MutableDict.as_mutable(JSONB), nullable=True, default=dict)
+    channel_details = Column(MutableDict.as_mutable(JSON), nullable=True, default=dict)
 
     account = relationship("Account", back_populates="inboxes")
     messages = relationship(
