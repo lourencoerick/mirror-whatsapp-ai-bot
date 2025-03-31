@@ -9,10 +9,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 from jwt.algorithms import RSAAlgorithm
 from typing import Dict, Any, Optional, List
-from config import Settings, get_settings
+from app.config import Settings, get_settings
 
 # --- Configuration ---
-settings = get_settings()
+settings: Settings = get_settings()
 # Clerk configuration from environment variables
 CLERK_JWKS_URL: str = settings.CLERK_JWKS_URL
 CLERK_ISSUER: str = settings.CLERK_ISSUER
