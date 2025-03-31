@@ -5,7 +5,7 @@ from typing import List
 from loguru import logger
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
-from app.services.repository.inbox import find_all_by_user
+from app.services.repository.inbox import find_inboxes_by_user_membership
 from app.api.schemas.inbox import InboxResponse
 
 router = APIRouter()
@@ -22,7 +22,9 @@ def get_user_inboxes(
     user_id = auth_context.user.id
     account_id = auth_context.account.id
 
-    inboxes = find_all_by_user(db=db, account_id=account_id, user_id=user_id)
+    inboxes = find_inboxes_by_user_membership(
+        db=db, account_id=account_id, user_id=user_id
+    )
     if inboxes:
         logger.info(f"Found inboxes: {inboxes}")
     else:
