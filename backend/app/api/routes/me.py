@@ -9,11 +9,11 @@ from app.services.repository import inbox as inbox_repo
 from app.api.schemas.inbox import InboxResponse
 
 
-router_me = APIRouter(prefix="/me", tags=["v1 - Current User"])
+router = APIRouter(prefix="/me", tags=["v1 - Current User"])
 
 
-@router_me.get("/inboxes", response_model=List[InboxResponse])
-def get_my_inboxes(  # Nome da função reflete a ação
+@router.get("/inboxes", response_model=List[InboxResponse])
+def get_my_inboxes(
     auth_context: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
 ):
@@ -26,8 +26,7 @@ def get_my_inboxes(  # Nome da função reflete a ação
     logger.info(
         f"Finding inboxes for current user (ID={user_id}) in Account={account_id}"
     )
-    inboxes = inbox_repo.find_inboxes_by_user_membership(  # Usar repo importado
+    inboxes = inbox_repo.find_inboxes_by_user_membership(
         db=db, account_id=account_id, user_id=user_id
     )
-    # ... (logging e retorno) ...
     return inboxes
