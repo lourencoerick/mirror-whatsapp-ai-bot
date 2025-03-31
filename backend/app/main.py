@@ -11,6 +11,7 @@ from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
 from app.api.routes import inbox as inbox_routes
 from app.api.routes import dev as dev_routes
+from app.api.routes import me as me_routes
 from app.api.routes import websocket as ws_routes
 from app.api.routes.webhooks import webhook as webhook_routes
 from app.api.routes.webhooks import clerk as clerk_routes
@@ -73,11 +74,10 @@ app.include_router(
 app.include_router(
     message_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Messages"]
 )
-app.include_router(
-    inbox_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Inboxes"]
-)
+app.include_router(me_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Me"])
 
 
+me_routes
 # --- Webhook Routers ---
 logger.info("Including Webhook routers")
 app.include_router(clerk_routes.router, prefix="", tags=["Clerk Webhooks"])
