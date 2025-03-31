@@ -43,13 +43,16 @@ def create_new_inbox(
 ):
     """Creates a new inbox for the authenticated user's account."""
     account_id = auth_context.account.id
+    user_id = auth_context.user.id
     logger.info(
         f"Received request to create inbox '{inbox_data.name}' for Account={account_id}"
     )
     try:
+        # Automatically associate the inbox to the user creator
         new_inbox = inbox_repo.create_inbox(
-            db=db, account_id=account_id, inbox_data=inbox_data
+            db=db, account_id=account_id, user_id=user_id, inbox_data=inbox_data
         )
+
         return new_inbox
     except Exception as e:
         logger.error(f"Failed to create inbox for Account={account_id}: {e}")

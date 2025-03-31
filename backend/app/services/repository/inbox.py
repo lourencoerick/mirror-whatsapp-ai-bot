@@ -116,7 +116,9 @@ def find_inboxes_by_user_membership(  # Renomeada de find_all_by_user para clare
     return inboxes
 
 
-def create_inbox(db: Session, *, account_id: UUID, inbox_data: InboxCreate) -> Inbox:
+def create_inbox(
+    db: Session, *, account_id: UUID, user_id: UUID, inbox_data: InboxCreate
+) -> Inbox:
     """
     Creates a new inbox for the specified account.
 
@@ -137,9 +139,12 @@ def create_inbox(db: Session, *, account_id: UUID, inbox_data: InboxCreate) -> I
         channel_id=f"{inbox_data.channel_type}-{uuid4().hex[:8]}",
         # TODO: Define how channel_id is truly generated or set
     )
-    db.add(new_inbox)
+    inbox_member = InboxMember(user_id=user_id, inbox_id=new_inbox.id)
+
+    db.add_all([new_inbox, inbox_member])
     try:
         db.commit()
+        db.refresh(new_inbox)
         db.refresh(new_inbox)
         logger.info(f"[InboxRepo] Successfully created Inbox ID={new_inbox.id}")
         return new_inbox
