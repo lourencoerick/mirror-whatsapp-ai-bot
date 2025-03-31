@@ -34,10 +34,21 @@ test-integration: ## Run integration tests
 	PYTHONPATH=$(APP_DIR) pytest $(TEST_DIR) -m integration --disable-warnings
 
 test-e2e: ## Run integration tests
-	PYTHONPATH=./ $(PYTHON) scripts/test_e2e_flow.py
+	PYTHONPATH=$(APP_DIR) $(PYTHON) scripts/test_e2e_flow.py
 
 onboarding: ## Run onboarding setup
-	PYTHONPATH=./ $(PYTHON) scripts/setup_onboarding.py
+	PYTHONPATH=$(APP_DIR) $(PYTHON) scripts/setup_onboarding.py
+
+worker-consumer: ## Run Consumer
+	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/message_consumer.py 
+
+worker-response: ## Run Response sender
+	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/response_sender.py
+
+run-app: ## Run Fast API app
+	PYTHONPATH=$(APP_DIR) uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+
 
 lint: ## Run ruff linter
 	ruff check $(APP_DIR)
@@ -54,6 +65,5 @@ endif
 db-reset: ## Reset database
 	psql -U user -d chatbotdb -h database -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
-db-load: ## Load demo data to the database
-	PYTHONPATH=./ $(PYTHON) scripts/setup_onboarding.py
+
 	

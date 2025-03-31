@@ -1,20 +1,25 @@
 from uuid import UUID
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import desc, select
 from typing import Optional, List
 from loguru import logger
-from app.middleware.account_context import get_account_id
 from app.models.conversation import Conversation
 from app.models.contact_inbox import ContactInbox
 from app.models.inbox_member import InboxMember
 
 
-def find_by_id(db: Session, conversation_id: UUID) -> Optional[Conversation]:
+def find_by_id(
+    db: Session, conversation_id: UUID, account_id: UUID
+) -> Optional[Conversation]:
     """
     Retrieves a conversation by ID.
     """
-    conversation = db.query(Conversation).filter_by(id=conversation_id).first()
+    conversation = (
+        db.query(Conversation)
+        .filter_by(id=conversation_id, account_id=account_id)
+        .first()
+    )
 
     if conversation:
         logger.debug(f"[conversation] Found conversation {conversation.id}")
@@ -27,9 +32,9 @@ def find_by_id(db: Session, conversation_id: UUID) -> Optional[Conversation]:
 def find_conversations_by_inbox(
     db: Session,
     inbox_id: UUID,
+    account_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    account_id: Optional[UUID] = None,
 ) -> List[Conversation]:
     """
     Retrieve a list of conversations for a specific inbox.
@@ -39,11 +44,10 @@ def find_conversations_by_inbox(
 
     Args:
         db (Session): The database session.
-        inbox_id (int): The identifier for the inbox.
+        inbox_id (UUID): The identifier for the inbox.
         limit (int, optional): The maximum number of records to return (default is 20).
         offset (int, optional): The number of records to skip for pagination (default is 0).
-        account_id (Optional[int], optional): The account identifier. If not provided,
-            it will be retrieved using `get_account_id()`.
+        account_id (UUID): The account identifier
 
     Returns:
         List[Conversation]: A list of Conversation objects.
@@ -53,10 +57,6 @@ def find_conversations_by_inbox(
         SQLAlchemyError: If an error occurs during the database query.
     """
     try:
-        # Retrieve account_id if not provided
-        if account_id is None:
-            account_id = get_account_id()
-
         # Raise an error if account_id remains None after retrieval
         if account_id is None:
             raise ValueError("Account ID could not be determined.")
@@ -115,8 +115,8 @@ def find_conversation(
 def get_or_create_conversation(
     db: Session,
     inbox_id: UUID,
+    account_id: UUID,
     contact_inbox_id: UUID,
-    account_id: Optional[UUID] = None,
 ) -> Conversation:
     """
     Find or create a conversation for a given contact in an inbox.
@@ -166,9 +166,9 @@ def get_or_create_conversation(
 def find_all_by_user(
     db: Session,
     user_id: UUID,
+    account_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    account_id: Optional[UUID] = None,
 ) -> List[Conversation]:
     """
     Retrieve all conversations accessible to a given user based on inbox membership.
@@ -182,18 +182,25 @@ def find_all_by_user(
     Returns:
         List[Conversation]: Conversations accessible to the user
     """
-    inbox_ids_query = select(InboxMember.inbox_id).filter(
-        InboxMember.user_id == user_id
+    inbox_ids_subquery = (
+        select(InboxMember.inbox_id)
+        .filter(InboxMember.user_id == user_id)
+        .scalar_subquery()
     )
 
+    logger.debug(f"Founded user inbox ids: {inbox_ids_subquery}")
     conversations = (
         db.query(Conversation)
-        .options(joinedload(Conversation.contact_inbox))
-        .filter(Conversation.inbox_id.in_(inbox_ids_query))
+        .options(
+            selectinload(Conversation.contact_inbox).selectinload(ContactInbox.contact)
+        )
+        .filter(
+            Conversation.account_id == account_id,
+            Conversation.inbox_id.in_(inbox_ids_subquery),
+        )
         .order_by(Conversation.updated_at.desc())
         .limit(limit)
         .offset(offset)
         .all()
     )
-
     return conversations

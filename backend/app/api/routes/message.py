@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from loguru import logger
 
 from app.database import get_db
-from app.middleware.account_context import get_account_id
+from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.queue.publisher import publish_message_to_queue
 from app.api.schemas.message import MessageResponse, MessageCreatePayload, MessageCreate
 from app.services.repository import message as message_repo
@@ -32,6 +32,7 @@ def get_messages(
     limit: int = 20,
     offset: int = 0,
     db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
     """
     Retrieve a paginated list of messages from a conversation.
@@ -45,7 +46,8 @@ def get_messages(
     Returns:
         List[MessageResponse]: List of messages for the given conversation.
     """
-    account_id = get_account_id()
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
     return message_repo.find_messages_by_conversation(
         db=db,
         conversation_id=conversation_id,
@@ -64,6 +66,7 @@ async def create_outgoing_message(
     conversation_id: UUID,
     payload: MessageCreatePayload,
     db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
     """
     Creates and sends an outgoing message linked to a conversation.
@@ -81,6 +84,8 @@ async def create_outgoing_message(
     Returns:
         MessageResponse: The message after being saved and optionally sent.
     """
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
     conversation = conversation_repo.find_by_id(db, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -94,7 +99,7 @@ async def create_outgoing_message(
         conversation_id=conversation.id,
         contact_id=conversation.contact_inbox.contact_id,
         source_id=internal_source_id,
-        user_id=UUID("22222222-2222-2222-2222-222222222222"),
+        user_id=user_id,
         direction="out",
         status="processing",
         message_timestamp=datetime.now(timezone.utc),

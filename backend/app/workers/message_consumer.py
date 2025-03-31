@@ -82,7 +82,9 @@ class MessageConsumer:
 
         if message:
             conversation = conversation_find_by_id(
-                db=db, conversation_id=message.conversation_id
+                db=db,
+                conversation_id=message.conversation_id,
+                account_id=message.account_id,
             )
 
             if conversation:

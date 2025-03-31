@@ -1,107 +1,100 @@
 import pytest
 from uuid import uuid4
 from fastapi.testclient import TestClient
-from app.database import SessionLocal
-from app.models.account import Account
+from sqlalchemy.orm import sessionmaker, Session
+from typing import Dict, Any
+
 from app.models.inbox import Inbox
 
-
-from app.main import app
-
-client = TestClient(app)
-
+WEBHOOK_PREFIX = "/webhooks"
 INSTANCE_ID = "680df327-c714-40a3-aec5-86ccbb57fa19"
 
 
-@pytest.fixture
-def setup_test_data():
-    """
-    Creates a test Account and Inbox, returns useful identifiers.
-    """
-    db = SessionLocal()
-
-    account_id = uuid4()
-    instance_id = INSTANCE_ID
-
-    account = Account(id=account_id, name="Test Account")
-    inbox = Inbox(
-        id=uuid4(),
-        name="Test Inbox",
-        account_id=account_id,
-        channel_type="whatsapp",
-        channel_id=instance_id,
-    )
-
-    db.add_all([account, inbox])
-    db.commit()
-
-    return {
-        "account_id": account_id,
-        "instance_id": instance_id,
-        "inbox_id": inbox.id,
-        "db": db,
-    }
-
-
-@pytest.fixture
-def valid_evolution_payload():
-    return {
-        "event": "messages.upsert",
-        "data": {
-            "key": {
-                "remoteJid": "5511941986775@s.whatsapp.net",
-                "fromMe": False,
-                "id": "wamid.12345",
-            },
-            "pushName": "LL",
-            "message": {"conversation": "Olá, isso é um teste!"},
-            "messageType": "conversation",
-            "messageTimestamp": 1742771256,
-            "instanceId": INSTANCE_ID,
-            "source": "ios",
-        },
-    }
-
-
 @pytest.mark.integration
-def test_webhook_evolution_valid_payload(setup_test_data, valid_evolution_payload):
-
-    response = client.post(
-        "/webhook/evolution_whatsapp",
-        # headers={"X-Account-ID": str(account_id)},
+def test_webhook_evolution_valid_payload(
+    unauthenticated_client: TestClient,
+    test_evolution_inbox: Inbox,
+    valid_evolution_payload: Dict[str, Any],
+    db_session: Session,
+):
+    """
+    Test receiving a valid message payload from Evolution webhook.
+    Expects the message to be enqueued successfully.
+    """
+    response = unauthenticated_client.post(
+        f"{WEBHOOK_PREFIX}/evolution_whatsapp",
         json=valid_evolution_payload,
     )
 
     assert response.status_code == 202
-    assert response.json()["status"] == "message enqueued"
-    assert response.json()["source_id"] == "wamid.12345"
+    data = response.json()
+    assert data["status"] == "message enqueued"
+    assert data["source_id"] == "wamid.12345"
 
 
 @pytest.mark.integration
-def test_webhook_evolution_not_treatable_event():
-    payload = {"invalid": "structure"}
-    response = client.post("/webhook/evolution_whatsapp", json=payload)
+def test_webhook_evolution_not_treatable_event(unauthenticated_client: TestClient):
+    """
+    Test sending a payload structure that the handler doesn't recognize
+    or cannot extract necessary info (like instanceId) from.
+    """
+    payload = {"event": "some.other.event", "instanceId": "non_existent_instance"}
+
+    response = unauthenticated_client.post(
+        f"{WEBHOOK_PREFIX}/evolution_whatsapp", json=payload
+    )
+
     assert response.status_code == 404
-    assert response.json()["detail"] == "Account not found for source_id"
+    assert "Account not found for source_id" in response.json()["detail"]
 
 
 @pytest.mark.integration
-def test_webhook_evolution_invalid_structure():
+def test_webhook_evolution_invalid_message_structure(
+    unauthenticated_client: TestClient,
+    test_evolution_inbox: Inbox,  # Include inbox fixture so account exists
+):
+    """
+    Test sending a payload with a recognized event type but invalid 'data'
+    structure for message processing.
+    """
+    # Arrange: Payload missing essential message fields but has valid instanceId
     payload = {
         "event": "messages.upsert",
-        "invalid": "structure",
         "data": {
-            "instanceId": INSTANCE_ID,
+            "key": {"id": "bad.id"},
+            # Missing 'message' field
+            "instanceId": INSTANCE_ID,  # Match the existing inbox's instanceId
         },
     }
-    response = client.post("/webhook/evolution_whatsapp", json=payload)
+
+    response = unauthenticated_client.post(
+        f"{WEBHOOK_PREFIX}/evolution_whatsapp", json=payload
+    )
+
     assert response.status_code == 400
-    assert response.json()["detail"] == "No valid message found"
+    assert "No valid message found" in response.json()["detail"]
 
 
 @pytest.mark.integration
-def test_webhook_evolution_empty_body():
-    response = client.post("/webhook/evolution_whatsapp", data={})
-    assert (
-        response.status_code == 500
-    )  # because JSON decode will fail and raise generic exception
+def test_webhook_evolution_empty_json_body(unauthenticated_client: TestClient):
+    """
+    Test sending an empty JSON object.
+    The handler might return 400 or 404 depending on initial checks.
+    """
+    response = unauthenticated_client.post(
+        f"{WEBHOOK_PREFIX}/evolution_whatsapp", json={}
+    )
+    assert response.status_code in [400, 404]
+
+
+@pytest.mark.integration
+def test_webhook_evolution_non_json_body(unauthenticated_client: TestClient):
+    """
+    Test sending data that is not valid JSON.
+    FastAPI/Starlette should handle this and return 422 Unprocessable Entity.
+    """
+    response = unauthenticated_client.post(
+        f"{WEBHOOK_PREFIX}/evolution_whatsapp",
+        data="this is not json",
+    )
+    assert response.status_code == 422

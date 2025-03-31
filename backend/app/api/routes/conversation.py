@@ -6,8 +6,7 @@ from typing import List
 from loguru import logger
 
 from app.database import get_db
-from app.middleware.account_context import get_account_id
-from app.middleware.user_context import get_user_id_from_header
+from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.api.schemas.conversation import (
     ConversationResponse,
     StartConversationResponse,
@@ -32,14 +31,14 @@ def get_user_conversations(
     limit: int = 20,
     offset: int = 0,
     db: Session = Depends(get_db),
-    account_id: UUID = Depends(get_account_id),
-    user_id: UUID = Depends(get_user_id_from_header),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
     """
     Return all conversations visible to the current user,
     based on inbox membership.
     """
-
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
     conversations = conversation_repo.find_all_by_user(
         db=db,
         user_id=user_id,
@@ -55,11 +54,17 @@ def get_user_conversations(
     "/inboxes/{inbox_id}/conversations", response_model=List[ConversationResponse]
 )
 def get_inbox_conversations(
-    inbox_id: UUID, limit: int = 20, offset: int = 0, db: Session = Depends(get_db)
+    inbox_id: UUID,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
     logger.info(f"Getting conversations for inbox_id {inbox_id}")
     conversations = conversation_repo.find_conversations_by_inbox(
-        db=db, inbox_id=inbox_id, limit=limit, offset=offset
+        db=db, inbox_id=inbox_id, account_id=account_id, limit=limit, offset=offset
     )
 
     return conversations_to_conversations_response(conversations)
@@ -72,8 +77,10 @@ async def start_conversation(
     inbox_id: UUID,
     payload: StartConversationRequest,
     db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
 ):
-    account_id = get_account_id()
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
 
     inbox = inbox_repo.find_by_id(db=db, account_id=account_id, inbox_id=inbox_id)
     if not inbox or inbox.account_id != account_id:

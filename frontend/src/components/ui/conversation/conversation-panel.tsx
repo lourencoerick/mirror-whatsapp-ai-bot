@@ -6,9 +6,11 @@ import Search from './search';
 import { Funnel } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
+interface ConversationPanelProps {
+  socketIdentifier: string;
+}
 
-const ConversationPanel = () => {
-  const { conversationId } = useParams() as { conversationId: string };
+const ConversationPanel:React.FC<ConversationPanelProps> = ({ socketIdentifier }) => {
   return (
     <div className="h-screen flex flex-col bg-slate-50 pt-4 gap-2 items-center">
 
@@ -26,7 +28,7 @@ const ConversationPanel = () => {
 
 
       <div className=" flex flex-col overflow-y-auto w-full max-w-sm">
-        <ConversationsList />
+        <ConversationsList socketIdentifier={socketIdentifier}/>
       </div>
     </ div>
   )

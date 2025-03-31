@@ -4,7 +4,6 @@ from sqlalchemy.pool import QueuePool
 from contextlib import contextmanager
 from typing import Generator
 
-from .events import set_rls_context
 from app.config import get_settings
 
 settings = get_settings()

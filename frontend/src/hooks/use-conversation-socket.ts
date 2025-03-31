@@ -10,20 +10,21 @@ interface ConversationSocketEvents {
 /**
  * Hook to manage WebSocket connection for conversation-related events with reconnection.
  *
- * Connects to `/ws/accounts/{accountId}/conversations` and dispatches events:
+ * Connects to `/ws/accounts/{socketIdentifier}/conversations` and dispatches events:
  * - `new_conversation`
  * - `conversation_updated`
  *
- * @param accountId - The current authenticated account ID.
+ * @param socketIdentifier - The identifier needed to establish the WebSocket connection
+ *                           (e.g., internal account ID).
  * @param events - Object with optional callbacks for event types.
  */
-export function useConversationSocket(accountId: string, events: ConversationSocketEvents) {
+export function useConversationSocket(socketIdentifier: string, events: ConversationSocketEvents) {
   const socketRef = useRef<ReconnectingWebSocket | null>(null);
   const { onNewConversation, onConversationUpdate } = events;
 
   useEffect(() => {
-    if (!accountId) {
-      console.warn('useConversationSocket: accountId is not provided.');
+    if (!socketIdentifier) {
+      console.warn('useConversationSocket: socketIdentifier is not provided.');
       return;
     }
 
@@ -40,7 +41,7 @@ export function useConversationSocket(accountId: string, events: ConversationSoc
     }
 
     // Monta a URL de conexão para a lista de conversas
-    const url = `${socketUrl}/ws/accounts/${accountId}/conversations`;
+    const url = `${socketUrl}/ws/accounts/${socketIdentifier}/conversations`;
     console.log('Connecting to WebSocket URL:', url);
 
     // Define as opções de reconexão
@@ -103,5 +104,5 @@ export function useConversationSocket(accountId: string, events: ConversationSoc
       console.debug('[ReconnectingWebSocket] Closing connection.');
       rws.close();
     };
-  }, [accountId, onNewConversation, onConversationUpdate]);
+  }, [socketIdentifier, onNewConversation, onConversationUpdate]);
 }

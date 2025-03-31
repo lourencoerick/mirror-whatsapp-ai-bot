@@ -6,8 +6,12 @@ import ConversationItem from './conversation-item';
 import { useInfiniteConversations } from '@/hooks/use-conversations';
 import { Conversation } from '@/types/conversation';
 
+interface ConversationsListProps {
+  socketIdentifier: string;
+}
 
-const ConversationsList: React.FC = () => {
+
+const ConversationsList: React.FC<ConversationsListProps> = ({ socketIdentifier }) => {
   // Retrieve route parameters using Next.js useParams hook
   const params = useParams();
   // Assume the route provides conversationId
@@ -15,7 +19,7 @@ const ConversationsList: React.FC = () => {
 
 
   // Use the custom infinite conversations hook
-  const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations("11111111-1111-1111-1111-111111111111");
+  const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations(socketIdentifier);
 
   // Create a ref for the element that triggers loading more conversations when visible
   const loaderRef = useRef<HTMLDivElement | null>(null);
@@ -58,8 +62,8 @@ const ConversationsList: React.FC = () => {
           isSelected={conversation.id === conversationId}
         />
       ))}
-      {error && <div className="p-4 text-red-500">Error loading conversations</div>}
-      {loading && <div className="p-4">Loading...</div>}
+      {error && <div className="p-4 text-red-500">Erro ao carregar conversas.</div>}
+      {loading && <div className="p-4">Carregando...</div>}
       {/* This element is used by Intersection Observer to trigger loading more */}
       <div ref={loaderRef} />
     </div>
