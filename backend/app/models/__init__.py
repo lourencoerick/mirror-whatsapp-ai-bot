@@ -14,6 +14,7 @@ from .message import Message
 from .subscription import Subscription
 from .user import User
 from .webhook import Webhook
+from .channels.evolution_instance import EvolutionInstance
 
 __all__ = [
     "AccessToken",
@@ -32,4 +33,5 @@ __all__ = [
     "Subscription",
     "User",
     "WebhookEvent",
+    "EvolutionInstance",
 ]

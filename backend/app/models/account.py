@@ -46,3 +46,7 @@ class Account(BaseModel):
     agent_bot_inboxes = relationship(
         "AgentBotInbox", back_populates="account", cascade="all, delete-orphan"
     )
+
+    evolution_instances = relationship(
+        "EvolutionInstance", back_populates="account", cascade="all, delete-orphan"
+    )
