@@ -1,5 +1,4 @@
 import React from 'react'
-import { useParams } from 'next/navigation';
 import ConversationsList from './conversation-list'
 import StartConversationDialog from './start-conversation-dialog'
 import Search from './search';
