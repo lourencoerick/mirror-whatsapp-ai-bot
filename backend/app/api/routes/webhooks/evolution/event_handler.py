@@ -1,0 +1,169 @@
+from uuid import UUID
+from typing import Callable, Coroutine, Any, Dict
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from loguru import logger
+
+from app.database import get_db
+from app.models.channels.evolution_instance import EvolutionInstance
+from app.api.schemas.webhooks.evolution_instance import (
+    ConnectionUpdateData,
+    EvolutionWebhookPayload,
+)
+
+from app.services.queue.iqueue import IQueue
+from app.services.queue.redis_queue import RedisQueue
+
+from app.services.helper.websocket import publish_to_instance_ws
+from app.services.helper.webhook import find_account_id_from_source
+from app.services.parser.parse_webhook_to_message import parse_webhook_to_message
+
+
+async def handle_connection_update(
+    instance_id: UUID,
+    payload: EvolutionWebhookPayload,
+    db: Session,
+) -> None:
+    """
+    Handles the 'connection.update' event.
+    Updates the instance status in the database and notifies the frontend via WebSocket.
+    """
+    evolution_instance = (
+        db.query(EvolutionInstance).filter(EvolutionInstance.id == instance_id).first()
+    )
+
+    if not evolution_instance:
+        logger.error(f"Received connection.update for unknown instance {instance_id}.")
+        return  # Important: Exit if instance not found
+
+    try:
+        conn_data = ConnectionUpdateData.model_validate(payload.data)
+
+        logger.info(
+            f"Processing connection.update for instance {instance_id}. State: {conn_data.state}"
+        )
+
+        if conn_data.state == "open" and evolution_instance.status != "CONNECTED":
+            logger.info(
+                f"Instance {instance_id} connected (state='open'). Updating DB status."
+            )
+            evolution_instance.status = "CONNECTED"
+            db.add(evolution_instance)
+            db.commit()
+            await publish_to_instance_ws(
+                str(instance_id),
+                {
+                    "type": "connection.update",
+                    "payload": {
+                        "instance_id": str(instance_id),
+                        "status": "CONNECTED",
+                    },
+                },
+            )
+
+        elif conn_data.state == "close" and evolution_instance.status == "CONNECTED":
+            logger.info(
+                f"Instance {instance_id} disconnected (state='close'). Updating DB status."
+            )
+            evolution_instance.status = "DISCONNECTED"
+            db.add(evolution_instance)
+            db.commit()
+            await publish_to_instance_ws(
+                str(instance_id),
+                {
+                    "type": "connection.update",
+                    "payload": {
+                        "instance_id": str(instance_id),
+                        "status": "DISCONNECTED",
+                    },
+                },
+            )
+
+    except Exception as e:
+        logger.error(
+            f"Error processing connection.update data for {instance_id}: {e}",
+            exc_info=True,
+        )
+
+
+async def handle_message(
+    instance_id: UUID,
+    payload: EvolutionWebhookPayload,
+    db: Session,
+) -> None:
+    """
+    Webhook to handle messages from Evolution API (unofficial WhatsApp).
+    Parses and enqueues a single message for processing.
+    """
+    queue: IQueue = RedisQueue(queue_name="message_queue")
+
+    try:
+        logger.debug(
+            f"[webhook] Validated Evolution payload: {payload.model_dump_json(indent=2)}"
+        )
+
+        event = payload.event or ""
+        # instance_id = payload.data.instanceId if payload.data else None
+
+        account_id = find_account_id_from_source(instance_id, db)
+
+        logger.info(f"[webhook] Account {account_id}, event {event} ")
+        if not account_id:
+            logger.warning("[webhook] Account not found for source_id")
+            raise HTTPException(
+                status_code=404, detail="Account not found for source_id"
+            )
+        elif event not in ["messages.upsert"]:
+            logger.warning("[webhook] Not a treatable event")
+            raise HTTPException(status_code=400, detail="Not a treatable event")
+
+        db.execute(
+            text("SET LOCAL my.app.account_id = :account_id"),
+            {"account_id": str(account_id)},
+        )
+        logger.debug(f"[webhook] SET LOCAL my.app.account_id = {account_id}")
+
+        message = parse_webhook_to_message(
+            db=db, account_id=account_id, payload=payload.model_dump()
+        )
+
+        if not message:
+            raise HTTPException(status_code=400, detail="No valid message found")
+
+        queue.enqueue(message)
+        logger.info(f"[webhook] Enqueued Evolution message: {message.get('source_id')}")
+
+        return {"status": "message enqueued", "source_id": message.get("source_id")}
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("[webhook] Error while handling Evolution payload")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+async def handle_unknown_event(
+    instance_id: UUID,
+    payload: EvolutionWebhookPayload,
+    db: Session,
+) -> None:
+    """
+    Handles unknown event types.
+    Logs a warning message.
+    """
+    logger.warning(
+        f"Received unhandled webhook event type '{payload.event}' for instance {instance_id}."
+    )
+
+
+EVENT_HANDLERS: Dict[
+    str,
+    Callable[
+        [UUID, EvolutionWebhookPayload, Session],
+        Coroutine[Any, Any, None],
+    ],
+] = {
+    "connection.update": handle_connection_update,
+    "message": handle_message,  # Example: Add a handler for 'message' events
+}
