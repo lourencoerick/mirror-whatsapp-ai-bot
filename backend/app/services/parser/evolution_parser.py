@@ -17,6 +17,7 @@ def parse_evolution_message(payload: Dict) -> Optional[Dict]:
             return None
 
         data = payload.get("data", {})
+        instance_id = payload.get("instance", None)
         key = data.get("key", {})
         content = data.get("message", {}).get("conversation")
         source_id = key.get("id")
@@ -39,7 +40,7 @@ def parse_evolution_message(payload: Dict) -> Optional[Dict]:
             "content_type": content_type,
             "content_attributes": {
                 "provider": "evolution",
-                "instance_id": data.get("instanceId"),
+                "instance_id": instance_id,
                 "sender": payload.get("sender"),
                 "raw_message_type": data.get("messageType"),
             },

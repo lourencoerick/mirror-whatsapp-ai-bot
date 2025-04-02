@@ -26,6 +26,7 @@ class EvolutionInstanceRead(BaseModel):
     shared_api_url: HttpUrl = Field(
         ..., description="Base URL of the shared Evolution API server."
     )
+    logical_token_encrypted: str = Field(..., description="Encrypted API key")
     webhook_url: HttpUrl = Field(
         ..., description="Webhook URL configured to receive events for this instance."
     )

@@ -32,7 +32,7 @@ class ConnectionUpdateData(BaseModel):
     profilePictureUrl: Optional[str] = None
 
 
-class EvolutionInstanceWebhookPayload(BaseModel):
+class EvolutionWebhookPayload(BaseModel):
     event: str
     instance: str
     data: ConnectionUpdateData | Dict[str, Any]

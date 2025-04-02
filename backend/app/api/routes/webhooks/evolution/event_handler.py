@@ -1,13 +1,14 @@
 from uuid import UUID
 from typing import Callable, Coroutine, Any, Dict
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from loguru import logger
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.database import get_db
 from app.models.channels.evolution_instance import EvolutionInstance
-from app.api.schemas.webhooks.evolution_instance import (
+from app.api.schemas.webhooks.evolution import (
     ConnectionUpdateData,
     EvolutionWebhookPayload,
 )
@@ -21,9 +22,7 @@ from app.services.parser.parse_webhook_to_message import parse_webhook_to_messag
 
 
 async def handle_connection_update(
-    instance_id: UUID,
-    payload: EvolutionWebhookPayload,
-    db: Session,
+    instance_id: UUID, payload: EvolutionWebhookPayload, db: Session = Depends(get_db)
 ) -> None:
     """
     Handles the 'connection.update' event.
@@ -35,7 +34,7 @@ async def handle_connection_update(
 
     if not evolution_instance:
         logger.error(f"Received connection.update for unknown instance {instance_id}.")
-        return  # Important: Exit if instance not found
+        return
 
     try:
         conn_data = ConnectionUpdateData.model_validate(payload.data)
@@ -51,16 +50,22 @@ async def handle_connection_update(
             evolution_instance.status = "CONNECTED"
             db.add(evolution_instance)
             db.commit()
-            await publish_to_instance_ws(
-                str(instance_id),
-                {
-                    "type": "connection.update",
-                    "payload": {
-                        "instance_id": str(instance_id),
-                        "status": "CONNECTED",
+            try:
+                await publish_to_instance_ws(
+                    str(instance_id),
+                    {
+                        "type": "connection.update",
+                        "payload": {
+                            "instance_id": str(instance_id),
+                            "status": "CONNECTED",
+                        },
                     },
-                },
-            )
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error publishing connection.update websocket event for {instance_id}: {e}",
+                    exc_info=True,
+                )
 
         elif conn_data.state == "close" and evolution_instance.status == "CONNECTED":
             logger.info(
@@ -69,18 +74,24 @@ async def handle_connection_update(
             evolution_instance.status = "DISCONNECTED"
             db.add(evolution_instance)
             db.commit()
-            await publish_to_instance_ws(
-                str(instance_id),
-                {
-                    "type": "connection.update",
-                    "payload": {
-                        "instance_id": str(instance_id),
-                        "status": "DISCONNECTED",
+            try:
+                await publish_to_instance_ws(
+                    str(instance_id),
+                    {
+                        "type": "connection.update",
+                        "payload": {
+                            "instance_id": str(instance_id),
+                            "status": "DISCONNECTED",
+                        },
                     },
-                },
-            )
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error publishing connection.update websocket event for {instance_id}: {e}",
+                    exc_info=True,
+                )
 
-    except Exception as e:
+    except SQLAlchemyError as e:
         logger.error(
             f"Error processing connection.update data for {instance_id}: {e}",
             exc_info=True,
@@ -88,10 +99,8 @@ async def handle_connection_update(
 
 
 async def handle_message(
-    instance_id: UUID,
-    payload: EvolutionWebhookPayload,
-    db: Session,
-) -> None:
+    instance_id: UUID, payload: EvolutionWebhookPayload, db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
     Webhook to handle messages from Evolution API (unofficial WhatsApp).
     Parses and enqueues a single message for processing.
@@ -104,50 +113,61 @@ async def handle_message(
         )
 
         event = payload.event or ""
+        logger.info(f"[webhook] Instance: {instance_id}, event {event} ")
         # instance_id = payload.data.instanceId if payload.data else None
 
-        account_id = find_account_id_from_source(instance_id, db)
+        account_id = find_account_id_from_source(str(instance_id), db)
 
         logger.info(f"[webhook] Account {account_id}, event {event} ")
         if not account_id:
             logger.warning("[webhook] Account not found for source_id")
-            raise HTTPException(
-                status_code=404, detail="Account not found for source_id"
-            )
+            e = HTTPException(status_code=404, detail="Account not found for source_id")
+            logger.error(f"[webhook] {e}")
+            raise e
         elif event not in ["messages.upsert"]:
             logger.warning("[webhook] Not a treatable event")
-            raise HTTPException(status_code=400, detail="Not a treatable event")
+            e = HTTPException(status_code=400, detail="Not a treatable event")
+            logger.error(f"[webhook] {e}")
+            raise e
 
-        db.execute(
-            text("SET LOCAL my.app.account_id = :account_id"),
-            {"account_id": str(account_id)},
-        )
-        logger.debug(f"[webhook] SET LOCAL my.app.account_id = {account_id}")
+        # try:
+        #     db.execute(
+        #         text("SET LOCAL my.app.account_id = :account_id"),
+        #         {"account_id": str(account_id)},
+        #     )
+        #     logger.debug(f"[webhook] SET LOCAL my.app.account_id = {account_id}")
+        # except SQLAlchemyError as e:
+        #     logger.error(f"[webhook] Error setting local account_id: {e}")
+        #     e = HTTPException(status_code=500, detail="Database error")
+        #     raise e from e
 
         message = parse_webhook_to_message(
             db=db, account_id=account_id, payload=payload.model_dump()
         )
 
         if not message:
-            raise HTTPException(status_code=400, detail="No valid message found")
+            e = HTTPException(status_code=400, detail="No valid message found")
+            logger.error(f"[webhook] {e}")
+            raise e
 
         queue.enqueue(message)
         logger.info(f"[webhook] Enqueued Evolution message: {message.get('source_id')}")
 
         return {"status": "message enqueued", "source_id": message.get("source_id")}
 
-    except HTTPException:
+    except HTTPException as e:
+        logger.error(f"[webhook] {e}")
         raise
-    except Exception:
-        logger.exception("[webhook] Error while handling Evolution payload")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+    except Exception as e:
+        logger.exception(f"[webhook] Error while handling Evolution payload: {e}")
+        e = HTTPException(status_code=500, detail="Internal Server Error")
+        logger.error(f"[webhook] {e}")
+        raise e
 
 
 async def handle_unknown_event(
-    instance_id: UUID,
-    payload: EvolutionWebhookPayload,
-    db: Session,
-) -> None:
+    instance_id: UUID, payload: EvolutionWebhookPayload, db: Session = Depends(get_db)
+) -> Dict[str, Any]:
     """
     Handles unknown event types.
     Logs a warning message.
@@ -155,15 +175,16 @@ async def handle_unknown_event(
     logger.warning(
         f"Received unhandled webhook event type '{payload.event}' for instance {instance_id}."
     )
+    return {}
 
 
 EVENT_HANDLERS: Dict[
     str,
     Callable[
         [UUID, EvolutionWebhookPayload, Session],
-        Coroutine[Any, Any, None],
+        Coroutine[Any, Any, Dict[str, Any]],
     ],
 ] = {
     "connection.update": handle_connection_update,
-    "message": handle_message,  # Example: Add a handler for 'message' events
+    "messages.upsert": handle_message,
 }
