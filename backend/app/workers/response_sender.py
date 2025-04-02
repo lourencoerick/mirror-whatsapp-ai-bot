@@ -71,7 +71,7 @@ class ResponseSender:
             return
 
         try:
-            response = evolution_send_message(message)
+            response = evolution_send_message(message=message, inbox=message.inbox)
             external_id = response.get("key", {}).get("id")
             status = response.get("status", "pending").lower()
             if external_id:

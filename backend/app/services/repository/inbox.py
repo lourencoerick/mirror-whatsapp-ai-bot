@@ -136,8 +136,8 @@ def create_inbox(
     new_inbox = Inbox(
         **inbox_data.model_dump(exclude_unset=True),
         account_id=account_id,
-        channel_id=f"{inbox_data.channel_type}-{uuid4().hex[:8]}",
         # TODO: Define how channel_id is truly generated or set
+        channel_id=inbox_data.channel_details["id"],
     )
     db.add(new_inbox)
     db.flush()

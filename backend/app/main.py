@@ -14,9 +14,8 @@ from app.api.routes import dev as dev_routes
 from app.api.routes import me as me_routes
 from app.api.routes import websocket as ws_routes
 from app.api.routes import evolution_instance as evolution_instance_routes
-from app.api.routes.webhooks import webhook as webhook_routes
 from app.api.routes.webhooks import clerk as clerk_routes
-from app.api.routes.webhooks import evolution_instance as wb_evolution_instance_routes
+from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
@@ -95,9 +94,8 @@ app.include_router(
 # --- Webhook Routers ---
 logger.info("Including Webhook routers")
 app.include_router(clerk_routes.router, prefix="", tags=["Clerk Webhooks"])
-app.include_router(webhook_routes.router, prefix="", tags=["Webhooks"])
 app.include_router(
-    wb_evolution_instance_routes.router, prefix="", tags=["Evolution Instance Webhooks"]
+    evolution_wb_routes.router, prefix="", tags=["Evolution Instance Webhooks"]
 )
 
 # --- WebSocket Router ---

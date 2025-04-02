@@ -7,6 +7,22 @@ import { Conversation, UseInfiniteConversationsResult } from '@/types/conversati
 const CONVERSATIONS_LIMIT: number = 10;
 
 /**
+ * Deduplicates an array of conversations based on conversation id.
+ * @param conversations An array of Conversation objects.
+ * @returns A new array with only unique conversations.
+ */
+function deduplicateConversations(conversations: Conversation[]): Conversation[] {
+  const seenIds = new Set<string>();
+  return conversations.filter((conversation) => {
+    if (seenIds.has(conversation.id)) {
+      return false; // Filter out duplicate
+    }
+    seenIds.add(conversation.id);
+    return true; // Keep unique conversation
+  });
+}
+
+/**
  * Custom hook to fetch conversations with infinite scrolling and real-time updates via WebSocket.
  *
  * Uses limit and offset for pagination and also integrates WebSocket events to:
@@ -39,7 +55,8 @@ export function useInfiniteConversations(socketIdentifier: string): UseInfiniteC
         const newConversations = response.data;
         setConversations((prevConversations) => {
           console.log('Previous conversations before API load:', prevConversations);
-          const updatedConversations = [...prevConversations, ...newConversations];
+          // Apply deduplication here
+          const updatedConversations = deduplicateConversations([...prevConversations, ...newConversations]);
           console.log('Updated conversations after API load:', updatedConversations);
           return updatedConversations;
         });
@@ -62,7 +79,7 @@ export function useInfiniteConversations(socketIdentifier: string): UseInfiniteC
     setHasMore(true);
     loadMore();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [socketIdentifier]);
 
   // Integration with WebSocket for real-time updates
   useConversationSocket(socketIdentifier, {
@@ -75,7 +92,8 @@ export function useInfiniteConversations(socketIdentifier: string): UseInfiniteC
           console.log('Conversation already exists:', newConv.id);
           return prev;
         }
-        const updatedConversations = [newConv, ...prev];
+        // Apply deduplication here
+        const updatedConversations = deduplicateConversations([newConv, ...prev]);
         console.log('Updated conversations after adding new conversation:', updatedConversations);
         return updatedConversations;
       });
@@ -91,8 +109,10 @@ export function useInfiniteConversations(socketIdentifier: string): UseInfiniteC
         }
         const updated = [...prev];
         updated[index] = updatedConv;
-        console.log('Updated conversations after updating conversation:', updated);
-        return updated;
+        // Apply deduplication here
+        const deduplicatedConversations = deduplicateConversations(updated);
+        console.log('Updated conversations after updating conversation:', deduplicatedConversations);
+        return deduplicatedConversations;
       });
     },
   });

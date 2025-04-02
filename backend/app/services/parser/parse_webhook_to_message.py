@@ -21,6 +21,7 @@ def parse_webhook_to_message(
 
     # Step 1 - Parse raw payload
     parsed = parse_evolution_message(payload)
+    logger.debug(f"Parsed webhook {parsed}")
     if not parsed:
         logger.warning("[parser] Failed to parse base message")
         return None
@@ -40,7 +41,7 @@ def parse_webhook_to_message(
         return None
 
     # Step 2 - Inbox
-    inbox = find_inbox_by_channel_id(db, account_id, channel_id)
+    inbox = find_inbox_by_channel_id(db, account_id=account_id, channel_id=channel_id)
     if not inbox:
         logger.error(f"[parser] Inbox not found for channel_id {channel_id}")
         return None
