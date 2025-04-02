@@ -9,7 +9,7 @@ from app.models.contact_inbox import ContactInbox
 from app.models.inbox_member import InboxMember
 
 
-def find_by_id(
+def find_conversation_by_id(
     db: Session, conversation_id: UUID, account_id: UUID
 ) -> Optional[Conversation]:
     """
@@ -163,7 +163,7 @@ def get_or_create_conversation(
     return conversation
 
 
-def find_all_by_user(
+def find_conversations_by_user(
     db: Session,
     user_id: UUID,
     account_id: UUID,

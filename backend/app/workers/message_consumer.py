@@ -7,7 +7,7 @@ from fastapi.encoders import jsonable_encoder
 
 from app.database import SessionLocal
 from app.services.repository.message import get_or_create_message
-from app.services.repository.conversation import find_by_id as conversation_find_by_id
+from app.services.repository.conversation import find_conversation_by_id
 from app.services.queue.redis_queue import RedisQueue
 from app.api.schemas.message import MessageCreate
 from app.services.helper.conversation import (
@@ -81,7 +81,7 @@ class MessageConsumer:
         message = get_or_create_message(db=db, message_data=message_data)
 
         if message:
-            conversation = conversation_find_by_id(
+            conversation = find_conversation_by_id(
                 db=db,
                 conversation_id=message.conversation_id,
                 account_id=message.account_id,

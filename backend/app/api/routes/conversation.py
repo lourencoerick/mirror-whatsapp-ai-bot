@@ -39,7 +39,7 @@ def get_user_conversations(
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
-    conversations = conversation_repo.find_all_by_user(
+    conversations = conversation_repo.find_conversations_by_user(
         db=db,
         user_id=user_id,
         account_id=account_id,

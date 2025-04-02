@@ -32,7 +32,7 @@ def test_processes_valid_message_successfully(mock_queue, valid_payload, mock_me
     mock_queue.dequeue.return_value = valid_payload
 
     with patch(
-        "app.services.repository.message.find_by_id", return_value=mock_message
+        "app.services.repository.message.find_message_by_id", return_value=mock_message
     ), patch(
         "app.workers.response_sender.evolution_send_message",
         return_value={"status": "SENT", "key": {"id": "external-abc"}},
@@ -52,9 +52,9 @@ def test_logs_warning_when_message_not_found(mock_queue, valid_payload):
     """
     mock_queue.dequeue.return_value = valid_payload
 
-    with patch("app.services.repository.message.find_by_id", return_value=None), patch(
-        "app.workers.response_sender.logger.warning"
-    ) as mock_log:
+    with patch(
+        "app.services.repository.message.find_message_by_id", return_value=None
+    ), patch("app.workers.response_sender.logger.warning") as mock_log:
         sender = ResponseSender()
         sender.queue = mock_queue
         sender._process_one_message()

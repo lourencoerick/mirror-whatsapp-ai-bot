@@ -8,7 +8,7 @@ from app.models.inbox import Inbox
 from app.api.schemas.message import MessageCreate
 
 
-def find_by_id(db: Session, message_id: UUID) -> Optional[Message]:
+def find_message_by_id(db: Session, message_id: UUID) -> Optional[Message]:
     """
     Retrieves a message by ID with related contact loaded.
     """

@@ -91,7 +91,7 @@ def find_inboxes_by_account(
     return inboxes
 
 
-def find_inboxes_by_user_membership(  # Renomeada de find_all_by_user para clareza
+def find_inboxes_by_user_membership(
     db: Session, *, user_id: UUID, account_id: UUID
 ) -> List[Inbox]:
     """

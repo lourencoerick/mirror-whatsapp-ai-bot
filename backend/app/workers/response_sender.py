@@ -65,7 +65,7 @@ class ResponseSender:
             db (Session): Active SQLAlchemy database session.
             message_id (UUID): The ID of the message to be delivered.
         """
-        message = message_repo.find_by_id(db, message_id)
+        message = message_repo.find_message_by_id(db, message_id)
         if not message:
             logger.warning(f"[sender] Message ID {message_id} not found in database")
             return

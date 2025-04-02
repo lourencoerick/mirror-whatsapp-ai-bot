@@ -6,7 +6,7 @@ from app.models.contact import Contact
 from app.models.contact_inbox import ContactInbox
 
 
-def find_by_phone(
+def find_contact_by_phone(
     db: Session, account_id: UUID, phone_number: str
 ) -> Optional[Contact]:
     if not all([account_id, phone_number]):
@@ -38,7 +38,7 @@ def upsert_contact(
     """
     Find or create a contact, and update name if provided.
     """
-    contact = find_by_phone(db, account_id, phone_number)
+    contact = find_contact_by_phone(db, account_id, phone_number)
 
     if not contact:
         logger.info(f"[contact] Creating contact for phone {phone_number}")

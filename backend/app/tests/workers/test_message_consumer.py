@@ -111,7 +111,7 @@ async def test_handle_message_with_invalid_schema_logs_warning(
 
 @pytest.fixture
 def mock_conversation_find_by_id():
-    with patch("app.workers.message_consumer.conversation_find_by_id") as mocked:
+    with patch("app.workers.message_consumer.find_conversation_by_id") as mocked:
         yield mocked
 
 
