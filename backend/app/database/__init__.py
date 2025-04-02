@@ -1,16 +1,17 @@
-from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import QueuePool
-from contextlib import contextmanager
-from typing import Generator
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
 from app.config import get_settings
 
 settings = get_settings()
 
-# Creating SQLAlchemy engine with optimized pooling
-engine = create_engine(
-    settings.DATABASE_URL,
+DATABASE_URL = settings.DATABASE_URL
+
+async_engine = create_async_engine(
+    DATABASE_URL,
     poolclass=QueuePool,
     pool_size=5,
     max_overflow=10,
@@ -19,25 +20,41 @@ engine = create_engine(
     echo=settings.DEBUG,
 )
 
-# Local Session
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+AsyncSessionLocal = sessionmaker(
+    async_engine, expire_on_commit=False, class_=AsyncSession
+)
 
 Base = declarative_base()
 
 
-def get_db() -> Generator:
+@asynccontextmanager
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
-    Context manager para sessões do banco de dados.
-    Garante que a sessão seja fechada após o uso.
+    Async context manager for database sessions.
+    Ensures the session is closed after use.
 
     Yields:
-        Session: Sessão do SQLAlchemy
+        AsyncSession: SQLAlchemy AsyncSession
     """
-    db = SessionLocal()
+    db = AsyncSessionLocal()
     try:
         yield db
+        await db.commit()
     except Exception:
-        db.rollback()
+        await db.rollback()
         raise
     finally:
-        db.close()
+        await db.close()
+
+
+def create_db_and_tables():
+    """
+    Creates the database and tables (synchronously).
+    This function is intended for initialization purposes.
+    """
+    from sqlalchemy import create_engine
+
+    engine = create_engine(
+        DATABASE_URL.replace("+asyncpg", "")
+    )  # Remova o asyncpg para usar a engine síncrona
+    Base.metadata.create_all(engine)
