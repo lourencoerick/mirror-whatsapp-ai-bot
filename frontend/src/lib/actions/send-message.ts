@@ -17,7 +17,7 @@ interface SendMessagePayload {
  * @throws An error if the API call fails.
  */
 export async function sendMessage({ conversationId, content }: SendMessagePayload): Promise<void> {
-  await api.post(`/conversations/${conversationId}/messages`, {
+  await api.post(`/api/v1/conversations/${conversationId}/messages`, {
     content,
   });
 }
