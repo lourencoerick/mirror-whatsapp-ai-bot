@@ -1,7 +1,7 @@
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from loguru import logger
 
@@ -27,10 +27,10 @@ router = APIRouter()
 
 
 @router.get("/conversations", response_model=List[ConversationResponse])
-def get_user_conversations(
+async def get_user_conversations(
     limit: int = 20,
     offset: int = 0,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
     """
@@ -39,13 +39,15 @@ def get_user_conversations(
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
-    conversations = conversation_repo.find_conversations_by_user(
-        db=db,
-        user_id=user_id,
-        account_id=account_id,
-        limit=limit,
-        offset=offset,
-    )
+
+    async with db as session:
+        conversations = await conversation_repo.find_conversations_by_user(
+            db=session,
+            user_id=user_id,
+            account_id=account_id,
+            limit=limit,
+            offset=offset,
+        )
 
     return conversations_to_conversations_response(conversations)
 
@@ -53,19 +55,25 @@ def get_user_conversations(
 @router.get(
     "/inboxes/{inbox_id}/conversations", response_model=List[ConversationResponse]
 )
-def get_inbox_conversations(
+async def get_inbox_conversations(
     inbox_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
     user_id = auth_context.user.id
     account_id = auth_context.account.id
     logger.info(f"Getting conversations for inbox_id {inbox_id}")
-    conversations = conversation_repo.find_conversations_by_inbox(
-        db=db, inbox_id=inbox_id, account_id=account_id, limit=limit, offset=offset
-    )
+
+    async with db as session:
+        conversations = await conversation_repo.find_conversations_by_inbox(
+            db=session,
+            inbox_id=inbox_id,
+            account_id=account_id,
+            limit=limit,
+            offset=offset,
+        )
 
     return conversations_to_conversations_response(conversations)
 
@@ -76,54 +84,57 @@ def get_inbox_conversations(
 async def start_conversation(
     inbox_id: UUID,
     payload: StartConversationRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
     user_id = auth_context.user.id
     account_id = auth_context.account.id
 
-    inbox = inbox_repo.find_inbox_by_id_and_account(
-        db=db, account_id=account_id, inbox_id=inbox_id
-    )
-    if not inbox or inbox.account_id != account_id:
-        raise HTTPException(status_code=404, detail="Inbox not found or unauthorized")
-
-    contact = contact_repo.upsert_contact(
-        db=db,
-        account_id=account_id,
-        phone_number=payload.phone_number,
-    )
-
-    internal_source_id = f"frontend-{uuid4().hex}"
-
-    contact_inbox = contact_repo.get_or_create_contact_inbox(
-        db=db,
-        contact_id=contact.id,
-        inbox_id=inbox.id,
-        source_id=internal_source_id,
-    )
-
-    conversation: Conversation = conversation_repo.get_or_create_conversation(
-        db=db,
-        account_id=account_id,
-        inbox_id=inbox.id,
-        contact_inbox_id=contact_inbox.id,
-    )
-
-    try:
-        logger.debug("[ws] publishing message to the channel....")
-        await publish_to_account_conversations_ws(
-            account_id,
-            {
-                "type": "new_conversation",
-                "payload": jsonable_encoder(
-                    parse_conversation_to_conversation_response(conversation)
-                ),
-            },
+    async with db as session:
+        inbox = await inbox_repo.find_inbox_by_id_and_account(
+            db=session, account_id=account_id, inbox_id=inbox_id
         )
-    except Exception as e:
-        logger.warning(
-            f"[ws] Failed to publish conversation {conversation.id} to Redis: {e}"
+        if not inbox or inbox.account_id != account_id:
+            raise HTTPException(
+                status_code=404, detail="Inbox not found or unauthorized"
+            )
+
+        contact = await contact_repo.upsert_contact(
+            db=session,
+            account_id=account_id,
+            phone_number=payload.phone_number,
         )
 
-    return StartConversationResponse(conversation_id=conversation.id)
+        internal_source_id = f"frontend-{uuid4().hex}"
+
+        contact_inbox = await contact_repo.get_or_create_contact_inbox(
+            db=session,
+            contact_id=contact.id,
+            inbox_id=inbox.id,
+            source_id=internal_source_id,
+        )
+
+        conversation: Conversation = await conversation_repo.get_or_create_conversation(
+            db=session,
+            account_id=account_id,
+            inbox_id=inbox.id,
+            contact_inbox_id=contact_inbox.id,
+        )
+
+        try:
+            logger.debug("[ws] publishing message to the channel....")
+            await publish_to_account_conversations_ws(
+                account_id,
+                {
+                    "type": "new_conversation",
+                    "payload": jsonable_encoder(
+                        parse_conversation_to_conversation_response(conversation)
+                    ),
+                },
+            )
+        except Exception as e:
+            logger.warning(
+                f"[ws] Failed to publish conversation {conversation.id} to Redis: {e}"
+            )
+
+        return StartConversationResponse(conversation_id=conversation.id)
