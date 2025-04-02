@@ -34,10 +34,10 @@ def send_message(message: Message) -> dict:
             "text": message.content,
         }
         headers = {
-            "apikey": settings.EVOLUTION_API_KEY,
+            "apikey": settings.EVOLUTION_API_SHARED_URL,
             "Content-Type": "application/json",
         }
-        url = f"{settings.EVOLUTION_SERVER_URL}/message/sendText/{settings.EVOLUTION_INSTANCE}"
+        url = f"{settings.EVOLUTION_API_SHARED_URL}/message/sendText/{settings.EVOLUTION_INSTANCE}"
 
         logger.info(
             f"[evolution_sender] Sending messsa to : {url}\npayload: {payload}\nheaders: {headers}"

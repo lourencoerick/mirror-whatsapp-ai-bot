@@ -82,7 +82,9 @@ async def start_conversation(
     user_id = auth_context.user.id
     account_id = auth_context.account.id
 
-    inbox = inbox_repo.find_by_id(db=db, account_id=account_id, inbox_id=inbox_id)
+    inbox = inbox_repo.find_inbox_by_id_and_account(
+        db=db, account_id=account_id, inbox_id=inbox_id
+    )
     if not inbox or inbox.account_id != account_id:
         raise HTTPException(status_code=404, detail="Inbox not found or unauthorized")
 

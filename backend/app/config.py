@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     Loads values from environment variables and .env file.
     """
 
+    BACKEND_BASE_URL: str = "http://localhost:8000"
+
     # --- Database ---
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/chatbotdb"
 
@@ -22,8 +24,12 @@ class Settings(BaseSettings):
 
     # --- Evolution API ---
     EVOLUTION_API_KEY: str = "your-api-key"
-    EVOLUTION_SERVER_URL: str = "localhost:8080"
+    EVOLUTION_BACKEND_API_KEY: str = "your-api-key"
+    EVOLUTION_API_SHARED_URL: str = "http://localhost:8080"
     EVOLUTION_INSTANCE: str = "680df327-c714-40a3-aec5-86ccbb57fa19"
+    SECRET_KEY_FOR_ENCRYPTION: str = (
+        "bBLiC4YQw25ISo2Ru58eckp86tFyVz7tj3mg6Q6N1bA="  # chave_secreta_forte_para_encriptacao_base64_aqui
+    )
 
     # --- Clerk ---
     CLERK_WEBHOOK_SECRET: str = "your-secret-key"

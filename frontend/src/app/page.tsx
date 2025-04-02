@@ -10,7 +10,7 @@ import {
 
 export default async function Home() {
   const authResult = await auth();
-  const token = await authResult.getToken();
+  const token = await authResult.getToken({ template: "fastapi-backend" });
 
   console.log(token);
 

@@ -31,7 +31,9 @@ class RedisPubSubBridge:
 
     async def start(self):
         pubsub = self.redis.pubsub()
-        await pubsub.psubscribe("ws:conversation:*", "ws:account:*:conversations")
+        await pubsub.psubscribe(
+            "ws:conversation:*", "ws:account:*:conversations", "ws:instances:*"
+        )
 
         logger.info("[RedisPubSub] Subscribed to ws:* patterns")
 
@@ -49,6 +51,9 @@ class RedisPubSubBridge:
                 if channel.startswith("ws:conversation:"):
                     conversation_id = UUID(channel.split(":")[-1])
                     await manager_instance.broadcast(conversation_id, data)
+                elif channel.startswith("ws:instances:"):
+                    instance_id = UUID(channel.split(":")[-1])
+                    await manager_instance.broadcast(instance_id, data)
                 elif channel.startswith("ws:account:") and channel.endswith(
                     ":conversations"
                 ):

@@ -11,9 +11,12 @@ from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
 from app.api.routes import inbox as inbox_routes
 from app.api.routes import dev as dev_routes
+from app.api.routes import me as me_routes
 from app.api.routes import websocket as ws_routes
+from app.api.routes import evolution_instance as evolution_instance_routes
 from app.api.routes.webhooks import webhook as webhook_routes
 from app.api.routes.webhooks import clerk as clerk_routes
+from app.api.routes.webhooks import evolution_instance as wb_evolution_instance_routes
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
@@ -49,6 +52,7 @@ app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 # --- Middleware ---
 # CORS Middleware (Essential for frontend interaction)
 frontend_domain = os.getenv("FRONTEND_DOMAIN", "http://localhost:3000")
+frontend_domain = "http://localhost:3000"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[frontend_domain],  # Restrict in production
@@ -76,16 +80,30 @@ app.include_router(
 app.include_router(
     inbox_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Inboxes"]
 )
+app.include_router(me_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Me"])
+
+
+# --- Evolution Instance Router ---
+logger.info("Including Evolution Instance router")
+app.include_router(
+    evolution_instance_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Evolution Instances"],
+)
 
 
 # --- Webhook Routers ---
 logger.info("Including Webhook routers")
 app.include_router(clerk_routes.router, prefix="", tags=["Clerk Webhooks"])
 app.include_router(webhook_routes.router, prefix="", tags=["Webhooks"])
+app.include_router(
+    wb_evolution_instance_routes.router, prefix="", tags=["Evolution Instance Webhooks"]
+)
 
 # --- WebSocket Router ---
 logger.info("Including WebSocket router")
 app.include_router(ws_routes.router, prefix="", tags=["WebSockets"])
+
 
 # --- Development/Utility Routers ---
 if settings.DEBUG:
