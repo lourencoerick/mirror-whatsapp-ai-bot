@@ -139,13 +139,14 @@ def create_inbox(
         channel_id=f"{inbox_data.channel_type}-{uuid4().hex[:8]}",
         # TODO: Define how channel_id is truly generated or set
     )
+    db.add(new_inbox)
+    db.flush()
     inbox_member = InboxMember(user_id=user_id, inbox_id=new_inbox.id)
-
-    db.add_all([new_inbox, inbox_member])
+    db.add(inbox_member)
     try:
         db.commit()
         db.refresh(new_inbox)
-        db.refresh(new_inbox)
+        db.refresh(inbox_member)
         logger.info(f"[InboxRepo] Successfully created Inbox ID={new_inbox.id}")
         return new_inbox
     except Exception as e:
