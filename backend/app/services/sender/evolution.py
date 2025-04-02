@@ -8,6 +8,8 @@ from tenacity import (
 )
 from app.config import get_settings
 from app.models.message import Message
+from app.models.inbox import Inbox
+from app.core.security import decrypt_logical_token
 
 settings = get_settings()
 
@@ -18,7 +20,7 @@ settings = get_settings()
     retry=retry_if_exception_type(httpx.RequestError),
     reraise=True,
 )
-def send_message(message: Message) -> dict:
+def send_message(message: Message, inbox: Inbox) -> dict:
     """
     Sends a text message using the Evolution API via HTTPX.
     Retries up to 3 times in case of connection-level failures.
@@ -29,15 +31,21 @@ def send_message(message: Message) -> dict:
             - text (str): Message content
     """
     try:
+        logger.debug(f"Inbox: {inbox}")
+        channel_id = inbox.channel_details["id"]
+        api_key = decrypt_logical_token(
+            inbox.channel_details["logical_token_encrypted"]
+        )
+
         payload = {
             "number": message.contact.phone_number,
             "text": message.content,
         }
         headers = {
-            "apikey": settings.EVOLUTION_API_SHARED_URL,
+            "apikey": api_key,
             "Content-Type": "application/json",
         }
-        url = f"{settings.EVOLUTION_API_SHARED_URL}/message/sendText/{settings.EVOLUTION_INSTANCE}"
+        url = f"{settings.EVOLUTION_API_SHARED_URL}/message/sendText/{channel_id}"
 
         logger.info(
             f"[evolution_sender] Sending messsa to : {url}\npayload: {payload}\nheaders: {headers}"

@@ -4,6 +4,7 @@ from sqlalchemy import desc
 from typing import List, Optional
 from loguru import logger
 from app.models.message import Message
+from app.models.inbox import Inbox
 from app.api.schemas.message import MessageCreate
 
 
@@ -14,6 +15,7 @@ def find_by_id(db: Session, message_id: UUID) -> Optional[Message]:
     message = (
         db.query(Message)
         .options(joinedload(Message.contact))
+        .options(joinedload(Message.inbox))
         .filter_by(id=message_id)
         .first()
     )
