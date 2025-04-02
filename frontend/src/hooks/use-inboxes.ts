@@ -29,7 +29,7 @@ export function useInboxes(): {
     async function fetchInboxes(): Promise<void> {
       try {
         setLoading(true);
-        const res: AxiosResponse<Inbox[]> = await api.get('/inboxes');
+        const res: AxiosResponse<Inbox[]> = await api.get('/api/v1/inboxes');
         setInboxes(res.data);
       } catch (err: unknown) {
         console.error('Error fetching inboxes', err);
