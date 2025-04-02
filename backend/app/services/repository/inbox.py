@@ -9,7 +9,7 @@ from app.models.inbox_member import InboxMember
 from app.api.schemas.inbox import InboxCreate, InboxUpdate
 
 
-def find_inbox_by_id_and_account(  # Renomeada e account_id obrigatório
+def find_inbox_by_id_and_account(
     db: Session, *, inbox_id: UUID, account_id: UUID
 ) -> Optional[Inbox]:
     """
