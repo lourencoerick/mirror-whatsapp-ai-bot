@@ -86,7 +86,9 @@ async def create_outgoing_message(
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
-    conversation = conversation_repo.find_by_id(db, conversation_id)
+    conversation = conversation_repo.find_by_id(
+        db, conversation_id=conversation_id, account_id=account_id
+    )
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
