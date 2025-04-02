@@ -24,17 +24,17 @@ api.interceptors.request.use(
     // Use startsWith for prefix matching
     const isPublicRoute = publicRoutes.some(route => config.url?.startsWith(route));
 
-    // Also skip if the request is for the token endpoint itself (if using baseURL)
-    if (config.url === '/api/token' || isPublicRoute) {
+    // Also skip if the request is for the token endpoint itself (if using baseURL) or for server side components w token
+    if (config.url === '/api/token' || isPublicRoute || config.headers.Authorization) {
       console.log(`[Axios Interceptor] Public route or token route ${config.url}, skipping token.`);
-      return config; // Don't add token
+      return config;
     }
 
     console.log(`[Axios Interceptor] Adding token for ${config.url}`);
-    const token = await getClientAuthToken(); // Fetch the token
+    const token = await getClientAuthToken();
 
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`; // Add the token
+      config.headers.Authorization = `Bearer ${token}`;
     } else {
       console.error('[Axios Interceptor] Token not available. Request might fail or be unauthorized.');
     }
@@ -49,7 +49,7 @@ api.interceptors.request.use(
 
 
 api.interceptors.response.use(
-    (response) => response, // Pass through successful responses
+    (response) => response,
     (error) => {
         if (error.response) {
             console.error(`[Axios Interceptor] Response Error ${error.response.status}:`, error.response.data?.detail || error.response.data);
@@ -65,7 +65,6 @@ api.interceptors.response.use(
         } else {
             console.error('[Axios Interceptor] Error setting up request:', error.message);
         }
-        // Reject the promise so the calling code's .catch() is triggered
         return Promise.reject(error);
     }
 );
