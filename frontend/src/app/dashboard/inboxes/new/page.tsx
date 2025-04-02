@@ -29,7 +29,7 @@ const WIZARD_STEPS = [
 ];
 
 type ChannelType = 'whatsapp_evolution_api' | 'whatsapp_cloud_api' | string;
-interface EvolutionApiDetails { instance_id: string; api_url: string; api_key?: string; }
+interface EvolutionApiDetails { instance_id: string; shared_api_url: string; logical_token_encrypted?: string; }
 interface CloudApiDetails { phoneNumberId: string; wabaId: string; accessToken: string; verifyToken: string; }
 interface ConfiguredChannelDetails { evolution?: EvolutionApiDetails; cloud?: CloudApiDetails; }
 interface CreateInboxResponse { id: string; name: string; channel_type: string; }

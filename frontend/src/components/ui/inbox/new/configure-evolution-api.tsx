@@ -18,7 +18,8 @@ interface EvolutionInstanceDetails {
     id: string;
     instance_name: string;
     // api_url might also be useful here if returned by backend
-    // api_url?: string;
+    shared_api_url?: string;
+    logical_token_encrypted?: string;
     // status from backend DB might differ from real-time connection status
     status?: string;
 }
