@@ -33,9 +33,16 @@ async def get_user_conversations(
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
-    """
-    Return all conversations visible to the current user,
-    based on inbox membership.
+    """Return all conversations visible to the current user, based on inbox membership.
+
+    Args:
+        limit (int, optional): The number of conversations to return. Defaults to 20.
+        offset (int, optional): The number of conversations to skip. Defaults to 0.
+        db (AsyncSession, optional): The database session. Defaults to Depends(get_db).
+        auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
+
+    Returns:
+        List[ConversationResponse]: A list of conversations.
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
@@ -62,6 +69,18 @@ async def get_inbox_conversations(
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
+    """Return all conversations for a specific inbox.
+
+    Args:
+        inbox_id (UUID): The ID of the inbox.
+        limit (int, optional): The number of conversations to return. Defaults to 20.
+        offset (int, optional): The number of conversations to skip. Defaults to 0.
+        db (AsyncSession, optional): The database session. Defaults to Depends(get_db).
+        auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
+
+    Returns:
+        List[ConversationResponse]: A list of conversations.
+    """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
     logger.info(f"Getting conversations for inbox_id {inbox_id}")
@@ -87,6 +106,19 @@ async def start_conversation(
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
+    """Start a new conversation in a specific inbox.
+
+    Args:
+        inbox_id (UUID): The ID of the inbox.
+        payload (StartConversationRequest): The data for the new conversation.
+        db (AsyncSession, optional): The database session. Defaults to Depends(get_db).
+        auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
+
+    Returns:
+        StartConversationResponse: The ID of the new conversation.
+    Raises:
+        HTTPException: If the inbox is not found or the user is not authorized.
+    """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
 
