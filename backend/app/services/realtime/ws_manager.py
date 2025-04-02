@@ -16,6 +16,12 @@ class WebSocketManager:
         self.active_connections: Dict[Union[UUID, str], List[WebSocket]] = {}
 
     async def connect(self, identifier: Union[UUID, str], websocket: WebSocket):
+        """connects a client
+
+        Args:
+            identifier (Union[UUID, str]): identifier
+            websocket (WebSocket): websocket
+        """
         if identifier not in self.active_connections:
             self.active_connections[identifier] = []
         self.active_connections[identifier].append(websocket)
@@ -27,7 +33,13 @@ class WebSocketManager:
             f"[ws] Current identifiers: {list(self.active_connections.keys())}"
         )
 
-    def disconnect(self, identifier: Union[UUID, str], websocket: WebSocket):
+    async def disconnect(self, identifier: Union[UUID, str], websocket: WebSocket):
+        """disconnects a client
+
+        Args:
+            identifier (Union[UUID, str]): identifier
+            websocket (WebSocket): websocket
+        """
         connections = self.active_connections.get(identifier)
         if not connections:
             return
@@ -44,6 +56,12 @@ class WebSocketManager:
             logger.debug(f"[ws] No more clients in {identifier}, cleaned up.")
 
     async def broadcast(self, identifier: Union[UUID, str], message: dict):
+        """braodcasts a message
+
+        Args:
+            identifier (Union[UUID, str]): identifier
+            message (dict): message
+        """
         connections = self.active_connections.get(identifier, [])
         if not connections:
             logger.debug(f"[ws] No clients to broadcast in {identifier}")

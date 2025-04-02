@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import Dict, Optional
 from loguru import logger
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.parser.evolution_parser import parse_evolution_message
 from app.services.repository.inbox import find_inbox_by_channel_id
@@ -10,8 +10,8 @@ from app.services.repository.conversation import get_or_create_conversation
 from app.api.schemas.message import MessageCreate
 
 
-def parse_webhook_to_message(
-    db: Session, account_id: UUID, payload: Dict
+async def parse_webhook_to_message(
+    db: AsyncSession, account_id: UUID, payload: Dict
 ) -> Optional[MessageCreate]:
     """
     Process a raw webhook payload and return a complete MessageCreate DTO.
@@ -41,25 +41,27 @@ def parse_webhook_to_message(
         return None
 
     # Step 2 - Inbox
-    inbox = find_inbox_by_channel_id(db, account_id=account_id, channel_id=channel_id)
+    inbox = await find_inbox_by_channel_id(
+        db, account_id=account_id, channel_id=channel_id
+    )
     if not inbox:
         logger.error(f"[parser] Inbox not found for channel_id {channel_id}")
         return None
 
     # Step 3 - Contact (upsert) & ContactInbox
-    contact = upsert_contact(
+    contact = await upsert_contact(
         db=db,
         account_id=account_id,
         phone_number=contact_phone,
         name=contact_name,
     )
 
-    contact_inbox = get_or_create_contact_inbox(
+    contact_inbox = await get_or_create_contact_inbox(
         db=db, contact_id=contact.id, inbox_id=inbox.id, source_id=source_id
     )
 
     # Step 4 - Conversation (get or create)
-    conversation = get_or_create_conversation(
+    conversation = await get_or_create_conversation(
         db=db,
         account_id=account_id,
         inbox_id=inbox.id,

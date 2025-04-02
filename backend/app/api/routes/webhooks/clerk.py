@@ -6,7 +6,7 @@ from fastapi import (
     Request,
     status,
 )
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from svix.webhooks import Webhook
 from loguru import logger
@@ -34,8 +34,8 @@ def _get_primary_email(data: dict) -> str | None:
     )
 
 
-def process_user_created(data: dict, db: Session):
-    """Processes the 'user.created' event from Clerk webhook (synchronous DB, Loguru logging)."""
+async def process_user_created(data: dict, db: AsyncSession):
+    """Processes the 'user.created' event from Clerk webhook (asynchronous DB, Loguru logging)."""
     clerk_user_id = data.get("id")
     primary_email = _get_primary_email(data)
     first_name = data.get("first_name")
@@ -63,7 +63,8 @@ def process_user_created(data: dict, db: Session):
         stmt_select = select(User).where(
             User.provider == "clerk", User.uid == clerk_user_id
         )
-        existing_user = db.execute(stmt_select).scalars().first()
+        result = await db.execute(stmt_select)
+        existing_user = result.scalars().first()
 
         if not existing_user:
             logger.info(
@@ -73,7 +74,7 @@ def process_user_created(data: dict, db: Session):
             account_name = f"Conta de {user_name}"
             new_account = Account(name=account_name)
             db.add(new_account)
-            db.flush()
+            await db.flush()
 
             logger.info(
                 f"Created Account ID: {new_account.id} for Clerk User: {clerk_user_id}"
@@ -89,7 +90,7 @@ def process_user_created(data: dict, db: Session):
                 sign_in_count=0,
             )
             db.add(new_user)
-            db.flush()
+            await db.flush()
 
             logger.info(
                 f"Created User ID: {new_user.id} for Clerk User: {clerk_user_id}"
@@ -107,7 +108,7 @@ def process_user_created(data: dict, db: Session):
                 f"Linking User {new_user.id} to Account {new_account.id} with role '{default_role}'"
             )
 
-            db.commit()
+            await db.commit()
 
             logger.info(
                 f"Successfully created and linked User {new_user.id} and Account {new_account.id} for Clerk ID {clerk_user_id}."
@@ -123,16 +124,16 @@ def process_user_created(data: dict, db: Session):
         logger.exception(
             f"Database error processing user.created for Clerk ID {clerk_user_id}"
         )
-        db.rollback()
+        await db.rollback()
 
 
 @router.post("/clerk", status_code=status.HTTP_200_OK, include_in_schema=False)
 async def handle_clerk_webhook(
     request: Request,
     settings: Settings = Depends(get_settings),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Handles incoming webhooks from Clerk (synchronous DB, Loguru logging)."""
+    """Handles incoming webhooks from Clerk (asynchronous DB, Loguru logging)."""
     webhook_secret = settings.CLERK_WEBHOOK_SECRET
     if not webhook_secret:
         logger.error("CLERK_WEBHOOK_SECRET is not configured in settings.")
@@ -185,7 +186,7 @@ async def handle_clerk_webhook(
         return {"message": "Webhook received but no data to process."}
 
     if event_type == "user.created":
-        process_user_created(event_data, db)
+        await process_user_created(event_data, db)
     # elif event_type == "user.updated":
     #     process_user_updated(event_data, db, settings)
     else:

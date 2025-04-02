@@ -1,11 +1,12 @@
+import asyncio
+import httpx
 from uuid import UUID
 from loguru import logger
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_db
 from app.services.queue.redis_queue import RedisQueue
 from app.services.sender.evolution import send_message as evolution_send_message
 from app.services.repository import message as message_repo
-import httpx
 
 
 class ResponseSender:
@@ -24,13 +25,13 @@ class ResponseSender:
         self.queue = RedisQueue(queue_name=queue_name)
         logger.info(f"[sender:init] ResponseSender initialized queue: {queue_name}")
 
-    def _process_one_message(self):
+    async def _process_one_message(self):
         """
         Processes one message from the queue: fetches the ID, looks up the message,
         and attempts delivery to the external provider.
         """
         try:
-            payload = self.queue.dequeue()
+            payload = await asyncio.to_thread(self.queue.dequeue)
             if not payload:
                 return
 
@@ -41,37 +42,40 @@ class ResponseSender:
                 logger.warning("[sender] Payload missing 'message_id'")
                 return
 
-            with SessionLocal() as db:
-                self._handle_message(db, message_id)
-                db.commit()
+            async with get_db() as db:
+                await self._handle_message(db, message_id)
+                await db.commit()
 
         except Exception as e:
             logger.exception(f"[sender] Unexpected failure: {type(e).__name__} - {e}")
 
-    def run(self):
+    async def run(self):
         """
         Starts the infinite loop to consume and process messages from the queue.
         """
         logger.info("[sender] Listening for messages to send...")
 
         while True:
-            self._process_one_message()
+            await self._process_one_message()
+            await asyncio.sleep(0.1)  # Add a small delay to prevent busy-waiting
 
-    def _handle_message(self, db: Session, message_id: UUID):
+    async def _handle_message(self, db: AsyncSession, message_id: UUID):
         """
         Handles delivery of a specific message by ID.
 
         Args:
-            db (Session): Active SQLAlchemy database session.
+            db (AsyncSession): Active SQLAlchemy database session.
             message_id (UUID): The ID of the message to be delivered.
         """
-        message = message_repo.find_message_by_id(db, message_id)
+        message = await message_repo.find_message_by_id(db, message_id)
         if not message:
             logger.warning(f"[sender] Message ID {message_id} not found in database")
             return
 
         try:
-            response = evolution_send_message(message=message, inbox=message.inbox)
+            response = await evolution_send_message(
+                message=message, inbox=message.inbox
+            )
             external_id = response.get("key", {}).get("id")
             status = response.get("status", "pending").lower()
             if external_id:
@@ -81,7 +85,6 @@ class ResponseSender:
             logger.info(
                 f"[sender] Message {message.id} delivered successfully "
                 f"(external_id={external_id}, status={status})"
-                f"response: {response}"
             )
 
         except httpx.HTTPError as e:
@@ -92,5 +95,11 @@ class ResponseSender:
             logger.exception(f"[sender] Unexpected error for message {message.id}: {e}")
 
 
+async def main():
+    """main function"""
+    sender = ResponseSender()
+    await sender.run()
+
+
 if __name__ == "__main__":
-    ResponseSender().run()
+    asyncio.run(main())

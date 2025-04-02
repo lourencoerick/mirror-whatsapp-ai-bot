@@ -1,6 +1,6 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from loguru import logger
 from app.database import get_db
@@ -13,9 +13,9 @@ router = APIRouter(prefix="/me", tags=["v1 - Current User"])
 
 
 @router.get("/inboxes", response_model=List[InboxResponse])
-def get_my_inboxes(
+async def get_my_inboxes(
     auth_context: AuthContext = Depends(get_auth_context),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Returns all inboxes the CURRENT authenticated user is a member of
@@ -26,7 +26,7 @@ def get_my_inboxes(
     logger.info(
         f"Finding inboxes for current user (ID={user_id}) in Account={account_id}"
     )
-    inboxes = inbox_repo.find_inboxes_by_user_membership(
+    inboxes = await inbox_repo.find_inboxes_by_user_membership(
         db=db, account_id=account_id, user_id=user_id
     )
     return inboxes

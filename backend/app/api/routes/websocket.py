@@ -34,7 +34,7 @@ async def websocket_conversation_endpoint(
         while True:
             await websocket.receive_text()  # Optional: receive pings or presence
     except WebSocketDisconnect:
-        manager_instance.disconnect(conversation_id, websocket)
+        await manager_instance.disconnect(conversation_id, websocket)
         logger.info(f"[ws] WebSocket disconnected from conversation {conversation_id}")
 
 
@@ -44,7 +44,7 @@ async def websocket_instance_status_endpoint(
     instance_id: UUID,
     # auth_context: AuthContext = Depends(get_auth_context),
 ):
-
+    """handles websocket instance status endpoint"""
     await websocket.accept()
     logger.info(f"[ws] WebSocket accepted for evolution instance {instance_id}")
 
@@ -55,7 +55,7 @@ async def websocket_instance_status_endpoint(
             await websocket.receive_text()  # Optional: receive pings or presence
             await websocket.send_text(f"Status update for {instance_id}: OK")
     except WebSocketDisconnect:
-        manager_instance.disconnect(instance_id, websocket)
+        await manager_instance.disconnect(instance_id, websocket)
         logger.info(
             f"[ws] WebSocket disconnected from evolution instance {instance_id}"
         )
@@ -81,7 +81,7 @@ async def websocket_account_conversations(
         while True:
             await websocket.receive_text()  # Optional: receive pings or presence
     except WebSocketDisconnect:
-        manager_instance.disconnect(account_id, websocket)
+        await manager_instance.disconnect(account_id, websocket)
         logger.info(
             f"[ws] WebSocket disconnected from account {account_id} (conversation list)"
         )
