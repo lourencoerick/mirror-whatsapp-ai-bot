@@ -42,8 +42,7 @@ JWK_CACHE_TTL_SECONDS: int = 600  # Cache JWKs for 10 minutes
 
 
 def get_jwks() -> Dict[str, Any]:
-    """
-    Fetches Clerk JSON Web Keys (JWKs) and caches them.
+    """Fetches Clerk JSON Web Keys (JWKs) and caches them.
 
     Retrieves JWKs from the CLERK_JWKS_URL. Caches the keys for
     JWK_CACHE_TTL_SECONDS to avoid excessive requests.
@@ -91,8 +90,7 @@ security = HTTPBearer()
 def verify_clerk_token(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> Dict[str, Any]:
-    """
-    FastAPI dependency to verify a Clerk JWT bearer token.
+    """Verifies a Clerk JWT bearer token.
 
     Args:
         credentials (HTTPAuthorizationCredentials): The credentials extracted
@@ -272,11 +270,16 @@ router = APIRouter()
 
 @router.get("/protected", summary="Example protected route")
 async def protected_route(payload: Dict[str, Any] = Depends(verify_clerk_token)):
-    """
-    An example route protected by Clerk authentication.
+    """An example route protected by Clerk authentication.
 
     Requires a valid Bearer token in the Authorization header.
     The verified token payload is injected into the 'payload' argument.
+
+    Args:
+        payload (Dict[str, Any], optional): The verified token payload. Defaults to Depends(verify_clerk_token).
+
+    Returns:
+        Dict[str, Any]: A message and the token payload.
     """
     user_id = payload.get("sub")  # Standard JWT claim for subject (user ID)
     # You can now use the user_id or other claims from the payload
@@ -285,7 +288,9 @@ async def protected_route(payload: Dict[str, Any] = Depends(verify_clerk_token))
 
 @router.get("/public", summary="Example public route")
 async def public_route():
-    """
-    An example route that does not require authentication.
+    """An example route that does not require authentication.
+
+    Returns:
+        Dict[str, Any]: A message.
     """
     return {"message": "This is a public endpoint."}
