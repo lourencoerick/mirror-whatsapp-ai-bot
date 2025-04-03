@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
@@ -42,7 +43,11 @@ class Message(BaseModel):
     content_type = Column(String(50), nullable=True)  # e.g., "text", "image"
     content_attributes = Column(JSON, nullable=True)
     contact_id = Column(UUID(as_uuid=True), ForeignKey("contacts.id"), nullable=True)
-    sent_at = Column(DateTime, nullable=True)
+    sent_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=lambda: datetime.now(timezone.utc),
+    )
 
     account = relationship("Account", back_populates="messages")
     inbox = relationship("Inbox", back_populates="messages")
