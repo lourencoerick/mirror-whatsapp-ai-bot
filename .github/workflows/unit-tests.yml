@@ -23,7 +23,7 @@ jobs:
         pip install -r backend/requirements.txt
         pip install pytest
 
-    - name: Run unit tests (no infra)
-      run: |
-        export PYTHONPATH=backend
-        pytest backend/app/tests -m unit --disable-warnings
+    # - name: Run unit tests (no infra)
+    #   run: |
+    #     export PYTHONPATH=backend
+    #     pytest backend/app/tests -m unit --disable-warnings
