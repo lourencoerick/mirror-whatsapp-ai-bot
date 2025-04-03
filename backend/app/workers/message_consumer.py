@@ -49,13 +49,34 @@ class MessageConsumer:
         """
         logger.info("[consumer] Starting message consumer...")
 
-        # Wait until both input and output queues are connected to Redis
-        while not (self.input_queue.is_connected and self.output_queue.is_connected):
-            logger.info("[consumer] Waiting for Redis connections to be established...")
-            await asyncio.sleep(1)
-        logger.info(
-            "[consumer] Redis connections established. Beginning message consumption."
-        )
+        logger.info("[consumer] Attempting to connect to Redis queues...")
+        await self.input_queue.connect()
+        await self.output_queue.connect()
+
+        # Loop de espera com retentativas se a conexão inicial falhar
+        retry_delay = 5
+        max_retries = 5
+        retries = 0
+        while (
+            not (self.input_queue.is_connected and self.output_queue.is_connected)
+            and retries < max_retries
+        ):
+            retries += 1
+            logger.warning(
+                f"[consumer] Failed initial Redis connection (Input: {self.input_queue.is_connected}, Output: {self.output_queue.is_connected}). "
+                f"Retrying attempt {retries}/{max_retries} in {retry_delay}s..."
+            )
+            await asyncio.sleep(retry_delay)
+            if not self.input_queue.is_connected:
+                await self.input_queue.connect()
+            if not self.output_queue.is_connected:
+                await self.output_queue.connect()
+
+        if not (self.input_queue.is_connected and self.output_queue.is_connected):
+            logger.error(
+                "[consumer] Could not establish Redis connections after multiple attempts. Exiting."
+            )
+            return
 
         while True:
             try:
@@ -64,7 +85,7 @@ class MessageConsumer:
                 )
 
                 if not raw_message:
-                    await asyncio.sleep(0.1)  # avoid busy-waiting
+                    await asyncio.sleep(0.1)
                     continue
 
                 logger.debug(f"[consumer] Raw message dequeued: {raw_message}")
