@@ -1,10 +1,10 @@
-# tests/test_inbox_routes.py (example file name)
-
 import pytest
 from uuid import uuid4, UUID
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
+
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.models.account import Account
 from app.models.user import User
@@ -12,14 +12,14 @@ from app.models.inbox import Inbox
 from app.models.inbox_member import InboxMember
 
 
-# Define API prefix
 API_V1_PREFIX = "/api/v1"
 
 
 @pytest.mark.integration
-def test_get_account_inboxes_success(
-    client: TestClient,
-    db_session: Session,
+@pytest.mark.asyncio
+async def test_list_account_inboxes_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
     test_account: Account,
     test_user: User,
     test_inbox: Inbox,
@@ -27,6 +27,7 @@ def test_get_account_inboxes_success(
     """
     Should return all inboxes belonging to the authenticated user's account.
     """
+
     another_inbox = Inbox(
         id=uuid4(),
         account_id=test_account.id,
@@ -35,13 +36,18 @@ def test_get_account_inboxes_success(
         channel_id="another-channel",
     )
 
-    another_inbox_member = InboxMember(user_id=test_user.id, inbox_id=another_inbox.id)
+    another_inbox_member = InboxMember(
+        id=uuid4(),
+        user_id=test_user.id,
+        inbox_id=another_inbox.id,
+    )
     db_session.add_all([another_inbox, another_inbox_member])
+    await db_session.flush()
+    await db_session.commit()
 
-    db_session.commit()
-    db_session.refresh(another_inbox)
+    await db_session.refresh(another_inbox)
 
-    response = client.get(
+    response = await client.get(
         f"{API_V1_PREFIX}/inboxes",
     )
 
@@ -63,11 +69,15 @@ def test_get_account_inboxes_success(
 
 
 @pytest.mark.integration
-def test_get_account_inboxes_unauthenticated(unauthenticated_client: TestClient):
+@pytest.mark.asyncio
+async def test_list_account_inboxes_unauthenticated(
+    unauthenticated_client: AsyncClient,
+):
     """
     Should return 403 Forbidden when no authentication is provided.
     """
-    response = unauthenticated_client.get(
+
+    response = await unauthenticated_client.get(
         f"{API_V1_PREFIX}/inboxes",
     )
 
@@ -76,15 +86,28 @@ def test_get_account_inboxes_unauthenticated(unauthenticated_client: TestClient)
 
 
 @pytest.mark.integration
-def test_get_account_inboxes_no_inboxes(
-    client: TestClient,
-    db_session: Session,
+@pytest.mark.asyncio
+async def test_list_account_inboxes_no_inboxes(
+    client: AsyncClient,
+    db_session: AsyncSession,
     test_account: Account,
+    test_user: User,
+    test_inbox: Inbox,
 ):
     """
-    Should return an empty list when the account has no inboxes.
+    Should return an empty list when the account's only inbox is deleted.
     """
-    response = client.get(
+    stmt_member = select(InboxMember).where(InboxMember.inbox_id == test_inbox.id)
+    result_member = await db_session.execute(stmt_member)
+    members = result_member.scalars().all()
+    for member in members:
+        await db_session.delete(member)
+    await db_session.flush()
+
+    await db_session.delete(test_inbox)
+    await db_session.commit()
+
+    response = await client.get(
         f"{API_V1_PREFIX}/inboxes",
     )
 

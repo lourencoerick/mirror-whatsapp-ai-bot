@@ -1,7 +1,8 @@
 import pytest
 from uuid import uuid4, UUID
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.models.account import Account
 from app.models.user import User
@@ -11,172 +12,196 @@ from app.models.contact_inbox import ContactInbox
 from app.models.contact import Contact
 from app.models.inbox_member import InboxMember
 
-# Define API prefix
 API_V1_PREFIX = "/api/v1"
 
 
 @pytest.mark.integration
-def test_get_inbox_conversations_success(
-    client: TestClient, db_session: Session, test_inbox: Inbox, test_account: Account
-):
-    """
-    Test fetching conversations for a specific inbox successfully.
-    Requires auth context to verify inbox ownership.
-    """
-    # Arrange: Create necessary data like Contact, ContactInbox, Conversation
-    contact = Contact(id=uuid4(), account_id=test_account.id, phone_number="111")
-    contact_inbox = ContactInbox(
-        id=uuid4(), contact=contact, inbox=test_inbox, source_id="test"
-    )
-    conversation = Conversation(
-        id=uuid4(),
-        account=test_account,
-        inbox=test_inbox,
-        contact_inbox=contact_inbox,
-        status="teste",
-    )
-    db_session.add_all([contact, contact_inbox, conversation])
-    db_session.commit()
-
-    # Act: Call the endpoint using the authenticated client
-    response = client.get(
-        f"{API_V1_PREFIX}/inboxes/{test_inbox.id}/conversations?limit=5&offset=0",
-    )
-
-    # Assert
-    assert response.status_code == 200
-    assert isinstance(response.json(), list)
-    # Add more specific assertions about the returned data if needed
-
-
-@pytest.mark.integration
-def test_get_user_conversations_success(
-    client: TestClient,
-    db_session: Session,
-    test_user: User,
-    test_account: Account,
+@pytest.mark.asyncio
+async def test_get_inbox_conversations_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
     test_inbox: Inbox,
+    test_account: Account,
 ):
-    """
-    Test fetching conversations visible to the authenticated user.
-    """
-    contact = Contact(id=uuid4(), account_id=test_account.id, phone_number="222")
+    """Test fetching conversations for a specific inbox successfully."""
+    # Arrange
+    contact = Contact(
+        id=uuid4(), account_id=test_account.id, phone_number="111_inbox_test"
+    )
     contact_inbox = ContactInbox(
-        id=uuid4(), contact=contact, inbox=test_inbox, source_id="test2"
+        id=uuid4(),
+        contact_id=contact.id,
+        inbox_id=test_inbox.id,
+        source_id="ci_source_inbox",
     )
     conversation = Conversation(
         id=uuid4(),
-        account=test_account,
-        inbox=test_inbox,
-        contact_inbox=contact_inbox,
+        account_id=test_account.id,
+        inbox_id=test_inbox.id,
+        contact_inbox_id=contact_inbox.id,
         status="open",
     )
-    # Link user to inbox if find_all_by_user checks membership
-    inbox_member = InboxMember(user=test_user, inbox=test_inbox)
-    db_session.add_all([contact, contact_inbox, conversation, inbox_member])
-    db_session.commit()
+    db_session.add_all([contact, contact_inbox, conversation])
+    await db_session.commit()
 
     # Act
-    response = client.get(
-        f"{API_V1_PREFIX}/conversations?limit=5&offset=0",
+    response = await client.get(
+        f"{API_V1_PREFIX}/inboxes/{test_inbox.id}/conversations?limit=5&offset=0",
     )
 
     # Assert
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
-    assert len(data) >= 1
-    # Assert based on the conversation created
+    found = any(item["id"] == str(conversation.id) for item in data)
+    assert (
+        found
+    ), f"Created conversation {conversation.id} not found in response for inbox {test_inbox.id}"
 
 
 @pytest.mark.integration
-def test_start_conversation_success(
-    client: TestClient, db_session: Session, test_inbox: Inbox, test_account: Account
+@pytest.mark.asyncio
+async def test_get_user_conversations_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    test_user: User,
+    test_account: Account,
+    test_inbox: Inbox,
 ):
-    """
-    Should successfully create a conversation via the authenticated endpoint.
-    """
-    # Arrange: Inbox already created by fixture
+    """Test fetching conversations visible to the authenticated user."""
+    # Arrange
+    contact = Contact(
+        id=uuid4(), account_id=test_account.id, phone_number="222_user_test"
+    )
+    contact_inbox = ContactInbox(
+        id=uuid4(),
+        contact_id=contact.id,
+        inbox_id=test_inbox.id,
+        source_id="ci_source_user",
+    )
+    conversation = Conversation(
+        id=uuid4(),
+        account_id=test_account.id,
+        inbox_id=test_inbox.id,
+        contact_inbox_id=contact_inbox.id,
+        status="open",
+    )
+    # Assumes test_user is already a member of test_inbox via fixture setup
+    db_session.add_all([contact, contact_inbox, conversation])
+    await db_session.commit()
 
     # Act
-    response = client.post(
-        f"{API_V1_PREFIX}/inboxes/{test_inbox.id}/conversations",
-        # No X-Account-ID header needed
-        json={"phone_number": "5511988888888"},
+    response = await client.get(
+        f"{API_V1_PREFIX}/conversations?limit=10&offset=0",
     )
 
     # Assert
-    assert response.status_code == 200  # Or 201 if you changed it
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    found = any(item["id"] == str(conversation.id) for item in data)
+    assert found, f"Conversation {conversation.id} not found in user's general list"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_start_conversation_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    test_inbox: Inbox,
+    test_account: Account,
+):
+    """Should successfully create a conversation via the endpoint."""
+    # Arrange
+    phone_number_to_create = "5511988888888"
+
+    # Act
+    response = await client.post(
+        f"{API_V1_PREFIX}/inboxes/{test_inbox.id}/conversations",
+        json={"phone_number": phone_number_to_create},
+    )
+
+    # Assert
+    assert response.status_code == 200  # Or 201 if that's what you return
     data = response.json()
     assert "conversation_id" in data
-    # Verify conversation, contact, contact_inbox were created in DB
-    conv = (
-        db_session.query(Conversation)
-        .filter(Conversation.id == UUID(data["conversation_id"]))
-        .first()
-    )
-    assert conv is not None
+    new_conversation_id = UUID(data["conversation_id"])
+
+    # Verify conversation exists in DB
+    stmt = select(Conversation).where(Conversation.id == new_conversation_id)
+    result = await db_session.execute(stmt)
+    conv = result.scalars().first()
+
+    assert conv is not None, "Conversation not found in database after creation"
     assert conv.account_id == test_account.id
     assert conv.inbox_id == test_inbox.id
 
+    # Verify related contact and contact_inbox
+    stmt_ci = select(ContactInbox).where(ContactInbox.id == conv.contact_inbox_id)
+    result_ci = await db_session.execute(stmt_ci)
+    ci = result_ci.scalars().first()
+    assert ci is not None
+
+    stmt_c = select(Contact).where(Contact.id == ci.contact_id)
+    result_c = await db_session.execute(stmt_c)
+    contact = result_c.scalars().first()
+    assert contact is not None
+    assert contact.phone_number == phone_number_to_create
+
 
 @pytest.mark.integration
-def test_start_conversation_inbox_not_found_or_unauthorized(
-    client: TestClient, db_session: Session, test_account: Account
+@pytest.mark.asyncio
+async def test_start_conversation_inbox_not_found_or_unauthorized(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    test_account: Account,  # Required by other_inbox
 ):
-    """
-    Should return 404 when inbox doesn't exist or belongs to another account,
-    even if the user is authenticated.
-    """
-    # Arrange: Create an inbox belonging to a *different* account
-    other_account = Account(id=uuid4(), name="Other Account")
+    """Should return 404 when inbox doesn't exist or belongs to another account."""
+    # Arrange: Create an inbox belonging to a different account
+    other_account = Account(id=uuid4(), name="Unauthorized Account")
     other_inbox = Inbox(
         id=uuid4(),
-        account=other_account,
+        account=other_account,  # Belongs to other account
         name="Other Inbox",
         channel_type="whatsapp",
-        channel_id="other_134",
+        channel_id="other_channel_id_134",
     )
     db_session.add_all([other_account, other_inbox])
-    db_session.commit()
+    await db_session.commit()
 
-    # Act: Try to access non-existent inbox
-    response_non_existent = client.post(
-        f"{API_V1_PREFIX}/inboxes/{str(uuid4())}/conversations",
+    # Act & Assert: Test with a non-existent inbox ID
+    non_existent_inbox_id = uuid4()
+    response_non_existent = await client.post(
+        f"{API_V1_PREFIX}/inboxes/{non_existent_inbox_id}/conversations",
         json={"phone_number": "5511977777777"},
     )
-    # Act: Try to access inbox of another account
-    response_unauthorized = client.post(
+    assert response_non_existent.status_code == 404
+    assert "Inbox not found or unauthorized" in response_non_existent.json()["detail"]
+
+    # Act & Assert: Test with an inbox ID belonging to the other account
+    response_unauthorized = await client.post(
         f"{API_V1_PREFIX}/inboxes/{other_inbox.id}/conversations",
         json={"phone_number": "5511966666666"},
     )
-
-    # Assert
-    assert response_non_existent.status_code == 404
-    assert (
-        "Inbox not found or unauthorized" in response_non_existent.json()["detail"]
-    )  # Check detail message
-
-    assert (
-        response_unauthorized.status_code == 404
-    )  # Endpoint logic should return 404 if inbox check fails
+    assert response_unauthorized.status_code == 404
     assert "Inbox not found or unauthorized" in response_unauthorized.json()["detail"]
 
 
 @pytest.mark.integration
-def test_start_conversation_unauthenticated(unauthenticated_client: TestClient):
-    """
-    Should return 403 Forbidden when no authentication is provided.
-    (HTTPBearer returns 403 if Authorization header is missing)
-    """
-    # Act: Use the client WITHOUT the auth override
-    response = unauthenticated_client.post(
-        f"{API_V1_PREFIX}/inboxes/{str(uuid4())}/conversations",
+@pytest.mark.asyncio
+async def test_start_conversation_unauthenticated(
+    unauthenticated_client: AsyncClient,
+):
+    """Should return 403 Forbidden when no authentication is provided."""
+    # Arrange
+    some_inbox_id = uuid4()
+
+    # Act
+    response = await unauthenticated_client.post(
+        f"{API_V1_PREFIX}/inboxes/{some_inbox_id}/conversations",
         json={"phone_number": "5511955555555"},
     )
 
-    # Assert: Expect 403 because HTTPBearer requires the Authorization header
+    # Assert
     assert response.status_code == 403
-    assert (
-        response.json()["detail"] == "Not authenticated"
-    )  # Default detail for HTTPBearer
+    assert response.json()["detail"] == "Not authenticated"

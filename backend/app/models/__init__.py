@@ -32,6 +32,6 @@ __all__ = [
     "Message",
     "Subscription",
     "User",
-    "WebhookEvent",
+    "Webhook",
     "EvolutionInstance",
 ]

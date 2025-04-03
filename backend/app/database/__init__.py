@@ -7,16 +7,10 @@ from typing import AsyncGenerator
 from app.config import get_settings
 
 settings = get_settings()
-
-DATABASE_URL = settings.DATABASE_URL
+DATABASE_URL = "postgresql+asyncpg://user:password@whatsapp_bot_db_dev:5432/chatbotdb"
 
 async_engine = create_async_engine(
     DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_pre_ping=True,
     echo=settings.DEBUG,
 )
 
@@ -27,7 +21,6 @@ AsyncSessionLocal = sessionmaker(
 Base = declarative_base()
 
 
-@asynccontextmanager
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Async context manager for database sessions.
@@ -47,7 +40,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         await db.close()
 
 
-def create_db_and_tables():
+def create_db_and_tables(url: str):
     """
     Creates the database and tables (synchronously).
     This function is intended for initialization purposes.
@@ -55,6 +48,6 @@ def create_db_and_tables():
     from sqlalchemy import create_engine
 
     engine = create_engine(
-        DATABASE_URL.replace("+asyncpg", "")
+        url.replace("+asyncpg", "")
     )  # Remova o asyncpg para usar a engine síncrona
     Base.metadata.create_all(engine)

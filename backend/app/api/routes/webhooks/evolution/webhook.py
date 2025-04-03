@@ -36,8 +36,20 @@ async def handle_evolution_webhook(
     handler = EVENT_HANDLERS.get(event_type, handle_unknown_event)
     try:
         await handler(platform_instance_id, payload, db)
-    except Exception as e:
-        logger.error(f"Error processing event {event_type} : {e}", exc_info=True)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    # 4. Acknowledge receipt to Evolution API
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except HTTPException as http_exc:
+        logger.warning(
+            f"Handler raised HTTPException: {http_exc.status_code} - {http_exc.detail}"
+        )
+        raise http_exc
+
+    except Exception as e:
+        # For unexpected errors, log and return a generic 500 error
+        logger.error(
+            f"Unexpected error processing event {event_type} : {e}", exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error processing webhook event.",
+        )

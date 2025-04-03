@@ -19,6 +19,8 @@ def parse_evolution_message(payload: Dict) -> Optional[Dict]:
         data = payload.get("data", {})
         instance_id = payload.get("instance", None)
         key = data.get("key", {})
+        if data.get("message") is None:
+            raise KeyError("No message provided in the body of the webhook")
         content = data.get("message", {}).get("conversation")
         source_id = key.get("id")
         remote_jid = key.get("remoteJid")
