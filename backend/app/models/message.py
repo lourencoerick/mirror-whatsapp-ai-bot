@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     DateTime,
+    text,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -19,13 +20,18 @@ from app.models.base import BaseModel
 class Message(BaseModel):
     __tablename__ = "messages"
     __table_args__ = (
-        Index("messages_account_id_index", "account_id"),
-        Index("messages_inbox_id_index", "inbox_id"),
-        Index("messages_conversation_id_index", "conversation_id"),
-        Index("messages_user_id_index", "user_id"),
-        Index("messages_source_id_index", "source_id"),
-        Index("messages_contact_id_index", "contact_id"),
-        Index("messages_sent_at_index", "sent_at"),
+        Index("idx_messages_account_id_index", "account_id"),
+        Index("idx_messages_inbox_id_index", "inbox_id"),
+        Index("idx_messages_conversation_id_index", "conversation_id"),
+        Index("idx_messages_user_id_index", "user_id"),
+        Index("idx_messages_source_id_index", "source_id"),
+        Index("idx_messages_contact_id_index", "contact_id"),
+        Index("idx_messages_sent_at_index", "sent_at"),
+        Index(
+            "ix_messages_content_gin_trgm",
+            text("(content) gin_trgm_ops"),
+            postgresql_using="gin",
+        ),
     )
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
