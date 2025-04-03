@@ -30,9 +30,8 @@ class RedisQueue(IQueue):
 
     def __init__(self, queue_name: str = "messages"):
         self.queue_name = queue_name
-        self.redis: Optional[redis.Redis] = None  # Redis client
-        self.is_connected = False  # Indicate if redis is connected
-        asyncio.create_task(self.connect())
+        self.redis: Optional[redis.Redis] = None
+        self.is_connected = False
         logger.debug(
             f"[RedisQueue] Connecting to Redis at {settings.REDIS_HOST}:{settings.REDIS_PORT}"
         )
@@ -58,7 +57,6 @@ class RedisQueue(IQueue):
             logger.error(
                 f"[RedisQueue] Failed to connect to Redis at {settings.REDIS_HOST}:{settings.REDIS_PORT} - {e}"
             )
-            asyncio.create_task(self.reconnect())
 
     async def reconnect(self, delay=5):
         """
@@ -74,9 +72,13 @@ class RedisQueue(IQueue):
         """Push a message to the Redis queue."""
         if not self.is_connected or self.redis is None:
             logger.warning(
-                "[RedisQueue] Not connected to Redis. Message enqueue failed."
+                "[RedisQueue] Not connected to Redis. Attempting to connect."
             )
-            return
+            await self.connect()
+            if not self.is_connected:
+                logger.error("[RedisQueue] Failed to connect, enqueue aborted.")
+                return
+
         serialized = json.dumps(message, default=default_converter)
         try:
             await self.redis.lpush(self.queue_name, serialized)
@@ -84,15 +86,22 @@ class RedisQueue(IQueue):
         except redis.exceptions.ConnectionError as e:
             self.is_connected = False
             logger.error(f"[RedisQueue] Connection error during enqueue: {e}")
-            asyncio.create_task(self.reconnect())
+
+            await self.reconnect()
+            if not self.is_connected:
+                logger.error("[RedisQueue] Failed to reconnect, enqueue aborted.")
+                return
 
     async def dequeue(self) -> Optional[dict]:
         """Pop a message from the queue (FIFO) using BLPOP with a timeout."""
         if not self.is_connected or self.redis is None:
             logger.warning(
-                "[RedisQueue] Not connected to Redis. Message dequeue failed."
+                "[RedisQueue] Not connected to Redis. Attempting to connect."
             )
-            return None
+            await self.connect()
+            if not self.is_connected:
+                logger.error("[RedisQueue] Failed to connect, dequeue aborted.")
+                return None
 
         try:
             result = await self.redis.blpop(self.queue_name, timeout=1)  # Use BLPOP
@@ -100,7 +109,7 @@ class RedisQueue(IQueue):
                 logger.debug("[RedisQueue] Queue is empty.")
                 return None
 
-            _, raw = result  # result is a tuple (queue_name, value)
+            _, raw = result
             deserialized = json.loads(raw)
             logger.debug(f"[RedisQueue] Dequeued message: {deserialized}")
             return deserialized
@@ -112,8 +121,10 @@ class RedisQueue(IQueue):
         except redis.exceptions.ConnectionError as e:
             self.is_connected = False
             logger.error(f"[RedisQueue] Connection error during dequeue: {e}")
-            asyncio.create_task(self.reconnect())
-            return None
+            await self.reconnect()
+            if not self.is_connected:
+                logger.error("[RedisQueue] Failed to reconnect, dequeue aborted.")
+                return None
         except Exception as e:
             logger.error(f"[RedisQueue] An unexpected error occurred: {e}")
             return None
@@ -122,14 +133,18 @@ class RedisQueue(IQueue):
         """Clear all items from the queue."""
         if not self.is_connected or self.redis is None:
             logger.warning("[RedisQueue] Not connected to Redis. Clear queue failed.")
-            return
+            await self.connect()
+            if not self.is_connected:
+                logger.error("[RedisQueue] Failed to connect, clear aborted.")
+                return
+
         try:
             await self.redis.delete(self.queue_name)
             logger.info(f"[RedisQueue] Queue '{self.queue_name}' cleared.")
         except redis.exceptions.ConnectionError as e:
             self.is_connected = False
             logger.error(f"[RedisQueue] Connection error during clear: {e}")
-            asyncio.create_task(self.reconnect())
+            await self.reconnect()
 
     async def close(self):
         """
@@ -137,7 +152,7 @@ class RedisQueue(IQueue):
         """
         if self.redis:
             await self.redis.close()
-            # Desconecta o pool de conexões
+
             await self.redis.connection_pool.disconnect()
         self.is_connected = False
         logger.info("[RedisQueue] Connection to Redis closed.")
