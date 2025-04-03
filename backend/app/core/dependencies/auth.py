@@ -1,9 +1,7 @@
 from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import (
-    Session,
-    selectinload,
-)  # Import selectinload para eager loading
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
+from sqlalchemy.orm import selectinload
 from loguru import logger
 
 from app.models.user import User
@@ -18,23 +16,31 @@ class AuthContext:
     """Holds the authenticated internal user and their active account."""
 
     def __init__(self, internal_user: User, active_account: Account):
+        """init
+
+        Args:
+            internal_user (User): internal_user
+            active_account (Account): active_account
+        """
         self.user: User = internal_user
         self.account: Account = active_account
 
 
 # --- Função de Dependência ---
-def get_auth_context(
+async def get_auth_context(
     payload: dict = Depends(verify_clerk_token),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),  # Inject the database session
 ) -> AuthContext:
     """
     FastAPI dependency to retrieve the internal User and active Account
-    based on the validated Clerk JWT payload.
+    based on the validated Clerk JWT payload.  Also sets the RLS context.
 
     Raises:
         HTTPException(401): If the 'sub' claim is missing in the token.
         HTTPException(403): If the user is not found in the internal DB
                             or is not associated with any account.
+        HTTPException(500): If there's a database error or RLS context setting fails.
+
     Returns:
         AuthContext: An object containing the internal User and active Account.
     """
@@ -54,7 +60,9 @@ def get_auth_context(
             .options(selectinload(User.account_users).selectinload(AccountUser.account))
             .where(User.provider == "clerk", User.uid == clerk_sub)
         )
-        user = db.execute(stmt).scalars().first()
+
+        result = await db.execute(stmt)
+        user = result.scalars().first()
 
         if not user:
             logger.error(
@@ -97,19 +105,20 @@ def get_auth_context(
 
         if active_account and active_account.id:
             try:
-                db.execute(
-                    text("SET LOCAL my.app.account_id = :account_id"),
-                    {"account_id": str(active_account.id)},
-                )
+                stmt = text(f"SET LOCAL my.app.account_id = '{str(active_account.id)}'")
+                await db.execute(stmt)
                 logger.debug(
                     f"[RLS] SET LOCAL my.app.account_id = {active_account.id} (via get_auth_context)"
                 )
+
             except Exception as rls_error:
                 logger.exception(
                     f"[RLS] Failed to set account_id {active_account.id} in get_auth_context"
                 )
+                await db.rollback()  # Rollback the transaction
                 raise HTTPException(
-                    status_code=500, detail="Failed to set security context"
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to set security context",
                 ) from rls_error
         else:
             pass

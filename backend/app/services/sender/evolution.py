@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 from loguru import logger
 from tenacity import (
@@ -20,7 +21,7 @@ settings = get_settings()
     retry=retry_if_exception_type(httpx.RequestError),
     reraise=True,
 )
-def send_message(message: Message, inbox: Inbox) -> dict:
+async def send_message(message: Message, inbox: Inbox) -> dict:
     """
     Sends a text message using the Evolution API via HTTPX.
     Retries up to 3 times in case of connection-level failures.
@@ -29,6 +30,7 @@ def send_message(message: Message, inbox: Inbox) -> dict:
         message (Message): Must contain:
             - number (str): Recipient phone number
             - text (str): Message content
+        inbox (Inbox): Inbox to send message from
     """
     try:
         logger.debug(f"Inbox: {inbox}")
@@ -51,7 +53,8 @@ def send_message(message: Message, inbox: Inbox) -> dict:
             f"[evolution_sender] Sending messsa to : {url}\npayload: {payload}\nheaders: {headers}"
         )
 
-        response = httpx.post(url, json=payload, headers=headers, timeout=10)
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
 
         logger.info(

@@ -21,6 +21,9 @@ services:
       redis:
         condition: service_started
 
+    ports:
+      - "8000:8000"        
+
   database:
     image: postgres:17.3-alpine
     container_name: whatsapp_bot_db_dev

@@ -69,6 +69,7 @@ def run_migrations_online() -> None:
 
     """
     url = config.get_main_option("sqlalchemy.url")
+    url = os.path.expandvars(url).replace("asyncpg", "psycopg2")
     config.set_main_option("sqlalchemy.url", os.path.expandvars(url))
 
     connectable = engine_from_config(

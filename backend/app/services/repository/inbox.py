@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from typing import Optional, List, Dict, Any
 from loguru import logger
@@ -9,14 +9,14 @@ from app.models.inbox_member import InboxMember
 from app.api.schemas.inbox import InboxCreate, InboxUpdate
 
 
-def find_inbox_by_id_and_account(  # Renomeada e account_id obrigatório
-    db: Session, *, inbox_id: UUID, account_id: UUID
+async def find_inbox_by_id_and_account(
+    db: AsyncSession, *, inbox_id: UUID, account_id: UUID
 ) -> Optional[Inbox]:
     """
     Finds a specific inbox by its ID, ensuring it belongs to the given account.
 
     Args:
-        db: Database session.
+        db: Asynchronous database session.
         inbox_id: The ID of the inbox to find.
         account_id: The ID of the account that must own the inbox.
 
@@ -24,11 +24,10 @@ def find_inbox_by_id_and_account(  # Renomeada e account_id obrigatório
         The Inbox object if found and authorized, otherwise None.
     """
     logger.debug(f"[InboxRepo] Finding inbox by ID={inbox_id} for Account={account_id}")
-    inbox = (
-        db.query(Inbox)
-        .filter(Inbox.id == inbox_id, Inbox.account_id == account_id)
-        .first()
+    result = await db.execute(
+        select(Inbox).filter(Inbox.id == inbox_id, Inbox.account_id == account_id)
     )
+    inbox = result.scalar_one_or_none()
 
     if not inbox:
         logger.warning(
@@ -37,8 +36,8 @@ def find_inbox_by_id_and_account(  # Renomeada e account_id obrigatório
     return inbox
 
 
-def find_inbox_by_channel_id(
-    db: Session, *, account_id: UUID, channel_id: str
+async def find_inbox_by_channel_id(
+    db: AsyncSession, *, account_id: UUID, channel_id: str
 ) -> Optional[Inbox]:
     """
     Retrieve an inbox by channel_id and account_id.
@@ -46,9 +45,10 @@ def find_inbox_by_channel_id(
     logger.debug(
         f"[InboxRepo] Finding inbox by ChannelID={channel_id} for Account={account_id}"
     )
-    inbox = (
-        db.query(Inbox).filter_by(account_id=account_id, channel_id=channel_id).first()
+    result = await db.execute(
+        select(Inbox).filter_by(account_id=account_id, channel_id=channel_id)
     )
+    inbox = result.scalar_one_or_none()
 
     if inbox:
         logger.debug(
@@ -61,14 +61,14 @@ def find_inbox_by_channel_id(
     return inbox
 
 
-def find_inboxes_by_account(
-    db: Session, *, account_id: UUID, limit: int = 100, offset: int = 0
+async def find_inboxes_by_account(
+    db: AsyncSession, *, account_id: UUID, limit: int = 100, offset: int = 0
 ) -> List[Inbox]:
     """
     Retrieves all inboxes belonging to a specific account with pagination.
 
     Args:
-        db: Database session.
+        db: Asynchronous database session.
         account_id: The ID of the account whose inboxes to retrieve.
         limit: Maximum number of inboxes to return.
         offset: Number of inboxes to skip.
@@ -79,20 +79,20 @@ def find_inboxes_by_account(
     logger.debug(
         f"[InboxRepo] Finding all inboxes for Account={account_id} (limit={limit}, offset={offset})"
     )
-    inboxes = (
-        db.query(Inbox)
+    result = await db.execute(
+        select(Inbox)
         .filter(Inbox.account_id == account_id)
         .order_by(Inbox.name)
         .limit(limit)
         .offset(offset)
-        .all()
     )
+    inboxes = result.scalars().all()
     logger.info(f"[InboxRepo] Found {len(inboxes)} inboxes for Account={account_id}")
     return inboxes
 
 
-def find_inboxes_by_user_membership(  # Renomeada de find_all_by_user para clareza
-    db: Session, *, user_id: UUID, account_id: UUID
+async def find_inboxes_by_user_membership(
+    db: AsyncSession, *, user_id: UUID, account_id: UUID
 ) -> List[Inbox]:
     """
     Fetch all inboxes within a specific account where the user is a member.
@@ -100,31 +100,32 @@ def find_inboxes_by_user_membership(  # Renomeada de find_all_by_user para clare
     logger.debug(
         f"[InboxRepo] Finding inboxes for User={user_id} in Account={account_id} via membership"
     )
-    inboxes = (
-        db.query(Inbox)
+    result = await db.execute(
+        select(Inbox)
         .join(InboxMember, Inbox.id == InboxMember.inbox_id)
         .filter(
             InboxMember.user_id == user_id,
             Inbox.account_id == account_id,
         )
         .order_by(Inbox.name)
-        .all()
     )
+    inboxes = result.scalars().all()
     logger.info(
         f"[InboxRepo] Found {len(inboxes)} inboxes for User={user_id} via membership in Account={account_id}"
     )
     return inboxes
 
 
-def create_inbox(
-    db: Session, *, account_id: UUID, user_id: UUID, inbox_data: InboxCreate
+async def create_inbox(
+    db: AsyncSession, *, account_id: UUID, user_id: UUID, inbox_data: InboxCreate
 ) -> Inbox:
     """
     Creates a new inbox for the specified account.
 
     Args:
-        db: Database session.
+        db: Asynchronous database session.
         account_id: The ID of the account to associate the inbox with.
+        user_id: The ID of the user creating the inbox (for InboxMember).
         inbox_data: Pydantic schema containing the inbox creation data.
 
     Returns:
@@ -136,31 +137,32 @@ def create_inbox(
     new_inbox = Inbox(
         **inbox_data.model_dump(exclude_unset=True),
         account_id=account_id,
-        # TODO: Define how channel_id is truly generated or set
-        channel_id=inbox_data.channel_details["id"],
+        channel_id=inbox_data.channel_details["id"],  # type: ignore
     )
     db.add(new_inbox)
-    db.flush()
+    await db.flush()
     inbox_member = InboxMember(user_id=user_id, inbox_id=new_inbox.id)
     db.add(inbox_member)
     try:
-        db.commit()
-        db.refresh(new_inbox)
-        db.refresh(inbox_member)
+        await db.commit()
+        await db.refresh(new_inbox)
+        await db.refresh(inbox_member)
         logger.info(f"[InboxRepo] Successfully created Inbox ID={new_inbox.id}")
         return new_inbox
     except Exception as e:
         logger.exception(f"[InboxRepo] Failed to create inbox for Account={account_id}")
-        db.rollback()
+        await db.rollback()
         raise
 
 
-def update_inbox(db: Session, *, inbox: Inbox, update_data: InboxUpdate) -> Inbox:
+async def update_inbox(
+    db: AsyncSession, *, inbox: Inbox, update_data: InboxUpdate
+) -> Inbox:
     """
     Updates an existing inbox with new data.
 
     Args:
-        db: Database session.
+        db: Asynchronous database session.
         inbox: The existing Inbox object to update (must be fetched first).
         update_data: Pydantic schema containing the fields to update.
 
@@ -180,23 +182,22 @@ def update_inbox(db: Session, *, inbox: Inbox, update_data: InboxUpdate) -> Inbo
         setattr(inbox, key, value)
 
     try:
-        db.add(inbox)
-        db.commit()
-        db.refresh(inbox)
+        await db.commit()
+        await db.refresh(inbox)
         logger.info(f"[InboxRepo] Successfully updated Inbox ID={inbox.id}")
         return inbox
     except Exception as e:
         logger.exception(f"[InboxRepo] Failed to update Inbox ID={inbox.id}")
-        db.rollback()
+        await db.rollback()
         raise
 
 
-def delete_inbox(db: Session, *, inbox: Inbox) -> bool:
+async def delete_inbox(db: AsyncSession, *, inbox: Inbox) -> bool:
     """
     Deletes an existing inbox.
 
     Args:
-        db: Database session.
+        db: Asynchronous database session.
         inbox: The existing Inbox object to delete (must be fetched first).
 
     Returns:
@@ -205,11 +206,11 @@ def delete_inbox(db: Session, *, inbox: Inbox) -> bool:
     inbox_id = inbox.id
     logger.warning(f"[InboxRepo] Attempting to delete Inbox ID={inbox_id}")
     try:
-        db.delete(inbox)
-        db.commit()
+        await db.delete(inbox)
+        await db.commit()
         logger.info(f"[InboxRepo] Successfully deleted Inbox ID={inbox_id}")
         return True
     except Exception as e:
         logger.exception(f"[InboxRepo] Failed to delete Inbox ID={inbox_id}")
-        db.rollback()
+        await db.rollback()
         raise

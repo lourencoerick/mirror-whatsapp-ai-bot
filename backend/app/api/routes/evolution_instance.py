@@ -2,8 +2,8 @@ import uuid
 import secrets
 from loguru import logger
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.core.security import encrypt_logical_token, decrypt_logical_token
@@ -33,13 +33,14 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
 )
 async def create_evolution_instance(
-    db: Session = Depends(get_db), auth_context: AuthContext = Depends(get_auth_context)
+    db: AsyncSession = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
 ) -> EvolutionInstance:
     """
     Handles the request to create a logical Evolution API instance associated with the authenticated account.
 
     Args:
-        db (Session): The database session dependency.
+        db (AsyncSession): The database session dependency.
         auth_context (AuthContext): The authentication context containing account information.
 
     Returns:
@@ -107,8 +108,8 @@ async def create_evolution_instance(
             f"[Account: {account_id}] [Instance: {platform_instance_id}] Adding EvolutionInstance to DB with status PENDING."
         )
         db.add(evolution_instance)
-        db.commit()
-        db.refresh(evolution_instance)
+        await db.commit()
+        await db.refresh(evolution_instance)
         logger.info(
             f"[Account: {account_id}] [Instance: {platform_instance_id}] Successfully saved EvolutionInstance with PENDING status."
         )
@@ -117,7 +118,7 @@ async def create_evolution_instance(
             f"[Account: {account_id}] [Instance: {platform_instance_id}] Failed to save initial EvolutionInstance to DB. Error: {e}",
             exc_info=True,
         )
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save instance state",
@@ -142,8 +143,8 @@ async def create_evolution_instance(
 
         evolution_instance.status = EvolutionInstanceStatus.CREATED
         db.add(evolution_instance)
-        db.commit()
-        db.refresh(evolution_instance)
+        await db.commit()
+        await db.refresh(evolution_instance)
         logger.info(
             f"[Account: {account_id}] [Instance: {platform_instance_id}] Instance status successfully updated to CREATED in DB."
         )
@@ -169,8 +170,8 @@ async def create_evolution_instance(
             )
             evolution_instance.status = EvolutionInstanceStatus.ERROR
             db.add(evolution_instance)
-            db.commit()
-            db.refresh(evolution_instance)
+            await db.commit()
+            await db.refresh(evolution_instance)
             logger.info(
                 f"[Account: {account_id}] [Instance: {platform_instance_id}] Instance status successfully updated to ERROR in DB."
             )
@@ -180,7 +181,7 @@ async def create_evolution_instance(
                 f"after external service failure. DB Error: {db_error}",
                 exc_info=True,
             )
-            db.rollback()
+            await db.rollback()
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -199,7 +200,7 @@ async def create_evolution_instance(
 )
 async def get_evolution_instance_qrcode(
     platform_instance_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> EvolutionInstanceQRCodeResponse:
     """
@@ -208,7 +209,7 @@ async def get_evolution_instance_qrcode(
 
     Args:
         platform_instance_id (uuid.UUID): The unique identifier of the Evolution instance.
-        db (Session): The database session dependency.
+        db (AsyncSession): The database session dependency.
         auth_context (AuthContext): The authentication context containing account information.
 
     Returns:
@@ -232,14 +233,13 @@ async def get_evolution_instance_qrcode(
         logger.debug(
             f"[Account: {account_id}] [Instance: {platform_instance_id}] Querying database for instance."
         )
-        evolution_instance = (
-            db.query(EvolutionInstance)
-            .filter(
+        result = await db.execute(
+            select(EvolutionInstance).filter(
                 EvolutionInstance.id == platform_instance_id,
                 EvolutionInstance.account_id == account_id,
             )
-            .first()
         )
+        evolution_instance = result.scalar_one_or_none()
     except Exception as e:
         logger.error(
             f"[Account: {account_id}] [Instance: {platform_instance_id}] Database query failed. Error: {e}",

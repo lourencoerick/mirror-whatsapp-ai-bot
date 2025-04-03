@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 from loguru import logger
@@ -13,9 +13,9 @@ router = APIRouter(prefix="", tags=["v1 - Inboxes"])
 
 
 @router.get("/inboxes", response_model=List[InboxResponse])
-def list_account_inboxes(
+async def list_account_inboxes(
     auth_context: AuthContext = Depends(get_auth_context),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = 100,
     offset: int = 0,
 ):
@@ -25,7 +25,7 @@ def list_account_inboxes(
     account_id = auth_context.account.id
     logger.info(f"Received request to list inboxes for Account={account_id}")
 
-    inboxes = inbox_repo.find_inboxes_by_account(
+    inboxes = await inbox_repo.find_inboxes_by_account(
         db=db, account_id=account_id, limit=limit, offset=offset
     )
     logger.info(f"Found {len(inboxes)} inboxes for account {account_id}")
@@ -36,10 +36,10 @@ def list_account_inboxes(
 @router.post(
     "/inboxes", response_model=InboxResponse, status_code=status.HTTP_201_CREATED
 )
-def create_new_inbox(
+async def create_new_inbox(
     inbox_data: InboxCreate,
     auth_context: AuthContext = Depends(get_auth_context),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Creates a new inbox for the authenticated user's account."""
     account_id = auth_context.account.id
@@ -49,7 +49,7 @@ def create_new_inbox(
     )
     try:
         # Automatically associate the inbox to the user creator
-        new_inbox = inbox_repo.create_inbox(
+        new_inbox = await inbox_repo.create_inbox(
             db=db, account_id=account_id, user_id=user_id, inbox_data=inbox_data
         )
 
@@ -64,15 +64,15 @@ def create_new_inbox(
 
 # --- READ (Single) ---
 @router.get("/inboxes/{inbox_id}", response_model=InboxResponse)
-def get_single_inbox(
+async def get_single_inbox(
     inbox_id: UUID,
     auth_context: AuthContext = Depends(get_auth_context),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Retrieves a specific inbox by ID, ensuring it belongs to the user's account."""
     account_id = auth_context.account.id
     logger.info(f"Received request to get Inbox ID={inbox_id} for Account={account_id}")
-    inbox = inbox_repo.find_inbox_by_id_and_account(
+    inbox = await inbox_repo.find_inbox_by_id_and_account(
         db=db, inbox_id=inbox_id, account_id=account_id
     )
     if not inbox:
@@ -88,18 +88,18 @@ def get_single_inbox(
 
 # --- UPDATE ---
 @router.put("/inboxes/{inbox_id}", response_model=InboxResponse)
-def update_existing_inbox(
+async def update_existing_inbox(
     inbox_id: UUID,
     update_data: InboxUpdate,
     auth_context: AuthContext = Depends(get_auth_context),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Updates an existing inbox. Ensures the inbox belongs to the user's account."""
     account_id = auth_context.account.id
     logger.info(
         f"Received request to update Inbox ID={inbox_id} for Account={account_id}"
     )
-    inbox_to_update = inbox_repo.find_inbox_by_id_and_account(
+    inbox_to_update = await inbox_repo.find_inbox_by_id_and_account(
         db=db, inbox_id=inbox_id, account_id=account_id
     )
     if not inbox_to_update:
@@ -111,7 +111,7 @@ def update_existing_inbox(
             detail="Inbox not found or not accessible",
         )
     try:
-        updated_inbox = inbox_repo.update_inbox(
+        updated_inbox = await inbox_repo.update_inbox(
             db=db, inbox=inbox_to_update, update_data=update_data
         )
         return updated_inbox
@@ -127,17 +127,17 @@ def update_existing_inbox(
 
 # --- DELETE ---
 @router.delete("/inboxes/{inbox_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_existing_inbox(
+async def delete_existing_inbox(
     inbox_id: UUID,
     auth_context: AuthContext = Depends(get_auth_context),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Deletes an existing inbox, ensuring it belongs to the user's account."""
     account_id = auth_context.account.id
     logger.info(
         f"Received request to delete Inbox ID={inbox_id} for Account={account_id}"
     )
-    inbox_to_delete = inbox_repo.find_inbox_by_id_and_account(
+    inbox_to_delete = await inbox_repo.find_inbox_by_id_and_account(
         db=db, inbox_id=inbox_id, account_id=account_id
     )
     if not inbox_to_delete:
@@ -149,7 +149,7 @@ def delete_existing_inbox(
             detail="Inbox not found or not accessible",
         )
     try:
-        success = inbox_repo.delete_inbox(db=db, inbox=inbox_to_delete)
+        success = await inbox_repo.delete_inbox(db=db, inbox=inbox_to_delete)
         if not success:
             raise HTTPException(status_code=500, detail="Deletion failed.")
         return None

@@ -1,8 +1,9 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Body
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict
 from loguru import logger
+
 from app.database import get_db
 from app.api.schemas.webhooks.evolution import EvolutionWebhookPayload
 from app.api.routes.webhooks.evolution.event_handler import (
@@ -21,7 +22,7 @@ router = APIRouter()
 async def handle_evolution_webhook(
     platform_instance_id: uuid.UUID,
     payload: EvolutionWebhookPayload = Body(...),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Handles incoming webhook events from the Evolution API server.

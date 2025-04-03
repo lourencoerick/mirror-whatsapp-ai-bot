@@ -1,8 +1,8 @@
 from uuid import UUID
 from typing import Callable, Coroutine, Any, Dict
 from fastapi import HTTPException, Depends, status
-from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text, select
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -22,15 +22,18 @@ from app.services.parser.parse_webhook_to_message import parse_webhook_to_messag
 
 
 async def handle_connection_update(
-    instance_id: UUID, payload: EvolutionWebhookPayload, db: Session = Depends(get_db)
+    instance_id: UUID,
+    payload: EvolutionWebhookPayload,
+    db: AsyncSession = Depends(get_db),
 ) -> None:
     """
     Handles the 'connection.update' event.
     Updates the instance status in the database and notifies the frontend via WebSocket.
     """
-    evolution_instance = (
-        db.query(EvolutionInstance).filter(EvolutionInstance.id == instance_id).first()
+    result = await db.execute(
+        select(EvolutionInstance).filter(EvolutionInstance.id == instance_id)
     )
+    evolution_instance = result.scalars().first()
 
     if not evolution_instance:
         logger.error(f"Received connection.update for unknown instance {instance_id}.")
@@ -49,7 +52,7 @@ async def handle_connection_update(
             )
             evolution_instance.status = "CONNECTED"
             db.add(evolution_instance)
-            db.commit()
+            await db.commit()
             try:
                 await publish_to_instance_ws(
                     str(instance_id),
@@ -73,7 +76,7 @@ async def handle_connection_update(
             )
             evolution_instance.status = "DISCONNECTED"
             db.add(evolution_instance)
-            db.commit()
+            await db.commit()
             try:
                 await publish_to_instance_ws(
                     str(instance_id),
@@ -99,7 +102,9 @@ async def handle_connection_update(
 
 
 async def handle_message(
-    instance_id: UUID, payload: EvolutionWebhookPayload, db: Session = Depends(get_db)
+    instance_id: UUID,
+    payload: EvolutionWebhookPayload,
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     Webhook to handle messages from Evolution API (unofficial WhatsApp).
@@ -116,7 +121,7 @@ async def handle_message(
         logger.info(f"[webhook] Instance: {instance_id}, event {event} ")
         # instance_id = payload.data.instanceId if payload.data else None
 
-        account_id = find_account_id_from_source(str(instance_id), db)
+        account_id = await find_account_id_from_source(str(instance_id), db)
 
         logger.info(f"[webhook] Account {account_id}, event {event} ")
         if not account_id:
@@ -141,7 +146,7 @@ async def handle_message(
         #     e = HTTPException(status_code=500, detail="Database error")
         #     raise e from e
 
-        message = parse_webhook_to_message(
+        message = await parse_webhook_to_message(
             db=db, account_id=account_id, payload=payload.model_dump()
         )
 
@@ -150,7 +155,7 @@ async def handle_message(
             logger.error(f"[webhook] {e}")
             raise e
 
-        queue.enqueue(message)
+        await queue.enqueue(message)
         logger.info(f"[webhook] Enqueued Evolution message: {message.get('source_id')}")
 
         return {"status": "message enqueued", "source_id": message.get("source_id")}
@@ -166,7 +171,9 @@ async def handle_message(
 
 
 async def handle_unknown_event(
-    instance_id: UUID, payload: EvolutionWebhookPayload, db: Session = Depends(get_db)
+    instance_id: UUID,
+    payload: EvolutionWebhookPayload,
+    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """
     Handles unknown event types.
@@ -181,7 +188,7 @@ async def handle_unknown_event(
 EVENT_HANDLERS: Dict[
     str,
     Callable[
-        [UUID, EvolutionWebhookPayload, Session],
+        [UUID, EvolutionWebhookPayload, AsyncSession],
         Coroutine[Any, Any, Dict[str, Any]],
     ],
 ] = {

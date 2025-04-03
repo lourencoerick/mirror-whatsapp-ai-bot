@@ -1,14 +1,14 @@
 from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from datetime import datetime, timezone
 from loguru import logger
 
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
-from app.services.queue.publisher import publish_message_to_queue
+from app.services.queue.redis_queue import RedisQueue
 from app.api.schemas.message import MessageResponse, MessageCreatePayload, MessageCreate
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
@@ -22,16 +22,17 @@ from app.services.helper.websocket import (
 )
 
 router = APIRouter()
+queue = RedisQueue(queue_name="response_queue")
 
 
 @router.get(
     "/conversations/{conversation_id}/messages", response_model=List[MessageResponse]
 )
-def get_messages(
+async def get_messages(
     conversation_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
     """
@@ -41,14 +42,14 @@ def get_messages(
         conversation_id (UUID): ID of the conversation.
         limit (int): Max number of messages to return (default: 20).
         offset (int): Number of messages to skip for pagination (default: 0).
-        db (Session): Injected database session.
+        db (AsyncSession): Injected database session.
 
     Returns:
         List[MessageResponse]: List of messages for the given conversation.
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
-    return message_repo.find_messages_by_conversation(
+    return await message_repo.find_messages_by_conversation(
         db=db,
         conversation_id=conversation_id,
         limit=limit,
@@ -65,7 +66,7 @@ def get_messages(
 async def create_outgoing_message(
     conversation_id: UUID,
     payload: MessageCreatePayload,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
     """
@@ -79,14 +80,14 @@ async def create_outgoing_message(
     Args:
         conversation_id (UUID): The target conversation ID.
         payload (MessageCreatePayload): The message content from the frontend.
-        db (Session): Database session.
+        db (AsyncSession): Database session.
 
     Returns:
         MessageResponse: The message after being saved and optionally sent.
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
-    conversation = conversation_repo.find_by_id(
+    conversation = await conversation_repo.find_conversation_by_id(
         db, conversation_id=conversation_id, account_id=account_id
     )
     if not conversation:
@@ -114,13 +115,15 @@ async def create_outgoing_message(
     )
 
     # Create or reuse message
-    message = message_repo.get_or_create_message(db, message_data)
+    message = await message_repo.get_or_create_message(db, message_data)
 
     # Update last message in the conversation
     if message:
         if conversation:
-            update_last_message_snapshot(
-                db=db, conversation=conversation, message=message
+            await update_last_message_snapshot(
+                db=db,
+                conversation=conversation,
+                message=message,
             )
         else:
             logger.warning(
@@ -128,7 +131,7 @@ async def create_outgoing_message(
             )
 
     try:
-        publish_message_to_queue(message_id=message.id, queue_name="response_queue")
+        await queue.enqueue({"message_id": message.id})
         logger.debug(f"[queue] Message {message.id} enqueued for delivery")
     except Exception as e:
         logger.warning(f"[queue] Failed to enqueue message {message.id}: {e}")

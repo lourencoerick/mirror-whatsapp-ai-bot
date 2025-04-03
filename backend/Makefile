@@ -67,3 +67,5 @@ db-reset: ## Reset database
 
 
 	
+generate-secret: ## Generate Secret Key
+	openssl rand -base64 32

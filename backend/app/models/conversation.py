@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
@@ -43,7 +44,12 @@ class Conversation(BaseModel):
     agent_last_seen_at = Column(DateTime, nullable=True)
     locked = Column(Boolean, nullable=True)
 
-    last_message_at = Column(DateTime, nullable=True, index=True)
+    last_message_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
     additional_attributes = Column(
         MutableDict.as_mutable(JSON), default=dict, nullable=True
     )
