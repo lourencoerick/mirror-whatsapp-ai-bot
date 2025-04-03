@@ -7,7 +7,6 @@ from typing import AsyncGenerator
 from app.config import get_settings
 
 settings = get_settings()
-print(settings.DATABASE_URL)
 DATABASE_URL = "postgresql+asyncpg://user:password@whatsapp_bot_db_dev:5432/chatbotdb"
 
 async_engine = create_async_engine(
