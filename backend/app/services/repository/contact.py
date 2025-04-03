@@ -8,6 +8,36 @@ from app.models.contact_inbox import ContactInbox
 from sqlalchemy import select
 
 
+async def find_contact_by_id(
+    db: AsyncSession, account_id: UUID, contact_id: str
+) -> Optional[Contact]:
+    """Finds a contact by phone number.
+
+    Args:
+        db (AsyncSession): Database session.
+        account_id (UUID): The ID of the account.
+        contact_id (UUID): The contact ID.
+
+    Returns:
+        Optional[Contact]: The Contact object if found, otherwise None.
+    """
+    if not all([account_id, contact_id]):
+        logger.warning("[contact] Missing required parameters for lookup")
+        return None
+
+    result = await db.execute(
+        select(Contact).filter_by(account_id=account_id, id=contact_id)
+    )
+    contact = result.scalar_one_or_none()
+
+    if contact:
+        logger.debug(f"[contact] Found contact (id={contact.id})")
+    else:
+        logger.info(f"[contact] No contact found {contact_id}")
+
+    return contact
+
+
 async def find_contact_by_phone(
     db: AsyncSession, account_id: UUID, phone_number: str
 ) -> Optional[Contact]:

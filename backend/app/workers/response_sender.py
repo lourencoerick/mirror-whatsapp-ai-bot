@@ -31,7 +31,7 @@ class ResponseSender:
         and attempts delivery to the external provider.
         """
         try:
-            payload = await asyncio.to_thread(self.queue.dequeue)
+            payload = await self.queue.dequeue()
             if not payload:
                 return
 
@@ -58,8 +58,14 @@ class ResponseSender:
     async def run(self):
         """
         Starts the infinite loop to consume and process messages from the queue.
+        Waits until the Redis connection is established before starting.
         """
         logger.info("[sender] Listening for messages to send...")
+
+        # Wait until the Redis connection is established
+        while not self.queue.is_connected:
+            logger.info("[sender] Waiting for Redis connection to be established...")
+            await asyncio.sleep(1)
 
         while True:
             await self._process_one_message()
@@ -77,6 +83,8 @@ class ResponseSender:
         if not message:
             logger.warning(f"[sender] Message ID {message_id} not found in database")
             return
+
+        await db.refresh(message, attribute_names=["contact", "inbox"])
 
         try:
             response = await evolution_send_message(
@@ -102,7 +110,9 @@ class ResponseSender:
 
 
 async def main():
-    """main function"""
+    """
+    Main function to start the response sender.
+    """
     sender = ResponseSender()
     await sender.run()
 

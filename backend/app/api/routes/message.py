@@ -8,7 +8,7 @@ from loguru import logger
 
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
-from app.services.queue.publisher import publish_message_to_queue
+from app.services.queue.redis_queue import RedisQueue
 from app.api.schemas.message import MessageResponse, MessageCreatePayload, MessageCreate
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
@@ -22,6 +22,7 @@ from app.services.helper.websocket import (
 )
 
 router = APIRouter()
+queue = RedisQueue(queue_name="response_queue")
 
 
 @router.get(
@@ -116,14 +117,13 @@ async def create_outgoing_message(
     # Create or reuse message
     message = await message_repo.get_or_create_message(db, message_data)
 
-    # Forces the loading of the 'contact' relationship to avoid lazy loading outside the context
-    await db.refresh(message, attribute_names=["contact"])
-
     # Update last message in the conversation
     if message:
         if conversation:
             await update_last_message_snapshot(
-                db=db, conversation=conversation, message=message
+                db=db,
+                conversation=conversation,
+                message=message,
             )
         else:
             logger.warning(
@@ -131,7 +131,7 @@ async def create_outgoing_message(
             )
 
     try:
-        publish_message_to_queue(message_id=message.id, queue_name="response_queue")
+        await queue.enqueue({"message_id": message.id})
         logger.debug(f"[queue] Message {message.id} enqueued for delivery")
     except Exception as e:
         logger.warning(f"[queue] Failed to enqueue message {message.id}: {e}")

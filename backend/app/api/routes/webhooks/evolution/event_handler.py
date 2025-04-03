@@ -155,7 +155,7 @@ async def handle_message(
             logger.error(f"[webhook] {e}")
             raise e
 
-        queue.enqueue(message)
+        await queue.enqueue(message)
         logger.info(f"[webhook] Enqueued Evolution message: {message.get('source_id')}")
 
         return {"status": "message enqueued", "source_id": message.get("source_id")}

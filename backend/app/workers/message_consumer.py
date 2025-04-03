@@ -23,7 +23,7 @@ from app.services.helper.websocket import (
 
 class MessageConsumer:
     """
-    Message consumer to process messages from the input queue and enqueue to output queue.
+    Message consumer to process messages from the input queue and enqueue them to the output queue.
     """
 
     def __init__(
@@ -31,11 +31,12 @@ class MessageConsumer:
         input_queue_name: str = "message_queue",
         output_queue_name: str = "ready_for_processing_queue",
     ):
-        """init
+        """
+        Initializes the consumer with input and output queues.
 
         Args:
-            input_queue_name (str, optional): input_queue_name. Defaults to "message_queue".
-            output_queue_name (str, optional): output_queue_name. Defaults to "ready_for_processing_queue".
+            input_queue_name (str): Name of the input queue. Defaults to "message_queue".
+            output_queue_name (str): Name of the output queue. Defaults to "ready_for_processing_queue".
         """
         self.input_queue = RedisQueue(queue_name=input_queue_name)
         self.output_queue = RedisQueue(queue_name=output_queue_name)
@@ -44,14 +45,24 @@ class MessageConsumer:
     async def run(self):
         """
         Runs the message consumer in an infinite loop.
+        Waits until the Redis connections are established before starting message processing.
         """
         logger.info("[consumer] Starting message consumer...")
 
+        # Wait until both input and output queues are connected to Redis
+        while not (self.input_queue.is_connected and self.output_queue.is_connected):
+            logger.info("[consumer] Waiting for Redis connections to be established...")
+            await asyncio.sleep(1)
+        logger.info(
+            "[consumer] Redis connections established. Beginning message consumption."
+        )
+
         while True:
             try:
-                raw_message: Optional[Union[str, dict]] = await asyncio.to_thread(
-                    self.input_queue.dequeue
+                raw_message: Optional[Union[str, dict]] = (
+                    await self.input_queue.dequeue()
                 )
+
                 if not raw_message:
                     await asyncio.sleep(0.1)  # avoid busy-waiting
                     continue
@@ -68,9 +79,9 @@ class MessageConsumer:
                     try:
                         await self._handle_message(db, data)
                         await db.commit()
-                        await asyncio.to_thread(self.output_queue.enqueue, raw_message)
+                        await self.output_queue.enqueue(raw_message)
                         logger.debug(
-                            f"[consumer] Enqueue raw_message in output_queue {raw_message}s"
+                            f"[consumer] Enqueued raw_message in output_queue: {raw_message}"
                         )
                     except Exception:
                         await db.rollback()
@@ -89,11 +100,12 @@ class MessageConsumer:
                 )
 
     async def _handle_message(self, db: AsyncSession, data: dict):
-        """handle messages
+        """
+        Processes the message, saves it to the database, and publishes updates via websocket.
 
         Args:
-            db (AsyncSession): db
-            data (dict): data
+            db (AsyncSession): Database session.
+            data (dict): Message data.
         """
         try:
             message_data = MessageCreate(**data)
@@ -104,8 +116,6 @@ class MessageConsumer:
         message = await message_repo.get_or_create_message(
             db=db, message_data=message_data
         )
-
-        await db.refresh(message, attribute_names=["contact"])
 
         if message:
             conversation = await conversation_repo.find_conversation_by_id(
@@ -135,7 +145,7 @@ class MessageConsumer:
                 )
             except Exception as e:
                 logger.warning(
-                    f"[ws] Failed to publish message {message.id} to Redis: {e}"
+                    f"[ws] Failed to publish message {message.id} to conversation websocket: {e}"
                 )
 
             try:
@@ -150,15 +160,16 @@ class MessageConsumer:
                 )
             except Exception as e:
                 logger.warning(
-                    f"[ws] Failed to publish message {message.id} to Redis: {e}"
+                    f"[ws] Failed to publish message {message.id} to account conversations websocket: {e}"
                 )
-
         else:
             logger.warning("[consumer] Failed to save message")
 
 
 async def main():
-    """main function"""
+    """
+    Main function to start the message consumer.
+    """
     consumer = MessageConsumer()
     await consumer.run()
 
