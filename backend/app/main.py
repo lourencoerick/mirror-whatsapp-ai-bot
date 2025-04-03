@@ -10,7 +10,6 @@ from app.api.routes import auth as auth_routes
 from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
 from app.api.routes import inbox as inbox_routes
-from app.api.routes import dev as dev_routes
 from app.api.routes import me as me_routes
 from app.api.routes import websocket as ws_routes
 from app.api.routes import evolution_instance as evolution_instance_routes
@@ -101,14 +100,6 @@ app.include_router(
 # --- WebSocket Router ---
 logger.info("Including WebSocket router")
 app.include_router(ws_routes.router, prefix="", tags=["WebSockets"])
-
-
-# --- Development/Utility Routers ---
-if settings.DEBUG:
-    logger.info("Including Development routes")
-    app.include_router(dev_routes.router, prefix="/dev", tags=["Development"])
-else:
-    logger.info("Skipping Development routes in non-DEBUG mode")
 
 
 # --- Root and Health Check ---
