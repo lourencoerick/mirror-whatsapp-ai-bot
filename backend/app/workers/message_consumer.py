@@ -53,7 +53,6 @@ class MessageConsumer:
         await self.input_queue.connect()
         await self.output_queue.connect()
 
-        # Loop de espera com retentativas se a conexão inicial falhar
         retry_delay = 5
         max_retries = 5
         retries = 0
