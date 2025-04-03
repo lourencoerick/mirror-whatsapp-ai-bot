@@ -1,6 +1,6 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy import desc, select
 from typing import List, Optional
 from loguru import logger
@@ -38,9 +38,9 @@ async def find_message_by_id(db: AsyncSession, message_id: UUID) -> Optional[Mes
 async def find_messages_by_conversation(
     db: AsyncSession,
     conversation_id: UUID,
+    account_id: UUID,
     limit: int = 20,
     offset: int = 0,
-    account_id: UUID,
 ) -> List[Message]:
     """Retrieve messages belonging to a specific conversation, filtered by account.
 
@@ -65,7 +65,9 @@ async def find_messages_by_conversation(
     return messages
 
 
-async def get_or_create_message(db: AsyncSession, message_data: MessageCreate) -> Message:
+async def get_or_create_message(
+    db: AsyncSession, message_data: MessageCreate
+) -> Message:
     """Retrieve a message by inbox_id and source_id, or create one if it doesn't exist.
     Ensures idempotent message handling.
 
@@ -82,6 +84,7 @@ async def get_or_create_message(db: AsyncSession, message_data: MessageCreate) -
     # Check for existing message
     result = await db.execute(
         select(Message)
+        .options(selectinload(Message.contact))
         .filter_by(inbox_id=message_data.inbox_id, source_id=message_data.source_id)
     )
     message = result.scalar_one_or_none()

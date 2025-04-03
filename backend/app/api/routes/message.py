@@ -116,6 +116,9 @@ async def create_outgoing_message(
     # Create or reuse message
     message = await message_repo.get_or_create_message(db, message_data)
 
+    # Forces the loading of the 'contact' relationship to avoid lazy loading outside the context
+    await db.refresh(message, attribute_names=["contact"])
+
     # Update last message in the conversation
     if message:
         if conversation:

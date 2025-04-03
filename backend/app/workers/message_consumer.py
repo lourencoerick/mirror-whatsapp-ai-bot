@@ -6,7 +6,7 @@ from loguru import logger
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import AsyncSessionLocal
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
 from app.services.queue.redis_queue import RedisQueue
@@ -64,7 +64,7 @@ class MessageConsumer:
                 )
 
                 start_time = time.time()
-                async with get_db() as db:
+                async with AsyncSessionLocal() as db:
                     try:
                         await self._handle_message(db, data)
                         await db.commit()
@@ -104,6 +104,8 @@ class MessageConsumer:
         message = await message_repo.get_or_create_message(
             db=db, message_data=message_data
         )
+
+        await db.refresh(message, attribute_names=["contact"])
 
         if message:
             conversation = await conversation_repo.find_conversation_by_id(

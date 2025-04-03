@@ -3,7 +3,7 @@ import httpx
 from uuid import UUID
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_db
+from app.database import AsyncSessionLocal
 from app.services.queue.redis_queue import RedisQueue
 from app.services.sender.evolution import send_message as evolution_send_message
 from app.services.repository import message as message_repo
@@ -42,9 +42,15 @@ class ResponseSender:
                 logger.warning("[sender] Payload missing 'message_id'")
                 return
 
-            async with get_db() as db:
-                await self._handle_message(db, message_id)
-                await db.commit()
+            async with AsyncSessionLocal() as db:
+                try:
+                    await self._handle_message(db, message_id)
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
+                    raise
+                finally:
+                    await db.close()
 
         except Exception as e:
             logger.exception(f"[sender] Unexpected failure: {type(e).__name__} - {e}")

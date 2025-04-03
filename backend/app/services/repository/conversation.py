@@ -24,7 +24,10 @@ async def find_conversation_by_id(
         Optional[Conversation]: The conversation if found, otherwise None.
     """
     result = await db.execute(
-        select(Conversation).filter_by(id=conversation_id, account_id=account_id)
+        select(Conversation)
+        .options(selectinload(Conversation.contact_inbox))
+        .options(selectinload(Conversation.inbox))
+        .filter_by(id=conversation_id, account_id=account_id)
     )
     conversation = result.scalar_one_or_none()
 
