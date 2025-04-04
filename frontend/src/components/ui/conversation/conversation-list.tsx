@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import ConversationItem from './conversation-item';
 import { useInfiniteConversations } from '@/hooks/use-conversations';
 import { Conversation } from '@/types/conversation';
@@ -14,12 +14,14 @@ interface ConversationsListProps {
 const ConversationsList: React.FC<ConversationsListProps> = ({ socketIdentifier }) => {
   // Retrieve route parameters using Next.js useParams hook
   const params = useParams();
+  const searchParams = useSearchParams();
+  const query = searchParams.get('query');
   // Assume the route provides conversationId
   const conversationId = params?.conversationId as string | undefined;
 
 
   // Use the custom infinite conversations hook
-  const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations(socketIdentifier);
+  const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations(socketIdentifier, query);
 
   // Create a ref for the element that triggers loading more conversations when visible
   const loaderRef = useRef<HTMLDivElement | null>(null);
