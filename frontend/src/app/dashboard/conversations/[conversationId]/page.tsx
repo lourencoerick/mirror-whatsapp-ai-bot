@@ -14,8 +14,14 @@ import { ChatMessage } from "@/components/ui/chat/chat-message";
 import { ChatInputBox } from "@/components/ui/chat/chat-input-box";
 import { ChatWebSocketBridge } from '@/components/ui/chat/chat-websocket-bridge';
 import { Message } from '@/types/message';
+import { useLayoutContext } from '@/contexts/layout-context';
+
 
 const ChatPage = () => {
+
+  const { setPageTitle } = useLayoutContext();
+  setPageTitle("Conversa ID: " + useParams().conversationId);
+
   const { conversationId } = useParams() as { conversationId: string };
     const searchParams = useSearchParams();
     const highlightId = searchParams.get('highlight');
