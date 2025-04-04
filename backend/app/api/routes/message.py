@@ -1,8 +1,8 @@
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 from loguru import logger
 
@@ -26,36 +26,69 @@ queue = RedisQueue(queue_name="response_queue")
 
 
 @router.get(
-    "/conversations/{conversation_id}/messages", response_model=List[MessageResponse]
+    "/conversations/{conversation_id}/messages",
+    response_model=List[MessageResponse],
+    summary="Get Conversation Messages (Paginated)",
+    description="Retrieves a paginated list of messages for a specific conversation, supporting cursor-based pagination.",
+    response_description="A list of messages, ordered chronologically (oldest first).",
 )
-async def get_messages(
-    conversation_id: UUID,
-    limit: int = 20,
-    offset: int = 0,
+async def get_conversation_messages_paginated(
+    conversation_id: UUID = Path(..., description="The ID of the conversation"),
+    limit: int = Query(
+        30, ge=1, le=100, description="Maximum number of messages to return"
+    ),
+    before_cursor: Optional[UUID] = Query(
+        None, description="Fetch messages older than this message ID"
+    ),
+    after_cursor: Optional[UUID] = Query(
+        None, description="Fetch messages newer than this message ID"
+    ),
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
     """
-    Retrieve a paginated list of messages from a conversation.
-
-    Args:
-        conversation_id (UUID): ID of the conversation.
-        limit (int): Max number of messages to return (default: 20).
-        offset (int): Number of messages to skip for pagination (default: 0).
-        db (AsyncSession): Injected database session.
-
-    Returns:
-        List[MessageResponse]: List of messages for the given conversation.
+    API endpoint to fetch messages with cursor-based pagination.
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
-    return await message_repo.find_messages_by_conversation(
-        db=db,
-        conversation_id=conversation_id,
-        limit=limit,
-        offset=offset,
-        account_id=account_id,
-    )
+    # Validação básica (embora a lógica do cursor no CRUD já lide com isso)
+    if before_cursor and after_cursor:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot use 'before_cursor' and 'after_cursor' simultaneously.",
+        )
+
+    if db is None:  # Verificação básica da dependência
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database session not available",
+        )
+
+    try:
+        # Chama a função CRUD atualizada
+        messages = await message_repo.get_messages_paginated(
+            db=db,
+            account_id=account_id,
+            conversation_id=conversation_id,
+            limit=limit,
+            before_cursor=before_cursor,
+            after_cursor=after_cursor,
+        )
+
+        # A função CRUD já retorna lista vazia se a conversa não existe ou o cursor é inválido
+        # Não precisamos de um 404 explícito aqui, a menos que queiramos distinguir
+        # "conversa não existe" de "sem mensagens antes/depois".
+
+        return messages  # FastAPI converte para MessageResponse
+
+    except Exception as e:
+        print(
+            f"Error in get_conversation_messages_paginated endpoint: {e}"
+        )  # Logue o erro
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while fetching messages.",
+        )
 
 
 @router.post(
@@ -161,3 +194,72 @@ async def create_outgoing_message(
     except Exception as e:
         logger.warning(f"[ws] Failed to publish message {message.id} to Redis: {e}")
     return message
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages/context/{message_id}",
+    response_model=List[MessageResponse],
+    summary="Get Message Context",
+    description="Retrieves a message and a specified number of surrounding messages within its conversation.",
+    response_description="A list of messages representing the context, ordered chronologically.",
+)
+async def get_message_context_endpoint(
+    conversation_id: UUID = Path(
+        ..., description="The ID of the conversation to search within"
+    ),
+    message_id: UUID = Path(
+        ..., description="The ID of the target message for context"
+    ),
+    limit_before: int = Query(
+        5,
+        ge=0,
+        le=200,
+        description="Number of messages to retrieve before the target message",
+    ),
+    limit_after: int = Query(
+        5,
+        ge=0,
+        le=200,
+        description="Number of messages to retrieve after (and including) the target message",
+    ),
+    db: AsyncSession = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
+):
+    """
+    API endpoint to fetch the context around a specific message.
+    """
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
+
+    if db is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database session not available",
+        )
+
+    try:
+        messages = await conversation_repo.get_message_context(
+            db=db,
+            account_id=account_id,
+            conversation_id=conversation_id,
+            target_message_id=message_id,
+            limit_before=limit_before,
+            limit_after=limit_after,
+        )
+
+        if not messages:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Target message or conversation not found, or no context available.",
+            )
+
+        return messages
+
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Error in get_message_context_endpoint: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while fetching message context.",
+        )

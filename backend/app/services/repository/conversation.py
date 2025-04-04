@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import desc, select, or_, cast, Text, literal, func, asc
+from sqlalchemy import desc, select, or_, and_, cast, Text, literal, func, asc
 from typing import Optional, List
 from loguru import logger
 from app.api.schemas.conversation import ConversationSearchResult, MessageSnippet
@@ -458,7 +458,94 @@ async def search_conversations(
             )
             results.append(result_item)
         except Exception as e:
-            print(f"Error processing conversation {conv.id} for search results: {e}")
+            logger.error(
+                f"Error processing conversation {conv.id} for search results: {e}"
+            )
             continue
 
     return results
+
+
+async def get_message_context(
+    db: AsyncSession,
+    *,
+    account_id: UUID,
+    conversation_id: UUID,
+    target_message_id: UUID,
+    limit_before: int = 5,
+    limit_after: int = 5,
+) -> List[Message]:
+    """
+    Fetches a message and its surrounding context within a conversation.
+
+    Retrieves a specified number of messages chronologically before and after
+    a target message, including the target message itself.
+
+    Args:
+        db: The SQLAlchemy AsyncSession.
+        conversation_id: The ID of the conversation.
+        target_message_id: The ID of the message to center the context around.
+        limit_before: Max number of messages to fetch before the target message.
+        limit_after: Max number of messages to fetch after (and including) the target message.
+
+    Returns:
+        A list of Message objects representing the context, ordered chronologically.
+        Returns an empty list if the target message or conversation is not found.
+    """
+    # 1. Fetch the target message
+    target_msg_stmt = select(Message).where(
+        and_(
+            Message.account_id == account_id,
+            Message.id == target_message_id,
+            Message.conversation_id == conversation_id,
+        )
+    )
+    target_msg_result = await db.execute(target_msg_stmt)
+    target_message = target_msg_result.scalar_one_or_none()
+
+    if not target_message:
+        return []
+
+    # 2. Fetching the context messages before the target message
+    before_stmt = (
+        select(Message)
+        .where(
+            and_(
+                Message.account_id == account_id,
+                Message.conversation_id == conversation_id,
+                Message.sent_at < target_message.sent_at,
+            )
+        )
+        .order_by(desc(Message.sent_at), desc(Message.created_at))
+        .limit(limit_before)
+    )
+    before_result = await db.execute(before_stmt)
+    messages_before = before_result.scalars().all()
+
+    # 3. Fetching the context messages after the target message
+    after_stmt = (
+        select(Message)
+        .where(
+            and_(
+                Message.conversation_id == conversation_id,
+                Message.sent_at >= target_message.sent_at,
+            )
+        )
+        .order_by(asc(Message.sent_at), asc(Message.id))
+        .limit(limit_after + 1)
+    )
+    after_result = await db.execute(after_stmt)
+    messages_after = after_result.scalars().all()
+
+    # Combina e ordena
+    # Reverse 'before' list to have the chronological order
+    combined_messages = list(reversed(messages_before)) + messages_after
+
+    # Remove duplicates
+    # final_message_map = {msg.id: msg for msg in combined_messages}
+
+    # Retorna a lista final ordenada (o dicionário não garante ordem, então reordenamos pelas IDs combinadas se necessário, mas a concatenação já deve ter a ordem correta)
+    # A concatenação `list(reversed(messages_before)) + messages_after` já deve estar ordenada corretamente por timestamp/id ASC.
+    # return list(final_message_map.values()) -> Perde a ordem
+
+    return combined_messages
