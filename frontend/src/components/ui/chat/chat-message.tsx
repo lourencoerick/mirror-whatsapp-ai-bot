@@ -1,3 +1,4 @@
+import React, { forwardRef } from 'react';
 import { ChatBubble, ChatBubbleAvatar, ChatBubbleMessage } from "@/components/ui/chat/chat-bubble";
 
 interface ChatMessageProps {
@@ -6,7 +7,7 @@ interface ChatMessageProps {
   loading?: boolean;
 }
 
-export function ChatMessage({ content, direction, loading = false }: ChatMessageProps) {
+export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(({ content, direction, loading = false }, ref) => {
   return (
     <ChatBubble variant={direction === "out" ? "sent" : "received"}>
       <ChatBubbleAvatar src="" fallback={direction === "out" ? "🤖" : "👤"} />
@@ -14,3 +15,6 @@ export function ChatMessage({ content, direction, loading = false }: ChatMessage
     </ChatBubble>
   );
 }
+);
+
+ChatMessage.displayName = "ChatMessage";
