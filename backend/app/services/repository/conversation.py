@@ -231,7 +231,7 @@ async def search_conversations(
     user_id: UUID,
     account_id: UUID,
     query: str,
-    skip: int = 0,
+    offset: int = 0,
     limit: int = 100,
 ) -> List[ConversationSearchResult]:
     """
@@ -243,7 +243,7 @@ async def search_conversations(
     Args:
         db: The SQLAlchemy AsyncSession.
         query: The search term.
-        skip: Number of records to skip.
+        offset: Number of records to skip.
         limit: Maximum number of records to return.
 
     Returns:
@@ -252,9 +252,7 @@ async def search_conversations(
     search_term = f"%{query}%"
 
     user_inbox_ids_subquery = (
-        select(InboxMember.inbox_id)
-        .filter(InboxMember.user_id == user_id)
-        .filter(InboxMember.account_id == account_id)
+        select(InboxMember.inbox_id).filter(InboxMember.user_id == user_id)
     ).scalar_subquery()
 
     # --- CTE 1: Name and Phone Matches (Rank 1) ---
@@ -368,7 +366,7 @@ async def search_conversations(
             asc(prioritized_matches_cte.c.match_rank),
             desc(Conversation.last_message_at),
         )
-        .offset(skip)
+        .offset(offset)
         .limit(limit)
     )
 

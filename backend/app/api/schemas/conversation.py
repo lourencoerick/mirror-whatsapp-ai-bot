@@ -13,19 +13,6 @@ class MessageSnippet(BaseModel):
         from_attributes = True
 
 
-class ConversationResponse(BaseModel):
-    id: UUID
-    phone_number: str
-    updated_at: datetime
-    profile_picture_url: Optional[str]
-    contact_name: Optional[str]
-    last_message_at: Optional[datetime]
-    last_message: Optional[MessageSnippet]
-
-    class Config:
-        from_attributes = True
-
-
 class ConversationSearchResult(BaseModel):
     id: UUID = Field(..., description="Unique identifier for the conversation")
     phone_number: str = Field(..., description="Contact's phone number (extracted)")
