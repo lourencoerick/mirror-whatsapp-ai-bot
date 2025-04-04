@@ -51,6 +51,16 @@ async def get_conversation_messages_paginated(
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
+
+    conversation = await conversation_repo.find_conversation_by_id(
+        db, conversation_id=conversation_id, account_id=account_id
+    )
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        )
+
     # Validação básica (embora a lógica do cursor no CRUD já lide com isso)
     if before_cursor and after_cursor:
         raise HTTPException(
