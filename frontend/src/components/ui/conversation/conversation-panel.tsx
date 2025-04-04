@@ -11,9 +11,9 @@ interface ConversationPanelProps {
 
 const ConversationPanel: React.FC<ConversationPanelProps> = ({ socketIdentifier }) => {
   return (
-    <div className="h-screen flex flex-col bg-slate-50 pt-4 gap-2 items-center">
-
-      <Search placeholder="Pesquisar..." />
+    <div className="h-screen flex flex-col bg-slate-50">
+      <div className='flex flex-col py-2 gap-2 items-center'>      
+        <Search placeholder="Pesquisar..." />
 
       <div className="flex flex-row justify-between items-center w-full px-2">
         <span className='text-lg font-semibold'>Conversas</span>
@@ -30,6 +30,9 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ socketIdentifier 
           </Button>
         </ div>
       </div>
+
+      </div>
+
 
 
       <div className=" flex flex-col overflow-y-auto w-full max-w-xs min-w-xs">
