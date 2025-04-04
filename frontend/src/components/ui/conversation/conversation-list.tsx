@@ -26,6 +26,7 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ socketIdentifier 
   // Create a ref for the element that triggers loading more conversations when visible
   const loaderRef = useRef<HTMLDivElement | null>(null);
 
+
   useEffect(() => {
     // Create an Intersection Observer to detect when the loader element enters the viewport
     const observer = new IntersectionObserver(
@@ -48,9 +49,11 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ socketIdentifier 
       }
     };
   }, [hasMore, loadMore, loading]);
+  
 
   return (
     <div className="">
+
       {conversations.map((conversation: Conversation) => (
         <ConversationItem
           key={conversation.id}
@@ -58,14 +61,24 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ socketIdentifier 
           id={conversation.id}
           phoneNumber={conversation.phone_number}
           contactName={conversation.contact_name}
-          lastMessage={conversation.last_message?.content ?? ''}
+          lastMessageContent={conversation.last_message?.content ?? ''}
           lastMessageTime={conversation.last_message_at}
           imageUrl={conversation.profile_picture_url}
           isSelected={conversation.id === conversationId}
+          matchingMessageId={conversation.matching_message?.id ?? ''}
+          matchingMessageContent={conversation.matching_message?.content ?? ''}
         />
       ))}
       {error && <div className="p-4 text-red-500">Erro ao carregar conversas.</div>}
       {loading && <div className="p-4">Carregando...</div>}
+      {!loading && !error && conversations.length === 0 && 
+        <div className="p-4 text-center text-gray-500">
+          {query ?
+            `Nenhuma conversa encontrada para "${query}".` :
+            'Nenhuma conversa para exibir.'
+          }
+        </div>
+}
       {/* This element is used by Intersection Observer to trigger loading more */}
       <div ref={loaderRef} />
     </div>
