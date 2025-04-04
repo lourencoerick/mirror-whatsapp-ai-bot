@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -11,22 +12,33 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
     String,
+    text,
 )
 from sqlalchemy.orm import relationship
-from app.models.base import BaseModel
 from sqlalchemy.ext.mutable import MutableDict
+
+from app.models.base import BaseModel
 
 
 class Conversation(BaseModel):
     __tablename__ = "conversations"
     __table_args__ = (
-        # UniqueConstraint(
-        #     "account_id",
-        #     "display_id",
-        #     name="conversations_account_id_display_id_unique",
-        # ),
-        Index("conversations_account_id_index", "account_id"),
-        Index("conversations_contact_inbox_id_index", "contact_inbox_id"),
+        Index("idx_conversations_account_id", "account_id"),
+        Index("idx_conversations_inbox_id", "inbox_id"),
+        Index("idx_conversations_last_message_at", "last_message_at"),
+        Index("idx_conversations_contact_inbox_id", "contact_inbox_id"),
+        # --- GIN Trigram Index on JSONB Expression for 'contact_name' ---
+        Index(
+            "ix_conv_addt_attrs_contact_name_gin_trgm",
+            text("(additional_attributes->>'contact_name') gin_trgm_ops"),
+            postgresql_using="gin",
+        ),
+        # --- GIN Trigram Index on JSONB Expression for 'phone_number' ---
+        Index(
+            "ix_conv_addt_attrs_phone_number_gin_trgm",
+            text("(additional_attributes->>'phone_number') gin_trgm_ops"),
+            postgresql_using="gin",
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -51,7 +63,7 @@ class Conversation(BaseModel):
         index=True,
     )
     additional_attributes = Column(
-        MutableDict.as_mutable(JSON), default=dict, nullable=True
+        MutableDict.as_mutable(JSONB), default=dict, nullable=True
     )
 
     account = relationship("Account", back_populates="conversations")

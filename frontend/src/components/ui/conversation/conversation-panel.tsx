@@ -26,7 +26,7 @@ const ConversationPanel:React.FC<ConversationPanelProps> = ({ socketIdentifier }
       </div>
 
 
-      <div className=" flex flex-col overflow-y-auto w-full max-w-sm">
+      <div className=" flex flex-col overflow-y-auto w-full max-w-xs min-w-xs">
         <ConversationsList socketIdentifier={socketIdentifier}/>
       </div>
     </ div>

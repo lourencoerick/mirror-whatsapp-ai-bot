@@ -62,10 +62,26 @@ class ResponseSender:
         """
         logger.info("[sender] Listening for messages to send...")
 
-        # Wait until the Redis connection is established
-        while not self.queue.is_connected:
-            logger.info("[sender] Waiting for Redis connection to be established...")
-            await asyncio.sleep(1)
+        logger.info("[sender] Attempting to connect to Redis queues...")
+
+        retry_delay = 5
+        max_retries = 5
+        retries = 0
+        while not (self.queue.is_connected) and retries < max_retries:
+            retries += 1
+            logger.warning(
+                f"[sender] Failed initial Redis connection {self.queue.is_connected}. "
+                f"Retrying attempt {retries}/{max_retries} in {retry_delay}s..."
+            )
+            await asyncio.sleep(retry_delay)
+            if not self.queue.is_connected:
+                await self.queue.connect()
+
+        if not (self.queue.is_connected):
+            logger.error(
+                "[sender] Could not establish Redis connections after multiple attempts. Exiting."
+            )
+            return
 
         while True:
             await self._process_one_message()

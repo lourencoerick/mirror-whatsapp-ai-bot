@@ -1,14 +1,14 @@
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from typing import List, Optional
 from loguru import logger
 
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.api.schemas.conversation import (
-    ConversationResponse,
+    ConversationSearchResult,
     StartConversationResponse,
     StartConversationRequest,
 )
@@ -26,7 +26,72 @@ from app.services.helper.conversation import (
 router = APIRouter()
 
 
-@router.get("/conversations", response_model=List[ConversationResponse])
+@router.get(
+    "/conversations",
+    response_model=List[ConversationSearchResult],
+    summary="List or Search Conversations",
+    description="Retrieve a list of conversations. Use the 'q' parameter to search by contact name, phone number, or message content.",
+    response_description="A list of conversations matching the criteria",
+)
+async def search_or_list_conversations(
+    q: Optional[str] = Query(
+        None,
+        min_length=2,
+        max_length=100,
+        title="Search Query",
+        description="Search term for contact name, phone number, or message content. If omitted, returns a list of all conversations.",
+    ),
+    offset: int = Query(
+        0, ge=0, title="Skip", description="Number of records to skip for pagination"
+    ),
+    limit: int = Query(
+        20,
+        ge=1,
+        le=200,
+        title="Limit",
+        description="Maximum number of records to return",
+    ),
+    db: AsyncSession = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
+):
+    """
+    Handles listing and searching conversations based on the presence of the 'q' query parameter.
+    """
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
+
+    try:
+        if q:
+            # --- Search Path ---
+            conversations = await conversation_repo.search_conversations(
+                db=db,
+                user_id=user_id,
+                account_id=account_id,
+                query=q,
+                offset=offset,
+                limit=limit,
+            )
+            return conversations
+        else:
+            # return []/
+            async with db as session:
+                conversations = await conversation_repo.find_conversations_by_user(
+                    db=session,
+                    user_id=user_id,
+                    account_id=account_id,
+                    limit=limit,
+                    offset=offset,
+                )
+            return conversations_to_conversations_response(conversations)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred while retrieving conversations. {e}",
+        )
+
+
+@router.get("/conversations/old", response_model=List[ConversationSearchResult])
 async def get_user_conversations(
     limit: int = 20,
     offset: int = 0,
@@ -42,7 +107,7 @@ async def get_user_conversations(
         auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
 
     Returns:
-        List[ConversationResponse]: A list of conversations.
+        List[ConversationSearchResult]: A list of conversations.
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
@@ -60,7 +125,7 @@ async def get_user_conversations(
 
 
 @router.get(
-    "/inboxes/{inbox_id}/conversations", response_model=List[ConversationResponse]
+    "/inboxes/{inbox_id}/conversations", response_model=List[ConversationSearchResult]
 )
 async def get_inbox_conversations(
     inbox_id: UUID,
@@ -79,7 +144,7 @@ async def get_inbox_conversations(
         auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
 
     Returns:
-        List[ConversationResponse]: A list of conversations.
+        List[ConversationSearchResult]: A list of conversations.
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id

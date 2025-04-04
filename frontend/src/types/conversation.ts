@@ -6,9 +6,16 @@ export interface Conversation {
   updated_at: string;
   last_message_at: string;
   last_message: {
+    id: string;
     content: string;
-    // created_at: string;
+    sent_at: string;
   } | null;
+
+  matching_message: {
+    id: string;
+    content: string;
+    sent_at: string;
+  } | null;  
 }
 
 

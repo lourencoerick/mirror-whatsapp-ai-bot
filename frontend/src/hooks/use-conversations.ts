@@ -1,121 +1,160 @@
-import { useState, useEffect, useCallback } from 'react';
-import { AxiosResponse } from 'axios';
-import api from '../lib/api';
-import { useConversationSocket } from '@/hooks/use-conversation-socket';
-import { Conversation, UseInfiniteConversationsResult } from '@/types/conversation';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { AxiosResponse } from "axios";
+import api from "../lib/api";
+import { useConversationSocket } from "@/hooks/use-conversation-socket";
+import {
+  Conversation,
+  UseInfiniteConversationsResult,
+} from "@/types/conversation";
 
-const CONVERSATIONS_LIMIT: number = 10;
+const CONVERSATIONS_LIMIT: number = 15;
 
 /**
  * Deduplicates an array of conversations based on conversation id.
+ * Keeps the first occurrence found.
  * @param conversations An array of Conversation objects.
  * @returns A new array with only unique conversations.
  */
-function deduplicateConversations(conversations: Conversation[]): Conversation[] {
+function deduplicateConversations(
+  conversations: Conversation[]
+): Conversation[] {
   const seenIds = new Set<string>();
-  return conversations.filter((conversation) => {
-    if (seenIds.has(conversation.id)) {
-      return false; // Filter out duplicate
+  const result: Conversation[] = [];
+  for (const conversation of conversations) {
+    if (!seenIds.has(conversation.id)) {
+      seenIds.add(conversation.id);
+      result.push(conversation);
     }
-    seenIds.add(conversation.id);
-    return true; // Keep unique conversation
-  });
+  }
+  return result;
 }
 
 /**
  * Custom hook to fetch conversations with infinite scrolling and real-time updates via WebSocket.
+ * Handles search queries and ensures state consistency during query changes.
  *
- * Uses limit and offset for pagination and also integrates WebSocket events to:
- * - Add a new conversation if it does not exist
- * - Update an existing conversation
+ * @param socketIdentifier - Identifier for WebSocket connection.
+ * @param query - Optional search query string.
  *
-* @param socketIdentifier - The identifier needed to establish the WebSocket connection
- *                           (e.g., internal account ID).
- *
- * @returns An object containing the conversation list, loading state, error state,
- * a flag indicating if more conversations exist, and a function to load more.
+ * @returns An object implementing UseInfiniteConversationsResult.
  */
-export function useInfiniteConversations(socketIdentifier: string): UseInfiniteConversationsResult {
+export function useInfiniteConversations(
+  socketIdentifier: string,
+  query: string | null
+): UseInfiniteConversationsResult {
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [offset, setOffset] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<boolean>(false);
+  const [loadingInitial, setLoadingInitial] = useState<boolean>(false);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(true);
 
-  // Function to load more conversations via API
-  const loadMore = useCallback((): void => {
-    if (loading || !hasMore) return;
+  const currentOffset = useRef<number>(0);
+  const isLoading = useRef<boolean>(false);
 
-    setLoading(true);
-    api
-      .get<Conversation[]>(`/api/v1/conversations`, {
-        params: { limit: CONVERSATIONS_LIMIT, offset: offset },
-      })
-      .then((response: AxiosResponse<Conversation[]>) => {
-        const newConversations = response.data;
-        setConversations((prevConversations) => {
-          console.log('Previous conversations before API load:', prevConversations);
-          // Apply deduplication here
-          const updatedConversations = deduplicateConversations([...prevConversations, ...newConversations]);
-          console.log('Updated conversations after API load:', updatedConversations);
-          return updatedConversations;
-        });
-        setOffset((prevOffset) => prevOffset + newConversations.length);
-        if (newConversations.length < CONVERSATIONS_LIMIT) {
-          setHasMore(false);
-        }
-      })
-      .catch((err: unknown) => {
-        console.error('Error fetching conversations:', err);
-        setError(true);
-      })
-      .finally(() => setLoading(false));
-  }, [loading, hasMore, offset]);
+  const activeQuery = useRef<string | null>(query);
 
-  // Initial load
+  const fetchConversations = useCallback(async (isInitialLoad: boolean) => {
+    if (isLoading.current) return;
+    if (!isInitialLoad && !hasMore) return;
+
+    isLoading.current = true;
+    const currentQuery = activeQuery.current;
+
+    if (isInitialLoad) {
+      setLoadingInitial(true);
+      currentOffset.current = 0;
+      setHasMore(true);
+      setError(null);
+    } else {
+      setLoadingMore(true);
+    }
+
+    const params: { limit: number; offset: number; q?: string } = {
+      limit: CONVERSATIONS_LIMIT,
+      offset: currentOffset.current,
+    };
+
+    const trimmedQuery = currentQuery?.trim();
+    if (trimmedQuery) {
+      params.q = trimmedQuery;
+    }
+
+    console.log(
+      `Fetching conversations: query="${params.q ?? "(none)"}", offset=${
+        params.offset
+      }`
+    );
+
+    try {
+      const response: AxiosResponse<Conversation[]> = await api.get<
+        Conversation[]
+      >(`/api/v1/conversations`, { params });
+      const newConversations = response.data;
+
+      setConversations((prevConversations) => {
+        const combined =
+          isInitialLoad || currentQuery !== activeQuery.current
+            ? newConversations
+            : [...prevConversations, ...newConversations];
+        return deduplicateConversations(combined);
+      });
+
+      currentOffset.current += newConversations.length;
+
+      setHasMore(newConversations.length === CONVERSATIONS_LIMIT);
+    } catch (err: unknown) {
+      console.error("Error fetching conversations:", err);
+      setError(
+        err instanceof Error ? err.message : "Falha ao buscar conversas."
+      );
+      setHasMore(false);
+    } finally {
+      setLoadingInitial(false);
+      setLoadingMore(false);
+      isLoading.current = false;
+    }
+  }, []);
+
   useEffect(() => {
+    console.log(`Initial load effect triggered. Query changed to: "${query}"`);
+    activeQuery.current = query;
     setConversations([]);
-    setOffset(0);
-    setHasMore(true);
-    loadMore();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socketIdentifier]);
+    fetchConversations(true);
+  }, [socketIdentifier, query, fetchConversations]);
 
-  // Integration with WebSocket for real-time updates
+  const loadMore = useCallback(() => {
+    console.log("loadMore called...");
+    fetchConversations(false);
+  }, [fetchConversations]);
+
   useConversationSocket(socketIdentifier, {
     onNewConversation: (newConv) => {
-      console.log('Socket event: new conversation received', newConv);
+      console.log("Socket event: new conversation received", newConv);
       setConversations((prev) => {
-        console.log('Previous conversations before adding new conversation:', prev);
-        const exists = prev.some((c) => c.id === newConv.id);
-        if (exists) {
-          console.log('Conversation already exists:', newConv.id);
-          return prev;
-        }
-        // Apply deduplication here
-        const updatedConversations = deduplicateConversations([newConv, ...prev]);
-        console.log('Updated conversations after adding new conversation:', updatedConversations);
-        return updatedConversations;
+        return deduplicateConversations([newConv, ...prev]);
       });
     },
     onConversationUpdate: (updatedConv) => {
-      console.log('Socket event: conversation update received', updatedConv);
+      console.log("Socket event: conversation update received", updatedConv);
       setConversations((prev) => {
-        console.log('Previous conversations before updating conversation:', prev);
         const index = prev.findIndex((c) => c.id === updatedConv.id);
+        let updatedList: Conversation[];
         if (index === -1) {
-          console.log('Conversation to update not found:', updatedConv.id);
-          return prev;
+          updatedList = [updatedConv, ...prev];
+        } else {
+          updatedList = [...prev];
+          updatedList[index] = updatedConv;
         }
-        const updated = [...prev];
-        updated[index] = updatedConv;
-        // Apply deduplication here
-        const deduplicatedConversations = deduplicateConversations(updated);
-        console.log('Updated conversations after updating conversation:', deduplicatedConversations);
-        return deduplicatedConversations;
+        return deduplicateConversations(updatedList);
       });
     },
   });
 
-  return { conversations, loading, error, hasMore, loadMore };
+  return {
+    conversations,
+    loading: loadingInitial || loadingMore,
+    error: error ? true : false,
+    hasMore,
+    loadMore,
+  };
 }

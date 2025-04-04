@@ -5,6 +5,8 @@ export interface Message {
     message_type: string;
     content_type: string;
     sent_at: string;
+    created_at: string;
+    updated_at: string;
 
 }
 

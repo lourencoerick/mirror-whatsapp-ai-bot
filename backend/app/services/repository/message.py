@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, tuple_, asc
 from typing import List, Optional
 from loguru import logger
 from app.models.message import Message
@@ -118,3 +118,99 @@ async def get_or_create_message(
     logger.info(f"[message] Created new message (id={new_message.id})")
 
     return new_message
+
+
+async def get_messages_paginated(
+    db: AsyncSession,
+    *,
+    account_id: UUID,
+    conversation_id: UUID,
+    limit: int = 30,
+    before_cursor: Optional[UUID] = None,
+    after_cursor: Optional[UUID] = None,
+) -> List[Message]:
+    """
+    Fetches a paginated list of messages for a conversation using cursor-based pagination.
+
+    - If 'before_cursor' is provided, fetches messages older than the cursor.
+    - If 'after_cursor' is provided, fetches messages newer than the cursor.
+    - If neither cursor is provided, fetches the latest messages.
+
+    Args:
+        db: The SQLAlchemy AsyncSession.
+        conversation_id: The ID of the conversation.
+        limit: The maximum number of messages to return.
+        before_cursor: The ID of the message before which to fetch older messages.
+        after_cursor: The ID of the message after which to fetch newer messages.
+
+    Returns:
+        A list of Message objects, sorted chronologically (timestamp ASC, id ASC).
+    """
+    # Base statement selecting messages for the conversation
+    stmt = select(Message).where(
+        Message.account_id == account_id,
+        Message.conversation_id == conversation_id,
+    )
+
+    # --- Apply Cursor Logic ---
+    target_cursor = after_cursor or before_cursor
+
+    # Fetch the cursor message's timestamp and ID if a cursor is provided
+    # Needed for tuple comparison
+    if target_cursor:
+        cursor_stmt = select(Message.sent_at, Message.id).where(
+            Message.id == target_cursor
+        )  # Assume timestamp is the primary sort key
+        cursor_result = await db.execute(cursor_stmt)
+        cursor_data = cursor_result.first()
+        if not cursor_data:
+            # Cursor message not found, return empty list or raise error?
+            # Returning empty is usually safer for pagination.
+            logger.info(f"Cursor message {target_cursor} not found.")
+            return []
+        cursor_timestamp, cursor_id = cursor_data
+
+    # --- Filtering ---
+    if before_cursor:
+        # Fetch messages chronologically *before* the cursor
+        # WHERE (timestamp < cursor_timestamp) OR (timestamp == cursor_timestamp AND id < cursor_id)
+        # Using tuple comparison for conciseness: (timestamp, id) < (cursor_timestamp, cursor_id)
+        print(f"Fetching messages before cursor {before_cursor}")
+        stmt = stmt.where(
+            tuple_(Message.sent_at, Message.id) < (cursor_timestamp, cursor_id)
+        )
+        # Order by most recent first (DESC) to get the ones right before the cursor
+        stmt = stmt.order_by(desc(Message.sent_at), desc(Message.id))
+
+    elif after_cursor:
+        # Fetch messages chronologically *after* the cursor
+        # WHERE (sent_at > cursor_sent_at) OR (sent_at == cursor_timestamp AND id > cursor_id)
+        # Using tuple comparison: (sent_at, id) > (cursor_timestamp, cursor_id)
+        print(f"Fetching messages after cursor {after_cursor}")
+        stmt = stmt.where(
+            tuple_(Message.sent_at, Message.id) > (cursor_timestamp, cursor_id)
+        )
+        # Order chronologically (ASC) - already the desired order for newer messages
+        stmt = stmt.order_by(asc(Message.sent_at), asc(Message.id))
+    else:
+        # --- Default Case: No Cursor (Fetch Latest) ---
+        print("Fetching latest messages (no cursor)")
+        # Order by most recent first (DESC)
+        stmt = stmt.order_by(desc(Message.sent_at), desc(Message.id))
+
+    # --- Apply Limit ---
+    stmt = stmt.limit(limit)
+
+    # --- Execute Query ---
+    result = await db.execute(stmt)
+    messages = result.scalars().all()
+
+    # --- Reverse results if needed ---
+    # If fetching 'before' or 'latest' (default), we ordered DESC,
+    # so reverse the list to get chronological ASC order for the final result.
+    if before_cursor or not after_cursor:
+        messages.reverse()
+        print(f"Reversed message list for 'before' or 'latest' fetch.")
+
+    print(f"Returning {len(messages)} messages.")
+    return messages
