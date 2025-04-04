@@ -22,7 +22,7 @@ async def update_last_message_snapshot(
     snapshot = {
         "id": str(message.id),
         "content": message.content,
-        "timestamp": (message.sent_at.isoformat() if message.sent_at else None),
+        "sent_at": (message.sent_at.isoformat() if message.sent_at else None),
         "direction": message.message_type,
         "content_type": message.content_type,
     }
