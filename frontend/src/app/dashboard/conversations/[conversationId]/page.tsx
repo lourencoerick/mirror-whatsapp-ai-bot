@@ -19,12 +19,16 @@ import { useLayoutContext } from '@/contexts/layout-context';
 
 const ChatPage = () => {
 
-  const { setPageTitle } = useLayoutContext();
-  setPageTitle("Conversa ID: " + useParams().conversationId);
+
 
   const { conversationId } = useParams() as { conversationId: string };
-    const searchParams = useSearchParams();
-    const highlightId = searchParams.get('highlight');
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get('highlight');
+
+  const { setPageTitle } = useLayoutContext();
+  useEffect(() => {
+    setPageTitle(`Conversa ID: ${conversationId}`);
+  }, [setPageTitle, conversationId]);
 
   const {
     messages,
@@ -47,11 +51,11 @@ const ChatPage = () => {
     setInput(e.target.value);
   };
 
-    const scrollToBottom = useCallback(() => {
-        if (messagesRef.current) {
-            messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
-        }
-    }, []);
+  const scrollToBottom = useCallback(() => {
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    }
+  }, []);
 
   const handleSend = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -79,12 +83,12 @@ const ChatPage = () => {
 
     const tolerance = 50;
     if (element.scrollTop <= tolerance && hasMoreOlder) {
-        console.log("loadOlderMessages")
+      console.log("loadOlderMessages")
       loadOlderMessages();
     }
 
     if (element.scrollHeight - element.scrollTop - element.clientHeight <= tolerance && hasMoreNewer) {
-        console.log("loadNewerMessages")
+      console.log("loadNewerMessages")
       loadNewerMessages();
     }
   }, [loadOlderMessages, loadNewerMessages, hasMoreOlder, hasMoreNewer, loadingOlder, loadingNewer, isAutoScrolling]);
@@ -129,10 +133,10 @@ const ChatPage = () => {
     if (loadingNewer) {
       return (
         <div className="text-center py-2">
-            <ChatBubble variant="received">
-              <ChatBubbleAvatar src="" fallback="🤖" />
-              <ChatBubbleMessage isLoading />
-            </ChatBubble>
+          <ChatBubble variant="received">
+            <ChatBubbleAvatar src="" fallback="🤖" />
+            <ChatBubbleMessage isLoading />
+          </ChatBubble>
         </div>
       );
     }
@@ -147,7 +151,7 @@ const ChatPage = () => {
         ref={messagesRef}
       >
         {renderOlderMessagesLoadingIndicator()}
-        
+
         <ChatWebSocketBridge
           conversationId={conversationId}
           onNewMessage={(message) => {
@@ -168,7 +172,7 @@ const ChatPage = () => {
           )}
 
           {messages.map((message, index) => (
-            
+
             <ChatMessage
               key={index}
               direction={message.direction}
