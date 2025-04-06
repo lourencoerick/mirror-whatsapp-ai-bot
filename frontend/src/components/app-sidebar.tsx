@@ -1,175 +1,82 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import {
-  AudioWaveform,
-  BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
-  Map,
-  PieChart,
-  Settings2,
-  SquareTerminal,
-} from "lucide-react"
-
-import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
-import { NavUser } from "@/components/nav-user"
-import { TeamSwitcher } from "@/components/team-switcher"
+import { NavUser } from "@/components/nav-user";
+import { NavAccount } from "@/components/nav-account";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarRail,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
+import { GalleryVerticalEnd } from "lucide-react"; // Example icon
 
-// This is sample data.
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
-  navMain: [
-    {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
-}
+// --- Configuration Import ---
+import { sidebarNavItems } from "@/config/sidebar-nav";
+import type { NavItem as ConfigNavItem } from "@/config/sidebar-nav"; 
+import { NavMain, type NavItem as NavMainItem } from "@/components/nav-main";
 
+// --- Placeholder Data  ---
+// TODO: use the account route to get the data from backend
+// or use org hook from clerk
+const accountData = {
+  name: "Acme Inc",
+  logo: GalleryVerticalEnd,
+  plan: "Enterprise",
+};
+
+// --- Helper Function for Data Mapping ---
+/**
+ * Maps the NavItem structure from config to the structure expected by NavMain.
+ * @param {ConfigNavItem} navItem - The navigation item from the config.
+ * @returns {NavMainItem} An object suitable for the NavMain component's 'items' prop.
+ */
+const mapNavItemToNavMainProps = (navItem: ConfigNavItem): NavMainItem => {
+  // Ensure the output matches NavMainItem: { title: string, href: string, ... }
+  const mappedItem: NavMainItem = {
+    title: navItem.name,
+    href: navItem.href,
+    icon: navItem.icon,
+    children: navItem.children
+      ?.filter((child) => !child.hidden)
+      .map(mapNavItemToNavMainProps),
+    exactMatch: navItem.exactMatch,
+  };
+  return mappedItem;
+};
+
+
+/**
+ * The main application sidebar component.
+ */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  console.log("Raw sidebarNavItems:", JSON.stringify(sidebarNavItems, null, 2));
+
+  // Filter out hidden items
+  const visibleNavItems = sidebarNavItems.filter(
+    (item) => !item.hidden
+  );
+
+  
+
+  console.log("Visible Nav Items:", JSON.stringify(visibleNavItems, null, 2));
+
+  const navMainPropsItems = visibleNavItems.map(mapNavItemToNavMainProps);
+
+  console.log("Items passed to NavMain:", JSON.stringify(navMainPropsItems, null, 2));
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <NavAccount account={accountData} />
       </SidebarHeader>
+
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
+        <NavMain items={navMainPropsItems} />
       </SidebarContent>
+
       <SidebarFooter>
         <NavUser />
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
-  )
+  );
 }
