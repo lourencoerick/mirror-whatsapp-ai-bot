@@ -1,34 +1,75 @@
+
 "use client";
 
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { SquarePen } from "lucide-react";
-
+import { toast } from "sonner"; 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import PhoneInputForm from "@/components/ui/conversation/start-conversation-dialog-input";
-import { startConversation } from "@/lib/actions/start-conversation";
+import PhoneInputForm from "@/components/ui/conversation/start-conversation-dialog-input"; 
+import { startConversation } from "@/lib/actions/start-conversation"; 
 
+/**
+ * Props for the StartConversationDialog component.
+ */
+interface StartConversationDialogProps {
+  /** The element that triggers the dialog opening. */
+  trigger: React.ReactNode;
+}
 
-
-export default function StartConversationDialog() {
+/**
+ * A dialog component to initiate a new WhatsApp conversation.
+ * Uses sonner toasts for user feedback on the start conversation action.
+ * User-facing text is in Portuguese (PT-BR).
+ *
+ * @param {StartConversationDialogProps} props - The component props.
+ * @param {React.ReactNode} props.trigger - The element that will open the dialog when clicked.
+ */
+export default function StartConversationDialog({ trigger }: StartConversationDialogProps) {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const router = useRouter(); 
+  const router = useRouter();
 
+  /**
+   * Handles the submission of the phone number to start a new conversation.
+   * Shows loading, success, or error toasts (in PT-BR) during the process.
+   * Navigates to the conversation page on success.
+   *
+   * @param {string} fullNumber - The complete phone number (including country code).
+   * @param {string} inboxId - The ID of the inbox to use for the conversation.
+   */
   const handleStartConversation = async (fullNumber: string, inboxId: string) => {
     setLoading(true);
+    const toastId = toast.loading("Iniciando conversa..."); 
+
     try {
       const res = await startConversation({ phoneNumber: fullNumber, inboxId: inboxId });
 
       if (res.success && res.conversation_id) {
-        setOpen(false);
+        toast.success("Conversa iniciada!", { 
+          id: toastId,
+          description: "Redirecionando...", 
+        });
+        setOpen(false); 
         router.push(`/dashboard/conversations/${res.conversation_id}`);
       } else {
-        console.error("Failed to start conversation", res.error);
+        
+        const errorMessage = res.error || "Não foi possível iniciar a conversa."; 
+        toast.error("Falha ao iniciar", { 
+          id: toastId,
+          description: errorMessage, 
+        });
+        console.error("Failed to start conversation:", errorMessage);
+        
       }
-    } catch (err) {
-      console.error("Unexpected error", err);
+    } catch (err: any) {
+      
+      console.error("Unexpected error starting conversation:", err);
+      const errorDescription = err.message || "Por favor, tente novamente mais tarde."; 
+      toast.error("Ocorreu um erro inesperado", { 
+        id: toastId,
+        description: errorDescription, 
+      });
+      
     } finally {
       setLoading(false);
     }
@@ -37,18 +78,17 @@ export default function StartConversationDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-          <SquarePen size={15} />
-        </Button>
+        {trigger}
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Inicie uma nova conversa</DialogTitle>
+          <DialogTitle>Iniciar nova conversa</DialogTitle> 
         </DialogHeader>
 
         <PhoneInputForm
-          onPhoneSubmit={(fullNumber, inboxId) => handleStartConversation(fullNumber, inboxId)}
+          onPhoneSubmit={handleStartConversation}
+          
           loadingText="Iniciando..."
           submitText="Iniciar"
         />

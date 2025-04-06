@@ -31,7 +31,7 @@ const DashboardHeader = () => {
     const { pageTitle } = useLayoutContext();
 
     return (
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4"> {/* Added px-4, bg, border-b */}
+        <header className="flex h-20 shrink-0 items-center gap-2 border-b bg-background px-4"> {/* Added px-4, bg, border-b */}
             {/* Sidebar Trigger and Separator */}
             <SidebarTrigger className="-ml-1" />
             <Separator
