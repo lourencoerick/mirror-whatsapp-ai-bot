@@ -1,5 +1,5 @@
 "use client";
-
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { useLayoutContext } from '@/contexts/layout-context';
@@ -8,7 +8,11 @@ import StartConversationDialog from '@/components/ui/conversation/start-conversa
 const ConversationsPage = () => {
 
   const { setPageTitle } = useLayoutContext();
-  setPageTitle("Conversas");
+  useEffect(() => {
+    setPageTitle("Conversas");
+  }, [setPageTitle]);
+
+
 
   return (
     <div className="flex h-full">
