@@ -8,6 +8,7 @@ from app.services.repository import inbox as inbox_repo
 from app.services.repository import contact as contact_repo
 from app.services.repository import conversation as conversation_repo
 from app.api.schemas.message import MessageCreate
+from app.api.schemas.contact import ContactCreate
 from app.services.helper.contact import normalize_phone_number
 
 
@@ -62,9 +63,10 @@ async def parse_webhook_to_message(
         contact = await contact_repo.create_contact(
             db=db,
             account_id=account_id,
-            name=contact_name,
-            phone_number=normalized_contact_phone,
-            identifier=normalized_contact_phone,
+            contact_data=ContactCreate(
+                name=contact_name,
+                phone_number=normalized_contact_phone,
+            ),
         )
 
     contact_inbox = await contact_repo.get_or_create_contact_inbox(

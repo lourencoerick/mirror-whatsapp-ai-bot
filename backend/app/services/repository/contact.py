@@ -153,7 +153,6 @@ async def create_contact(
         **contact_data.model_dump(exclude_unset=True),
         account_id=account_id,
         identifier=normalized_phone,
-        phone_number=normalized_phone,
     )
     db.add(db_contact)
     try:

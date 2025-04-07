@@ -21,6 +21,7 @@ from app.services.helper.conversation import (
     conversations_to_conversations_response,
     parse_conversation_to_conversation_response,
 )
+from app.api.schemas.contact import ContactCreate
 from app.services.helper.contact import normalize_phone_number
 
 
@@ -175,8 +176,9 @@ async def start_conversation(
             contact = await contact_repo.create_contact(
                 db=db,
                 account_id=account_id,
-                phone_number=normalize_phone_number,
-                identifier=normalize_phone_number,
+                contact_data=ContactCreate(
+                    phone_number=normalized_phone_number,
+                ),
             )
 
         internal_source_id = f"frontend-{uuid4().hex}"
