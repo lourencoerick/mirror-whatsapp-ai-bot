@@ -1,9 +1,8 @@
 import React from 'react';
 
-export default function Home() {
+
+export default function DashboardPage() {
   return (
-    <div className="">
-      Dashboard
-    </div>
+      <div>Conteúdo da dashboard aqui.</div>
   );
 }

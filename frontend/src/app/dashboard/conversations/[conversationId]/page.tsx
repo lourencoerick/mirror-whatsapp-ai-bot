@@ -17,6 +17,13 @@ import { Message } from '@/types/message';
 import { useLayoutContext } from '@/contexts/layout-context';
 
 
+
+import Link from 'next/link';
+import { MessageSquareOff, LockKeyhole } from 'lucide-react'; // Using two icons for illustration
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import ConversationNotFound from "@/components/ui/conversation/unavailable-conversation"
+
 const ChatPage = () => {
 
 
@@ -168,7 +175,7 @@ const ChatPage = () => {
           )}
 
           {error && (
-            <div className="text-red-500 p-4">Erro ao carregar mensagens.</div>
+            <ConversationNotFound />
           )}
 
           {messages.map((message, index) => (
