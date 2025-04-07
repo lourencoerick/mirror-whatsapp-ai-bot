@@ -82,7 +82,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
     if (!isLoaded || contextLoading) {
         return (
-            <div className="flex items-center justify-center h-screen">
+            <div className="flex items-center justify-center h-screen w-full">
                 Carregando...
             </div>
         );
