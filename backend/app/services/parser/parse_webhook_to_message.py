@@ -4,10 +4,11 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.parser.evolution_parser import parse_evolution_message
-from app.services.repository.inbox import find_inbox_by_channel_id
-from app.services.repository.contact import upsert_contact, get_or_create_contact_inbox
-from app.services.repository.conversation import get_or_create_conversation
+from app.services.repository import inbox as inbox_repo
+from app.services.repository import contact as contact_repo
+from app.services.repository import conversation as conversation_repo
 from app.api.schemas.message import MessageCreate
+from app.services.helper.contact import normalize_phone_number
 
 
 async def parse_webhook_to_message(
@@ -41,7 +42,7 @@ async def parse_webhook_to_message(
         return None
 
     # Step 2 - Inbox
-    inbox = await find_inbox_by_channel_id(
+    inbox = await inbox_repo.find_inbox_by_channel_id(
         db, account_id=account_id, channel_id=channel_id
     )
     if not inbox:
@@ -49,19 +50,29 @@ async def parse_webhook_to_message(
         return None
 
     # Step 3 - Contact (upsert) & ContactInbox
-    contact = await upsert_contact(
+    normalized_contact_phone = normalize_phone_number(contact_phone)
+
+    contact = await contact_repo.find_contact_by_identifier(
         db=db,
         account_id=account_id,
-        phone_number=contact_phone,
-        name=contact_name,
+        identifier=normalized_contact_phone,
     )
 
-    contact_inbox = await get_or_create_contact_inbox(
+    if not contact:
+        contact = await contact_repo.create_contact(
+            db=db,
+            account_id=account_id,
+            name=contact_name,
+            phone_number=normalized_contact_phone,
+            identifier=normalized_contact_phone,
+        )
+
+    contact_inbox = await contact_repo.get_or_create_contact_inbox(
         db=db, contact_id=contact.id, inbox_id=inbox.id, source_id=source_id
     )
 
     # Step 4 - Conversation (get or create)
-    conversation = await get_or_create_conversation(
+    conversation = await conversation_repo.get_or_create_conversation(
         db=db,
         account_id=account_id,
         inbox_id=inbox.id,
