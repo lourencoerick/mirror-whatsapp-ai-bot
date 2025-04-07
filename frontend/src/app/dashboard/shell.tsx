@@ -12,7 +12,7 @@ import {
 import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch';
 import ConversationPanel from "@/components/ui/conversation/conversation-panel";
 import { LayoutProvider, useLayoutContext } from '@/contexts/layout-context';
-
+import LoadingLogo from '@/components/loading-logo';
 interface UserContextData {
     internal_user_id: string;
     active_account_id: string;
@@ -82,9 +82,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
     if (!isLoaded || contextLoading) {
         return (
-            <div className="flex items-center justify-center h-screen w-full">
-                Carregando...
-            </div>
+            <LoadingLogo />
         );
     }
 
