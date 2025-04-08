@@ -60,7 +60,7 @@ import {
       href: '/dashboard/contacts',
       icon: Users,
       children: [
-        { name: 'Adicionar Contato', href: '/dashboard/contacts/add', icon: UserPlus },
+        { name: 'Adicionar Contato', href: '/dashboard/contacts/add', icon: UserPlus, hidden: true },
       ],
     },
     {
