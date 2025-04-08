@@ -10,10 +10,11 @@ from app.api.routes import auth as auth_routes
 from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
 from app.api.routes import inbox as inbox_routes
+from app.api.routes import contact as contact_routes
 from app.api.routes import me as me_routes
 from app.api.routes import websocket as ws_routes
-from app.api.routes import evolution_instance as evolution_instance_routes
 from app.api.routes.webhooks import clerk as clerk_routes
+from app.api.routes import evolution_instance as evolution_instance_routes
 from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
 
 # Import Dependencies and Context
@@ -78,6 +79,10 @@ app.include_router(
 app.include_router(
     inbox_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Inboxes"]
 )
+app.include_router(
+    contact_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Contacts"]
+)
+
 app.include_router(me_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Me"])
 
 

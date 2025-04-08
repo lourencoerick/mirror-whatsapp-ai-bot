@@ -21,6 +21,8 @@ from app.services.helper.conversation import (
     conversations_to_conversations_response,
     parse_conversation_to_conversation_response,
 )
+from app.api.schemas.contact import ContactCreate
+from app.services.helper.contact import normalize_phone_number
 
 
 router = APIRouter()
@@ -73,7 +75,6 @@ async def search_or_list_conversations(
             )
             return conversations
         else:
-            # return []/
             async with db as session:
                 conversations = await conversation_repo.find_conversations_by_user(
                     db=session,
@@ -89,39 +90,6 @@ async def search_or_list_conversations(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred while retrieving conversations. {e}",
         )
-
-
-@router.get("/conversations/old", response_model=List[ConversationSearchResult])
-async def get_user_conversations(
-    limit: int = 20,
-    offset: int = 0,
-    db: AsyncSession = Depends(get_db),
-    auth_context: AuthContext = Depends(get_auth_context),
-):
-    """Return all conversations visible to the current user, based on inbox membership.
-
-    Args:
-        limit (int, optional): The number of conversations to return. Defaults to 20.
-        offset (int, optional): The number of conversations to skip. Defaults to 0.
-        db (AsyncSession, optional): The database session. Defaults to Depends(get_db).
-        auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
-
-    Returns:
-        List[ConversationSearchResult]: A list of conversations.
-    """
-    user_id = auth_context.user.id
-    account_id = auth_context.account.id
-
-    async with db as session:
-        conversations = await conversation_repo.find_conversations_by_user(
-            db=session,
-            user_id=user_id,
-            account_id=account_id,
-            limit=limit,
-            offset=offset,
-        )
-
-    return conversations_to_conversations_response(conversations)
 
 
 @router.get(
@@ -196,11 +164,22 @@ async def start_conversation(
                 status_code=404, detail="Inbox not found or unauthorized"
             )
 
-        contact = await contact_repo.upsert_contact(
-            db=session,
+        normalized_phone_number = normalize_phone_number(payload.phone_number)
+
+        contact = await contact_repo.find_contact_by_identifier(
+            db=db,
             account_id=account_id,
-            phone_number=payload.phone_number,
+            identifier=normalized_phone_number,
         )
+
+        if not contact:
+            contact = await contact_repo.create_contact(
+                db=db,
+                account_id=account_id,
+                contact_data=ContactCreate(
+                    phone_number=normalized_phone_number,
+                ),
+            )
 
         internal_source_id = f"frontend-{uuid4().hex}"
 
