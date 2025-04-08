@@ -17,12 +17,7 @@ import { Message } from '@/types/message';
 import { useLayoutContext } from '@/contexts/layout-context';
 
 
-
-import Link from 'next/link';
-import { MessageSquareOff, LockKeyhole } from 'lucide-react'; // Using two icons for illustration
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import ConversationNotFound from "@/components/ui/conversation/unavailable-conversation"
+import ConversationNotFound from "@/components/ui/conversation/conversation-notfound"
 
 const ChatPage = () => {
 
