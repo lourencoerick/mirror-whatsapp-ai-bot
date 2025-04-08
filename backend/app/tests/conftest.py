@@ -187,6 +187,7 @@ async def test_contact(db_session: AsyncSession, test_account: Account) -> Conta
         account_id=test_account.id,
         phone_number="5511941986775",
         name="Test Contact from Fixture",
+        identifier="5511941986775",
     )
     db_session.add(contact)
     await db_session.flush()
