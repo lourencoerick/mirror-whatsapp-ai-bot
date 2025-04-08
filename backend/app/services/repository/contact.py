@@ -68,7 +68,7 @@ async def find_contact_by_identifier(
 
 
 async def get_contacts(
-    db: AsyncSession, *, account_id: UUID, skip: int = 0, limit: int = 20
+    db: AsyncSession, *, account_id: UUID, offset: int = 0, limit: int = 20
 ) -> List[Contact]:
     """
     Retrieves a paginated list of contacts for a specific account asynchronously.
@@ -76,7 +76,7 @@ async def get_contacts(
     Args:
         db: The SQLAlchemy AsyncSession object.
         account_id: The UUID of the account whose contacts are to be retrieved.
-        skip: The number of records to skip (for pagination).
+        offset: The number of records to skip (for pagination).
         limit: The maximum number of records to return (for pagination).
 
     Returns:
@@ -86,7 +86,7 @@ async def get_contacts(
         select(Contact)
         .filter(Contact.account_id == account_id)
         .order_by(Contact.created_at.desc())
-        .offset(skip)
+        .offset(offset)
         .limit(limit)
     )
     result = await db.execute(stmt)
@@ -132,6 +132,7 @@ async def create_contact(
     """
     # Normalization is synchronous
     normalized_phone = normalize_phone_number(contact_data.phone_number)
+
     if not normalized_phone:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -142,6 +143,7 @@ async def create_contact(
     existing_contact = await find_contact_by_identifier(
         db=db, identifier=normalized_phone, account_id=account_id
     )
+
     if existing_contact:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -149,6 +151,7 @@ async def create_contact(
         )
 
     # Create the ORM model instance (synchronous)
+    contact_data.phone_number = normalized_phone
     db_contact = Contact(
         **contact_data.model_dump(exclude_unset=True),
         account_id=account_id,
