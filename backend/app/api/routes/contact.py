@@ -75,7 +75,7 @@ async def create_new_contact(
     "/contacts",
     response_model=PaginatedContactRead,
     summary="List contacts",
-    description="Retrieves a paginated list of contacts for the current account.",
+    description="Retrieves a paginated, searchable, and sortable list of contacts for the current account.",
 )
 async def list_contacts(
     db: AsyncSession = Depends(get_db),
@@ -86,35 +86,70 @@ async def list_contacts(
     limit: int = Query(
         20, ge=1, le=100, description="Maximum number of records to return"
     ),
+    search: Optional[str] = Query(
+        None,
+        description="Search term to filter contacts by name, email, or phone number.",
+        min_length=1,
+        max_length=100,
+    ),
+    sort_by: Optional[str] = Query(
+        None,
+        description="Field to sort contacts by (e.g., 'name', 'email', 'created_at').",
+    ),
+    sort_direction: str = Query(
+        default="asc",
+        pattern="^(asc|desc)$",
+        description="Sort direction: 'asc' (ascending) or 'desc' (descending).",
+    ),
 ):
     """
     Retrieves a list of contacts belonging to the authenticated user's account,
-    with support for pagination.
+    with support for pagination, search, and sorting.
 
     Args:
         db: The database session dependency.
-        account_id: The account ID dependency from the authenticated user.
-        skip: Pagination offset.
+        auth_context: Authentication context containing account ID.
+        offset: Pagination offset.
         limit: Pagination limit.
+        search: Optional search term.
+        sort_by: Optional field to sort by.
+        sort_direction: Sort direction ('asc' or 'desc').
 
     Returns:
-        A paginated response containing the list of contacts and the total count.
+        A paginated response containing the list of contacts and the total count
+        matching the search criteria.
 
     Raises:
         HTTPException 500: If a database error occurs.
     """
     account_id = auth_context.account.id
     if db is None:
+
+        logger.error("Database session not available in list_contacts")
         raise HTTPException(status_code=500, detail="Database session not available")
 
     try:
+
         contacts = await contact_repo.get_contacts(
-            db=db, account_id=account_id, offset=offset, limit=limit
+            db=db,
+            account_id=account_id,
+            offset=offset,
+            limit=limit,
+            search=search,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
         )
-        total_contacts = await contact_repo.count_contacts(db=db, account_id=account_id)
+
+        total_contacts = await contact_repo.count_contacts(
+            db=db, account_id=account_id, search=search
+        )
+
         return PaginatedContactRead(total=total_contacts, items=contacts)
     except Exception as e:
-        logger.error(f"Unexpected error listing contacts: {e}")
+        logger.exception(
+            f"Unexpected error listing contacts for account {account_id}: {e}",
+            exc_info=True,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while listing contacts.",
@@ -166,11 +201,7 @@ async def get_contact_details(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        # Catch any unexpected errors during retrieval
-        # Log the error e
-        print(
-            f"Unexpected error getting contact {contact_id}: {e}"
-        )  # Replace with proper logging
+        logger.exception(f"Unexpected error getting contact {contact_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while retrieving the contact.",
@@ -235,7 +266,7 @@ async def update_existing_contact(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        logger.error(f"Unexpected error updating contact {contact_id}: {e}")
+        logger.exception(f"Unexpected error updating contact {contact_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while updating the contact.",
@@ -293,7 +324,7 @@ async def delete_existing_contact(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        logger.error(f"Unexpected error deleting contact {contact_id}: {e}")
+        logger.exception(f"Unexpected error deleting contact {contact_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while deleting the contact.",
