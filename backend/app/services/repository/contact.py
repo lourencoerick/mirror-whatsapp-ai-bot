@@ -2,8 +2,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Type, Dict, Any
 from loguru import logger
-from sqlalchemy import select, func
-
+from sqlalchemy import select, func, or_, update
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
@@ -13,32 +12,36 @@ from app.api.schemas.contact import ContactCreate, ContactUpdate
 from app.services.helper.contact import normalize_phone_number
 
 
+ALLOWED_SORT_FIELDS: Dict[str, Any] = {
+    "name": Contact.name,
+    "email": Contact.email,
+    "phone_number": Contact.phone_number,
+    "created_at": Contact.created_at,
+}
+DEFAULT_SORT_FIELD = Contact.name
+
+
 async def find_contact_by_id(
     db: AsyncSession, account_id: UUID, contact_id: str
 ) -> Optional[Contact]:
-    """Finds a contact by phone number.
-
-    Args:
-        db (AsyncSession): Database session.
-        account_id (UUID): The ID of the account.
-        contact_id (UUID): The contact ID.
-
-    Returns:
-        Optional[Contact]: The Contact object if found, otherwise None.
-    """
+    """Finds an *active* contact by ID."""  # Modified docstring
     if not all([account_id, contact_id]):
         logger.warning("[contact] Missing required parameters for lookup")
         return None
 
     result = await db.execute(
-        select(Contact).filter_by(account_id=account_id, id=contact_id)
+        select(Contact).filter_by(
+            account_id=account_id,
+            id=contact_id,
+            deleted_at=None,  # Added filter for active contacts
+        )
     )
     contact = result.scalar_one_or_none()
 
     if contact:
-        logger.debug(f"[contact] Found contact (id={contact.id})")
+        logger.debug(f"[contact] Found active contact (id={contact.id})")
     else:
-        logger.info(f"[contact] No contact found {contact_id}")
+        logger.info(f"[contact] No active contact found {contact_id}")
 
     return contact
 
@@ -46,21 +49,13 @@ async def find_contact_by_id(
 async def find_contact_by_identifier(
     db: AsyncSession, *, identifier: str, account_id: UUID
 ) -> Optional[Contact]:
-    """
-    Retrieves a contact by its normalized identifier and account ID.
-
-    Args:
-        db: The SQLAlchemy Session object.
-        identifier: The normalized phone number (E.164 format).
-        account_id: The UUID of the account the contact belongs to.
-
-    Returns:
-        The Contact instance if found, otherwise None.
-    """
+    """Retrieves an *active* contact by its normalized identifier and account ID."""  # Modified docstring
 
     result = await db.execute(
         select(Contact).filter(
-            Contact.identifier == identifier, Contact.account_id == account_id
+            Contact.identifier == identifier,
+            Contact.account_id == account_id,
+            Contact.deleted_at.is_(None),  # Added filter for active contacts
         )
     )
 
@@ -68,89 +63,110 @@ async def find_contact_by_identifier(
 
 
 async def get_contacts(
-    db: AsyncSession, *, account_id: UUID, offset: int = 0, limit: int = 20
+    db: AsyncSession,
+    account_id: UUID,
+    offset: int,
+    limit: int,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_direction: str = "asc",
 ) -> List[Contact]:
-    """
-    Retrieves a paginated list of contacts for a specific account asynchronously.
+    """Fetches a paginated, filtered, and sorted list of *active* contacts."""  # Modified docstring
 
-    Args:
-        db: The SQLAlchemy AsyncSession object.
-        account_id: The UUID of the account whose contacts are to be retrieved.
-        offset: The number of records to skip (for pagination).
-        limit: The maximum number of records to return (for pagination).
-
-    Returns:
-        A list of ContactModel instances.
-    """
-    stmt = (
-        select(Contact)
-        .filter(Contact.account_id == account_id)
-        .order_by(Contact.created_at.desc())
-        .offset(offset)
-        .limit(limit)
+    # Added filter for active contacts
+    stmt = select(Contact).where(
+        Contact.account_id == account_id, Contact.deleted_at.is_(None)
     )
+
+    # --- Apply Search Filter ---
+    if search:
+        search_term = f"%{search}%"
+        stmt = stmt.where(
+            or_(
+                Contact.name.ilike(search_term),
+                Contact.email.ilike(search_term),
+                Contact.phone_number.ilike(search_term),
+            )
+        )
+
+    # --- Apply Sorting ---
+    sort_column = DEFAULT_SORT_FIELD
+    if sort_by and sort_by in ALLOWED_SORT_FIELDS:
+        sort_column = ALLOWED_SORT_FIELDS[sort_by]
+
+    if sort_direction == "desc":
+        stmt = stmt.order_by(sort_column.desc())
+    else:
+        stmt = stmt.order_by(sort_column.asc())
+
+    # --- Apply Pagination ---
+    stmt = stmt.offset(offset).limit(limit)
+
+    # --- Execute Query ---
     result = await db.execute(stmt)
     return result.scalars().all()
 
 
-async def count_contacts(db: AsyncSession, *, account_id: UUID) -> int:
-    """
-    Counts the total number of contacts for a specific account asynchronously.
+async def count_contacts(
+    db: AsyncSession, account_id: UUID, search: Optional[str] = None
+) -> int:
+    """Counts *active* contacts matching the optional search filter."""
 
-    Args:
-        db: The SQLAlchemy AsyncSession object.
-        account_id: The UUID of the account.
+    # Added filter for active contacts
+    stmt = select(func.count(Contact.id)).where(
+        Contact.account_id == account_id, Contact.deleted_at.is_(None)
+    )
 
-    Returns:
-        The total number of contacts.
-    """
-    stmt = select(func.count(Contact.id)).filter(Contact.account_id == account_id)
-    result = await db.execute(stmt)
-    count = result.scalar()
-    return count if count is not None else 0
+    if search:
+        search_term = f"%{search}%"
+        stmt = stmt.where(
+            or_(
+                Contact.name.ilike(search_term),
+                Contact.email.ilike(search_term),
+                Contact.phone_number.ilike(search_term),
+            )
+        )
+
+    total = await db.scalar(stmt)
+    return total or 0
 
 
 async def create_contact(
     db: AsyncSession, *, contact_data: ContactCreate, account_id: UUID
 ) -> Contact:
-    """
-    Creates a new contact in the database asynchronously after normalizing the phone number.
+    """Creates a new contact. Checks for conflicts only among *active* contacts."""
 
-    Args:
-        db: The SQLAlchemy AsyncSession object.
-        contact_data: The Pydantic schema containing contact creation data.
-        account_id: The UUID of the account creating this contact.
-
-    Returns:
-        The newly created ContactModel instance.
-
-    Raises:
-        HTTPException: 400 if phone number is invalid/unparseable.
-        HTTPException: 409 if a contact with the same normalized phone number
-                       already exists for this account.
-        HTTPException: 500 on database errors.
-    """
-    # Normalization is synchronous
     normalized_phone = normalize_phone_number(contact_data.phone_number)
-
     if not normalized_phone:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid or unparseable phone number: {contact_data.phone_number}",
         )
 
-    # Check if identifier already exists for this account (asynchronously)
+    # Check if identifier already exists for an *active* contact
     existing_contact = await find_contact_by_identifier(
         db=db, identifier=normalized_phone, account_id=account_id
     )
-
     if existing_contact:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Contact with phone number {contact_data.phone_number} (normalized: {normalized_phone}) already exists.",
+            detail=f"Active contact with phone number {contact_data.phone_number} (normalized: {normalized_phone}) already exists.",
         )
 
-    # Create the ORM model instance (synchronous)
+    # Check for email conflict among *active* contacts (if email provided)
+    # Assumes partial unique index on (account_id, email) WHERE deleted_at IS NULL
+    if contact_data.email:
+        existing_email_contact = await db.scalar(
+            select(Contact).filter_by(
+                account_id=account_id, email=contact_data.email, deleted_at=None
+            )
+        )
+        if existing_email_contact:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Active contact with email {contact_data.email} already exists.",
+            )
+
     contact_data.phone_number = normalized_phone
     db_contact = Contact(
         **contact_data.model_dump(exclude_unset=True),
@@ -161,11 +177,34 @@ async def create_contact(
     try:
         await db.commit()
         await db.refresh(db_contact)
-    except IntegrityError:
+    except IntegrityError as e:
         await db.rollback()
+        logger.warning(
+            f"Integrity error creating contact, possibly email/identifier conflict: {e}"
+        )
+
+        if contact_data.email and await db.scalar(
+            select(Contact.id).filter_by(
+                account_id=account_id, email=contact_data.email, deleted_at=None
+            )
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Active contact with email {contact_data.email} already exists.",
+            )
+
+        if await db.scalar(
+            select(Contact.id).filter_by(
+                account_id=account_id, identifier=normalized_phone, deleted_at=None
+            )
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Active contact with phone number {contact_data.phone_number} already exists.",
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Contact with phone number {contact_data.phone_number} (normalized: {normalized_phone}) already exists (database constraint).",
+            detail="Contact creation failed due to a conflict.",
         )
     except Exception as e:
         await db.rollback()
@@ -180,26 +219,15 @@ async def create_contact(
 async def update_contact(
     db: AsyncSession, *, contact: Contact, update_data: ContactUpdate
 ) -> Contact:
-    """
-    Updates an existing contact in the database asynchronously.
+    """Updates an existing *active* contact. Checks for conflicts only among other *active* contacts."""
 
-    Requires the existing contact model instance to be passed in.
+    if contact.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cannot update a deleted contact.",
+        )
 
-    Args:
-        db: The SQLAlchemy AsyncSession object.
-        contact: The existing ContactModel instance to update.
-        update_data: The Pydantic schema containing contact update data.
-
-    Returns:
-        The updated ContactModel instance.
-
-    Raises:
-        HTTPException: 400 if a new phone number is provided and it's invalid.
-        HTTPException: 409 if a new phone number conflicts with an existing contact.
-        HTTPException: 500 on database errors.
-    """
     update_dict = update_data.model_dump(exclude_unset=True)
-
     if not update_dict:
         return contact
 
@@ -211,30 +239,46 @@ async def update_contact(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number cannot be set to empty.",
             )
-
         new_normalized_phone = normalize_phone_number(new_phone_number)
         if not new_normalized_phone:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid or unparseable phone number provided for update: {new_phone_number}",
             )
-
-        # Check for conflict only if the identifier is actually changing
         if new_normalized_phone != contact.identifier:
-            # Check asynchronously
+            # Check for conflict with another *active* contact
             existing_contact = await find_contact_by_identifier(
                 db=db, identifier=new_normalized_phone, account_id=contact.account_id
             )
             if existing_contact and existing_contact.id != contact.id:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Another contact with phone number {new_phone_number} (normalized: {new_normalized_phone}) already exists.",
+                    detail=f"Another active contact with phone number {new_phone_number} (normalized: {new_normalized_phone}) already exists.",
                 )
-            # Update the identifier
             update_dict["identifier"] = new_normalized_phone
             update_dict["phone_number"] = new_normalized_phone
 
-    # Update the model attributes (synchronous)
+    # Check if email is being updated and check for conflicts among *active* contacts
+    if (
+        "email" in update_dict
+        and update_dict["email"] != contact.email
+        and update_dict["email"]
+    ):
+        existing_email_contact = await db.scalar(
+            select(Contact)
+            .filter_by(
+                account_id=contact.account_id,
+                email=update_dict["email"],
+                deleted_at=None,
+            )
+            .filter(Contact.id != contact.id)
+        )
+        if existing_email_contact:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Another active contact with email {update_dict['email']} already exists.",
+            )
+
     for key, value in update_dict.items():
         setattr(contact, key, value)
 
@@ -242,11 +286,43 @@ async def update_contact(
     try:
         await db.commit()
         await db.refresh(contact)
-    except IntegrityError:
+    except IntegrityError as e:
         await db.rollback()
+        logger.warning(f"Integrity error updating contact {contact.id}: {e}")
+
+        if (
+            "email" in update_dict
+            and update_dict["email"]
+            and await db.scalar(
+                select(Contact.id)
+                .filter_by(
+                    account_id=contact.account_id,
+                    email=update_dict["email"],
+                    deleted_at=None,
+                )
+                .filter(Contact.id != contact.id)
+            )
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Another active contact with email {update_dict['email']} already exists.",
+            )
+        if "identifier" in update_dict and await db.scalar(
+            select(Contact.id)
+            .filter_by(
+                account_id=contact.account_id,
+                identifier=update_dict["identifier"],
+                deleted_at=None,
+            )
+            .filter(Contact.id != contact.id)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Another active contact with phone number {update_dict.get('phone_number', '')} already exists.",
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Update failed due to conflicting phone number (database constraint).",
+            detail="Contact update failed due to a conflict.",
         )
     except Exception as e:
         await db.rollback()
@@ -259,24 +335,43 @@ async def update_contact(
 
 
 async def delete_contact(db: AsyncSession, *, contact: Contact) -> None:
-    """
-    Deletes a contact from the database asynchronously.
+    """Soft deletes a contact by setting the deleted_at timestamp."""
 
-    Requires the existing contact model instance to be passed in.
+    if contact.deleted_at is not None:
+        logger.warning(f"Attempted to delete already soft-deleted contact {contact.id}")
+        return
 
-    Args:
-        db: The SQLAlchemy AsyncSession object.
-        contact: The ContactModel instance to delete.
-
-    Raises:
-        HTTPException: 500 if deletion fails.
-    """
-    await db.delete(contact)
     try:
+
+        stmt = (
+            update(Contact)
+            .where(Contact.id == contact.id, Contact.deleted_at.is_(None))
+            .values(deleted_at=func.now())
+            .execution_options(synchronize_session="fetch")
+        )
+        result = await db.execute(stmt)
+
+        if result.rowcount == 0:
+            logger.warning(
+                f"Contact {contact.id} was not found or already deleted during soft delete operation."
+            )
+
+            await db.refresh(contact, attribute_names=["deleted_at"])
+            if contact.deleted_at is None:
+
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to soft delete contact.",
+                )
+            return
+
         await db.commit()
+
+        logger.info(f"Soft deleted contact {contact.id}")
+
     except Exception as e:
         await db.rollback()
-        logger.error(f"Database error deleting contact {contact.id}: {e}")
+        logger.error(f"Database error soft deleting contact {contact.id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete contact due to a database error.",
@@ -285,21 +380,20 @@ async def delete_contact(db: AsyncSession, *, contact: Contact) -> None:
 
 async def get_or_create_contact_inbox(
     db: AsyncSession,
+    account_id: UUID,
     contact_id: UUID,
     inbox_id: UUID,
     source_id: UUID,
 ) -> ContactInbox:
-    """Finds or creates a ContactInbox association between a contact and an inbox.
+    """Finds or creates a ContactInbox association. Assumes caller provides an *active* contact ID."""
 
-    Args:
-        db (AsyncSession): Database session.
-        contact_id (UUID): The ID of the contact.
-        inbox_id (UUID): The ID of the inbox.
-        source_id (UUID): The source ID.
+    contact = await find_contact_by_id(db, account_id, contact_id)
+    if not contact:
+        raise HTTPException(
+            status_code=404,
+            detail="Cannot associate with a non-existent or deleted contact.",
+        )
 
-    Returns:
-        ContactInbox: The ContactInbox object.
-    """
     result = await db.execute(
         select(ContactInbox).filter_by(contact_id=contact_id, inbox_id=inbox_id)
     )
@@ -315,9 +409,6 @@ async def get_or_create_contact_inbox(
             source_id=source_id,
         )
         db.add(contact_inbox)
-        await db.flush()
-        await db.commit()
-        await db.refresh(contact_inbox)
 
     else:
         logger.debug(f"[contact_inbox] Found contact_inbox (id={contact_inbox.id})")

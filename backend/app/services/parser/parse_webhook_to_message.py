@@ -70,7 +70,11 @@ async def parse_webhook_to_message(
         )
 
     contact_inbox = await contact_repo.get_or_create_contact_inbox(
-        db=db, contact_id=contact.id, inbox_id=inbox.id, source_id=source_id
+        db=db,
+        account_id=account_id,
+        contact_id=contact.id,
+        inbox_id=inbox.id,
+        source_id=source_id,
     )
 
     # Step 4 - Conversation (get or create)
