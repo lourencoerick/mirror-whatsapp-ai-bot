@@ -47,7 +47,7 @@ export const EditContactForm: React.FC<EditContactFormProps> = ({ contact, onSuc
     defaultValues: {
       name: contact.name || '',
       phone_number: contact.phone_number || '',
-      email: contact.email || '',
+      email: contact.email || undefined,
     },
   });
 

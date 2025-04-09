@@ -5,11 +5,13 @@ import { z } from 'zod';
 import { toast } from "sonner"; 
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, inputVariants } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AddContactSchema, type AddContactFormData } from '@/lib/validators/contact.schema';
 import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch';
 import { Loader2 } from 'lucide-react';
+import { InputMask } from '@react-input/mask';
+import { cn } from "@/lib/utils"
 
 /**
  * Props for the AddContactForm component.
@@ -41,7 +43,7 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({ onSuccess, onCan
     reset,
   } = useForm<AddContactFormData>({
     resolver: zodResolver(AddContactSchema),
-    defaultValues: { name: '', phone_number: '', email: '' },
+    defaultValues: { name: '', phone_number: '', email: undefined }, 
   });
 
   /**
@@ -99,7 +101,21 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({ onSuccess, onCan
       {/* Phone Number Field */}
       <div className="space-y-1">
         <Label htmlFor="phone_number">Telefone</Label>
-        <Input id="phone_number" {...register('phone_number')} placeholder="Ex: 5511987654321" disabled={isSubmitting} required />
+        <InputMask
+          id="phone_number"
+          mask="+55 (__) _____-____" // Adjusted mask for common mobile format
+          placeholder="+55 (11) 98765-4321" // More descriptive placeholder
+          replacement={{ '_': /\d/ }} // Use '9' for digits as per react-input-mask convention
+          autoFocus
+          {...register("phone_number", {
+            setValueAs: (value: string) => value.replace(/\D/g, ''), // Removes all non-digits
+          })}
+          // Apply the same classes as the standard Input component
+          className={cn(inputVariants)}
+          disabled={isSubmitting}
+          required
+        />
+        {/* <Input id="phone_number" {...register('phone_number')} placeholder="Ex: 5511987654321" disabled={isSubmitting} required /> */}
         {errors.phone_number && <p className="text-xs text-red-500">{errors.phone_number.message}</p>}
       </div>
 
