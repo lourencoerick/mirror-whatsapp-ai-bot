@@ -7,11 +7,19 @@ export const AddContactSchema = z.object({
   phone_number: z.string()
     .min(10, { message: "Número de telefone inválido." }) // Mínimo razoável
     .regex(phoneRegex, { message: "Formato de telefone inválido." }), // Valida o formato
-  email: z.string()
-    .email({ message: "Formato de email inválido." })
-    .max(100, { message: "O email é muito longo."})
-    .optional() // Email é opcional
-    .or(z.literal('')), // Permite string vazia como válida para opcional
+  email:  z.preprocess(
+    (val) => {
+      if (typeof val === "string" && val.trim() === "") {
+        return undefined;
+      }
+      return val;
+    },
+    z
+      .string()
+      .email({ message: "Formato de email inválido." })
+      .max(100, { message: "O email é muito longo." })
+      .optional()
+  ),
 });
 
 export type AddContactFormData = z.infer<typeof AddContactSchema>;

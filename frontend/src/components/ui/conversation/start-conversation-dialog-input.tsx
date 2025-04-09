@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { z } from "zod";
 import { InputMask } from '@react-input/mask';
 import { useInboxes } from "@/hooks/use-inboxes";
+import { cn } from "@/lib/utils"
+import { inputVariants } from '@/components/ui/input';
 
 const countries = getCountries(); // ['BR', 'US', 'FR', ...]
 
@@ -64,7 +66,7 @@ export default function PhoneInputForm({
       </select>
       {errors.inboxId && (
         <span className="text-center text-red-500 text-sm">{errors.inboxId.message}</span>
-      )}      
+      )}
       <div className="flex flex-row gap-2 text-sm text-center">
         <select {...register("country")} className="w-1/2 border rounded p-1">
           {countries.map((c) => (
@@ -75,15 +77,16 @@ export default function PhoneInputForm({
         </select>
         {selectedCountry === "BR" ? (
           <InputMask
-            mask="(__) _____-____"
-            placeholder="Digite o número"
-            replacement={{ _: /\d/ }}
+            id="number"
+            mask="(__) _____-____" 
+            placeholder="(11) 98765-4321" 
+            replacement={{ '_': /\d/ }} 
             autoFocus
             {...register("number", {
-              setValueAs: (value) => value.replace(/\D/g, ''),
+              setValueAs: (value: string) => value.replace(/\D/g, ''), 
             })}
-            className="w-full text-md h-9 border-1 border-gray-200 rounded-md"
-            style={{ paddingLeft: "1rem" }}
+            className={cn(inputVariants)}
+            required
           />
         ) : (
           <Input type="tel" placeholder="Digite o número" {...register("number")} />

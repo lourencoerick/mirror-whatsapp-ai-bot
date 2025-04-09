@@ -185,6 +185,7 @@ async def start_conversation(
 
         contact_inbox = await contact_repo.get_or_create_contact_inbox(
             db=session,
+            account_id=account_id,
             contact_id=contact.id,
             inbox_id=inbox.id,
             source_id=internal_source_id,
