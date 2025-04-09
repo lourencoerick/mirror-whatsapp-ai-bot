@@ -387,7 +387,9 @@ async def get_or_create_contact_inbox(
 ) -> ContactInbox:
     """Finds or creates a ContactInbox association. Assumes caller provides an *active* contact ID."""
 
-    contact = await find_contact_by_id(db, account_id, contact_id)
+    contact = await find_contact_by_id(
+        db=db, account_id=account_id, contact_id=contact_id
+    )
     if not contact:
         raise HTTPException(
             status_code=404,
@@ -409,6 +411,17 @@ async def get_or_create_contact_inbox(
             source_id=source_id,
         )
         db.add(contact_inbox)
+
+        try:
+            await db.commit()
+            await db.refresh(contact_inbox)
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Database error updating contact {contact.id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create contact_inbox due to a database error.",
+            )
 
     else:
         logger.debug(f"[contact_inbox] Found contact_inbox (id={contact_inbox.id})")
