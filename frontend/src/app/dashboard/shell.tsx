@@ -28,7 +28,7 @@ const DashboardHeader = () => {
         <header className="flex h-20 shrink-0 items-center gap-2 border-b bg-background px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mx-2 data-[orientation=vertical]:h-4" />
-            <h1 className="text-base font-semibold truncate whitespace-nowrap">
+            <h1 className="text-2xl font-semibold truncate whitespace-nowrap">
                 {pageTitle}
             </h1>
         </header>
