@@ -2,7 +2,7 @@ import React from 'react'
 import ConversationsList from './conversation-list'
 import StartConversationDialog from './start-conversation-dialog'
 import Search from './search';
-import { Funnel, SquarePen } from 'lucide-react';
+import { Funnel, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ConversationPanelProps {
@@ -21,7 +21,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ socketIdentifier 
           <StartConversationDialog
             trigger={
               <Button variant="outline" size="sm">
-                <SquarePen size={15} className="" /> {/* Added margin for better spacing */}
+                <Send size={15} className="" /> {/* Added margin for better spacing */}
               </Button>
             }
           />
