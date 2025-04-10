@@ -8,7 +8,7 @@ type Props = {
 function LoadingLogo({size = 250}: Props) {
   return (
     <div className='h-screen w-full flex justify-center items-center'>
-        <Image src="./logo.svg"
+        <Image src="/logo.svg"
             alt="Lambda Labs logo"
             width={size}
             height={size}
