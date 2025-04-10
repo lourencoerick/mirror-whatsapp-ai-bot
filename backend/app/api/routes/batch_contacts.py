@@ -2,15 +2,21 @@
 
 from uuid import UUID, uuid4
 import json
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, status, Path
+from fastapi import (
+    APIRouter,
+    Depends,
+    UploadFile,
+    File,
+    HTTPException,
+    status,
+    Path,
+    Query,
+)
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from arq import ArqRedis  # Assuming ARQ with Redis
 from loguru import logger
-
-# --- Local Imports ---
-# Adjust these paths based on your project structure
 
 # Database and Task Queue Dependencies
 from app.database import get_db
@@ -25,16 +31,16 @@ from app.api.schemas.contact_importer import (
     ContactImportJobStartResponse,
     ContactImportJobStatusResponse,
     ContactImportSummary,
-    ContactImportError,
+    PaginatedImportJobListResponse,
 )
 
 # Authentication
 from app.core.dependencies.auth import get_auth_context, AuthContext
 
-# s
-from app.services.cloud_storage import save_import_file_gcs  # GCS Upload function
+
+from app.services.cloud_storage import save_import_file_gcs
 from app.workers.batch_contacts.contact_importer import ARQ_TASK_NAME
-from app.config import get_settings, Settings  # Importa as configurações
+from app.config import get_settings, Settings
 
 settings: Settings = get_settings()
 
@@ -86,26 +92,22 @@ async def initiate_contact_import(
               task enqueuing fails unexpectedly.
             - 503 Service Unavailable: If GCS or the Task Queue is not available.
     """
-    # Use actual user/account ID from authentication context
-    account_id = auth_context.account.id  # Example: Assuming user model has account_id
+    account_id = auth_context.account.id
 
     job_id = uuid4()
 
     # 1. Upload File to GCS
     try:
-        # The save_import_file_gcs function should handle basic validation (e.g., .csv extension)
         gcs_blob_name = await save_import_file_gcs(file=file, job_id=job_id)
         logger.success(
             f"File uploaded to GCS. Bucket: {settings.GCS_BUCKET_NAME}, Blob: {gcs_blob_name}"
-        )  # Use proper logging
+        )
     except HTTPException as http_exc:
-        # Re-raise specific HTTP errors from the upload function (e.g., 400, 404, 503)
+
         raise http_exc
     except Exception as e:
-        # Catch unexpected errors during upload
-        logger.exception(
-            f"Unexpected error saving file to GCS: {e}"
-        )  # Use proper logging
+
+        logger.exception(f"Unexpected error saving file to GCS: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during file upload.",
@@ -114,11 +116,12 @@ async def initiate_contact_import(
     # 2. Create ImportJob record in Database
     db_job = ImportJob(
         id=job_id,
-        account_id=account_id,  # Use real account_id
-        status=ImportJobStatus.PENDING,  # Initial status
-        file_key=gcs_blob_name,  # Store the GCS blob name/path
-        arq_task_id=None,  # ARQ task ID will be added after enqueuing
-        result_summary={},  # Initialize result summary as empty dict or null
+        account_id=account_id,
+        status=ImportJobStatus.PENDING,
+        file_key=gcs_blob_name,
+        original_filename=file.filename,
+        arq_task_id=None,
+        result_summary={},
     )
     try:
         db.add(db_job)
@@ -129,9 +132,7 @@ async def initiate_contact_import(
         )  # Use proper logging
     except Exception as e:
         await db.rollback()
-        logger.exception(
-            f"Error creating ImportJob in DB for job {job_id}: {e}"
-        )  # Use proper logging
+        logger.exception(f"Error creating ImportJob in DB for job {job_id}: {e}")
         # Optional: Attempt to delete the uploaded GCS file for cleanup? (Can also fail)
         # try:
         #     bucket = get_gcs_bucket()
@@ -149,44 +150,39 @@ async def initiate_contact_import(
     # 3. Enqueue Background Task (ARQ)
     arq_job_id = None
     try:
-        # Enqueue the job defined in your ARQ worker settings
+
         arq_task = await arq_pool.enqueue_job(
-            ARQ_TASK_NAME,  # Name of the task function (e.g., 'process_contact_csv_task')
-            _job_id=f"contact_import_{job_id}",  # Optional: Custom ARQ job ID for traceability
-            # Pass necessary identifiers for the task to retrieve job details
-            job_pk=db_job.id,  # Pass the primary key of our ImportJob record
+            ARQ_TASK_NAME,
+            _job_id=f"contact_import_{job_id}",
+            job_pk=db_job.id,
             account_id=db_job.account_id,
         )
         if not arq_task:
-            # This case might happen if the queue is full or connection lost momentarily
+
             raise ConnectionError("Failed to enqueue job: ARQ pool returned None.")
 
-        arq_job_id = arq_task.job_id  # Get the actual job ID from ARQ
+        arq_job_id = arq_task.job_id
         logger.info(
             f"Task enqueued via ARQ with ARQ Job ID: {arq_job_id} for ImportJob {job_id}\n------{arq_task}"
-        )  # Use proper logging
+        )
 
         # 4. Update ImportJob with ARQ Task ID
         db_job.arq_task_id = arq_job_id
         await db.commit()
-        logger.info(
-            f"ImportJob {job_id} updated with ARQ task_id."
-        )  # Use proper logging
+        logger.info(f"ImportJob {job_id} updated with ARQ task_id.")
 
     except Exception as e:
         logger.exception(
             f"Error enqueuing task or updating job for ImportJob {job_id}: {e}"
-        )  # Use proper logging
-        # If enqueuing fails, mark our DB job as FAILED
+        )
+
         db_job.status = ImportJobStatus.FAILED
         db_job.result_summary = {
             "error": "Failed to enqueue processing task",
             "detail": str(e),
         }
         await db.commit()
-        # No need to re-raise here, we will return the final response,
-        # but the job status reflects the failure to enqueue.
-        # However, it might be better UX to return 500 if enqueuing fails critically.
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Could not enqueue import task: {e}",
@@ -194,8 +190,8 @@ async def initiate_contact_import(
 
     # 5. Return Success Response (202 Accepted)
     response_data = ContactImportJobStartResponse(
-        job_id=db_job.id,
-        status=str(db_job.status.value),  # Return current status (should be PENDING)
+        id=db_job.id,
+        status=str(db_job.status.value),
     )
     return response_data
 
@@ -203,12 +199,12 @@ async def initiate_contact_import(
 @router.get(
     "/contacts/batch/import/status/{job_id}",
     response_model=ContactImportJobStatusResponse,
+    response_model_by_alias=True,
     summary="Get Contact Batch Import Job Status",
     description="Retrieves the current status and results (if available) "
     "for a specific contact import job.",
     responses={
         404: {"description": "Import job not found or access denied."},
-        # Add other potential responses like 401/403 if auth is active
     },
 )
 async def get_contact_import_status(
@@ -231,10 +227,9 @@ async def get_contact_import_status(
         HTTPException: 404 Not Found if the job doesn't exist or doesn't belong
                        to the requesting user's account.
     """
-    # Use actual user/account ID from authentication context
+
     account_id = auth_context.account.id
 
-    # Query the database for the job using AsyncSession
     stmt = select(ImportJob).where(
         ImportJob.id == job_id, ImportJob.account_id == account_id
     )
@@ -247,40 +242,80 @@ async def get_contact_import_status(
             detail=f"Import job with ID '{job_id}' not found.",
         )
 
-    # --- Handle result_summary parsing (if needed) ---
-    # Pydantic's from_attributes=True handles this well if the DB model's
-    # result_summary field is a dict/JSONB type.
-    # If it's stored as a JSON *string*, you might need manual parsing:
     parsed_summary = None
-    if isinstance(db_job.result_summary, str):  # Check if it's a string
+    if isinstance(db_job.result_summary, str):
         try:
             summary_dict = json.loads(db_job.result_summary)
             parsed_summary = ContactImportSummary(**summary_dict)
         except (json.JSONDecodeError, TypeError, ValidationError) as e:
             logger.warning(f"Could not parse result_summary JSON for job {job_id}: {e}")
-            # Decide how to handle: return null, return raw string, or error?
-            # Returning null is often safest.
-            parsed_summary = None  # Keep as None if parsing fails
-    elif isinstance(
-        db_job.result_summary, dict
-    ):  # If it's already a dict (e.g., from JSONB)
+
+            parsed_summary = None
+    elif isinstance(db_job.result_summary, dict):
         try:
-            # Validate dict against the schema
+
             parsed_summary = ContactImportSummary(**db_job.result_summary)
         except ValidationError as e:
             logger.warning(
                 f"Could not validate result_summary dict for job {job_id}: {e}"
             )
-            parsed_summary = None  # Keep as None if validation fails
+            parsed_summary = None
 
-    # Create the response object using the Pydantic model
-    # Pydantic automatically maps fields by name due to Config.from_attributes = True
-    # We override result_summary if we did manual parsing/validation
     response_data = ContactImportJobStatusResponse.model_validate(db_job)
-    response_data.result_summary = parsed_summary  # Assign the parsed/validated summary
 
-    # Convert status Enum to string if necessary (Pydantic might handle this)
+    response_data.result_summary = parsed_summary
+
     if isinstance(response_data.status, ImportJobStatus):
         response_data.status = response_data.status.value
 
     return response_data
+
+
+@router.get(
+    "/contacts/batch/import/jobs",
+    response_model=PaginatedImportJobListResponse,
+    summary="List Contact Import Jobs",
+    description="Retrieves a paginated list of contact import jobs initiated by the user.",
+)
+async def list_contact_import_jobs(
+    db: AsyncSession = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
+    page: int = Query(1, ge=1, description="Page number starting from 1"),
+    size: int = Query(20, ge=1, le=100, description="Number of items per page"),
+):
+    """
+    Fetches a paginated list of import jobs for the authenticated user's account.
+    """
+    account_id = auth_context.account.id
+    offset = (page - 1) * size
+
+    count_stmt = select(func.count(ImportJob.id)).where(
+        ImportJob.account_id == account_id
+    )
+    total_items_result = await db.execute(count_stmt)
+    total_items = total_items_result.scalar_one_or_none() or 0
+
+    if total_items == 0:
+        return PaginatedImportJobListResponse(
+            total_items=0, total_pages=0, page=page, size=size, items=[]
+        )
+
+    select_stmt = (
+        select(ImportJob)
+        .where(ImportJob.account_id == account_id)
+        .order_by(ImportJob.created_at.desc())
+        .offset(offset)
+        .limit(size)
+    )
+    jobs_result = await db.execute(select_stmt)
+    jobs = jobs_result.scalars().all()
+
+    total_pages = (total_items + size - 1) // size
+
+    return PaginatedImportJobListResponse(
+        total_items=total_items,
+        total_pages=total_pages,
+        page=page,
+        size=size,
+        items=jobs,
+    )
