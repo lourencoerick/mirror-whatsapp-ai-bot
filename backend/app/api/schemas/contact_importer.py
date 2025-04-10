@@ -1,9 +1,8 @@
-# app/schemas/contact_import.py
-
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from uuid import UUID
 from datetime import datetime
+from app.models.import_job import ImportJobStatus
 
 
 class ContactImportError(BaseModel):
@@ -38,8 +37,9 @@ class ContactImportSummary(BaseModel):
 class ContactImportJobStartResponse(BaseModel):
     """Response returned when a contact import job is successfully initiated."""
 
-    job_id: UUID = Field(
-        ..., description="The unique identifier for the background import job."
+    id: UUID = Field(
+        ...,
+        description="The unique identifier for the background import job.",
     )
     status: str = Field(
         "Pending", description="Initial status of the job."
@@ -61,17 +61,48 @@ class ContactImportJobStatusResponse(BaseModel):
         None,
         description="Identifier for the uploaded file in storage (e.g., GCS blob name).",
     )  # Optional: Might not want to expose this
+    original_filename: Optional[str] = Field(
+        None,
+        description="Original name of the uploaded file.",
+    )
     created_at: datetime = Field(..., description="Timestamp when the job was created.")
     finished_at: Optional[datetime] = Field(
         None,
         description="Timestamp when the job finished processing (null if not finished).",
     )
-    # Use Json[Optional[ContactImportSummary]] to automatically parse the JSON string from DB
-    # Or handle parsing manually in the endpoint if stored as a plain dict/JSONB
+
     result_summary: Optional[ContactImportSummary] = Field(
         None,
         description="Summary of import results (available when status is COMPLETE or FAILED with partial results).",
     )
 
     class Config:
-        from_attributes = True  # Enable ORM mode for easy conversion from DB model
+        from_attributes = True
+
+        populate_by_name = True
+
+
+class ImportJobListItem(BaseModel):
+    """Data for a single import job item in a list."""
+
+    id: UUID = Field(...)
+    status: ImportJobStatus
+    original_filename: Optional[str] = None
+    created_at: datetime
+    finished_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PaginatedImportJobListResponse(BaseModel):
+    """Response model for paginated list of import jobs."""
+
+    total_items: int
+    total_pages: int
+    page: int
+    size: int
+    items: List[ImportJobListItem]
+
+    class Config:
+        from_attributes = True
