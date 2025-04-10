@@ -5,6 +5,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     JSON,
+    Integer,
     Enum as SQLAlchemyEnum,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -17,10 +18,10 @@ from app.models.base import BaseModel
 
 # Define an Enum for the status field for clarity and consistency
 class ImportJobStatus(str, enum.Enum):
-    PENDING = "Pending"
-    PROCESSING = "Processing"
-    COMPLETE = "Complete"
-    FAILED = "Failed"
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
 
 
 class ImportJob(BaseModel):
@@ -49,6 +50,9 @@ class ImportJob(BaseModel):
     # Store the key/path to the uploaded file (e.g., S3 key or temp file path)
     file_key = Column(String, nullable=False)
     original_filename = Column(String, nullable=True)
+
+    total_rows = Column(Integer, nullable=True)
+    processed_rows = Column(Integer, nullable=True, default=0)
 
     # Store the result summary as JSON when the job finishes
     result_summary = Column(JSON, nullable=True)
