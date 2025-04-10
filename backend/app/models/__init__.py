@@ -15,6 +15,7 @@ from .subscription import Subscription
 from .user import User
 from .webhook import Webhook
 from .channels.evolution_instance import EvolutionInstance
+from .import_job import ImportJob
 
 __all__ = [
     "AccessToken",
@@ -34,4 +35,5 @@ __all__ = [
     "User",
     "Webhook",
     "EvolutionInstance",
+    "ImportJob",
 ]

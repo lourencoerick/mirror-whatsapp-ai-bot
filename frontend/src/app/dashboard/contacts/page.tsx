@@ -1,9 +1,9 @@
-
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import { toast } from "sonner";
+import Link from 'next/link'; // Import Link for navigation
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,19 +13,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"; 
-import { PaginatedContact, Contact } from '@/types/contact'; 
-import ContactSearchBar from '@/components/ui/contact/contact-search-bar'; 
-import ContactList from '@/components/ui/contact/contact-list'; 
-import { PaginationControls } from '@/components/ui/pagination-controls'; 
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button"; // Import Button
+import { PaginatedContact, Contact } from '@/types/contact';
+import ContactSearchBar from '@/components/ui/contact/contact-search-bar';
+import ContactList from '@/components/ui/contact/contact-list';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch';
 import { useLayoutContext } from '@/contexts/layout-context';
-import { AddContactDialog } from '@/components/ui/contact/add-contact-dialog'; 
-import { EditContactDialog } from '@/components/ui/contact/edit-contact-dialog'; 
-import { Loader2 } from 'lucide-react'; 
+import { AddContactDialog } from '@/components/ui/contact/add-contact-dialog';
+import { EditContactDialog } from '@/components/ui/contact/edit-contact-dialog';
+import { Loader2, UploadCloud } from 'lucide-react'; // Import Loader2 and UploadCloud icon
 
 // --- Constants ---
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 10;
 
 /**
  * Main page component for displaying and managing contacts with search, sort, and pagination.
@@ -42,9 +43,9 @@ export default function ContactsPage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [contactToEdit, setContactToEdit] = useState<Contact | null>(null); // State for Edit Dialog
-  const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string | null } | null>(null); // State for Delete Alert
-  const [isDeleting, setIsDeleting] = useState(false); // Loading state for delete action
+  const [contactToEdit, setContactToEdit] = useState<Contact | null>(null);
+  const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string | null } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const authenticatedFetch = useAuthenticatedFetch();
 
@@ -113,15 +114,15 @@ export default function ContactsPage() {
   }, [paginatedData?.items]);
 
   const handleCloseEditDialog = () => {
-    setContactToEdit(null); // Clear contact to close the Edit Dialog
+    setContactToEdit(null);
   };
 
   // --- Delete Action Handlers ---
   const handleDeleteContact = (contactId: string) => {
     const contact = paginatedData?.items.find(c => c.id.toString() === contactId);
-    setContactToDelete({ 
+    setContactToDelete({
         id: contactId,
-        name: contact?.name || contactId 
+        name: contact?.name || contactId
     });
   };
 
@@ -136,14 +137,14 @@ export default function ContactsPage() {
         const errorInfo = await response.json().catch(() => ({}));
         throw new Error(errorInfo.detail || `Falha ao excluir contato: ${response.statusText}`);
       }
-      mutate(); // Revalidate SWR data
+      mutate();
       toast.success(`Contato "${contactToDelete.name || contactToDelete.id}" excluído com sucesso!`);
       setContactToDelete(null);
     } catch (err: any) {
       console.error("Error deleting contact:", err);
       toast.error(`Erro ao excluir contato: ${err.message}`);
     } finally {
-      setIsDeleting(false); // Reset loading state
+      setIsDeleting(false);
     }
   };
 
@@ -153,7 +154,6 @@ export default function ContactsPage() {
 
   // --- Render Logic ---
 
-  // Error State
   if (error) {
     return (
       <div className="container mx-auto p-4 text-center text-red-600">
@@ -163,24 +163,38 @@ export default function ContactsPage() {
     );
   }
 
-  // Main Content Render
   return (
     <div className="container mx-auto p-4">
-      {/* Top Bar: Search and Add Button */}
+      {/* Top Bar: Search and Action Buttons */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+        {/* Search Bar */}
         <div className="w-full sm:w-auto flex-grow">
           <ContactSearchBar onSearchChange={handleSearchChange} placeholder="Buscar por nome, email ou telefone..." />
         </div>
-        {/* Add Contact Dialog Trigger */}
-        <AddContactDialog mutate={mutate} />
+
+        {/* Action Buttons Group */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Import Button */}
+          <Link href="/dashboard/contacts/import" passHref legacyBehavior>
+            <Button variant="outline" asChild>
+              <a> {/* Use anchor tag inside Button with asChild */}
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Importar em Lote
+              </a>
+            </Button>
+          </Link>
+
+          {/* Add Contact Dialog Trigger */}
+          <AddContactDialog mutate={mutate} />
+        </div>
       </div>
 
-      {/* Contact List - Pass the actual handlers */}
+      {/* Contact List */}
       <ContactList
         contacts={paginatedData?.items ?? []}
         isLoading={isLoading && !paginatedData?.items}
-        onEdit={handleEditContact} 
-        onDelete={handleDeleteContact} 
+        onEdit={handleEditContact}
+        onDelete={handleDeleteContact}
         sortBy={sortBy}
         sortDirection={sortDirection}
         onSortChange={handleSortChange}
@@ -198,14 +212,14 @@ export default function ContactsPage() {
         />
       )}
 
-      {/* Edit Contact Dialog (Rendered conditionally based on contactToEdit state) */}
+      {/* Edit Contact Dialog */}
       <EditContactDialog
         contact={contactToEdit}
         onClose={handleCloseEditDialog}
         mutate={mutate}
       />
 
-      {/* Delete Confirmation Alert Dialog (Rendered conditionally based on contactToDelete state) */}
+      {/* Delete Confirmation Alert Dialog */}
       <AlertDialog open={!!contactToDelete} onOpenChange={(open) => !open && cancelDeleteContact()}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -16,6 +16,7 @@ from app.api.routes import websocket as ws_routes
 from app.api.routes.webhooks import clerk as clerk_routes
 from app.api.routes import evolution_instance as evolution_instance_routes
 from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
+from app.api.routes import batch_contacts as batch_contacts_routes
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
@@ -23,6 +24,10 @@ from app.core.dependencies.auth import get_auth_context, AuthContext
 # Import Services/Config
 from app.services.realtime.redis_pubsub import RedisPubSubBridge
 from app.config import get_settings
+
+# Import functions from arq_manager
+from app.core.arq_manager import init_arq_pool, close_arq_pool, get_arq_pool
+from arq.connections import ArqRedis
 
 from dotenv import load_dotenv
 
@@ -36,13 +41,47 @@ settings = get_settings()  # Load settings if needed for config below
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Start background tasks like Redis bridge
+    """
+    Handles application startup and shutdown events.
+    Initializes ARQ pool and starts background tasks like Redis bridge.
+    """
+    logger.info("Application startup sequence initiated...")
+
+    # Initialize ARQ Redis pool
+    logger.info("Initializing ARQ Redis pool...")
+    await init_arq_pool()
+    logger.info("ARQ Redis pool initialized.")
+
+    # Start other background tasks like Redis bridge
     logger.info("Starting Redis PubSub Bridge...")
-    asyncio.create_task(pubsub_bridge.start())
-    yield
-    # Clean up resources if needed on shutdown
-    logger.info("Stopping Redis PubSub Bridge (if applicable)...")
-    # await pubsub_bridge.stop() # Add stop logic if needed
+    pubsub_task = asyncio.create_task(pubsub_bridge.start())
+    # You might want to add error handling or checks for pubsub_task startup
+
+    try:
+        yield  # Application runs here
+    finally:
+        # Clean up resources on shutdown
+        logger.info("Application shutdown sequence initiated...")
+
+        # Stop Redis PubSub Bridge (ensure stop logic is safe)
+        logger.info("Stopping Redis PubSub Bridge...")
+        # Consider adding timeout or cancellation logic for the task if needed
+        # await pubsub_bridge.stop() # Call your actual stop logic
+        if "pubsub_task" in locals() and not pubsub_task.done():
+            # Optional: Add cancellation logic if start() runs indefinitely
+            # pubsub_task.cancel()
+            # try:
+            #     await pubsub_task
+            # except asyncio.CancelledError:
+            #     logger.info("PubSub bridge task cancelled.")
+            pass  # Assuming start() completes or is handled elsewhere
+
+        # Close ARQ Redis pool
+        logger.info("Closing ARQ Redis pool...")
+        await close_arq_pool()
+        logger.info("ARQ Redis pool closed.")
+
+        logger.info("Application shutdown complete.")
 
 
 # Create FastAPI app instance
@@ -84,6 +123,12 @@ app.include_router(
 )
 
 app.include_router(me_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Me"])
+
+app.include_router(
+    batch_contacts_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Contacts Batch Operations"],
+)
 
 
 # --- Evolution Instance Router ---
