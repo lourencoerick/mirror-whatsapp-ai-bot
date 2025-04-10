@@ -11,7 +11,7 @@ interface AuthenticatedFetchOptions extends RequestInit {}
 /**
  * Type definition for the fetch function returned by the hook.
  */
-type FetchFunction = (
+export type FetchFunction = (
     url: string,
     options?: AuthenticatedFetchOptions
 ) => Promise<Response>;
@@ -73,6 +73,9 @@ export function useAuthenticatedFetch(): FetchFunction {
        headers.set('Content-Type', 'application/json'); // Assume JSON by default
     }
 
+    if (headers.has('Content-Type') && headers.get('Content-Type') === "") {
+      headers.delete('Content-Type');
+    }
     // 6. Construct the Full Backend URL
     // Read the backend base URL from frontend environment variables
     const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:8000'; // Default for local dev
