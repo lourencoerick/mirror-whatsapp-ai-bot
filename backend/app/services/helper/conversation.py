@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 from app.models.message import Message
 from app.api.schemas.conversation import ConversationSearchResult, MessageSnippet
+from app.api.schemas.contact import ContactBase
 from app.models.conversation import Conversation
 from app.services.repository import contact as contact_repo
 
@@ -70,10 +71,11 @@ def parse_conversation_to_conversation_response(
     last_message = attrs.get("last_message", {})
     return ConversationSearchResult(
         id=conversation.id,
-        updated_at=conversation.updated_at,
-        phone_number=attrs.get("phone_number", ""),
-        contact_name=attrs.get("contact_name"),
-        profile_picture_url=attrs.get("profile_picture_url"),
+        contact=ContactBase(
+            name=attrs.get("contact_name"),
+            phone_number=attrs.get("phone_number"),
+            profile_picture_url=attrs.get("profile_picture_url"),
+        ),
         last_message_at=conversation.last_message_at,
         last_message=(
             MessageSnippet(
@@ -84,6 +86,7 @@ def parse_conversation_to_conversation_response(
             if last_message
             else None
         ),
+        updated_at=conversation.updated_at,
     )
 
 

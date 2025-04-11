@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
+from .contact import ContactBase
+
 
 class MessageSnippet(BaseModel):
     id: UUID
@@ -15,16 +17,9 @@ class MessageSnippet(BaseModel):
 
 class ConversationSearchResult(BaseModel):
     id: UUID = Field(..., description="Unique identifier for the conversation")
-    phone_number: str = Field(..., description="Contact's phone number (extracted)")
-    updated_at: datetime = Field(
-        ..., description="Timestamp of the last relevant activity"
-    )
-    profile_picture_url: Optional[str] = Field(
-        None, description="URL of contact's profile picture (extracted)"
-    )
-    contact_name: Optional[str] = Field(
-        None, description="Name of the contact (extracted)"
-    )
+
+    contact: Optional[ContactBase] = Field(..., description="Contact's information")
+
     last_message_at: Optional[datetime] = Field(
         None, description="Timestamp of the last message in the conversation"
     )
@@ -35,6 +30,10 @@ class ConversationSearchResult(BaseModel):
     matching_message: Optional[MessageSnippet] = Field(
         None,
         description="Snippet of the most recent message content that matched the search query (if the match was in a message)",
+    )
+
+    updated_at: datetime = Field(
+        ..., description="Timestamp of the last relevant activity"
     )
 
 

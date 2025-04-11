@@ -6,6 +6,7 @@ from sqlalchemy import desc, select, or_, and_, cast, Text, literal, func, asc
 from typing import Optional, List
 from loguru import logger
 from app.api.schemas.conversation import ConversationSearchResult, MessageSnippet
+from app.api.schemas.contact import ContactBase
 from app.models.message import Message
 from app.models.conversation import Conversation
 from app.models.contact_inbox import ContactInbox
@@ -429,9 +430,14 @@ async def search_conversations(
 
         # --- Build Result Item ---
         try:
-            phone_number = conv.additional_attributes.get("phone_number")
-            contact_name = conv.additional_attributes.get("contact_name")
-            profile_picture_url = conv.additional_attributes.get("profile_picture_url")
+            contact = ContactBase(
+                name=conv.additional_attributes.get("contact_name"),
+                phone_number=conv.additional_attributes.get("phone_number"),
+                profile_picture_url=conv.additional_attributes.get(
+                    "profile_picture_url"
+                ),
+            )
+
             updated_at = conv.last_message_at or conv.updated_at
 
             last_msg_snippet = MessageSnippet(
@@ -452,9 +458,7 @@ async def search_conversations(
 
             result_item = ConversationSearchResult(
                 id=conv.id,
-                phone_number=str(phone_number) if phone_number is not None else None,
-                contact_name=contact_name,
-                profile_picture_url=profile_picture_url,
+                contact=contact,
                 updated_at=updated_at,
                 last_message=last_msg_snippet,
                 matching_message=matching_msg_snippet,
