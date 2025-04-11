@@ -8,7 +8,6 @@ from datetime import datetime
 PHONE_REGEX = re.compile(r"^[0-9\+\-\s\(\)]+$")
 
 
-# Base schema with common fields
 class ContactBase(BaseModel):
     """Base schema for contact attributes."""
 
@@ -41,16 +40,12 @@ class ContactBase(BaseModel):
         from_attributes = True
 
 
-# Schema for creating a new contact (API input)
 class ContactCreate(ContactBase):
     """Schema used for creating a new contact via the API."""
 
-    # No specific fields needed only on creation for now
     pass
 
 
-# Schema for updating an existing contact (API input)
-# All fields are optional for updates
 class ContactUpdate(BaseModel):
     """Schema used for updating an existing contact via the API. All fields are optional."""
 
@@ -88,7 +83,6 @@ class ContactUpdate(BaseModel):
         from_attributes = True
 
 
-# Schema for reading/returning contact data (API output)
 class ContactRead(ContactBase):
     """Schema used for returning contact data via the API."""
 
@@ -117,7 +111,6 @@ class ContactRead(ContactBase):
         from_attributes = True
 
 
-# Schema for paginated list response
 class PaginatedContactRead(BaseModel):
     """Schema for returning a paginated list of contacts."""
 
