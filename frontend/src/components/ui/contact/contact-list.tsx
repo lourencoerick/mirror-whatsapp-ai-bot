@@ -1,18 +1,19 @@
 import React from 'react';
-import { Contact } from '@/types/contact'; 
-import ContactListItem from './contact-item'; 
+import { Contact } from '@/types/contact';
+import ContactListItem from './contact-item';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'; 
-import { cn } from '@/lib/utils'; 
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 /**
- * Props for the ContactList component including sorting.
+ * Props for the ContactList component including sorting and send message action.
  */
 interface ContactListProps {
   contacts: Contact[];
   isLoading: boolean;
   onEdit: (contactId: string) => void;
   onDelete: (contactId: string) => void;
+  onSendMessage: (contact: Contact) => void;
   // --- Sorting Props ---
   sortBy: string | null;
   sortDirection: 'asc' | 'desc';
@@ -21,7 +22,7 @@ interface ContactListProps {
 
 /**
  * Renders a list of contacts using ContactListItem.
- * Includes sortable headers, loading, and empty states.
+ * Includes sortable headers, loading, empty states, and passes action handlers down.
  * Texts are in Brazilian Portuguese.
  *
  * @component
@@ -33,6 +34,7 @@ const ContactList: React.FC<ContactListProps> = ({
   isLoading,
   onEdit,
   onDelete,
+  onSendMessage,
   sortBy,
   sortDirection,
   onSortChange,
@@ -44,7 +46,6 @@ const ContactList: React.FC<ContactListProps> = ({
   const SortableHeader = ({ columnKey, label, className }: { columnKey: string, label: string, className?: string }) => {
     const isActive = sortBy === columnKey;
     const Icon = isActive ? (sortDirection === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
-
     const directionText = isActive ? (sortDirection === 'asc' ? '(ascendente)' : '(descendente)') : '';
 
     return (
@@ -57,9 +58,9 @@ const ContactList: React.FC<ContactListProps> = ({
         role="button"
         tabIndex={0}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSortChange(columnKey); }}
-        aria-label={`Ordenar por ${label} ${directionText}`} // Translated aria-label
+        aria-label={`Ordenar por ${label} ${directionText}`}
       >
-        {label} {/* Label is passed already translated */}
+        {label}
         <Icon
           className={cn("h-3 w-3 flex-shrink-0", isActive ? "text-foreground" : "text-muted-foreground/50")}
           aria-hidden="true"
@@ -68,17 +69,16 @@ const ContactList: React.FC<ContactListProps> = ({
     );
   };
 
-  // Loading State: Display skeleton loaders
+  // Loading State
   if (isLoading) {
     return (
       <div className="border rounded-lg overflow-hidden mt-4">
-        {/* Optional Header Skeleton */}
-        <div className="hidden md:flex items-center bg-muted/50 border-b px-4 py-3">
+        {/* ... skeleton loading state ... */}
+         <div className="hidden md:flex items-center bg-muted/50 border-b px-4 py-3">
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-4 w-32 ml-4" />
             <Skeleton className="h-4 w-40 ml-auto" />
         </div>
-        {/* Skeleton Items */}
         <div className="divide-y">
             {[...Array(5)].map((_, index) => (
             <div key={index} className="flex items-center py-3 px-4">
@@ -97,38 +97,33 @@ const ContactList: React.FC<ContactListProps> = ({
     );
   }
 
-  // Empty State: Display a message if no contacts and not loading
+  // Empty State
   if (!contacts || contacts.length === 0) {
     return (
       <div className="text-center py-10 border rounded-lg mt-4">
-        <p className="text-gray-500">Nenhum contato encontrado.</p> 
-        {/* Optional: Add a button/link here */}
+        <p className="text-gray-500">Nenhum contato encontrado.</p>
       </div>
     );
   }
 
-  // Data Available State: Render the list with sortable headers
+  // Data Available State
   return (
     <div className="border rounded-lg overflow-hidden mt-4">
-      {/* Header Row - Visible on medium screens and up */}
+      {/* Header Row */}
       <div className="hidden md:flex items-center bg-muted/50 border-b px-4 py-2 text-xs text-muted-foreground uppercase tracking-wider font-medium">
-        {/* Ensure 'columnKey' matches the field name your backend uses for sorting */}
         <div className="flex-1 min-w-0 pr-4">
-            <SortableHeader columnKey="name" label="Nome" /> 
+            <SortableHeader columnKey="name" label="Nome" />
         </div>
         <div className="w-48 pr-4">
-            <SortableHeader columnKey="phone_number" label="Telefone" /> 
+            <SortableHeader columnKey="phone_number" label="Telefone" />
         </div>
         <div className="flex-1 min-w-0 pr-4">
-            <SortableHeader columnKey="email" label="Email" /> 
+            <SortableHeader columnKey="email" label="Email" />
         </div>
-        {/* <div className="w-40 pr-4">
-            <SortableHeader columnKey="created_at" label="Criado em" /> 
-        </div> */}
-        <div className="w-20 text-right flex-shrink-0">Ações</div> 
+        <div className="w-20 text-right flex-shrink-0">Ações</div>
       </div>
 
-      {/* Contact Items */}
+      {/* Contact Items - Pass the new onSendMessage prop */}
       <div className="divide-y">
         {contacts.map((contact) => (
           <ContactListItem
@@ -136,6 +131,7 @@ const ContactList: React.FC<ContactListProps> = ({
             contact={contact}
             onEdit={onEdit ? () => onEdit(contact.id.toString()) : undefined}
             onDelete={onDelete ? () => onDelete(contact.id.toString()) : undefined}
+            onSendMessage={onSendMessage ? () => onSendMessage(contact) : undefined}
           />
         ))}
       </div>

@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import { toast } from "sonner";
-import Link from 'next/link'; // Import Link for navigation
+import Link from 'next/link';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,8 +14,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button"; // Import Button
-import { PaginatedContact, Contact } from '@/types/contact';
+import { Button } from "@/components/ui/button";
+import { PaginatedContact, Contact } from '@/types/contact'; 
 import ContactSearchBar from '@/components/ui/contact/contact-search-bar';
 import ContactList from '@/components/ui/contact/contact-list';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -23,13 +23,15 @@ import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch';
 import { useLayoutContext } from '@/contexts/layout-context';
 import { AddContactDialog } from '@/components/ui/contact/add-contact-dialog';
 import { EditContactDialog } from '@/components/ui/contact/edit-contact-dialog';
-import { Loader2, UploadCloud } from 'lucide-react'; // Import Loader2 and UploadCloud icon
+import StartConversationDialog from '@/components/ui/conversation/start-conversation-dialog'; 
+import { Loader2, UploadCloud } from 'lucide-react'; 
 
 // --- Constants ---
 const ITEMS_PER_PAGE = 10;
 
 /**
- * Main page component for displaying and managing contacts with search, sort, and pagination.
+ * Main page component for displaying and managing contacts with search, sort, pagination,
+ * and actions including starting a conversation.
  * Texts are in Brazilian Portuguese.
  */
 export default function ContactsPage() {
@@ -46,6 +48,11 @@ export default function ContactsPage() {
   const [contactToEdit, setContactToEdit] = useState<Contact | null>(null);
   const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string | null } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // --- State for Start Conversation Dialog ---
+  const [contactToSendTo, setContactToSendTo] = useState<Contact | null>(null);
+  const [isStartConvDialogOpen, setIsStartConvDialogOpen] = useState(false);
+  // --- End State ---
 
   const authenticatedFetch = useAuthenticatedFetch();
 
@@ -79,30 +86,19 @@ export default function ContactsPage() {
     { keepPreviousData: true }
   );
 
-  // Calculate total pages
+  // Calculate total pages 
   const totalPages = paginatedData ? Math.ceil(paginatedData.total / ITEMS_PER_PAGE) : 0;
 
-  // --- Event Handlers ---
-  const handleSearchChange = useCallback((term: string) => {
-    setSearchTerm(term);
-    setCurrentPage(1);
-  }, []);
-
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
-
+  // --- Event Handlers (Search, Page, Sort remain the same)---
+  const handleSearchChange = useCallback((term: string) => { setSearchTerm(term); setCurrentPage(1); }, []);
+  const handlePageChange = useCallback((page: number) => { setCurrentPage(page); }, []);
   const handleSortChange = useCallback((newSortBy: string) => {
-    if (newSortBy === sortBy) {
-      setSortDirection(prevDir => (prevDir === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortBy(newSortBy);
-      setSortDirection('asc');
-    }
+    if (newSortBy === sortBy) { setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc'); }
+    else { setSortBy(newSortBy); setSortDirection('asc'); }
     setCurrentPage(1);
   }, [sortBy]);
 
-  // --- Edit Action Handlers ---
+  // --- Edit Action Handlers  ---
   const handleEditContact = useCallback((contactId: string) => {
     const contact = paginatedData?.items.find(c => c.id.toString() === contactId);
     if (contact) {
@@ -117,7 +113,8 @@ export default function ContactsPage() {
     setContactToEdit(null);
   };
 
-  // --- Delete Action Handlers ---
+
+  // --- Delete Action Handlers  ---
   const handleDeleteContact = (contactId: string) => {
     const contact = paginatedData?.items.find(c => c.id.toString() === contactId);
     setContactToDelete({
@@ -125,7 +122,6 @@ export default function ContactsPage() {
         name: contact?.name || contactId
     });
   };
-
   const confirmDeleteContact = async () => {
     if (!contactToDelete) return;
     setIsDeleting(true);
@@ -152,8 +148,25 @@ export default function ContactsPage() {
     setContactToDelete(null);
   };
 
-  // --- Render Logic ---
+  // --- New Handler for Send Message Click ---
+  const handleSendMessageClick = useCallback((contact: Contact) => {
+      if (!contact.phone_number) {
+          toast.error("Este contato não possui um número de telefone válido.");
+          return;
+      }
+      setContactToSendTo(contact);
+      setIsStartConvDialogOpen(true);
+  }, []);
 
+  // --- Handler for Controlled Dialog Open Change ---
+  const handleStartConvDialogChange = (open: boolean) => {
+      setIsStartConvDialogOpen(open);
+      if (!open) {
+          setContactToSendTo(null);
+      }
+  }
+
+  // --- Render Logic ---
   if (error) {
     return (
       <div className="container mx-auto p-4 text-center text-red-600">
@@ -177,24 +190,23 @@ export default function ContactsPage() {
           {/* Import Button */}
           <Link href="/dashboard/contacts/import" passHref legacyBehavior>
             <Button variant="outline" asChild>
-              <a> {/* Use anchor tag inside Button with asChild */}
-                <UploadCloud className="mr-2 h-4 w-4" />
-                Importar em Lote
-              </a>
+              <a><UploadCloud className="mr-2 h-4 w-4" />Importar</a>
             </Button>
           </Link>
 
           {/* Add Contact Dialog Trigger */}
+          {/* Assuming AddContactDialog provides its own trigger */}
           <AddContactDialog mutate={mutate} />
         </div>
       </div>
 
-      {/* Contact List */}
+      {/* Contact List - Pass the new onSendMessage prop */}
       <ContactList
         contacts={paginatedData?.items ?? []}
         isLoading={isLoading && !paginatedData?.items}
         onEdit={handleEditContact}
         onDelete={handleDeleteContact}
+        onSendMessage={handleSendMessageClick} // <-- Pass the handler here
         sortBy={sortBy}
         sortDirection={sortDirection}
         onSortChange={handleSortChange}
@@ -208,7 +220,7 @@ export default function ContactsPage() {
           itemsPerPage={ITEMS_PER_PAGE}
           onPageChange={handlePageChange}
           totalPages={totalPages}
-          className="border-t bg-card"
+          className="border-t bg-card mt-4"
         />
       )}
 
@@ -221,7 +233,8 @@ export default function ContactsPage() {
 
       {/* Delete Confirmation Alert Dialog */}
       <AlertDialog open={!!contactToDelete} onOpenChange={(open) => !open && cancelDeleteContact()}>
-        <AlertDialogContent>
+        {/* ... AlertDialog content ... */}
+         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
@@ -242,6 +255,15 @@ export default function ContactsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Start Conversation Dialog (Controlled Instance) */}
+      {/* This instance is controlled by state and receives initialContact */}
+      <StartConversationDialog
+          open={isStartConvDialogOpen}
+          onOpenChange={handleStartConvDialogChange}
+          initialContact={contactToSendTo}
+          // No trigger prop here
+      />
 
     </div>
   );

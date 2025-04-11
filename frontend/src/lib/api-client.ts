@@ -3,6 +3,9 @@ import {
   PaginatedImportJobListResponse,
 } from "@/types/contact-import";
 
+import { Contact } from '@/types/contact'; 
+import { FetchFunction } from '@/hooks/use-authenticated-fetch'; // Adjust path
+
 /**
  * Fetches the status of a specific contact import job.
  * This function is designed to be used as a fetcher by SWR.
@@ -15,7 +18,7 @@ import {
  */
 export const getContactImportJobStatus = async (
   jobId: string,
-  fetcher: (url: string, options?: RequestInit) => Promise<Response>
+  fetcher: FetchFunction
 ): Promise<ContactImportJobStatusResponse> => {
   if (!jobId) {
     throw new Error("Job ID is required to fetch status.");
@@ -73,7 +76,7 @@ export const getContactImportJobStatus = async (
 export const listContactImportJobs = async (
   page: number,
   size: number,
-  fetcher: (url: string, options?: RequestInit) => Promise<Response>
+  fetcher: FetchFunction
 ): Promise<PaginatedImportJobListResponse> => {
   const endpoint = `/api/v1/contacts/batch/import/jobs?page=${page}&size=${size}`;
   const response = await fetcher(endpoint, {
@@ -94,4 +97,48 @@ export const listContactImportJobs = async (
 
   const data: PaginatedImportJobListResponse = await response.json();
   return data;
+};
+
+
+
+
+/**
+ * Searches for contacts based on a query string.
+ * @param {string} query - The search term.
+ * @param {number} limit - Maximum number of results to return.
+ * @param {AuthenticatedFetchFunction} fetchFn - The authenticated fetch function instance.
+ * @returns {Promise<Contact[]>} A promise resolving to an array of matching contacts.
+ * @throws {Error} If the network request fails or the API returns an error status.
+ */
+export const searchContacts = async (
+  query: string,
+  limit: number = 10, // Default limit for search results
+  fetchFn: FetchFunction
+): Promise<Contact[]> => {
+  // Only search if query is not empty (optional, API might handle this)
+  if (!query.trim()) {
+    return [];
+  }
+
+  const endpoint = `/api/v1/contacts?search=${encodeURIComponent(query)}&limit=${limit}`;
+  const response = await fetchFn(endpoint, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    let errorDetail = `API returned status ${response.status}`;
+    try {
+      const errorData = await response.json();
+      errorDetail = errorData.detail || errorDetail;
+    } catch (e) { /* Ignore */ }
+    throw new Error(`Failed to search contacts: ${errorDetail}`);
+  }
+
+  // Assuming the API returns a PaginatedContact structure even for search
+  // If it returns just Contact[], adjust accordingly
+  const data: { items: Contact[] } = await response.json(); // Adjust based on actual API response structure
+  return data.items || []; // Return the items array
 };
