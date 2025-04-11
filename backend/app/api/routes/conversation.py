@@ -178,6 +178,7 @@ async def start_conversation(
                 account_id=account_id,
                 contact_data=ContactCreate(
                     phone_number=normalized_phone_number,
+                    identifier=normalized_phone_number,
                 ),
             )
 
