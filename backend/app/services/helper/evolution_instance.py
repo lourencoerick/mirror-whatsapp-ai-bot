@@ -1,11 +1,17 @@
 import httpx
 from typing import Dict, Any, List, Optional
 from loguru import logger
+
+from app.api.schemas.evolution_instance import EvolutionContactProfile
 from app.config import get_settings, Settings
 
 settings: Settings = get_settings()
 
 async_client = httpx.AsyncClient(timeout=30.0)
+
+
+class EvolutionAPIError(Exception):
+    pass
 
 
 async def create_logical_evolution_instance(
@@ -113,4 +119,34 @@ async def set_evolution_instance_webhooks(
         raise
     except Exception as e:
         logger.exception("Error creating instance")
+        raise
+
+
+async def fetch_evolution_contact_profile(
+    instance_name: str, shared_url: str, api_key: str, phone_number: str
+) -> EvolutionContactProfile:
+
+    headers = {"apikey": api_key, "Content-Type": "application/json"}
+
+    payload = {"number": phone_number}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{shared_url}/chat/fetchProfile/{instance_name}",
+                json=payload,
+                headers=headers,
+            )
+        response.raise_for_status()
+        return EvolutionContactProfile.model_validate(response.json())
+
+    except httpx.HTTPStatusError as e:
+        logger.exception(
+            f"HTTP error getting the profile for phone number {phone_number}: {e.response.text}"
+        )
+        raise EvolutionAPIError("Failed to fetch contact profile") from e
+    except Exception as e:
+        logger.exception(
+            f"Error getting the profile for phone number {phone_number}", e
+        )
         raise
