@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { PaginatedContact, Contact } from '@/types/contact'; // Ensure Contact type is imported
+import { PaginatedContact, Contact } from '@/types/contact'; 
 import ContactSearchBar from '@/components/ui/contact/contact-search-bar';
 import ContactList from '@/components/ui/contact/contact-list';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -23,10 +23,8 @@ import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch';
 import { useLayoutContext } from '@/contexts/layout-context';
 import { AddContactDialog } from '@/components/ui/contact/add-contact-dialog';
 import { EditContactDialog } from '@/components/ui/contact/edit-contact-dialog';
-// --- Import StartConversationDialog ---
-import StartConversationDialog from '@/components/ui/conversation/start-conversation-dialog'; // Adjust path if needed
-// --- Import Icons ---
-import { Loader2, UploadCloud } from 'lucide-react'; // Added Plus icon
+import StartConversationDialog from '@/components/ui/conversation/start-conversation-dialog'; 
+import { Loader2, UploadCloud } from 'lucide-react'; 
 
 // --- Constants ---
 const ITEMS_PER_PAGE = 10;
@@ -58,7 +56,7 @@ export default function ContactsPage() {
 
   const authenticatedFetch = useAuthenticatedFetch();
 
-  // --- SWR Fetcher (remains the same) ---
+  // --- SWR Fetcher ---
   const fetcher = useCallback(async (url: string): Promise<PaginatedContact> => {
     const res = await authenticatedFetch(url);
     if (!res.ok) {
@@ -68,7 +66,7 @@ export default function ContactsPage() {
     return res.json();
   }, [authenticatedFetch]);
 
-  // --- API URL Construction (remains the same) ---
+  // --- API URL Construction ---
   const apiUrl = React.useMemo(() => {
     const offset = (currentPage - 1) * ITEMS_PER_PAGE;
     let url = `/api/v1/contacts?limit=${ITEMS_PER_PAGE}&offset=${offset}`;
@@ -81,17 +79,17 @@ export default function ContactsPage() {
     return url;
   }, [currentPage, searchTerm, sortBy, sortDirection]);
 
-  // --- Data Fetching with SWR (remains the same) ---
+  // --- Data Fetching with SWR ---
   const { data: paginatedData, error, isLoading, mutate } = useSWR<PaginatedContact, Error>(
     apiUrl,
     fetcher,
     { keepPreviousData: true }
   );
 
-  // Calculate total pages (remains the same)
+  // Calculate total pages 
   const totalPages = paginatedData ? Math.ceil(paginatedData.total / ITEMS_PER_PAGE) : 0;
 
-  // --- Event Handlers (Search, Page, Sort remain the same) ---
+  // --- Event Handlers (Search, Page, Sort remain the same)---
   const handleSearchChange = useCallback((term: string) => { setSearchTerm(term); setCurrentPage(1); }, []);
   const handlePageChange = useCallback((page: number) => { setCurrentPage(page); }, []);
   const handleSortChange = useCallback((newSortBy: string) => {
@@ -100,14 +98,55 @@ export default function ContactsPage() {
     setCurrentPage(1);
   }, [sortBy]);
 
-  // --- Edit Action Handlers (remain the same) ---
-  const handleEditContact = useCallback((contactId: string) => { /* ... */ }, [paginatedData?.items]);
-  const handleCloseEditDialog = () => { setContactToEdit(null); };
+  // --- Edit Action Handlers  ---
+  const handleEditContact = useCallback((contactId: string) => {
+    const contact = paginatedData?.items.find(c => c.id.toString() === contactId);
+    if (contact) {
+      setContactToEdit(contact);
+    } else {
+      console.warn("Contact not found in current data for editing:", contactId);
+      toast.error("Contato não encontrado para edição.");
+    }
+  }, [paginatedData?.items]);
 
-  // --- Delete Action Handlers (remain the same) ---
-  const handleDeleteContact = (contactId: string) => { /* ... */ };
-  const confirmDeleteContact = async () => { /* ... */ };
-  const cancelDeleteContact = () => { setContactToDelete(null); };
+  const handleCloseEditDialog = () => {
+    setContactToEdit(null);
+  };
+
+
+  // --- Delete Action Handlers  ---
+  const handleDeleteContact = (contactId: string) => {
+    const contact = paginatedData?.items.find(c => c.id.toString() === contactId);
+    setContactToDelete({
+        id: contactId,
+        name: contact?.name || contactId
+    });
+  };
+  const confirmDeleteContact = async () => {
+    if (!contactToDelete) return;
+    setIsDeleting(true);
+    try {
+      const response = await authenticatedFetch(`/api/v1/contacts/${contactToDelete.id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const errorInfo = await response.json().catch(() => ({}));
+        throw new Error(errorInfo.detail || `Falha ao excluir contato: ${response.statusText}`);
+      }
+      mutate();
+      toast.success(`Contato "${contactToDelete.name || contactToDelete.id}" excluído com sucesso!`);
+      setContactToDelete(null);
+    } catch (err: any) {
+      console.error("Error deleting contact:", err);
+      toast.error(`Erro ao excluir contato: ${err.message}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const cancelDeleteContact = () => {
+    setContactToDelete(null);
+  };
 
   // --- New Handler for Send Message Click ---
   const handleSendMessageClick = useCallback((contact: Contact) => {
@@ -115,15 +154,14 @@ export default function ContactsPage() {
           toast.error("Este contato não possui um número de telefone válido.");
           return;
       }
-      setContactToSendTo(contact); // Set the specific contact
-      setIsStartConvDialogOpen(true); // Open the controlled dialog
+      setContactToSendTo(contact);
+      setIsStartConvDialogOpen(true);
   }, []);
 
   // --- Handler for Controlled Dialog Open Change ---
   const handleStartConvDialogChange = (open: boolean) => {
       setIsStartConvDialogOpen(open);
       if (!open) {
-          // Clear the contact when the dialog closes
           setContactToSendTo(null);
       }
   }
@@ -182,7 +220,7 @@ export default function ContactsPage() {
           itemsPerPage={ITEMS_PER_PAGE}
           onPageChange={handlePageChange}
           totalPages={totalPages}
-          className="border-t bg-card mt-4" // Added margin-top
+          className="border-t bg-card mt-4"
         />
       )}
 
