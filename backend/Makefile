@@ -45,6 +45,10 @@ worker-consumer: ## Run Consumer
 worker-response: ## Run Response sender
 	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/response_sender.py
 
+worker-arq: ## Run Response sender
+	PYTHONPATH=$(APP_DIR) arq app.workers.batch_contacts.contact_creator.WorkerSettings
+
+
 run-app: ## Run Fast API app
 	PYTHONPATH=$(APP_DIR) uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
@@ -69,3 +73,6 @@ db-reset: ## Reset database
 	
 generate-secret: ## Generate Secret Key
 	openssl rand -base64 32
+
+gcs-export-key:  ## Export GOOGLE_APPLICATION_CREDENTIALS  Key
+	export GOOGLE_APPLICATION_CREDENTIALS=./keys/lambdalabs-gcp-663770819dd9.json
