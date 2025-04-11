@@ -1,8 +1,6 @@
-// components/ui/contact/contact-list.tsx
-
 import React from 'react';
 import { Contact } from '@/types/contact';
-import ContactListItem from './contact-item'; // Assuming this component handles actions
+import ContactListItem from './contact-item';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,8 +13,7 @@ interface ContactListProps {
   isLoading: boolean;
   onEdit: (contactId: string) => void;
   onDelete: (contactId: string) => void;
-  /** Callback when 'Send Message' action is clicked for a contact */
-  onSendMessage: (contact: Contact) => void; // <-- New prop added
+  onSendMessage: (contact: Contact) => void;
   // --- Sorting Props ---
   sortBy: string | null;
   sortDirection: 'asc' | 'desc';
@@ -37,7 +34,7 @@ const ContactList: React.FC<ContactListProps> = ({
   isLoading,
   onEdit,
   onDelete,
-  onSendMessage, // <-- Destructure the new prop
+  onSendMessage,
   sortBy,
   sortDirection,
   onSortChange,
@@ -132,11 +129,9 @@ const ContactList: React.FC<ContactListProps> = ({
           <ContactListItem
             key={contact.id.toString()}
             contact={contact}
-            // Pass existing handlers, ensuring they are defined before calling
             onEdit={onEdit ? () => onEdit(contact.id.toString()) : undefined}
             onDelete={onDelete ? () => onDelete(contact.id.toString()) : undefined}
-            // Pass the new handler, passing the full contact object
-            onSendMessage={onSendMessage ? () => onSendMessage(contact) : undefined} // <-- Pass new prop
+            onSendMessage={onSendMessage ? () => onSendMessage(contact) : undefined}
           />
         ))}
       </div>
