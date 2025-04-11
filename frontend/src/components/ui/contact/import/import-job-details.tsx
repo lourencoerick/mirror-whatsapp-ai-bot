@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { AlertCircle } from 'lucide-react';
 
 import { FetchFunction } from '@/hooks/use-authenticated-fetch'; 
-import { getContactImportJobStatus } from '@/lib/api-client';
+import { getContactImportJobStatus } from '@/lib/api/contact';
 import { ContactImportJobStatusResponse } from '@/types/contact-import';
 
 
