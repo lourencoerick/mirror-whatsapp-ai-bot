@@ -1,5 +1,3 @@
-# src/schemas/evolution_instance.py
-
 from uuid import UUID
 from enum import Enum
 from typing import Optional, List, Dict, Any, Literal
@@ -80,3 +78,43 @@ class EvolutionChannelDetailsInput(BaseModel):
         ...,
         description="The platform's unique ID for the configured Evolution instance.",
     )
+
+
+# --- Models for Sync Contact Processes ---
+
+
+class EvolutionContact(BaseModel):
+    """Represents a contact as returned by the Evolution API."""
+
+    id: str  # Usually the phone number like '5511999998888@c.us'
+    remoteJid: str
+    pushName: Optional[str] = None
+    profilePicUrl: Optional[str] = None
+    instanceId: Optional[str] = None
+
+    @property
+    def profile_picture_url(self) -> Optional[str]:
+        """Returns the profile_picture_url."""
+        return self.profilePicUrl
+
+    @property
+    def phone_number(self) -> Optional[str]:
+        """Extracts the phone number part from the id."""
+        if "@" in self.remoteJid:
+            num = self.remoteJid.split("@")[0]
+            # Basic validation/normalization (improve as needed)
+            if num.isdigit():
+                return num
+        return None
+
+    @property
+    def display_name(self) -> Optional[str]:
+        """Returns the best available name."""
+        return self.pushName
+
+
+class SyncInitiatedResponse(BaseModel):
+    """Response model indicating successful initiation of a background task."""
+
+    message: str = "Synchronization initiated."
+    id: Optional[str] = None

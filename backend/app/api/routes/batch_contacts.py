@@ -1,5 +1,3 @@
-# app/routers/batch_contacts.py
-
 from uuid import UUID, uuid4
 import json
 from fastapi import (
@@ -15,7 +13,7 @@ from fastapi import (
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from arq import ArqRedis  # Assuming ARQ with Redis
+from arq import ArqRedis
 from loguru import logger
 
 # Database and Task Queue Dependencies
@@ -39,7 +37,9 @@ from app.core.dependencies.auth import get_auth_context, AuthContext
 
 
 from app.services.cloud_storage import save_import_file_gcs
-from app.workers.batch_contacts.contact_importer import ARQ_TASK_NAME
+from app.workers.batch_contacts.tasks.contact_importer import (
+    ARQ_TASK_NAME as CONTACT_IMPORTER_ARQ_TASK_NAME,
+)
 from app.config import get_settings, Settings
 
 settings: Settings = get_settings()
@@ -127,9 +127,7 @@ async def initiate_contact_import(
         db.add(db_job)
         await db.commit()
         await db.refresh(db_job)
-        logger.info(
-            f"ImportJob {job_id} created in DB with status PENDING."
-        )  # Use proper logging
+        logger.info(f"ImportJob {job_id} created in DB with status PENDING.")
     except Exception as e:
         await db.rollback()
         logger.exception(f"Error creating ImportJob in DB for job {job_id}: {e}")
@@ -152,7 +150,7 @@ async def initiate_contact_import(
     try:
 
         arq_task = await arq_pool.enqueue_job(
-            ARQ_TASK_NAME,
+            CONTACT_IMPORTER_ARQ_TASK_NAME,
             _job_id=f"contact_import_{job_id}",
             job_pk=db_job.id,
             account_id=db_job.account_id,

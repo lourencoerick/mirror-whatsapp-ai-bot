@@ -167,6 +167,9 @@ async def get_or_create_conversation(
     additional_attributes: dict = {}
     additional_attributes["contact_name"] = contact_inbox.contact.name
     additional_attributes["phone_number"] = contact_inbox.contact.phone_number
+    additional_attributes["profile_picture_url"] = (
+        contact_inbox.contact.profile_picture_url
+    )
 
     conversation = Conversation(
         account_id=account_id,
