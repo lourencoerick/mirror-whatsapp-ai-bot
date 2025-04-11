@@ -1,15 +1,17 @@
-import uuid
+from uuid import UUID, uuid4
 import secrets
 from loguru import logger
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from arq import ArqRedis
 
 from app.database import get_db
 from app.core.security import encrypt_logical_token, decrypt_logical_token
 from app.api.schemas.evolution_instance import (
     EvolutionInstanceRead,
     EvolutionInstanceQRCodeResponse,
+    SyncInitiatedResponse,
 )
 from app.models.channels.evolution_instance import (
     EvolutionInstanceStatus,
@@ -19,6 +21,12 @@ from app.services.helper.evolution_instance import (
     create_logical_evolution_instance,
     generate_connection_qrcode,
 )
+
+from app.workers.batch_contacts.tasks.evolution_whatsapp_sync import (
+    ARQ_TASK_NAME as SYNC_WAPP_CONTACT_ARQ_TASK_NAME,
+)
+from app.core.arq_manager import get_arq_pool
+
 from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.helper.websocket import publish_to_instance_ws
 from app.config import Settings, get_settings
@@ -57,7 +65,7 @@ async def create_evolution_instance(
     )
 
     # 1. Generate Unique IDs
-    platform_instance_id = uuid.uuid4()
+    platform_instance_id = uuid4()
     instance_name = str(platform_instance_id)
     logical_token = secrets.token_urlsafe(32)
     logger.info(
@@ -199,7 +207,7 @@ async def create_evolution_instance(
     response_model=EvolutionInstanceQRCodeResponse,
 )
 async def get_evolution_instance_qrcode(
-    platform_instance_id: uuid.UUID,
+    platform_instance_id: UUID,
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> EvolutionInstanceQRCodeResponse:
@@ -208,7 +216,7 @@ async def get_evolution_instance_qrcode(
     ensuring the instance belongs to the authenticated account.
 
     Args:
-        platform_instance_id (uuid.UUID): The unique identifier of the Evolution instance.
+        platform_instance_id (UUID): The unique identifier of the Evolution instance.
         db (AsyncSession): The database session dependency.
         auth_context (AuthContext): The authentication context containing account information.
 
@@ -332,3 +340,104 @@ async def get_evolution_instance_qrcode(
         f"QR Present: {bool(qr_code)}, Status: {connection_status_from_service}"
     )
     return response_data
+
+
+@router.post(
+    "/instances/evolution/{instance_id}/sync-contacts",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=SyncInitiatedResponse,
+    summary="Initiate WhatsApp Contact Synchronization",
+    description="Triggers a background task to fetch contacts from the specified "
+    "WhatsApp instance (via Evolution API) and sync them with the platform's database.",
+    responses={
+        404: {"description": "Instance not found or not accessible by the user."},
+        503: {
+            "description": "Could not enqueue synchronization task (e.g., task queue unavailable)."
+        },
+    },
+)
+async def trigger_whatsapp_contact_sync(
+    instance_id: UUID = Path(
+        ..., description="The unique identifier of the WhatsApp instance."
+    ),
+    db: AsyncSession = Depends(get_db),
+    arq_pool: ArqRedis = Depends(get_arq_pool),
+    auth_context: AuthContext = Depends(get_auth_context),
+):
+    """
+    Validates the instance ID and enqueues a background task
+    to synchronize WhatsApp contacts for the given instance.
+
+    Args:
+        instance_id: The UUID of the instance from the URL path.
+        db: Database session dependency.
+        arq_pool: ARQ Redis pool dependency.
+        auth_context: Authentication context dependency.
+
+    Returns:
+        A confirmation message indicating the sync task has been accepted.
+
+    Raises:
+        HTTPException:
+            - 404 Not Found: If the instance doesn't exist or doesn't belong to the user's account.
+            - 503 Service Unavailable: If the task queue (ARQ) is unavailable.
+    """
+    logger.debug(
+        f"Endpoint received arq_pool dependency: {arq_pool}, type: {type(arq_pool)}"
+    )
+    account_id = auth_context.account.id
+    logger.info(
+        f"Received request to sync contacts for instance {instance_id} by account {account_id}"
+    )
+
+    # 1. Verify Instance Ownership and Existence
+    stmt = select(EvolutionInstance.id).where(
+        EvolutionInstance.id == instance_id,
+        EvolutionInstance.account_id == account_id,
+        EvolutionInstance.status == EvolutionInstanceStatus.CONNECTED,
+    )
+    result = await db.execute(stmt)
+    db_instance = result.scalars().first()
+
+    if not db_instance:
+        logger.warning(
+            f"Instance {instance_id} not found or not accessible for account {account_id}."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Instance with ID '{instance_id}' not found or access denied.",
+        )
+
+    logger.debug(
+        f"Attempting to enqueue task '{SYNC_WAPP_CONTACT_ARQ_TASK_NAME}'. ARQ Pool: {arq_pool}"
+    )
+    logger.debug(f"Inside endpoint, checking arq_pool. Type: {type(arq_pool)}")
+
+    # 2. Enqueue the Background Task
+    try:
+        arq_task = await arq_pool.enqueue_job(
+            SYNC_WAPP_CONTACT_ARQ_TASK_NAME,
+            instance_id=instance_id,
+            account_id=account_id,
+        )
+        if not arq_task:
+            # This might happen if the connection is temporarily lost or queue full
+            raise ConnectionError("Failed to enqueue job: ARQ pool returned None.")
+
+        logger.info(
+            f"Enqueued task '{SYNC_WAPP_CONTACT_ARQ_TASK_NAME}' for instance {instance_id}. ARQ Job ID: {arq_task.job_id}"
+        )
+        # Optionally return the ARQ job ID in the response
+        return SyncInitiatedResponse(
+            message="Contact synchronization successfully initiated.",
+            id=arq_task.job_id,
+        )
+
+    except Exception as e:
+        logger.exception(
+            f"Failed to enqueue contact sync task for instance {instance_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not initiate contact synchronization task at this time.",
+        )
