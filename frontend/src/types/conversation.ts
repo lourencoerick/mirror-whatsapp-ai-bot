@@ -1,8 +1,10 @@
 export interface Conversation {
   id: string;
-  profile_picture_url: string;
-  phone_number: string;
-  contact_name: string;
+  contact: {
+    name: string;    
+    phone_number: string;
+    profile_picture_url: string;
+  } | null;
   updated_at: string;
   last_message_at: string;
   last_message: {
