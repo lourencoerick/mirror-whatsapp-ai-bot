@@ -113,6 +113,40 @@ class EvolutionContact(BaseModel):
         return self.pushName
 
 
+class EvolutionContactProfile(BaseModel):
+    """Represents a contact as returned by the Evolution API."""
+
+    wuid: str  # Usually the phone number like '5511999998888@c.us'
+    name: str
+    numberExists: Optional[bool] = None
+    isBusiness: Optional[bool] = None
+    email: Optional[str] = None
+    picture: Optional[str] = None
+    description: Optional[str] = None
+
+    @property
+    def number_exists(self) -> Optional[bool]:
+        return self.numberExists
+
+    @property
+    def is_business(self) -> Optional[bool]:
+        return self.isBusiness
+
+    @property
+    def profile_picture_url(self) -> Optional[str]:
+        return self.picture
+
+    @property
+    def phone_number(self) -> Optional[str]:
+        """Extracts the phone number part from the id."""
+        if "@" in self.wuid:
+            num = self.wuid.split("@")[0]
+            # Basic validation/normalization (improve as needed)
+            if num.isdigit():
+                return num
+        return None
+
+
 class SyncInitiatedResponse(BaseModel):
     """Response model indicating successful initiation of a background task."""
 
