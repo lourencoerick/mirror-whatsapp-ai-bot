@@ -1,97 +1,97 @@
-
+// components/ui/conversation/StartConversationDialog.tsx
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // Added useEffect
 import { useRouter } from "next/navigation";
-import { toast } from "sonner"; 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import PhoneInputForm from "@/components/ui/conversation/start-conversation-dialog-input"; 
-import { startConversation } from "@/lib/actions/start-conversation"; 
+import { toast } from "sonner";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogClose
+} from "@/components/ui/dialog";
+import { StartConversationForm } from "@/components/ui/conversation/start-conversation-form"; // Adjust path
+import { startConversation } from "@/lib/actions/start-conversation";
+import { Contact } from "@/types/contact"; // Import Contact type
 
-/**
- * Props for the StartConversationDialog component.
- */
 interface StartConversationDialogProps {
   /** The element that triggers the dialog opening. */
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode; // Make trigger optional if controlled externally
+  /** Optional: Pre-selects a contact */
+  initialContact?: Contact | null;
+  /** Controls the open state if used as a controlled component */
+  open?: boolean;
+  /** Callback when the open state changes */
+  onOpenChange?: (open: boolean) => void;
 }
 
-/**
- * A dialog component to initiate a new WhatsApp conversation.
- * Uses sonner toasts for user feedback on the start conversation action.
- * User-facing text is in Portuguese (PT-BR).
- *
- * @param {StartConversationDialogProps} props - The component props.
- * @param {React.ReactNode} props.trigger - The element that will open the dialog when clicked.
- */
-export default function StartConversationDialog({ trigger }: StartConversationDialogProps) {
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+export default function StartConversationDialog({
+    trigger,
+    initialContact = null,
+    open: controlledOpen, // Rename prop to avoid conflict
+    onOpenChange: controlledOnOpenChange,
+}: StartConversationDialogProps) {
+  // Use internal state if not controlled externally
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined && controlledOnOpenChange !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? controlledOnOpenChange : setInternalOpen;
+
   const router = useRouter();
 
-  /**
-   * Handles the submission of the phone number to start a new conversation.
-   * Shows loading, success, or error toasts (in PT-BR) during the process.
-   * Navigates to the conversation page on success.
-   *
-   * @param {string} fullNumber - The complete phone number (including country code).
-   * @param {string} inboxId - The ID of the inbox to use for the conversation.
-   */
-  const handleStartConversation = async (fullNumber: string, inboxId: string) => {
-    setLoading(true);
-    const toastId = toast.loading("Iniciando conversa..."); 
+  // Reset internal state when dialog closes (if uncontrolled)
+  useEffect(() => {
+      if (!isControlled && !open) {
+          // Add any state reset needed here if form state doesn't reset automatically
+      }
+  }, [open, isControlled]);
 
+
+  const handleStartConversationSubmit = async (phoneNumber: string, inboxId: string) => {
+    const toastId = toast.loading("Iniciando conversa...");
     try {
-      const res = await startConversation({ phoneNumber: fullNumber, inboxId: inboxId });
-
+      const res = await startConversation({ phoneNumber: phoneNumber, inboxId: inboxId });
       if (res.success && res.conversation_id) {
-        toast.success("Conversa iniciada!", { 
-          id: toastId,
-          description: "Redirecionando...", 
-        });
-        setOpen(false); 
+        toast.success("Conversa iniciada!", { id: toastId, description: "Redirecionando..." });
+        setOpen(false); // Close the dialog
         router.push(`/dashboard/conversations/${res.conversation_id}`);
       } else {
-        
-        const errorMessage = res.error || "Não foi possível iniciar a conversa."; 
-        toast.error("Falha ao iniciar", { 
-          id: toastId,
-          description: errorMessage, 
-        });
-        console.error("Failed to start conversation:", errorMessage);
-        
+        toast.error("Falha ao iniciar", { id: toastId, description: res.error || "Não foi possível iniciar a conversa." });
       }
     } catch (err: any) {
-      
-      console.error("Unexpected error starting conversation:", err);
-      const errorDescription = err.message || "Por favor, tente novamente mais tarde."; 
-      toast.error("Ocorreu um erro inesperado", { 
-        id: toastId,
-        description: errorDescription, 
-      });
-      
-    } finally {
-      setLoading(false);
+      toast.error("Ocorreu um erro inesperado", { id: toastId, description: err.message || "Por favor, tente novamente." });
     }
   };
 
+  const dialogTitle = initialContact ? `Enviar para ${initialContact.name || initialContact.phone_number}` : "Iniciar Nova Conversa";
+  const dialogDescription = initialContact ? `Selecione a caixa de entrada para enviar a mensagem.` : `Selecione uma caixa de entrada e busque/selecione o contato desejado.`;
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger}
-      </DialogTrigger>
+      {/* Only render trigger if provided and not controlled */}
+      {!isControlled && trigger && (
+          <DialogTrigger asChild>
+            {trigger}
+          </DialogTrigger>
+      )}
 
-      <DialogContent>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Iniciar nova conversa</DialogTitle> 
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
-
-        <PhoneInputForm
-          onPhoneSubmit={handleStartConversation}
-          
-          loadingText="Iniciando..."
-          submitText="Iniciar"
-        />
+        <div className="py-4">
+          {/* Pass initialContact to the form */}
+          <StartConversationForm
+            initialContact={initialContact} // Pass down the prop
+            onStartConversation={handleStartConversationSubmit}
+            submitText="Iniciar Conversa"
+            loadingText="Iniciando..."
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
