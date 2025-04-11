@@ -60,6 +60,7 @@ async def create_logical_evolution_instance(
 async def generate_connection_qrcode(
     shared_url: str, instance_name: str, api_key: str
 ) -> Dict[str, Any]:
+    shared_api_url = settings.EVOLUTION_API_SHARED_URL
     backend_key = settings.EVOLUTION_BACKEND_API_KEY
 
     headers = {
@@ -150,3 +151,28 @@ async def fetch_evolution_contact_profile(
             f"Error getting the profile for phone number {phone_number}", e
         )
         raise
+
+
+async def fetch_evolution_connection_state(
+    instance_name: str, shared_url: str, api_key: str
+) -> Dict[str, Any]:
+
+    headers = {"apikey": api_key, "Content-Type": "application/json"}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{shared_url}/instance/connectionState/{instance_name}",
+                headers=headers,
+            )
+        response.raise_for_status()
+        return response.json()
+
+    except httpx.HTTPStatusError as e:
+        logger.exception(
+            f"HTTP error getting the connection state of {instance_name}: {e.response.text}"
+        )
+        raise Exception from e
+    except Exception as e:
+        logger.exception(f"Error getting the connection state of {instance_name}", e)
+        raise Exception from e
