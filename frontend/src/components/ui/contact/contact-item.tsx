@@ -15,8 +15,7 @@ interface ContactListItemProps {
   contact: Contact;
   onEdit?: (contactId: string) => void;
   onDelete?: (contactId: string) => void;
-  /** Callback when 'Send Message' action is clicked */
-  onSendMessage?: () => void; // <-- New prop added
+  onSendMessage?: () => void;
   onCardClick?: (contactId: string) => void;
 }
 
@@ -34,7 +33,7 @@ const ContactListItem: React.FC<ContactListItemProps> = ({
   contact,
   onEdit,
   onDelete,
-  onSendMessage, // <-- Destructure the new prop
+  onSendMessage,
   onCardClick,
 }) => {
   if (!contact || !contact.id) {
@@ -44,9 +43,8 @@ const ContactListItem: React.FC<ContactListItemProps> = ({
 
   const { id, name, phone_number, email } = contact;
 
-  // Determine display name for aria-labels
   const contactIdentifier = name || phone_number || id.toString();
-  const hasPhoneNumber = !!phone_number; // Check if phone number exists
+  const hasPhoneNumber = !!phone_number;
 
   const handleEditClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation(); // Prevent card click if applicable
@@ -69,11 +67,10 @@ const ContactListItem: React.FC<ContactListItemProps> = ({
   // --- New Handler for Send Message ---
   const handleSendMessageClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation(); // Prevent card click if applicable
-    if (onSendMessage && hasPhoneNumber) { // Check if handler and phone number exist
-      onSendMessage(); // Call the handler passed from ContactList
+    if (onSendMessage && hasPhoneNumber) { 
+      onSendMessage(); 
     } else if (!hasPhoneNumber) {
         console.warn("ContactListItem: Cannot send message, phone number missing.");
-        // Optionally show a toast notification here
         // toast.warning("Contato sem número de telefone.");
     } else {
       console.warn("ContactListItem: onSendMessage handler not provided.");
@@ -93,7 +90,6 @@ const ContactListItem: React.FC<ContactListItemProps> = ({
     <div
       className={cn(
         `group flex items-center py-3 px-4 border-b last:border-b-0 transition-colors`,
-        // Adjust hover based on whether the whole card is clickable
         isCardClickable ? 'cursor-pointer hover:bg-muted/50' : 'hover:bg-gray-50/50'
       )}
       onClick={isCardClickable ? handleCardClick : undefined}
@@ -121,7 +117,6 @@ const ContactListItem: React.FC<ContactListItemProps> = ({
         )}
       </div>
 
-      {/* Actions Column - Adjust width if needed */}
       <div className="w-auto md:w-28 flex items-center justify-end gap-0 sm:gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex-shrink-0">
         {/* Send Message Button */}
         {onSendMessage && (
@@ -129,7 +124,7 @@ const ContactListItem: React.FC<ContactListItemProps> = ({
             variant="ghost"
             size="icon"
             onClick={handleSendMessageClick}
-            disabled={!hasPhoneNumber} // Disable if no phone number
+            disabled={!hasPhoneNumber} 
             aria-label={`Enviar mensagem para ${contactIdentifier}`}
             title={hasPhoneNumber ? `Enviar mensagem para ${contactIdentifier}` : "Contato sem número de telefone"} // Add title for clarity
             className="h-8 w-8"
@@ -161,8 +156,6 @@ const ContactListItem: React.FC<ContactListItemProps> = ({
             <Trash2 className="h-4 w-4" />
           </Button>
         )}
-         {/* Placeholder if no actions are provided - adjust width if needed */}
-         {/* {!onSendMessage && !onEdit && !onDelete && <div className="h-8 w-8"></div>} */}
       </div>
       {/* --- End Column Structure --- */}
     </div>
