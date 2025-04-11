@@ -20,6 +20,7 @@ from app.models.channels.evolution_instance import (
 from app.services.helper.evolution_instance import (
     create_logical_evolution_instance,
     generate_connection_qrcode,
+    fetch_evolution_connection_state,
 )
 
 from app.workers.batch_contacts.tasks.evolution_whatsapp_sync import (
@@ -283,7 +284,7 @@ async def get_evolution_instance_qrcode(
             f"at URL: {evolution_instance.shared_api_url}"
         )
         data = await generate_connection_qrcode(
-            shared_url=evolution_instance.shared_api_url,
+            shared_url=settings.EVOLUTION_API_SHARED_URL,
             instance_name=evolution_instance.instance_name,
             api_key=decrypt_logical_token(evolution_instance.logical_token_encrypted),
         )
@@ -441,3 +442,220 @@ async def trigger_whatsapp_contact_sync(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Could not initiate contact synchronization task at this time.",
         )
+
+
+@router.get(
+    "/instances/evolution/{instance_id}/status",
+    response_model=EvolutionInstanceRead,  # Assuming this is your Pydantic Read Schema
+    status_code=status.HTTP_200_OK,
+    summary="Synchronize and Get Evolution Instance Status",
+    description="Fetches the current connection status from the specified Evolution API instance, "
+    "updates the corresponding Evolution Instance record, and returns the updated instance details.",
+    responses={
+        404: {"description": "Instance not found or not accessible."},
+        400: {"description": "Instance missing configuration or other bad request."},
+        502: {"description": "Failed to communicate with the upstream Evolution API."},
+        504: {
+            "description": "Could not connect to the upstream Evolution API (Timeout)."
+        },
+        500: {"description": "Internal server error."},
+    },
+)
+async def sync_and_get_instance_status(
+    instance_id: str = Path(
+        ...,
+        description="The unique identifier of the Evolution API instance record in our database.",
+    ),
+    db: AsyncSession = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> (
+    EvolutionInstance
+):  # Returns the SQLAlchemy model, FastAPI converts using response_model
+    """
+    Retrieves the connection status from the Evolution API, updates the
+    database record for the corresponding Evolution Instance, and returns the updated instance.
+
+    Args:
+        instance_id: The Evolution instance identifier (our DB ID) from the URL path.
+        db: Database session dependency.
+        auth_context: Authentication context dependency.
+
+    Returns:
+        The updated EvolutionInstance SQLAlchemy object.
+
+    Raises:
+        HTTPException: If validation fails or communication with Evolution API fails.
+    """
+    account_id = auth_context.account.id
+    logger.info(
+        f"Received request to sync status for Evolution instance ID '{instance_id}' for Account={account_id}"
+    )
+
+    # 1. Fetch Instance Details from OUR Database
+    evolution_instance: EvolutionInstance | None = None
+    try:
+        logger.debug(
+            f"[Account: {account_id}] [Instance ID: {instance_id}] Querying database for instance."
+        )
+        # Ensure you are querying by the primary key 'id' if instance_id is the UUID/PK
+        result = await db.execute(
+            select(EvolutionInstance).filter(
+                EvolutionInstance.id == instance_id,  # Assuming instance_id is the PK
+                EvolutionInstance.account_id == account_id,
+            )
+        )
+        evolution_instance = result.scalar_one_or_none()
+    except Exception as e:
+        logger.error(
+            f"[Account: {account_id}] [Instance ID: {instance_id}] Database query failed. Error: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error occurred while fetching instance.",
+        )
+
+    if not evolution_instance:
+        logger.warning(
+            f"[Account: {account_id}] [Instance ID: {instance_id}] Instance not found or access denied."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Instance with ID {instance_id} not found for this account.",
+        )
+
+    # Log the instance name if available, helps debugging
+    instance_name_for_log = evolution_instance.instance_name or "N/A"
+    logger.info(
+        f"[Account: {account_id}] [Instance ID: {instance_id}] Found instance in DB. "
+        f"Instance Name: {instance_name_for_log}, Current DB Status: {evolution_instance.status}"
+    )
+
+    # 3. Extract Evolution API connection details
+    api_url = evolution_instance.shared_api_url
+    api_key_encrypted = evolution_instance.logical_token_encrypted
+    instance_name = evolution_instance.instance_name  # Name needed for the API call
+
+    if not api_url or not api_key_encrypted or not instance_name:
+        logger.error(
+            f"Sync status failed: Missing API config or instance name for Instance ID {instance_id}."
+        )
+        # Optionally update status to CONFIG_ERROR
+        try:
+            evolution_instance.status = EvolutionInstanceStatus.ERROR
+            db.add(evolution_instance)
+            await db.commit()
+        except Exception:
+            await db.rollback()  # Rollback potential status update on error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Instance is missing necessary Evolution API configuration (URL, API Key, or Instance Name).",
+        )
+
+    # 4. Call Evolution API via the helper function
+    final_status = (
+        evolution_instance.status
+    )  # Keep current status as default if fetch fails unexpectedly later
+    try:
+        # Decrypt the token just before use
+        decrypted_api_key = decrypt_logical_token(api_key_encrypted)
+
+        logger.debug(
+            f"Calling fetch_evolution_connection_state for instance name '{instance_name}' (Instance ID: {instance_id})"
+        )
+        evo_data = await fetch_evolution_connection_state(
+            instance_name=instance_name,
+            shared_url=api_url,
+            api_key=decrypted_api_key,
+        )
+
+        # *** Verify this parsing logic against actual API response ***
+        evo_status_str = (
+            evo_data.get("instance", {}).get("state", "UNKNOWN_RESPONSE").lower()
+        )  # Use lower for case-insensitivity
+
+        # Map status string to Enum
+        if evo_status_str == "open":
+            final_status = EvolutionInstanceStatus.CONNECTED
+        elif evo_status_str == "close":
+            final_status = EvolutionInstanceStatus.DISCONNECTED
+        elif evo_status_str == "connecting":
+            final_status = EvolutionInstanceStatus.CONNECTING
+        else:
+            # Store the raw status if it's unknown but maybe informative
+            final_status = (
+                EvolutionInstanceStatus.UNKNOWN
+            )  # Or store evo_status_str directly if column allows
+            logger.warning(
+                f"Received unknown status '{evo_status_str}' from Evolution API for instance '{instance_name}'"
+            )
+
+        logger.info(
+            f"Evolution API returned status '{evo_status_str}', mapped to '{final_status}' for instance '{instance_name}' (Instance ID: {instance_id})"
+        )
+
+    except HTTPException as e:
+        # If fetch helper raises HTTPException (e.g., 502, 504), update DB status and re-raise
+        logger.warning(
+            f"Updating instance {instance_id} status to API_ERROR due to fetch failure: {e.detail}"
+        )
+        try:
+            evolution_instance.status = EvolutionInstanceStatus.API_ERROR
+            db.add(evolution_instance)
+            await db.commit()
+        except Exception as db_err:
+            await db.rollback()
+            logger.error(
+                f"Failed to update instance {instance_id} status to API_ERROR after fetch failure: {db_err}"
+            )
+        raise e  # Re-raise the original exception
+
+    except Exception as e:
+        # Catch any other unexpected error (e.g., decryption error, unexpected helper error)
+        logger.exception(
+            f"Unexpected error during status fetch process for instance id {instance_id}"
+        )
+        try:
+            evolution_instance.status = (
+                EvolutionInstanceStatus.UNKNOWN
+            )  # Or a specific internal error status
+            db.add(evolution_instance)
+            await db.commit()
+        except Exception as db_err:
+            await db.rollback()
+            logger.error(
+                f"Failed to update instance {instance_id} status to UNKNOWN after unexpected error: {db_err}"
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected internal error occurred while processing the instance status.",
+        ) from e
+
+    # 5. Update Database with the successfully fetched status
+    try:
+        if evolution_instance.status != final_status:
+            logger.info(
+                f"Updating instance {instance_id} status in DB from '{evolution_instance.status}' to '{final_status}'"
+            )
+            evolution_instance.status = final_status
+            db.add(evolution_instance)  # Mark instance as dirty
+            await db.commit()
+            await db.refresh(
+                evolution_instance
+            )  # Refresh to get updated timestamps etc.
+        else:
+            logger.info(
+                f"Instance {instance_id} status ('{final_status}') hasn't changed. No DB update needed."
+            )
+            # No commit/refresh needed if status is the same
+
+    except Exception as e:
+        await db.rollback()
+        logger.exception(
+            f"Failed to update instance status in DB for Instance ID {instance_id}"
+        )
+        raise HTTPException(status_code=500, detail="Failed to save updated status.")
+
+    # 6. Return the (potentially refreshed) instance object
+    return evolution_instance
