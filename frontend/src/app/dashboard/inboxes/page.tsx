@@ -19,10 +19,7 @@ export default function InboxesPage() {
   const { setPageTitle } = useLayoutContext();
 
   useEffect(() => {
-    setPageTitle("Inboxes");
-    return () => {
-      setPageTitle("Dashboard");
-    };
+    setPageTitle("Caixas de Entrada");
   }, [setPageTitle]);
 
   return (

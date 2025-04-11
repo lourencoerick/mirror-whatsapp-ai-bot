@@ -4,26 +4,25 @@ import Link from 'next/link';
 import React, { useEffect } from 'react';
 import ContactImportDialog from '@/components/ui/contact/import/contact-import-dialog'; // Adjust path if needed
 import ContactImportJobsTable from '@/components/ui/contact/import/contact-import-jobs-table';
-
+import { ArrowLeft }  from "lucide-react";
 import { useLayoutContext } from '@/contexts/layout-context';
 
 const ContactImportPage: React.FC = () => {
 
     const { setPageTitle } = useLayoutContext();
-    useEffect(() => {
-        setPageTitle("Importar Contatos");
-    }, [setPageTitle]);
+
 
     // --- Set Page Title ---
     useEffect(() => {
         setPageTitle(
             <div className="flex items-center gap-2">
-                <Link href="/dashboard/contacts" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" aria-label="Voltar para Inboxes">
-                    <span className="font-normal">{"< Voltar"}</span>
-                </Link>
-                <span className="text-sm text-muted-foreground">|</span>
-                <span className="font-semibold">Importar Contatos</span>
-            </div>
+            <Link href="/dashboard/contacts" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" aria-label="Voltar para Caixas de Entrada">
+                <ArrowLeft className="h-4 w-4" />
+                <span className="font-semibold">Contatos</span>
+            </Link>
+            <span className="text-sm text-muted-foreground">/</span>
+            <span className="font-semibold">Importar Contatos</span>
+        </div>
         );
     }, [setPageTitle]);    
 
