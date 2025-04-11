@@ -157,6 +157,13 @@ async def fetch_evolution_connection_state(
     instance_name: str, shared_url: str, api_key: str
 ) -> Dict[str, Any]:
 
+    # TODO: remove the general EVOLUTION_API_SHARED_URL
+    # after hosting the Evolution manager
+    shared_api_url = settings.EVOLUTION_API_SHARED_URL
+    backend_key = settings.EVOLUTION_BACKEND_API_KEY
+
+    shared_url = shared_api_url
+
     headers = {"apikey": api_key, "Content-Type": "application/json"}
 
     try:
