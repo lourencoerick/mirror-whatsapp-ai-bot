@@ -158,29 +158,31 @@ const ChatPage = () => {
           conversationId={conversationId}
           onNewMessage={(message) => {
             setMessages((prev: Message[]) => [...prev, message]);
-            scrollToBottom();
+            if (message.direction === "out") {
+              scrollToBottom();
+            }            
           }}
         />
         <ChatMessageList>
-          {loadingInitial && (
-            <ChatBubble variant="received">
-              <ChatBubbleAvatar src="" fallback="🤖" />
-              <ChatBubbleMessage isLoading />
-            </ChatBubble>
-          )}
+            {loadingInitial && (
+              <ChatBubble variant="received">
+                <ChatBubbleAvatar src="" fallback="🤖" />
+                <ChatBubbleMessage isLoading />
+              </ChatBubble>
+            )}
 
-          {error && (
-            <ConversationNotFound />
-          )}
+            {error && (
+              <ConversationNotFound />
+            )}
 
-          {messages.map((message, index) => (
+            {messages.map((message, index) => (
 
-            <ChatMessage
-              key={index}
-              direction={message.direction}
-              content={message.content}
-            />
-          ))}
+              <ChatMessage
+                key={index}
+                direction={message.direction}
+                content={message.content}
+              />
+            ))}
         </ChatMessageList>
         {renderNewerMessagesLoadingIndicator()}
       </div>
