@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 
 import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch'; 
-import { listContactImportJobs  } from '@/lib/api-client'; 
+import { listContactImportJobs  } from '@/lib/api/contact'; 
 import { PaginatedImportJobListResponse, ImportJobListItem  } from '@/types/contact-import'; 
 
 import JobStatusDetails from './import-job-details'; 

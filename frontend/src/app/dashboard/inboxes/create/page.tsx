@@ -9,12 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2, Terminal } from "lucide-react";
+import { Loader2, Terminal, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { StepIndicator } from '@/components/ui/inbox/new/step-indicator';
-import { ChooseChannelStep } from '@/components/ui/inbox/new/choose-channel-step';
-import { ConfigureEvolutionApiStep } from '@/components/ui/inbox/new/configure-evolution-api';
-import { ConfigureCloudApiStep } from '@/components/ui/inbox/new/configure-cloud-api';
+import { StepIndicator } from '@/components/ui/inbox/create/step-indicator';
+import { ChooseChannelStep } from '@/components/ui/inbox/create/choose-channel-step';
+import { ConfigureEvolutionApiStep } from '@/components/ui/inbox/create/configure-evolution-api';
+import { ConfigureCloudApiStep } from '@/components/ui/inbox/create/configure-cloud-api';
 import { useLayoutContext } from '@/contexts/layout-context';
 
 /**
@@ -59,14 +59,17 @@ export default function CreateInboxPage() {
     useEffect(() => {
         setPageTitle(
             <div className="flex items-center gap-2">
-                <Link href="/dashboard/inboxes" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" aria-label="Voltar para Inboxes">
-                    <span className="font-normal">{"< Voltar"}</span>
+                <Link href="/dashboard/inboxes" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" aria-label="Voltar para Caixas de Entrada">
+                    <ArrowLeft className="h-4 w-4" />
+                    <span className="font-normal">Caixas de Entrada</span>
                 </Link>
-                <span className="text-sm text-muted-foreground">|</span>
-                <span className="font-semibold text-md">Criar nova Inbox</span>
+                <span className="text-sm text-muted-foreground">/</span>
+                <span className="font-semibold text-md">
+                    {isLoading ? 'Carregando...' : 'Criar Nova Caixa de Entrada'}
+                </span>
             </div>
         );
-    }, [setPageTitle]);
+    }, [setPageTitle, isLoading]);    
 
     // --- Navigation and Callback Handlers (Logic remains, error messages in PT-BR) ---
 

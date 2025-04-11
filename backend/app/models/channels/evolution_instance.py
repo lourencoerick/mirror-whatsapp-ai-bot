@@ -25,6 +25,9 @@ class EvolutionInstanceStatus(str, enum.Enum):
     CONNECTED = "CONNECTED"  # Confirmed 'open' state via webhook or API check
     DISCONNECTED = "DISCONNECTED"  # Confirmed 'close' state via webhook or API check
     ERROR = "ERROR"  # Failed during creation or encountered a persistent error
+    UNKNOWN = "UNKNOWN"
+    CONNECTING = "CONNECTING"
+    API_ERROR = "API_ERROR"
 
 
 class EvolutionInstance(BaseModel):

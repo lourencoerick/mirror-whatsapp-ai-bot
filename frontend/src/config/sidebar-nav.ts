@@ -52,7 +52,7 @@ import {
       href: '/dashboard/inboxes',
       icon: Inbox,
       children: [
-        { name: 'Criar Nova Caixa', href: '/dashboard/inboxes/create', icon: PlusSquare },
+        { name: 'Criar Nova Caixa', href: '/dashboard/inboxes/create', icon: PlusSquare, hidden: true  },
       ],
     },
     {

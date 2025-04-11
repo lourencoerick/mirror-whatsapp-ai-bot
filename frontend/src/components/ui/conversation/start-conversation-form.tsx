@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useInboxes } from "@/hooks/use-inboxes";
 import { useAuthenticatedFetch, FetchFunction } from '@/hooks/use-authenticated-fetch';
-import { searchContacts } from '@/lib/api-client';
+import { searchContacts } from '@/lib/api/contact';
 import { Contact } from '@/types/contact';
 import { useOnClickOutside } from '@/hooks/use-on-click-outside'; // Assuming you have this hook
 import {formatPhoneNumber} from "@/lib/utils/phone-utils"
