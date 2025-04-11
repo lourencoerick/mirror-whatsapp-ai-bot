@@ -1,7 +1,6 @@
-// components/ui/conversation/StartConversationDialog.tsx
 "use client";
 
-import React, { useState, useEffect } from "react"; // Added useEffect
+import React, { useState, useEffect } from "react"; 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -13,13 +12,13 @@ import {
     DialogTrigger,
     DialogClose
 } from "@/components/ui/dialog";
-import { StartConversationForm } from "@/components/ui/conversation/start-conversation-form"; // Adjust path
+import { StartConversationForm } from "@/components/ui/conversation/start-conversation-form"; 
 import { startConversation } from "@/lib/actions/start-conversation";
-import { Contact } from "@/types/contact"; // Import Contact type
+import { Contact } from "@/types/contact"; 
 
 interface StartConversationDialogProps {
   /** The element that triggers the dialog opening. */
-  trigger?: React.ReactNode; // Make trigger optional if controlled externally
+  trigger?: React.ReactNode; 
   /** Optional: Pre-selects a contact */
   initialContact?: Contact | null;
   /** Controls the open state if used as a controlled component */
@@ -31,7 +30,7 @@ interface StartConversationDialogProps {
 export default function StartConversationDialog({
     trigger,
     initialContact = null,
-    open: controlledOpen, // Rename prop to avoid conflict
+    open: controlledOpen,
     onOpenChange: controlledOnOpenChange,
 }: StartConversationDialogProps) {
   // Use internal state if not controlled externally
@@ -45,7 +44,6 @@ export default function StartConversationDialog({
   // Reset internal state when dialog closes (if uncontrolled)
   useEffect(() => {
       if (!isControlled && !open) {
-          // Add any state reset needed here if form state doesn't reset automatically
       }
   }, [open, isControlled]);
 

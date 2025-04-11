@@ -1,4 +1,3 @@
-// components/ui/conversation/StartConversationForm.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -27,7 +26,6 @@ interface StartConversationFormProps {
   onStartConversation: (phoneNumber: string, inboxId: string) => Promise<void>;
   submitText?: string;
   loadingText?: string;
-  /** Optional: Pre-selects a contact and disables search */
   initialContact?: Contact | null;
 }
 
@@ -35,7 +33,7 @@ export function StartConversationForm({
   onStartConversation,
   submitText = "Iniciar Conversa",
   loadingText = "Iniciando...",
-  initialContact = null, // Default to null
+  initialContact = null, 
 }: StartConversationFormProps) {
   const [searchQuery, setSearchQuery] = useState('');
   // Initialize selectedContact with initialContact if provided
@@ -63,9 +61,9 @@ export function StartConversationForm({
   // --- SWR Fetcher for Contact Search (only runs if no initialContact) ---
   const searchFetcher = (
     query: string,
-    fetchFn: AuthenticatedFetchFunction
+    fetchFn: FetchFunction
   ): Promise<Contact[]> => {
-    if (!query || initialContact) return Promise.resolve([]); // Don't fetch if pre-filled
+    if (!query || initialContact) return Promise.resolve([]);
     return searchContacts(query, 10, fetchFn);
   };
 
@@ -110,7 +108,7 @@ export function StartConversationForm({
     // Should not happen if initialContact is set, but safe guard
     if (initialContact) return;
     setSearchQuery(event.target.value);
-    setSelectedContact(null); // Clear selection when typing
+    setSelectedContact(null);
     if (!isDropdownOpen) {
         setIsDropdownOpen(true);
     }
@@ -123,8 +121,6 @@ export function StartConversationForm({
     }
   };
 
-  // No clear button needed if contact is pre-filled
-  // const clearSelectedContact = () => { ... }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -162,7 +158,7 @@ export function StartConversationForm({
         {selectedContact ? (
             <div className={cn(
                 "flex items-center justify-between p-2 border rounded-md text-sm",
-                initialContact ? "bg-muted/60" : "bg-muted/50" // Slightly different bg if pre-filled
+                initialContact ? "bg-muted/60" : "bg-muted/50"
             )}>
                 <div>
                     <span className="font-medium">{selectedContact.name || 'Sem Nome'}</span>
@@ -175,7 +171,7 @@ export function StartConversationForm({
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0"
-                        onClick={() => setSelectedContact(null)} // Simple clear
+                        onClick={() => setSelectedContact(null)}
                         aria-label="Limpar seleção de contato"
                         disabled={isSubmitting}
                     >
@@ -194,10 +190,10 @@ export function StartConversationForm({
                     onChange={handleSearchChange}
                     onFocus={handleFocus}
                     autoComplete="off"
-                    disabled={isSubmitting || !!initialContact} // Disable if pre-filled
+                    disabled={isSubmitting || !!initialContact} 
                 />
                 {/* Dropdown List */}
-                {isDropdownOpen && searchQuery && !initialContact && ( // Also check !initialContact
+                {isDropdownOpen && searchQuery && !initialContact && ( 
                     <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-y-auto">
                         {/* ... dropdown content (loading, error, results) ... */}
                          <ul className="py-1">
