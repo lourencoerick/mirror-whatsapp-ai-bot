@@ -59,14 +59,14 @@ const ConversationsList: React.FC<ConversationsListProps> = ({ socketIdentifier 
           key={conversation.id}
           // Map API fields to the expected props of ConversationItem.
           id={conversation.id}
-          phoneNumber={conversation.phone_number}
-          contactName={conversation.contact_name}
+          phoneNumber={conversation.contact?.phone_number ?? ''}
+          contactName={conversation.contact?.name ?? ''}
+          imageUrl={conversation.contact?.profile_picture_url ?? ''}          
           lastMessageContent={conversation.last_message?.content ?? ''}
           lastMessageTime={conversation.last_message_at}
-          imageUrl={conversation.profile_picture_url}
-          isSelected={conversation.id === conversationId}
           matchingMessageId={conversation.matching_message?.id ?? ''}
           matchingMessageContent={conversation.matching_message?.content ?? ''}
+          isSelected={conversation.id === conversationId}
         />
       ))}
       {error && <div className="p-4 text-red-500">Erro ao carregar conversas.</div>}

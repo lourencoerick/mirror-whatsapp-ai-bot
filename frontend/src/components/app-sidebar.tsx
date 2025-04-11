@@ -49,7 +49,7 @@ const mapNavItemToNavMainProps = (navItem: ConfigNavItem): NavMainItem => {
  * The main application sidebar component.
  */
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  console.log("Raw sidebarNavItems:", JSON.stringify(sidebarNavItems, null, 2));
+  // console.log("Raw sidebarNavItems:", JSON.stringify(sidebarNavItems, null, 2));
 
   // Filter out hidden items
   const visibleNavItems = sidebarNavItems.filter(
@@ -58,11 +58,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   
 
-  console.log("Visible Nav Items:", JSON.stringify(visibleNavItems, null, 2));
+  // console.log("Visible Nav Items:", JSON.stringify(visibleNavItems, null, 2));
 
   const navMainPropsItems = visibleNavItems.map(mapNavItemToNavMainProps);
 
-  console.log("Items passed to NavMain:", JSON.stringify(navMainPropsItems, null, 2));
+  // console.log("Items passed to NavMain:", JSON.stringify(navMainPropsItems, null, 2));
 
   return (
     <Sidebar collapsible="icon" {...props}>

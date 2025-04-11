@@ -12,27 +12,27 @@ import { truncateText } from "@/lib/utils/text-utils";
 
 type ConversationItemProps = {
   id: string;
-  phoneNumber?: string;
   contactName?: string;
+  phoneNumber?: string;
+  imageUrl?: string;
   lastMessageContent?: string;
   lastMessageTime?: string;
-  imageUrl?: string;
-  isSelected?: boolean;
   matchingMessageId?: string;
   matchingMessageContent?: string;
+  isSelected?: boolean;
 
 };
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
   id,
-  phoneNumber = '',
   contactName = '',
+  phoneNumber = '',
+  imageUrl = '',
   lastMessageContent = '',
   lastMessageTime,
-  imageUrl = '',
-  isSelected = false,
   matchingMessageId,
   matchingMessageContent,
+  isSelected = false,
 }) => {
   const router = useRouter();
 
