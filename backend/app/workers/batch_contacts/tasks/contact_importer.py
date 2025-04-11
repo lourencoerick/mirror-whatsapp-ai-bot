@@ -1,5 +1,3 @@
-# app/worker/tasks.py
-
 import uuid
 import csv
 import io
@@ -23,7 +21,9 @@ from app.services.repository import contact as contact_repo
 from app.services.helper.contact import normalize_phone_number
 from app.services.cloud_storage import get_gcs_bucket
 
+
 # --- Async Database Session Management for Worker ---
+ARQ_TASK_NAME = "process_contact_csv_task"
 
 
 @asynccontextmanager
@@ -71,6 +71,8 @@ async def _create_contact_in_db_async(
         return None
 
     try:
+        contact_data.identifier = normalized_phone
+        contact_data.phone_number = normalized_phone
         new_contact = await contact_repo.create_contact(
             db=db, contact_data=contact_data, account_id=account_id
         )
@@ -135,7 +137,7 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
             # but we might want intermediate commits for status updates.
             # Let's commit the status change explicitly here.
             await db.commit()
-            print(f"Job {job_pk} status updated to PROCESSING.")
+            logger.info(f"Job {job_pk} status updated to PROCESSING.")
 
             # --- Start Processing Logic ---
             total_rows = 0
@@ -145,7 +147,7 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
 
             try:
                 # 3. Get File from GCS (Run blocking I/O in thread)
-                print(f"Fetching file {db_job.file_key} from GCS...")
+                logger.info(f"Fetching file {db_job.file_key} from GCS...")
                 bucket = (
                     get_gcs_bucket()
                 )  # Assuming get_gcs_bucket is synchronous setup
@@ -158,7 +160,7 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
 
                 # Download (synchronous, run in thread)
                 csv_content_bytes = await asyncio.to_thread(blob.download_as_bytes)
-                print(f"File {db_job.file_key} downloaded.")
+                logger.info(f"File {db_job.file_key} downloaded.")
 
                 # Decode (synchronous, CPU-bound, usually fast enough)
                 try:
@@ -166,8 +168,8 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
                 except UnicodeDecodeError:
                     try:
                         csv_content_string = csv_content_bytes.decode("latin-1")
-                        print(
-                            f"Warning: Decoded CSV for job {job_pk} using latin-1 encoding."
+                        logger.warning(
+                            f"Decoded CSV for job {job_pk} using latin-1 encoding."
                         )
                     except UnicodeDecodeError:
                         raise ValueError(
@@ -183,12 +185,12 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
                     skipinitialspace=True,
                 )
                 header = next(reader)
-                print(f"CSV Header: {header}")
+                logger.info(f"CSV Header: {header}")
 
                 for i, row in enumerate(reader):
                     row_number = i + 2
                     total_rows += 1
-                    print(f"Processing row {row_number}: {row}")
+                    logger.info(f"Processing row {row_number}: {row}")
 
                     try:
                         if not row.get("name") or not row.get("phone_number"):
@@ -205,6 +207,7 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
                         contact_input = ContactCreate(
                             name=row["name"].strip(),
                             phone_number=cleaned_phone,
+                            identifier=cleaned_phone,
                             email=row.get("email", "").strip() or None,
                         )
 
