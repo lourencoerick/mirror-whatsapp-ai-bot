@@ -8,17 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Settings, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-/**
- * Interface for the data structure of a single inbox,
- * mirroring the data expected from the API or parent component.
- */
-interface Inbox {
-    id: string;
-    name: string;
-    channel_type: string;
-    // Add other fields if needed for display (e.g., status, unread count)
-}
 
+import {
+    Inbox,
+  } from '@/types/inbox';
+  
 /**
  * Props accepted by the InboxItem component.
  */
