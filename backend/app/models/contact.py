@@ -9,6 +9,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
     DateTime,
+    Boolean,
 )
 
 
@@ -25,6 +26,8 @@ class Contact(BaseModel):
     name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=True)
     phone_number = Column(String(255), nullable=True)
+    is_whatsapp_business = Column(Boolean, nullable=True)
+    is_whatsapp = Column(Boolean, nullable=True)
     pubsub_token = Column(String(255), nullable=True)
     identifier = Column(String(255), nullable=False)
     profile_picture_url = Column(String(255), nullable=True)
