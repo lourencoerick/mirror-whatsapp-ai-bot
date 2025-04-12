@@ -1,20 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AxiosResponse } from "axios";
-import api from "../lib/api";
+import api from "@/lib/api";
 import { useConversationSocket } from "@/hooks/use-conversation-socket";
 import {
   Conversation,
+  ConversationStatusEnum,
   UseInfiniteConversationsResult,
 } from "@/types/conversation";
 
 const CONVERSATIONS_LIMIT: number = 15;
 
-/**
- * Deduplicates an array of conversations based on conversation id.
- * Keeps the first occurrence found.
- * @param conversations An array of Conversation objects.
- * @returns A new array with only unique conversations.
- */
+// Helper to remove duplicate conversations based on ID
 function deduplicateConversations(
   conversations: Conversation[]
 ): Conversation[] {
@@ -29,18 +25,19 @@ function deduplicateConversations(
   return result;
 }
 
+export interface ConversationFilters {
+  query?: string | null;
+  status?: ConversationStatusEnum[] | null;
+  has_unread?: boolean | null;
+}
+
 /**
- * Custom hook to fetch conversations with infinite scrolling and real-time updates via WebSocket.
- * Handles search queries and ensures state consistency during query changes.
- *
- * @param socketIdentifier - Identifier for WebSocket connection.
- * @param query - Optional search query string.
- *
- * @returns An object implementing UseInfiniteConversationsResult.
+ * Custom hook to fetch conversations with infinite scrolling,
+ * filtering, and real-time updates.
  */
 export function useInfiniteConversations(
   socketIdentifier: string,
-  query: string | null
+  filters: ConversationFilters
 ): UseInfiniteConversationsResult {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingInitial, setLoadingInitial] = useState<boolean>(false);
@@ -48,17 +45,29 @@ export function useInfiniteConversations(
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState<boolean>(true);
 
+  // Refs to manage state without causing re-renders
   const currentOffset = useRef<number>(0);
   const isLoading = useRef<boolean>(false);
+  const activeFilters = useRef<ConversationFilters>(filters);
+  const hasMoreRef = useRef(hasMore);
 
-  const activeQuery = useRef<string | null>(query);
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+  }, [hasMore]);
 
+  // Function to fetch conversations
   const fetchConversations = useCallback(async (isInitialLoad: boolean) => {
-    if (isLoading.current) return;
-    if (!isInitialLoad && !hasMore) return;
+    if (isLoading.current || (!isInitialLoad && !hasMoreRef.current)) {
+      console.log("Fetch skipped:", {
+        isLoading: isLoading.current,
+        isInitialLoad,
+        currentHasMore: hasMoreRef.current,
+      });
+      return;
+    }
 
     isLoading.current = true;
-    const currentQuery = activeQuery.current;
+    const currentFilters = activeFilters.current;
 
     if (isInitialLoad) {
       setLoadingInitial(true);
@@ -69,44 +78,45 @@ export function useInfiniteConversations(
       setLoadingMore(true);
     }
 
-    const params: { limit: number; offset: number; q?: string } = {
+    const params: {
+      limit: number;
+      offset: number;
+      q?: string;
+      status?: string[];
+      has_unread?: string;
+    } = {
       limit: CONVERSATIONS_LIMIT,
       offset: currentOffset.current,
     };
 
-    const trimmedQuery = currentQuery?.trim();
-    if (trimmedQuery) {
-      params.q = trimmedQuery;
-    }
+    const trimmedQuery = currentFilters.query?.trim();
+    if (trimmedQuery) params.q = trimmedQuery;
+    if (currentFilters.status && currentFilters.status.length > 0)
+      params.status = currentFilters.status;
+    if (currentFilters.has_unread !== null && currentFilters.has_unread !== undefined)
+      params.has_unread = String(currentFilters.has_unread);
 
-    console.log(
-      `Fetching conversations: query="${params.q ?? "(none)"}", offset=${
-        params.offset
-      }`
-    );
+    console.log(`Fetching conversations: filters=${JSON.stringify(params)}`);
 
     try {
-      const response: AxiosResponse<Conversation[]> = await api.get<
-        Conversation[]
-      >(`/api/v1/conversations`, { params });
+      const response: AxiosResponse<Conversation[]> = await api.get<Conversation[]>(
+        `/api/v1/conversations`,
+        { params }
+      );
       const newConversations = response.data;
 
       setConversations((prevConversations) => {
-        const combined =
-          isInitialLoad || currentQuery !== activeQuery.current
-            ? newConversations
-            : [...prevConversations, ...newConversations];
+        const combined = isInitialLoad
+          ? newConversations
+          : [...prevConversations, ...newConversations];
         return deduplicateConversations(combined);
       });
 
       currentOffset.current += newConversations.length;
-
       setHasMore(newConversations.length === CONVERSATIONS_LIMIT);
     } catch (err: unknown) {
       console.error("Error fetching conversations:", err);
-      setError(
-        err instanceof Error ? err.message : "Falha ao buscar conversas."
-      );
+      setError(err instanceof Error ? err.message : "Failed to fetch conversations.");
       setHasMore(false);
     } finally {
       setLoadingInitial(false);
@@ -115,24 +125,24 @@ export function useInfiniteConversations(
     }
   }, []);
 
+  // Trigger initial load or re-fetch when filters change
   useEffect(() => {
-    console.log(`Initial load effect triggered. Query changed to: "${query}"`);
-    activeQuery.current = query;
-    setConversations([]);
+    console.log(`Filters changed: ${JSON.stringify(filters)}. Triggering fetch.`);
+    activeFilters.current = filters;
     fetchConversations(true);
-  }, [socketIdentifier, query, fetchConversations]);
+  }, [socketIdentifier, JSON.stringify(filters), fetchConversations]);
 
+  // Callback to load more data
   const loadMore = useCallback(() => {
     console.log("loadMore called...");
     fetchConversations(false);
   }, [fetchConversations]);
 
+  // WebSocket integration for real-time updates
   useConversationSocket(socketIdentifier, {
     onNewConversation: (newConv) => {
       console.log("Socket event: new conversation received", newConv);
-      setConversations((prev) => {
-        return deduplicateConversations([newConv, ...prev]);
-      });
+      setConversations((prev) => deduplicateConversations([newConv, ...prev]));
     },
     onConversationUpdate: (updatedConv) => {
       console.log("Socket event: conversation update received", updatedConv);
@@ -140,6 +150,7 @@ export function useInfiniteConversations(
         const index = prev.findIndex((c) => c.id === updatedConv.id);
         let updatedList: Conversation[];
         if (index === -1) {
+          console.warn(`Updated conversation ${updatedConv.id} not found in list, adding.`);
           updatedList = [updatedConv, ...prev];
         } else {
           updatedList = [...prev];

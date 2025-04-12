@@ -1,87 +1,93 @@
 'use client';
 
 import React, { useEffect, useRef } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation'; // For conversationId
 import ConversationItem from './conversation-item';
-import { useInfiniteConversations } from '@/hooks/use-conversations';
+import { useInfiniteConversations, ConversationFilters } from '@/hooks/use-conversations';
 import { Conversation } from '@/types/conversation';
 
 interface ConversationsListProps {
   socketIdentifier: string;
+  filters: ConversationFilters;
 }
 
-
-const ConversationsList: React.FC<ConversationsListProps> = ({ socketIdentifier }) => {
-  // Retrieve route parameters using Next.js useParams hook
+const ConversationsList: React.FC<ConversationsListProps> = ({ socketIdentifier, filters }) => {
+  // Get selected conversationId from route params
   const params = useParams();
-  const searchParams = useSearchParams();
-  const query = searchParams.get('query');
-  // Assume the route provides conversationId
   const conversationId = params?.conversationId as string | undefined;
 
+  // Fetch conversations using the provided filters
+  const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations(
+    socketIdentifier,
+    filters
+  );
 
-  // Use the custom infinite conversations hook
-  const { conversations, loading, error, hasMore, loadMore } = useInfiniteConversations(socketIdentifier, query);
-
-  // Create a ref for the element that triggers loading more conversations when visible
+  // Ref for the infinite scroll trigger element
   const loaderRef = useRef<HTMLDivElement | null>(null);
 
-
+  // Intersection Observer to trigger loadMore
   useEffect(() => {
-    // Create an Intersection Observer to detect when the loader element enters the viewport
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMore && !loading) {
+          console.log("Intersection observer triggered loadMore");
           loadMore();
         }
       },
       { threshold: 1.0 }
     );
 
-    if (loaderRef.current) {
-      observer.observe(loaderRef.current);
+    const currentLoader = loaderRef.current;
+    if (currentLoader) {
+      observer.observe(currentLoader);
     }
 
-    // Cleanup observer on unmount or when dependencies change
     return () => {
-      if (loaderRef.current) {
-        observer.unobserve(loaderRef.current);
+      if (currentLoader) {
+        observer.unobserve(currentLoader);
       }
     };
   }, [hasMore, loadMore, loading]);
-  
 
   return (
-    <div className="">
+    <>
+      {/* Render conversations list */}
+      {!loading &&
+        conversations.map((conversation: Conversation) => (
+          <ConversationItem
+            key={conversation.id}
+            id={conversation.id}
+            phoneNumber={conversation.contact?.phone_number ?? ''}
+            contactName={conversation.contact?.name ?? ''}
+            imageUrl={conversation.contact?.profile_picture_url ?? ''}
+            lastMessageContent={conversation.last_message?.content ?? ''}
+            lastMessageTime={conversation.updated_at}
+            unreadCount={conversation.unread_agent_count}
+            status={conversation.status}
+            matchingMessageId={conversation.matching_message?.id ?? null}
+            matchingMessageContent={conversation.matching_message?.content ?? null}
+            isSelected={conversation.id === conversationId}
+          />
+        ))}
 
-      {conversations.map((conversation: Conversation) => (
-        <ConversationItem
-          key={conversation.id}
-          // Map API fields to the expected props of ConversationItem.
-          id={conversation.id}
-          phoneNumber={conversation.contact?.phone_number ?? ''}
-          contactName={conversation.contact?.name ?? ''}
-          imageUrl={conversation.contact?.profile_picture_url ?? ''}          
-          lastMessageContent={conversation.last_message?.content ?? ''}
-          lastMessageTime={conversation.last_message_at}
-          matchingMessageId={conversation.matching_message?.id ?? ''}
-          matchingMessageContent={conversation.matching_message?.content ?? ''}
-          isSelected={conversation.id === conversationId}
-        />
-      ))}
-      {error && <div className="p-4 text-red-500">Erro ao carregar conversas.</div>}
-      {loading && <div className="p-4">Carregando...</div>}
-      {!loading && !error && conversations.length === 0 && 
-        <div className="p-4 text-center text-gray-500">
-          {query ?
-            `Nenhuma conversa encontrada para "${query}".` :
-            'Nenhuma conversa para exibir.'
-          }
+      {/* Loading indicator */}
+      {loading && <div className="p-4 text-center text-gray-500 w-xs">Carregando...</div>}
+
+      {/* Error message */}
+      {error && <div className="p-4 text-center text-red-500 w-xs">Erro ao carregar conversas.</div>}
+
+      {/* Empty state message */}
+      {!loading && !error && conversations.length === 0 && (
+        <div className="p-4 text-center text-gray-500 w-xs">
+          {filters.query
+            ? `Nenhuma conversa encontrada para "${filters.query}".`
+            : 'Nenhuma conversa encontrada para este filtro.'}
         </div>
-}
-      {/* This element is used by Intersection Observer to trigger loading more */}
-      <div ref={loaderRef} />
-    </div>
+      )}
+
+      {/* Infinite scroll trigger element */}
+      {hasMore && <div ref={loaderRef} style={{ height: '1px' }} />}
+    </>
   );
 };
 
