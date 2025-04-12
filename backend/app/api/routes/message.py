@@ -29,8 +29,12 @@ queue = RedisQueue(queue_name="response_queue")
     "/conversations/{conversation_id}/messages",
     response_model=List[MessageResponse],
     summary="Get Conversation Messages (Paginated)",
-    description="Retrieves a paginated list of messages for a specific conversation, supporting cursor-based pagination.",
-    response_description="A list of messages, ordered chronologically (oldest first).",
+    description=(
+        "Retrieves a paginated list of messages for a specific conversation, "
+        "supporting cursor-based pagination. The messages are ordered chronologically "
+        "(oldest first)."
+    ),
+    response_description="A list of messages.",
 )
 async def get_conversation_messages_paginated(
     conversation_id: UUID = Path(..., description="The ID of the conversation"),
@@ -45,11 +49,24 @@ async def get_conversation_messages_paginated(
     ),
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
-):
+) -> List[MessageResponse]:
+    """Retrieve messages for a conversation using cursor-based pagination.
+
+    Args:
+        conversation_id (UUID): The ID of the conversation.
+        limit (int): Maximum number of messages to return.
+        before_cursor (Optional[UUID]): Fetch messages older than this message ID.
+        after_cursor (Optional[UUID]): Fetch messages newer than this message ID.
+        db (AsyncSession): The database session.
+        auth_context (AuthContext): Authentication context containing user and account info.
+
+    Returns:
+        List[MessageResponse]: A list of messages ordered chronologically (oldest first).
+
+    Raises:
+        HTTPException: 404 if the conversation is not found.
+        HTTPException: 400 if both before_cursor and after_cursor are provided.
     """
-    API endpoint to fetch messages with cursor-based pagination.
-    """
-    user_id = auth_context.user.id
     account_id = auth_context.account.id
 
     conversation = await conversation_repo.find_conversation_by_id(
@@ -61,82 +78,64 @@ async def get_conversation_messages_paginated(
             detail="Conversation not found",
         )
 
-    # Validação básica (embora a lógica do cursor no CRUD já lide com isso)
     if before_cursor and after_cursor:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot use 'before_cursor' and 'after_cursor' simultaneously.",
         )
 
-    if db is None:  # Verificação básica da dependência
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database session not available",
-        )
-
-    try:
-        # Chama a função CRUD atualizada
-        messages = await message_repo.get_messages_paginated(
-            db=db,
-            account_id=account_id,
-            conversation_id=conversation_id,
-            limit=limit,
-            before_cursor=before_cursor,
-            after_cursor=after_cursor,
-        )
-
-        # A função CRUD já retorna lista vazia se a conversa não existe ou o cursor é inválido
-        # Não precisamos de um 404 explícito aqui, a menos que queiramos distinguir
-        # "conversa não existe" de "sem mensagens antes/depois".
-
-        return messages  # FastAPI converte para MessageResponse
-
-    except Exception as e:
-        print(
-            f"Error in get_conversation_messages_paginated endpoint: {e}"
-        )  # Logue o erro
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while fetching messages.",
-        )
+    messages = await message_repo.get_messages_paginated(
+        db=db,
+        account_id=account_id,
+        conversation_id=conversation_id,
+        limit=limit,
+        before_cursor=before_cursor,
+        after_cursor=after_cursor,
+    )
+    return messages
 
 
 @router.post(
     "/conversations/{conversation_id}/messages",
     response_model=MessageResponse,
     status_code=201,
+    summary="Create Outgoing Message",
+    description=(
+        "Creates and sends an outgoing message linked to a conversation. The endpoint "
+        "validates the conversation, persists a new outgoing message with a generated source_id, "
+        "updates the last message snapshot in the conversation, and enqueues the message for delivery."
+    ),
 )
 async def create_outgoing_message(
     conversation_id: UUID,
     payload: MessageCreatePayload,
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
-):
-    """
-    Creates and sends an outgoing message linked to a conversation.
-
-    - Validates that the conversation exists and belongs to the account
-    - Persists a new outgoing message using a generated source_id
-    - Sends the message to the external provider (e.g., Evolution)
-    - Updates the source_id if an external ID is returned
+) -> MessageResponse:
+    """Create and send an outgoing message linked to a conversation.
 
     Args:
         conversation_id (UUID): The target conversation ID.
         payload (MessageCreatePayload): The message content from the frontend.
-        db (AsyncSession): Database session.
+        db (AsyncSession): The database session.
+        auth_context (AuthContext): Authentication context containing user and account info.
 
     Returns:
-        MessageResponse: The message after being saved and optionally sent.
+        MessageResponse: The persisted message.
+
+    Raises:
+        HTTPException: 404 if the conversation is not found.
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
+
     conversation = await conversation_repo.find_conversation_by_id(
         db, conversation_id=conversation_id, account_id=account_id
     )
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Generate internal source_id
+    # Generate an internal source_id
     internal_source_id = f"internal-{uuid4().hex}"
 
     message_data = MessageCreate(
@@ -157,21 +156,18 @@ async def create_outgoing_message(
         },
     )
 
-    # Create or reuse message
+    # Create or reuse message (the repository handles transaction management)
     message = await message_repo.get_or_create_message(db, message_data)
 
-    # Update last message in the conversation
+    # Update last message snapshot in the conversation
     if message:
-        if conversation:
-            await update_last_message_snapshot(
-                db=db,
-                conversation=conversation,
-                message=message,
-            )
-        else:
-            logger.warning(
-                f"[consumer] Conversation not found: {message.conversation_id}"
-            )
+        await update_last_message_snapshot(
+            db=db,
+            conversation=conversation,
+            message=message,
+        )
+    else:
+        logger.warning(f"[consumer] Conversation not found: {message.conversation_id}")
 
     try:
         await queue.enqueue({"message_id": message.id})
@@ -180,7 +176,7 @@ async def create_outgoing_message(
         logger.warning(f"[queue] Failed to enqueue message {message.id}: {e}")
 
     try:
-        logger.debug(f"[ws] publishing message to the channel....")
+        logger.debug(f"[ws] Publishing message to the channel...")
         await publish_to_conversation_ws(
             conversation_id=conversation.id,
             data={
@@ -202,7 +198,10 @@ async def create_outgoing_message(
             },
         )
     except Exception as e:
-        logger.warning(f"[ws] Failed to publish message {message.id} to Redis: {e}")
+        logger.warning(
+            f"[ws] Failed to publish message {message.id} to account channel: {e}"
+        )
+
     return message
 
 
@@ -210,8 +209,11 @@ async def create_outgoing_message(
     "/conversations/{conversation_id}/messages/context/{message_id}",
     response_model=List[MessageResponse],
     summary="Get Message Context",
-    description="Retrieves a message and a specified number of surrounding messages within its conversation.",
-    response_description="A list of messages representing the context, ordered chronologically.",
+    description=(
+        "Retrieves a target message and a specified number of surrounding messages "
+        "within its conversation. The context is ordered chronologically."
+    ),
+    response_description="A list of messages representing the context.",
 )
 async def get_message_context_endpoint(
     conversation_id: UUID = Path(
@@ -221,31 +223,35 @@ async def get_message_context_endpoint(
         ..., description="The ID of the target message for context"
     ),
     limit_before: int = Query(
-        5,
-        ge=0,
-        le=200,
-        description="Number of messages to retrieve before the target message",
+        5, ge=0, le=200, description="Number of messages to retrieve before the target"
     ),
     limit_after: int = Query(
         5,
         ge=0,
         le=200,
-        description="Number of messages to retrieve after (and including) the target message",
+        description="Number of messages to retrieve after (and including) the target",
     ),
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
-):
-    """
-    API endpoint to fetch the context around a specific message.
-    """
-    user_id = auth_context.user.id
-    account_id = auth_context.account.id
+) -> List[MessageResponse]:
+    """Retrieve context messages around a specific target message.
 
-    if db is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database session not available",
-        )
+    Args:
+        conversation_id (UUID): The ID of the conversation to search within.
+        message_id (UUID): The ID of the target message.
+        limit_before (int): Number of messages to retrieve before the target message.
+        limit_after (int): Number of messages to retrieve after (and including) the target message.
+        db (AsyncSession): The database session.
+        auth_context (AuthContext): Authentication context containing user and account info.
+
+    Returns:
+        List[MessageResponse]: A list of context messages, ordered chronologically.
+
+    Raises:
+        HTTPException: 404 if no context messages are found.
+        HTTPException: 500 if an error occurs while fetching the message context.
+    """
+    account_id = auth_context.account.id
 
     try:
         messages = await conversation_repo.get_message_context(

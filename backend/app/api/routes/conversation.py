@@ -74,21 +74,21 @@ async def search_or_list_conversations(
     account_id = auth_context.account.id
 
     try:
-        if q:
-            # --- Search Path ---
-            conversations = await conversation_repo.search_conversations(
-                db=db,
-                user_id=user_id,
-                account_id=account_id,
-                query=q,
-                offset=offset,
-                limit=limit,
-                status=status,
-                has_unread=has_unread,
-            )
-            return conversations
-        else:
-            async with db as session:
+        async with db as session:
+            if q:
+                # --- Search Path ---
+                conversations = await conversation_repo.search_conversations(
+                    db=session,
+                    user_id=user_id,
+                    account_id=account_id,
+                    query=q,
+                    offset=offset,
+                    limit=limit,
+                    status=status,
+                    has_unread=has_unread,
+                )
+                return conversations
+            else:
                 conversations = await conversation_repo.find_conversations_by_user(
                     db=session,
                     user_id=user_id,
@@ -182,14 +182,14 @@ async def start_conversation(
         normalized_phone_number = normalize_phone_number(payload.phone_number)
 
         contact = await contact_repo.find_contact_by_identifier(
-            db=db,
+            db=session,
             account_id=account_id,
             identifier=normalized_phone_number,
         )
 
         if not contact:
             contact = await contact_repo.create_contact(
-                db=db,
+                db=session,
                 account_id=account_id,
                 contact_data=ContactCreate(
                     phone_number=normalized_phone_number,
@@ -237,31 +237,33 @@ async def start_conversation(
     response_model=ConversationSearchResult,  # Use the same response as list/search for consistency
     summary="Update Conversation Status",
     description="Updates the status of a specific conversation.",
-    status_code=status.HTTP_200_OK,  # OK for successful update
+    status_code=status.HTTP_200_OK,
 )
 async def update_conversation_status_endpoint(
     conversation_id: UUID,
     payload: ConversationUpdateStatus = Body(...),  # Use Body for the request payload
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
-):
+) -> ConversationSearchResult:
     """
     Updates the status of a conversation identified by its ID.
 
     - **conversation_id**: The UUID of the conversation to update.
     - **payload**: Request body containing the new status.
+
+    Returns:
+        ConversationSearchResult: The updated conversation data.
+
+    Raises:
+        HTTPException: If the conversation is not found or update fails.
     """
     account_id = auth_context.account.id
     user_id = auth_context.user.id  # For potential permission checks later
 
     logger.info(
-        f"User {user_id} attempting to update status of conversation {conversation_id} to {payload.status} for account {account_id}"
+        f"User {user_id} attempting to update status of conversation {conversation_id} "
+        f"to {payload.status} for account {account_id}"
     )
-
-    # Optional: Add fine-grained permission check here.
-    # Does the user have permission to modify this specific conversation?
-    # (e.g., check if they are assigned, or admin, or member of the inbox)
-    # For now, we rely on the repository potentially checking account_id implicitly or explicitly.
 
     try:
         # Call the repository function to perform the update
@@ -270,14 +272,9 @@ async def update_conversation_status_endpoint(
             conversation_id=conversation_id,
             new_status=payload.status,
             account_id=account_id,
-            # Consider adding account_id to the repo function signature
-            # for an extra layer of security/filtering within the query itself.
-            # e.g., .where(Conversation.id == conversation_id, Conversation.account_id == account_id)
         )
 
         if not updated_conversation:
-            # To be more specific, check if the conversation exists at all first
-            # This prevents leaking information about existence vs. update failure
             conv_exists = await conversation_repo.find_conversation_by_id(
                 db=db, conversation_id=conversation_id, account_id=account_id
             )
@@ -290,11 +287,11 @@ async def update_conversation_status_endpoint(
                     detail="Conversation not found.",
                 )
             else:
-                # Conversation exists, but update failed (e.g., DB error handled in repo, or status unchanged)
+
                 logger.error(
-                    f"Failed to update status for conversation {conversation_id}. Repo returned None."
+                    f"Failed to update status for conversation {conversation_id}. "
+                    f"Repository returned None."
                 )
-                # This case might indicate an issue in the repo logic or DB state
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to update conversation status.",
@@ -315,14 +312,6 @@ async def update_conversation_status_endpoint(
         logger.info(
             f"Successfully updated status for conversation {conversation_id}. Preparing response."
         )
-        # --- End WebSocket Placeholder ---
-
-        # Commit the transaction before returning the response
-        await db.commit()
-        logger.debug(
-            f"Committed transaction for conversation {conversation_id} status update."
-        )
-
         # Parse the updated ORM object to the response schema
         response_data = parse_conversation_to_conversation_response(
             updated_conversation
@@ -330,15 +319,11 @@ async def update_conversation_status_endpoint(
         return response_data
 
     except HTTPException as http_exc:
-        # Re-raise HTTPExceptions directly
-        await db.rollback()  # Rollback on known errors
         raise http_exc
     except Exception as e:
-        # Catch unexpected errors
-        await db.rollback()  # Rollback on unexpected errors
         logger.exception(
             f"Unexpected error updating status for conversation {conversation_id}: {e}"
-        )  # Use logger.exception to include traceback
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while updating the conversation status.",
