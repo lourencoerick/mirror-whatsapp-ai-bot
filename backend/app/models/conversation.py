@@ -13,11 +13,20 @@ from sqlalchemy import (
     Index,
     String,
     text,
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.mutable import MutableDict
+import enum
 
 from app.models.base import BaseModel
+
+
+class ConversationStatusEnum(str, enum.Enum):
+    PENDING = "PENDING"
+    HUMAN_ACTIVE = "HUMAN_ACTIVE"
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
 
 
 class Conversation(BaseModel):
@@ -48,12 +57,36 @@ class Conversation(BaseModel):
         UUID(as_uuid=True), ForeignKey("contact_inboxes.id"), nullable=False
     )
 
-    status = Column(String(50), nullable=False)
     assignee_id = Column(UUID(as_uuid=True), nullable=True)
     display_id = Column(String(255), nullable=True)
 
     user_last_seen_at = Column(DateTime, nullable=True)
     agent_last_seen_at = Column(DateTime, nullable=True)
+
+    status = Column(
+        SQLEnum(
+            ConversationStatusEnum, name="conversation_status_enum", create_type=True
+        ),
+        default=ConversationStatusEnum.PENDING,
+        nullable=False,
+        index=True,
+        comment="Current status of the conversation regarding human interaction",
+    )
+
+    unread_agent_count = Column(
+        Integer,
+        default=0,
+        nullable=False,
+        server_default="0",
+        comment="Count of unread messages for the agent since last interaction/read",
+    )
+
+    is_bot_active = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
     locked = Column(Boolean, nullable=True)
 
     last_message_at = Column(
