@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Body, Path
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -27,6 +27,35 @@ from app.services.helper.contact import normalize_phone_number
 
 
 router = APIRouter()
+
+
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=ConversationSearchResult,
+    summary="Find Conversation",
+)
+async def get_conversation(
+    conversation_id: UUID = Path(..., description="Conversation ID"),
+    db: AsyncSession = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
+):
+    """
+    Handles listing and searching conversations based on the presence of the 'q' query parameter.
+    """
+    user_id = auth_context.user.id
+    account_id = auth_context.account.id
+
+    try:
+        conversation = await conversation_repo.find_conversation_by_id(
+            db=db, account_id=account_id, conversation_id=conversation_id
+        )
+        return parse_conversation_to_conversation_response(conversation)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred while retrieving conversations. {e}",
+        )
 
 
 @router.get(
@@ -72,33 +101,32 @@ async def search_or_list_conversations(
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
-
+    logger.debug(f"[conversation route] Status Filter active :{status}")
     try:
-        async with db as session:
-            if q:
-                # --- Search Path ---
-                conversations = await conversation_repo.search_conversations(
-                    db=session,
-                    user_id=user_id,
-                    account_id=account_id,
-                    query=q,
-                    offset=offset,
-                    limit=limit,
-                    status=status,
-                    has_unread=has_unread,
-                )
-                return conversations
-            else:
-                conversations = await conversation_repo.find_conversations_by_user(
-                    db=session,
-                    user_id=user_id,
-                    account_id=account_id,
-                    limit=limit,
-                    offset=offset,
-                    status=status,
-                    has_unread=has_unread,
-                )
-            return conversations_to_conversations_response(conversations)
+        if q:
+            # --- Search Path ---
+            conversations = await conversation_repo.search_conversations(
+                db=db,
+                user_id=user_id,
+                account_id=account_id,
+                query=q,
+                offset=offset,
+                limit=limit,
+                status=status,
+                has_unread=has_unread,
+            )
+            return conversations
+        else:
+            conversations = await conversation_repo.find_conversations_by_user(
+                db=db,
+                user_id=user_id,
+                account_id=account_id,
+                limit=limit,
+                offset=offset,
+                status=status,
+                has_unread=has_unread,
+            )
+        return conversations_to_conversations_response(conversations)
 
     except Exception as e:
         raise HTTPException(
@@ -133,14 +161,13 @@ async def get_inbox_conversations(
     account_id = auth_context.account.id
     logger.info(f"Getting conversations for inbox_id {inbox_id}")
 
-    async with db as session:
-        conversations = await conversation_repo.find_conversations_by_inbox(
-            db=session,
-            inbox_id=inbox_id,
-            account_id=account_id,
-            limit=limit,
-            offset=offset,
-        )
+    conversations = await conversation_repo.find_conversations_by_inbox(
+        db=db,
+        inbox_id=inbox_id,
+        account_id=account_id,
+        limit=limit,
+        offset=offset,
+    )
 
     return conversations_to_conversations_response(conversations)
 
@@ -170,66 +197,63 @@ async def start_conversation(
     user_id = auth_context.user.id
     account_id = auth_context.account.id
 
-    async with db as session:
-        inbox = await inbox_repo.find_inbox_by_id_and_account(
-            db=session, account_id=account_id, inbox_id=inbox_id
-        )
-        if not inbox or inbox.account_id != account_id:
-            raise HTTPException(
-                status_code=404, detail="Inbox not found or unauthorized"
-            )
+    inbox = await inbox_repo.find_inbox_by_id_and_account(
+        db=db, account_id=account_id, inbox_id=inbox_id
+    )
+    if not inbox or inbox.account_id != account_id:
+        raise HTTPException(status_code=404, detail="Inbox not found or unauthorized")
 
-        normalized_phone_number = normalize_phone_number(payload.phone_number)
+    normalized_phone_number = normalize_phone_number(payload.phone_number)
 
-        contact = await contact_repo.find_contact_by_identifier(
-            db=session,
+    contact = await contact_repo.find_contact_by_identifier(
+        db=db,
+        account_id=account_id,
+        identifier=normalized_phone_number,
+    )
+
+    if not contact:
+        contact = await contact_repo.create_contact(
+            db=db,
             account_id=account_id,
-            identifier=normalized_phone_number,
+            contact_data=ContactCreate(
+                phone_number=normalized_phone_number,
+            ),
         )
 
-        if not contact:
-            contact = await contact_repo.create_contact(
-                db=session,
-                account_id=account_id,
-                contact_data=ContactCreate(
-                    phone_number=normalized_phone_number,
+    internal_source_id = f"frontend-{uuid4().hex}"
+
+    contact_inbox = await contact_repo.get_or_create_contact_inbox(
+        db=db,
+        account_id=account_id,
+        contact_id=contact.id,
+        inbox_id=inbox.id,
+        source_id=internal_source_id,
+    )
+
+    conversation: Conversation = await conversation_repo.get_or_create_conversation(
+        db=db,
+        account_id=account_id,
+        inbox_id=inbox.id,
+        contact_inbox_id=contact_inbox.id,
+    )
+
+    try:
+        logger.debug("[ws] publishing message to the channel....")
+        await publish_to_account_conversations_ws(
+            account_id,
+            {
+                "type": "new_conversation",
+                "payload": jsonable_encoder(
+                    parse_conversation_to_conversation_response(conversation)
                 ),
-            )
-
-        internal_source_id = f"frontend-{uuid4().hex}"
-
-        contact_inbox = await contact_repo.get_or_create_contact_inbox(
-            db=session,
-            account_id=account_id,
-            contact_id=contact.id,
-            inbox_id=inbox.id,
-            source_id=internal_source_id,
+            },
+        )
+    except Exception as e:
+        logger.warning(
+            f"[ws] Failed to publish conversation {conversation.id} to Redis: {e}"
         )
 
-        conversation: Conversation = await conversation_repo.get_or_create_conversation(
-            db=session,
-            account_id=account_id,
-            inbox_id=inbox.id,
-            contact_inbox_id=contact_inbox.id,
-        )
-
-        try:
-            logger.debug("[ws] publishing message to the channel....")
-            await publish_to_account_conversations_ws(
-                account_id,
-                {
-                    "type": "new_conversation",
-                    "payload": jsonable_encoder(
-                        parse_conversation_to_conversation_response(conversation)
-                    ),
-                },
-            )
-        except Exception as e:
-            logger.warning(
-                f"[ws] Failed to publish conversation {conversation.id} to Redis: {e}"
-            )
-
-        return StartConversationResponse(conversation_id=conversation.id)
+    return StartConversationResponse(conversation_id=conversation.id)
 
 
 @router.put(
