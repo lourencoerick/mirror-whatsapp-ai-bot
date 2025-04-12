@@ -12,8 +12,7 @@ from app.services.repository import contact as contact_repo
 async def update_last_message_snapshot(
     db: AsyncSession, conversation: Conversation, message: Message
 ) -> None:
-    """
-    Updates the conversation with a snapshot of the last message and its timestamp.
+    """Update the conversation with a snapshot of the last message and its timestamp.
 
     Args:
         db (AsyncSession): Asynchronous database session.
@@ -23,34 +22,37 @@ async def update_last_message_snapshot(
     snapshot = {
         "id": str(message.id),
         "content": message.content,
-        "sent_at": (message.sent_at.isoformat() if message.sent_at else None),
+        "sent_at": message.sent_at.isoformat() if message.sent_at else None,
         "direction": message.message_type,
         "content_type": message.content_type,
     }
 
-    # Update additional_attributes safely
+    # Ensure additional_attributes exists for safe update
     if conversation.additional_attributes is None:
         conversation.additional_attributes = {}
 
     conversation.additional_attributes["last_message"] = snapshot
 
+    # Retrieve the contact using the repository (transaction management handled by caller)
     contact = await contact_repo.find_contact_by_id(
         db=db, account_id=message.account_id, contact_id=message.contact_id
     )
 
+    # Update the snapshot with contact information if available and the message is incoming
     if contact and contact.name and message.direction == "in":
         conversation.additional_attributes["contact_name"] = contact.name
         conversation.additional_attributes["phone_number"] = contact.phone_number
         conversation.additional_attributes["profile_picture_url"] = (
             contact.profile_picture_url
         )
+
+    # Notify SQLAlchemy that additional_attributes has been modified
     flag_modified(conversation, "additional_attributes")
 
+    # Update the conversation's last message timestamp
     conversation.last_message_at = message.sent_at
 
-    await db.commit()
-    await db.refresh(conversation)
-
+    # Note: Transaction finalization (commit/refresh) should be performed by the upper layer.
     logger.debug(
         f"[conversation] Updated snapshot and timestamp for conversation {conversation.id}"
     )
