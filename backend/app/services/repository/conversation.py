@@ -2,7 +2,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import desc, select, or_, and_, cast, Text, literal, func, asc
+from sqlalchemy import desc, select, or_, and_, cast, Text, literal, func, asc, update
 from typing import Optional, List
 from loguru import logger
 from app.api.schemas.conversation import ConversationSearchResult, MessageSnippet
@@ -592,24 +592,173 @@ async def get_message_context(
 
 
 async def update_conversation_status(
-    self, db: AsyncSession, *, conversation_id: UUID, new_status: ConversationStatusEnum
+    db: AsyncSession, *, conversation_id: UUID, new_status: ConversationStatusEnum
 ) -> Optional[Conversation]:
-    """Updates the status of a specific conversation."""
-    # Implementation will go here later
-    pass
+    """
+    Updates the status of a specific conversation.
+
+    Args:
+        db: The database session.
+        conversation_id: The ID of the conversation to update.
+        new_status: The new status to set.
+
+    Returns:
+        The updated Conversation object if found and updated, otherwise None.
+    """
+    try:
+        # Option 1: Update directly (more efficient, less ORM object handling)
+        stmt = (
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(
+                status=new_status, updated_at=func.now()
+            )  # Explicitly set updated_at
+            # Ensure returning() is supported by dialect (PostgreSQL)
+            .returning(Conversation)
+        )
+        result = await db.execute(stmt)
+        updated_conversation = (
+            result.scalar_one_or_none()
+        )  # Use scalar_one_or_none for safety
+
+        if updated_conversation:
+            # Commit is likely handled by the caller (e.g., API route)
+            # await db.commit()
+            # Refresh might not be needed if returning() works well
+            # await db.refresh(updated_conversation)
+            logger.info(
+                f"Updated conversation {conversation_id} status to {new_status}"
+            )
+            return updated_conversation
+        else:
+            logger.warning(
+                f"Conversation {conversation_id} not found for status update."
+            )
+            return None
+
+    except SQLAlchemyError as e:
+        logger.error(
+            f"Database error updating conversation {conversation_id} status: {e}"
+        )
+        # Rollback might be needed here if commit was intended inside
+        # await db.rollback()
+        return None  # Indicate failure
 
 
 async def increment_conversation_unread_count(
-    self, db: AsyncSession, *, conversation_id: UUID, increment_by: int = 1
+    db: AsyncSession, *, conversation_id: UUID, increment_by: int = 1
 ) -> Optional[Conversation]:
-    """Increments the unread count for a conversation."""
-    # Implementation will go here later
-    pass
+    """
+    Increments the unread_agent_count for a conversation atomically.
+
+    Args:
+        db: The database session.
+        conversation_id: The ID of the conversation to update.
+        increment_by: The amount to increment the count by (default: 1).
+
+    Returns:
+        The updated Conversation object if found and updated, otherwise None.
+    """
+    if increment_by <= 0:
+        logger.warning("Increment value must be positive.")
+        # Or fetch and return current conversation without change
+        result = await db.execute(select(Conversation).filter_by(id=conversation_id))
+        return result.scalar_one_or_none()
+
+    try:
+        stmt = (
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            .values(
+                # Use F expression for atomic increment
+                unread_agent_count=Conversation.unread_agent_count + increment_by,
+                updated_at=func.now(),  # Explicitly update timestamp
+            )
+            .returning(Conversation)  # Return the updated row
+            .execution_options(
+                synchronize_session="fetch"
+            )  # Strategy for ORM state sync
+        )
+        result = await db.execute(stmt)
+        updated_conversation = result.scalar_one_or_none()
+
+        if updated_conversation:
+            # await db.commit() # Commit handled by caller
+            logger.info(
+                f"Incremented unread count for conversation {conversation_id} by {increment_by}"
+            )
+            return updated_conversation
+        else:
+            logger.warning(
+                f"Conversation {conversation_id} not found for unread count increment."
+            )
+            return None
+
+    except SQLAlchemyError as e:
+        logger.error(
+            f"Database error incrementing unread count for {conversation_id}: {e}"
+        )
+        # await db.rollback()
+        return None
 
 
 async def reset_conversation_unread_count(
-    self, db: AsyncSession, *, conversation_id: UUID
+    db: AsyncSession, *, conversation_id: UUID
 ) -> Optional[Conversation]:
-    """Resets the unread count for a conversation to zero."""
-    # Implementation will go here later
-    pass
+    """
+    Resets the unread_agent_count for a conversation to zero.
+
+    Args:
+        db: The database session.
+        conversation_id: The ID of the conversation to update.
+
+    Returns:
+        The updated Conversation object if found and updated, otherwise None.
+    """
+    try:
+        stmt = (
+            update(Conversation)
+            .where(Conversation.id == conversation_id)
+            # Only update if the count is currently greater than 0
+            .where(Conversation.unread_agent_count > 0)
+            .values(
+                unread_agent_count=0,
+                updated_at=func.now(),  # Explicitly update timestamp
+            )
+            .returning(Conversation)
+            .execution_options(synchronize_session="fetch")
+        )
+        result = await db.execute(stmt)
+        updated_conversation = result.scalar_one_or_none()
+
+        if updated_conversation:
+            # await db.commit() # Commit handled by caller
+            logger.info(f"Reset unread count for conversation {conversation_id}")
+            return updated_conversation
+        else:
+            # It's possible the conversation exists but count was already 0, or it doesn't exist
+            # Check if conversation exists to differentiate
+            exists_check = await db.execute(
+                select(Conversation.id).filter_by(id=conversation_id)
+            )
+            if not exists_check.scalar_one_or_none():
+                logger.warning(
+                    f"Conversation {conversation_id} not found for unread count reset."
+                )
+            else:
+                logger.info(
+                    f"Unread count for conversation {conversation_id} was already 0 or reset failed."
+                )
+                # Optionally fetch and return the conversation even if count didn't change
+                result = await db.execute(
+                    select(Conversation).filter_by(id=conversation_id)
+                )
+                return result.scalar_one_or_none()
+            return None
+
+    except SQLAlchemyError as e:
+        logger.error(
+            f"Database error resetting unread count for {conversation_id}: {e}"
+        )
+        # await db.rollback()
+        return None
