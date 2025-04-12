@@ -234,39 +234,47 @@ async def start_conversation(
 
 @router.put(
     "/conversations/{conversation_id}/status",
-    response_model=ConversationSearchResult,  # Use the same response as list/search for consistency
+    response_model=ConversationSearchResult,
     summary="Update Conversation Status",
-    description="Updates the status of a specific conversation.",
+    description=(
+        "Updates the status of a specific conversation. "
+        "If setting status to CLOSED, also resets the unread count."
+    ),
     status_code=status.HTTP_200_OK,
 )
 async def update_conversation_status_endpoint(
     conversation_id: UUID,
-    payload: ConversationUpdateStatus = Body(...),  # Use Body for the request payload
+    payload: ConversationUpdateStatus = Body(...),
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> ConversationSearchResult:
     """
-    Updates the status of a conversation identified by its ID.
+    Updates the status of a conversation and resets unread count if closing.
 
-    - **conversation_id**: The UUID of the conversation to update.
-    - **payload**: Request body containing the new status.
+    Args:
+        conversation_id (UUID): The UUID of the conversation to update.
+        payload (ConversationUpdateStatus): Request body containing the new status.
+        db (AsyncSession): Database session dependency.
+        auth_context (AuthContext): Authentication context dependency.
 
     Returns:
         ConversationSearchResult: The updated conversation data.
 
     Raises:
-        HTTPException: If the conversation is not found or update fails.
+        HTTPException: 404 if the conversation is not found.
+        HTTPException: 500 if the update fails or an unexpected error occurs.
     """
     account_id = auth_context.account.id
-    user_id = auth_context.user.id  # For potential permission checks later
+    user_id = auth_context.user.id
 
     logger.info(
         f"User {user_id} attempting to update status of conversation {conversation_id} "
         f"to {payload.status} for account {account_id}"
     )
 
+    # Use the single session provided by Depends(get_db) for all operations
     try:
-        # Call the repository function to perform the update
+        # 1. Update the status
         updated_conversation = await conversation_repo.update_conversation_status(
             db=db,
             conversation_id=conversation_id,
@@ -275,55 +283,97 @@ async def update_conversation_status_endpoint(
         )
 
         if not updated_conversation:
+            # Check if conversation exists at all before raising 500
             conv_exists = await conversation_repo.find_conversation_by_id(
                 db=db, conversation_id=conversation_id, account_id=account_id
             )
             if not conv_exists:
                 logger.warning(
-                    f"Conversation {conversation_id} not found for account {account_id}."
+                    f"Conversation {conversation_id} not found for account {account_id} during status update."
                 )
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Conversation not found.",
                 )
             else:
-
+                # Conversation exists, but update failed for some other reason
                 logger.error(
                     f"Failed to update status for conversation {conversation_id}. "
-                    f"Repository returned None."
+                    f"Repository returned None despite conversation existing."
                 )
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to update conversation status.",
                 )
 
-        # --- WebSocket Broadcast Placeholder ---
-        # TODO: After successful update, broadcast the change via WebSockets
-        # Example:
-        # await broadcast_conversation_update(
-        #     account_id=account_id,
-        #     conversation_data={
-        #         "id": updated_conversation.id,
-        #         "status": updated_conversation.status,
-        #         "unread_agent_count": updated_conversation.unread_agent_count,
-        #         "updated_at": updated_conversation.updated_at
-        #     }
-        # )
         logger.info(
-            f"Successfully updated status for conversation {conversation_id}. Preparing response."
+            f"Successfully updated status for conversation {conversation_id} to {payload.status}."
         )
-        # Parse the updated ORM object to the response schema
+
+        # 2. Reset unread count if status is set to CLOSED
+        final_conversation_state = (
+            updated_conversation  # Start with the result of the status update
+        )
+        if payload.status == ConversationStatusEnum.CLOSED:
+            logger.debug(
+                f"Status set to CLOSED, resetting unread count for conversation {conversation_id}."
+            )
+            conv_after_reset = await conversation_repo.reset_conversation_unread_count(
+                db=db,
+                account_id=account_id,
+                conversation_id=conversation_id,
+            )
+            if conv_after_reset:
+                final_conversation_state = conv_after_reset  # Use the state after reset
+                logger.info(f"Unread count reset for conversation {conversation_id}.")
+            else:
+                # Log warning but proceed, maybe count was already 0 or reset failed internally
+                logger.warning(
+                    f"Failed to reset unread count for closing conversation {conversation_id}. Using state after status update."
+                )
+                # Keep final_conversation_state as it was after the status update
+
+        # 3. Broadcast the update via WebSockets
+        try:
+            # Use the final state (potentially after reset) for broadcasting
+            parsed_conversation = parse_conversation_to_conversation_response(
+                final_conversation_state
+            )
+            await publish_to_account_conversations_ws(
+                account_id=account_id,
+                data={
+                    "type": "conversation_updated",
+                    "payload": jsonable_encoder(parsed_conversation),
+                },
+            )
+            logger.debug(
+                f"[ws] Published conversation_updated event for {conversation_id} after status change."
+            )
+        except Exception as e:
+            # Log error but don't fail the request
+            logger.warning(
+                f"[ws] Failed to publish status update for conversation {conversation_id} to WebSocket: {e}"
+            )
+
+        # 4. Prepare and return the response
+        # Use the final state for the response as well
         response_data = parse_conversation_to_conversation_response(
-            updated_conversation
+            final_conversation_state
+        )
+        logger.info(
+            f"Prepared response for conversation {conversation_id} status update."
         )
         return response_data
 
     except HTTPException as http_exc:
+        # Re-raise HTTP exceptions directly
         raise http_exc
     except Exception as e:
+        # Catch any other unexpected errors during the process
         logger.exception(
             f"Unexpected error updating status for conversation {conversation_id}: {e}"
         )
+        # FastAPI's dependency injection handles rollback on the session 'db'
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred while updating the conversation status.",

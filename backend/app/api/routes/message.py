@@ -241,6 +241,9 @@ async def create_outgoing_message(
                 # Keep the state from the reset step if status update fails
 
         # 4. Update Last Message Snapshot (using the final updated conversation state)
+        logger.debug(
+            f"Message ID to update the conversation last message: {message.id}"
+        )
         await update_last_message_snapshot(
             db=db,
             conversation=final_updated_conversation,
@@ -249,6 +252,14 @@ async def create_outgoing_message(
         logger.debug(
             f"Last message snapshot updated for conversation {conversation.id}"
         )
+
+        logger.debug(
+            f"Explicitly flushing session after conversation updates for {conversation.id}"
+        )
+        # We need to flush the conversation object that was modified by update_last_message_snapshot
+        await db.flush(objects=[final_updated_conversation])
+        # Alternatively, a general flush might work: await db.flush()
+        logger.debug(f"Session flushed after conversation update.")
 
     except Exception as e:
         # Log the exception that caused the transaction to fail
@@ -267,12 +278,12 @@ async def create_outgoing_message(
     # Enqueue the message ID for the sending worker
     try:
         # Ensure queue is connected (ideally handle connection more robustly)
-        if not await queue.is_connected_async():
+        if not queue.is_connected:
             logger.warning(
                 "[queue] Response queue not connected. Attempting to connect..."
             )
             await queue.connect()
-            if not await queue.is_connected_async():
+            if not queue.is_connected:
                 logger.error(
                     "[queue] Failed to connect to response queue. Cannot enqueue message."
                 )

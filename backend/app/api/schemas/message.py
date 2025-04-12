@@ -17,7 +17,9 @@ class MessageCreate(BaseModel):
     user_id: Optional[UUID] = None
 
     direction: Literal["in", "out"]
-    status: Literal["received", "sent", "pending", "processing", "failed"] = "received"
+    status: Literal[
+        "received", "sent", "pending", "processing", "failed", "delivered"
+    ] = "received"
     message_timestamp: datetime  # the moment when the user sent the message
     private: Optional[bool] = False
     content: Optional[str] = None

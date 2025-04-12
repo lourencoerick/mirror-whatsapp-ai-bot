@@ -19,40 +19,55 @@ async def update_last_message_snapshot(
         conversation (Conversation): The conversation to update.
         message (Message): The new message triggering the update.
     """
+    logger.debug(
+        f"Updating snapshot for conversation {conversation.id} with message ID={message.id}"
+    )
     snapshot = {
         "id": str(message.id),
         "content": message.content,
         "sent_at": message.sent_at.isoformat() if message.sent_at else None,
-        "direction": message.message_type,
+        "direction": message.direction,  # Corrected direction
         "content_type": message.content_type,
     }
 
-    # Ensure additional_attributes exists for safe update
-    if conversation.additional_attributes is None:
-        conversation.additional_attributes = {}
+    # --- Modification Start ---
+    # Get the current attributes or initialize an empty dict
+    current_attributes = conversation.additional_attributes or {}
+    # Create a new dictionary to store the updated attributes
+    new_attributes = current_attributes.copy()
 
-    conversation.additional_attributes["last_message"] = snapshot
+    # Update the last_message in the new dictionary
+    new_attributes["last_message"] = snapshot
 
-    # Retrieve the contact using the repository (transaction management handled by caller)
-    contact = await contact_repo.find_contact_by_id(
-        db=db, account_id=message.account_id, contact_id=message.contact_id
-    )
-
-    # Update the snapshot with contact information if available and the message is incoming
-    if contact and contact.name and message.direction == "in":
-        conversation.additional_attributes["contact_name"] = contact.name
-        conversation.additional_attributes["phone_number"] = contact.phone_number
-        conversation.additional_attributes["profile_picture_url"] = (
-            contact.profile_picture_url
+    # Retrieve and potentially update contact info in the new dictionary
+    # Note: This contact update logic might only be relevant for incoming messages,
+    # but we include it here based on your original function. Adjust if needed.
+    try:  # Added try/except for safety during contact fetch
+        contact = await contact_repo.find_contact_by_id(
+            db=db, account_id=message.account_id, contact_id=message.contact_id
+        )
+        if contact and contact.name:  # Check if contact and name exist
+            # Consider if these should only be updated for incoming messages ('message.direction == "in"')
+            new_attributes["contact_name"] = contact.name
+            new_attributes["phone_number"] = contact.phone_number
+            new_attributes["profile_picture_url"] = contact.profile_picture_url
+    except Exception as e:
+        logger.warning(
+            f"Could not fetch or update contact info during snapshot update: {e}"
         )
 
-    # Notify SQLAlchemy that additional_attributes has been modified
-    flag_modified(conversation, "additional_attributes")
+    # Re-assign the entire dictionary back to the conversation object
+    conversation.additional_attributes = new_attributes
+    # --- Modification End ---
 
-    # Update the conversation's last message timestamp
+    # Update the conversation's last message timestamp (standard column, should be fine)
     conversation.last_message_at = message.sent_at
 
-    # Note: Transaction finalization (commit/refresh) should be performed by the upper layer.
+    # We are NOT calling flag_modified anymore when re-assigning the whole dict.
+    # Ensure the conversation object is associated with the session if it wasn't already
+    # (though it should be if fetched/passed correctly)
+    db.add(conversation)  # Good practice to ensure it's marked dirty
+
     logger.debug(
         f"[conversation] Updated snapshot and timestamp for conversation {conversation.id}"
     )
