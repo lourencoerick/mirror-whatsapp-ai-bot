@@ -85,44 +85,91 @@ class ResponseSender:
 
         while True:
             await self._process_one_message()
-            await asyncio.sleep(0.1)  # Add a small delay to prevent busy-waiting
+            await asyncio.sleep(0.1)
 
     async def _handle_message(self, db: AsyncSession, message_id: UUID):
         """
-        Handles delivery of a specific message by ID.
+        Handles delivery of a specific message by ID, with retries if not found initially.
 
         Args:
             db (AsyncSession): Active SQLAlchemy database session.
             message_id (UUID): The ID of the message to be delivered.
         """
-        message = await message_repo.find_message_by_id(db, message_id)
+        message = None
+        max_retries = 3
+        retry_delay = 0.5
+
+        for attempt in range(max_retries):
+            message = await message_repo.find_message_by_id(db, message_id)
+            if message:
+                logger.debug(
+                    f"[sender] Message {message_id} found on attempt {attempt + 1}."
+                )
+                break
+            else:
+                logger.warning(
+                    f"[sender] Message ID {message_id} not found on attempt {attempt + 1}/{max_retries}. "
+                    f"Retrying in {retry_delay}s..."
+                )
+
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+
         if not message:
-            logger.warning(f"[sender] Message ID {message_id} not found in database")
+            logger.error(
+                f"[sender] Message ID {message_id} not found after {max_retries} attempts. Giving up."
+            )
+
             return
 
-        await db.refresh(message, attribute_names=["contact", "inbox"])
+        try:
+
+            await db.refresh(message, attribute_names=["contact", "inbox"])
+        except Exception as refresh_err:
+            logger.error(
+                f"[sender] Failed to refresh message {message_id} relations: {refresh_err}. Proceeding without refresh."
+            )
 
         try:
+            if not message.inbox:
+                logger.error(
+                    f"[sender] Inbox relation not loaded for message {message_id}. Cannot send."
+                )
+                message.status = "failed"
+
+                return
+
             response = await evolution_send_message(
                 message=message, inbox=message.inbox
             )
+
             external_id = response.get("key", {}).get("id")
-            status = response.get("status", "pending").lower()
+            status_from_provider = response.get("status", "pending").lower()
+
             if external_id:
-                message.source_id = external_id
-            message.status = status
+                logger.info(
+                    f"[sender] Message {message.id} sent, external ID: {external_id}"
+                )
+
+            message.status = status_from_provider
+            db.add(message)
 
             logger.info(
-                f"[sender] Message {message.id} delivered successfully "
-                f"(external_id={external_id}, status={status})"
+                f"[sender] Message {message.id} status updated to '{status_from_provider}' based on provider response."
             )
 
         except httpx.HTTPError as e:
             message.status = "failed"
-            logger.warning(f"[sender] HTTP error for message {message.id}: {e}")
+            db.add(message)
+            logger.warning(f"[sender] HTTP error sending message {message.id}: {e}")
         except Exception as e:
             message.status = "failed"
-            logger.exception(f"[sender] Unexpected error for message {message.id}: {e}")
+            db.add(message)
+            logger.exception(
+                f"[sender] Unexpected error sending message {message.id}: {e}"
+            )
+
+        # O commit final será feito em _process_one_message após esta função retornar
 
 
 async def main():
