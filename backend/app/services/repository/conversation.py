@@ -30,8 +30,10 @@ async def find_conversation_by_id(
     """
     result = await db.execute(
         select(Conversation)
-        .options(selectinload(Conversation.contact_inbox))
         .options(selectinload(Conversation.inbox))
+        .options(
+            selectinload(Conversation.contact_inbox).selectinload(ContactInbox.contact)
+        )
         .filter_by(id=conversation_id, account_id=account_id)
     )
     conversation = result.scalar_one_or_none()
@@ -207,6 +209,7 @@ async def find_conversations_by_user(
     Returns:
         List[Conversation]: Conversations accessible to the user.
     """
+
     inbox_ids_subquery = (
         select(InboxMember.inbox_id).filter(InboxMember.user_id == user_id)
     ).scalar_subquery()
