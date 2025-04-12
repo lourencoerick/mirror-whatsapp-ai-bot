@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Body
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -11,6 +11,7 @@ from app.api.schemas.conversation import (
     ConversationSearchResult,
     StartConversationResponse,
     StartConversationRequest,
+    ConversationUpdateStatus,
 )
 from app.services.repository import contact as contact_repo
 from app.services.repository import conversation as conversation_repo
@@ -229,3 +230,116 @@ async def start_conversation(
             )
 
         return StartConversationResponse(conversation_id=conversation.id)
+
+
+@router.put(
+    "/conversations/{conversation_id}/status",
+    response_model=ConversationSearchResult,  # Use the same response as list/search for consistency
+    summary="Update Conversation Status",
+    description="Updates the status of a specific conversation.",
+    status_code=status.HTTP_200_OK,  # OK for successful update
+)
+async def update_conversation_status_endpoint(
+    conversation_id: UUID,
+    payload: ConversationUpdateStatus = Body(...),  # Use Body for the request payload
+    db: AsyncSession = Depends(get_db),
+    auth_context: AuthContext = Depends(get_auth_context),
+):
+    """
+    Updates the status of a conversation identified by its ID.
+
+    - **conversation_id**: The UUID of the conversation to update.
+    - **payload**: Request body containing the new status.
+    """
+    account_id = auth_context.account.id
+    user_id = auth_context.user.id  # For potential permission checks later
+
+    logger.info(
+        f"User {user_id} attempting to update status of conversation {conversation_id} to {payload.status} for account {account_id}"
+    )
+
+    # Optional: Add fine-grained permission check here.
+    # Does the user have permission to modify this specific conversation?
+    # (e.g., check if they are assigned, or admin, or member of the inbox)
+    # For now, we rely on the repository potentially checking account_id implicitly or explicitly.
+
+    try:
+        # Call the repository function to perform the update
+        updated_conversation = await conversation_repo.update_conversation_status(
+            db=db,
+            conversation_id=conversation_id,
+            new_status=payload.status,
+            account_id=account_id,
+            # Consider adding account_id to the repo function signature
+            # for an extra layer of security/filtering within the query itself.
+            # e.g., .where(Conversation.id == conversation_id, Conversation.account_id == account_id)
+        )
+
+        if not updated_conversation:
+            # To be more specific, check if the conversation exists at all first
+            # This prevents leaking information about existence vs. update failure
+            conv_exists = await conversation_repo.find_conversation_by_id(
+                db=db, conversation_id=conversation_id, account_id=account_id
+            )
+            if not conv_exists:
+                logger.warning(
+                    f"Conversation {conversation_id} not found for account {account_id}."
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Conversation not found.",
+                )
+            else:
+                # Conversation exists, but update failed (e.g., DB error handled in repo, or status unchanged)
+                logger.error(
+                    f"Failed to update status for conversation {conversation_id}. Repo returned None."
+                )
+                # This case might indicate an issue in the repo logic or DB state
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update conversation status.",
+                )
+
+        # --- WebSocket Broadcast Placeholder ---
+        # TODO: After successful update, broadcast the change via WebSockets
+        # Example:
+        # await broadcast_conversation_update(
+        #     account_id=account_id,
+        #     conversation_data={
+        #         "id": updated_conversation.id,
+        #         "status": updated_conversation.status,
+        #         "unread_agent_count": updated_conversation.unread_agent_count,
+        #         "updated_at": updated_conversation.updated_at
+        #     }
+        # )
+        logger.info(
+            f"Successfully updated status for conversation {conversation_id}. Preparing response."
+        )
+        # --- End WebSocket Placeholder ---
+
+        # Commit the transaction before returning the response
+        await db.commit()
+        logger.debug(
+            f"Committed transaction for conversation {conversation_id} status update."
+        )
+
+        # Parse the updated ORM object to the response schema
+        response_data = parse_conversation_to_conversation_response(
+            updated_conversation
+        )
+        return response_data
+
+    except HTTPException as http_exc:
+        # Re-raise HTTPExceptions directly
+        await db.rollback()  # Rollback on known errors
+        raise http_exc
+    except Exception as e:
+        # Catch unexpected errors
+        await db.rollback()  # Rollback on unexpected errors
+        logger.exception(
+            f"Unexpected error updating status for conversation {conversation_id}: {e}"
+        )  # Use logger.exception to include traceback
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while updating the conversation status.",
+        )

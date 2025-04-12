@@ -592,7 +592,11 @@ async def get_message_context(
 
 
 async def update_conversation_status(
-    db: AsyncSession, *, conversation_id: UUID, new_status: ConversationStatusEnum
+    db: AsyncSession,
+    *,
+    account_id: UUID,
+    conversation_id: UUID,
+    new_status: ConversationStatusEnum,
 ) -> Optional[Conversation]:
     """
     Updates the status of a specific conversation.
@@ -609,7 +613,12 @@ async def update_conversation_status(
         # Option 1: Update directly (more efficient, less ORM object handling)
         stmt = (
             update(Conversation)
-            .where(Conversation.id == conversation_id)
+            .where(
+                and_(
+                    Conversation.id == conversation_id,
+                    Conversation.account_id == account_id,
+                )
+            )
             .values(
                 status=new_status, updated_at=func.now()
             )  # Explicitly set updated_at
@@ -646,7 +655,7 @@ async def update_conversation_status(
 
 
 async def increment_conversation_unread_count(
-    db: AsyncSession, *, conversation_id: UUID, increment_by: int = 1
+    db: AsyncSession, *, account_id: UUID, conversation_id: UUID, increment_by: int = 1
 ) -> Optional[Conversation]:
     """
     Increments the unread_agent_count for a conversation atomically.
@@ -668,7 +677,12 @@ async def increment_conversation_unread_count(
     try:
         stmt = (
             update(Conversation)
-            .where(Conversation.id == conversation_id)
+            .where(
+                and_(
+                    Conversation.id == conversation_id,
+                    Conversation.account_id == account_id,
+                )
+            )
             .values(
                 # Use F expression for atomic increment
                 unread_agent_count=Conversation.unread_agent_count + increment_by,
@@ -703,7 +717,7 @@ async def increment_conversation_unread_count(
 
 
 async def reset_conversation_unread_count(
-    db: AsyncSession, *, conversation_id: UUID
+    db: AsyncSession, *, account_id: UUID, conversation_id: UUID
 ) -> Optional[Conversation]:
     """
     Resets the unread_agent_count for a conversation to zero.
@@ -718,9 +732,13 @@ async def reset_conversation_unread_count(
     try:
         stmt = (
             update(Conversation)
-            .where(Conversation.id == conversation_id)
-            # Only update if the count is currently greater than 0
-            .where(Conversation.unread_agent_count > 0)
+            .where(
+                and_(
+                    Conversation.id == conversation_id,
+                    Conversation.account_id == account_id,
+                    Conversation.unread_agent_count > 0,
+                )
+            )
             .values(
                 unread_agent_count=0,
                 updated_at=func.now(),  # Explicitly update timestamp
