@@ -93,10 +93,4 @@ class Contact(BaseModel):
             postgresql_using="gin",
             postgresql_ops={"name": "gin_trgm_ops"},
         ),
-        Index(
-            "ix_contacts_name_gin_trgm",
-            "phone_number",
-            postgresql_using="gin",
-            postgresql_ops={"phone_number": "gin_trgm_ops"},
-        ),
     )
