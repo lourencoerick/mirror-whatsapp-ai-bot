@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status, Body
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -10,6 +10,8 @@ from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.queue.redis_queue import RedisQueue
 from app.api.schemas.message import MessageResponse, MessageCreatePayload, MessageCreate
+from app.models.conversation import Conversation, ConversationStatusEnum
+
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
 from app.services.helper.conversation import (
@@ -98,110 +100,239 @@ async def get_conversation_messages_paginated(
 @router.post(
     "/conversations/{conversation_id}/messages",
     response_model=MessageResponse,
-    status_code=201,
+    status_code=201,  # Use 201 Created for successful resource creation
     summary="Create Outgoing Message",
     description=(
         "Creates and sends an outgoing message linked to a conversation. The endpoint "
-        "validates the conversation, persists a new outgoing message with a generated source_id, "
-        "updates the last message snapshot in the conversation, and enqueues the message for delivery."
+        "validates the conversation, persists a new outgoing message, resets the conversation's "
+        "unread count, potentially updates its status to HUMAN_ACTIVE, updates the last message snapshot, "
+        "and enqueues the message for delivery."
     ),
 )
 async def create_outgoing_message(
-    conversation_id: UUID,
-    payload: MessageCreatePayload,
+    conversation_id: UUID = Path(..., description="The target conversation ID."),
+    payload: MessageCreatePayload = Body(...),  # Explicitly mark payload as Body
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> MessageResponse:
-    """Create and send an outgoing message linked to a conversation.
+    """Create and send an outgoing message, updating conversation state.
 
     Args:
         conversation_id (UUID): The target conversation ID.
         payload (MessageCreatePayload): The message content from the frontend.
-        db (AsyncSession): The database session.
-        auth_context (AuthContext): Authentication context containing user and account info.
+        db (AsyncSession): The database session provided by FastAPI.
+        auth_context (AuthContext): Authentication context.
 
     Returns:
-        MessageResponse: The persisted message.
+        MessageResponse: The persisted message details.
 
     Raises:
         HTTPException: 404 if the conversation is not found.
+        HTTPException: 500 if saving or updating fails unexpectedly.
     """
     user_id = auth_context.user.id
     account_id = auth_context.account.id
 
+    # Fetch conversation within the transaction context managed by FastAPI
     conversation = await conversation_repo.find_conversation_by_id(
         db, conversation_id=conversation_id, account_id=account_id
     )
     if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        logger.warning(
+            f"Conversation {conversation_id} not found for account {account_id}."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found"
+        )
 
-    # Generate an internal source_id
+    # Store original status for later check
+    original_status = conversation.status
+
+    # Generate an internal source_id for tracking
     internal_source_id = f"internal-{uuid4().hex}"
 
     message_data = MessageCreate(
         account_id=conversation.account_id,
         inbox_id=conversation.inbox_id,
         conversation_id=conversation.id,
-        contact_id=conversation.contact_inbox.contact_id,
+        # Ensure contact_id is correctly retrieved if needed, might require loading relation
+        contact_id=(
+            conversation.contact_inbox.contact_id
+            if conversation.contact_inbox
+            else None
+        ),
         source_id=internal_source_id,
-        user_id=user_id,
+        user_id=user_id,  # Agent sending the message
         direction="out",
-        status="processing",
+        status="processing",  # Initial status before sending
         message_timestamp=datetime.now(timezone.utc),
         content=payload.content,
-        content_type="text",
+        content_type="text",  # Assuming text for now, might need adjustment
         content_attributes={
             "source": "frontend",
-            "channel_type": conversation.inbox.channel_type,
+            "channel_type": (
+                conversation.inbox.channel_type if conversation.inbox else None
+            ),
         },
     )
 
-    # Create or reuse message (the repository handles transaction management)
-    message = await message_repo.get_or_create_message(db, message_data)
+    # --- Database Operations ---
+    # These operations will be committed/rolled back together by FastAPI
+    try:
+        # 1. Create the message
+        # Assuming get_or_create_message uses the provided 'db' session and doesn't commit itself
+        message = await message_repo.get_or_create_message(db, message_data)
+        if not message:
+            # This case might indicate an issue with get_or_create_message logic if it doesn't raise
+            logger.error(
+                f"Failed to create message for conversation {conversation_id}, get_or_create returned None."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create message.",
+            )
 
-    # Update last message snapshot in the conversation
-    if message:
+        logger.info(
+            f"Outgoing message {message.id} created for conversation {conversation_id}."
+        )
+
+        # Variable to hold the latest conversation state after updates
+        final_updated_conversation: Conversation = conversation
+
+        # 2. Reset Unread Count (since agent sent a message)
+        logger.debug(f"Resetting unread count for conversation {conversation.id}")
+        updated_conv_reset = await conversation_repo.reset_conversation_unread_count(
+            db=db,
+            account_id=account_id,
+            conversation_id=conversation.id,
+        )
+        if updated_conv_reset:
+            final_updated_conversation = updated_conv_reset
+            logger.info(f"Unread count reset for conversation {conversation.id}")
+        else:
+            # Log warning, but proceed. The count might have been 0 already.
+            # If find_conversation_by_id failed inside reset_..., it would return None.
+            logger.warning(
+                f"Failed to reset unread count for conversation {conversation.id} (maybe already 0 or conversation not found during reset?)."
+            )
+            # Keep the previously fetched conversation state if reset fails
+
+        # 3. Update Status to HUMAN_ACTIVE if it was PENDING
+        if original_status == ConversationStatusEnum.PENDING:
+            logger.debug(
+                f"Updating status for conversation {conversation.id} from PENDING to HUMAN_ACTIVE"
+            )
+            updated_conv_status = await conversation_repo.update_conversation_status(
+                db=db,
+                account_id=account_id,
+                conversation_id=conversation.id,
+                new_status=ConversationStatusEnum.HUMAN_ACTIVE,
+            )
+            if updated_conv_status:
+                final_updated_conversation = updated_conv_status  # Use the latest state
+                logger.info(
+                    f"Status updated for conversation {conversation.id} to HUMAN_ACTIVE"
+                )
+            else:
+                # Log warning, but proceed. update_conversation_status should handle not found.
+                logger.warning(
+                    f"Failed to update status for conversation {conversation.id} to HUMAN_ACTIVE."
+                )
+                # Keep the state from the reset step if status update fails
+
+        # 4. Update Last Message Snapshot (using the final updated conversation state)
         await update_last_message_snapshot(
             db=db,
-            conversation=conversation,
+            conversation=final_updated_conversation,
             message=message,
         )
-    else:
-        logger.warning(f"[consumer] Conversation not found: {message.conversation_id}")
+        logger.debug(
+            f"Last message snapshot updated for conversation {conversation.id}"
+        )
 
-    try:
-        await queue.enqueue({"message_id": message.id})
-        logger.debug(f"[queue] Message {message.id} enqueued for delivery")
     except Exception as e:
-        logger.warning(f"[queue] Failed to enqueue message {message.id}: {e}")
+        # Log the exception that caused the transaction to fail
+        logger.exception(
+            f"Database error during outgoing message creation/update for conversation {conversation_id}: {e}"
+        )
+        # FastAPI will automatically trigger a rollback on the session 'db' here
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save message or update conversation state.",
+        )
 
+    # --- Post-Transaction Operations (Queueing & WebSockets) ---
+    # These happen only if the database operations above were successful (no exception raised)
+
+    # Enqueue the message ID for the sending worker
     try:
-        logger.debug(f"[ws] Publishing message to the channel...")
+        # Ensure queue is connected (ideally handle connection more robustly)
+        if not await queue.is_connected_async():
+            logger.warning(
+                "[queue] Response queue not connected. Attempting to connect..."
+            )
+            await queue.connect()
+            if not await queue.is_connected_async():
+                logger.error(
+                    "[queue] Failed to connect to response queue. Cannot enqueue message."
+                )
+                # Decide how critical this is. Maybe raise an error or just log.
+                # For now, log and continue, but the message won't be sent.
+            else:
+                await queue.enqueue(
+                    {"message_id": str(message.id)}
+                )  # Ensure UUID is string for JSON
+                logger.info(f"[queue] Message {message.id} enqueued for delivery")
+        else:
+            await queue.enqueue({"message_id": str(message.id)})
+            logger.info(f"[queue] Message {message.id} enqueued for delivery")
+
+    except Exception as e:
+        # Log error, but don't fail the request, as the message is saved.
+        # Consider adding monitoring or retry logic for queue failures.
+        logger.error(
+            f"[queue] Failed to enqueue message {message.id} for delivery: {e}"
+        )
+        # Potentially add a background task to retry enqueueing later
+
+    # Publish WebSocket events
+    try:
+        # Event for the specific conversation (new message)
         await publish_to_conversation_ws(
             conversation_id=conversation.id,
             data={
-                "type": "new_message",
-                "payload": jsonable_encoder(message),
+                "type": "new_message",  # Or maybe "outgoing_message" to be specific?
+                "payload": jsonable_encoder(message),  # Send the created message object
             },
         )
-    except Exception as e:
-        logger.warning(f"[ws] Failed to publish message {message.id} to Redis: {e}")
+        logger.debug(
+            f"[ws] Published new_message event for conversation {conversation.id}"
+        )
 
-    try:
+        # Event for the account list (updated conversation state)
+        # Use the final_updated_conversation which includes reset count/new status
+        parsed_conversation = parse_conversation_to_conversation_response(
+            final_updated_conversation
+        )
         await publish_to_account_conversations_ws(
-            conversation.account_id,
+            final_updated_conversation.account_id,
             {
                 "type": "conversation_updated",
-                "payload": jsonable_encoder(
-                    parse_conversation_to_conversation_response(conversation)
-                ),
+                "payload": jsonable_encoder(parsed_conversation),
             },
         )
-    except Exception as e:
-        logger.warning(
-            f"[ws] Failed to publish message {message.id} to account channel: {e}"
+        logger.debug(
+            f"[ws] Published conversation_updated event for conversation {conversation.id}"
         )
 
+    except Exception as e:
+        # Log warning, WebSocket failures shouldn't block the response
+        logger.warning(
+            f"[ws] Failed to publish WebSocket events for message {message.id}: {e}"
+        )
+
+    # Return the created message details
+    # Ensure the returned message object is compatible with MessageResponse schema
     return message
 
 
