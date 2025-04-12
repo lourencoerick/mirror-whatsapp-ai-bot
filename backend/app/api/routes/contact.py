@@ -4,6 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.repository import contact as contact_repo
@@ -14,7 +15,6 @@ from app.api.schemas.contact import (
     PaginatedContactRead,
 )
 
-# Create the router
 router = APIRouter()
 
 
@@ -23,40 +23,38 @@ router = APIRouter()
     response_model=ContactRead,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new contact",
-    description="Creates a new contact for the current account after normalizing the phone number.",
+    description=(
+        "Creates a new contact for the current account after normalizing the phone number. "
+        "Checks for existing contacts with the same normalized phone number and stores the normalized "
+        "number in both the `identifier` and `phone_number` fields."
+    ),
 )
 async def create_new_contact(
     contact_data: ContactCreate,
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
-):
-    """
-    Creates a new contact associated with the authenticated user's account.
-
-    - Normalizes the phone number to digits-only E.164 format (no '+').
-    - Checks for existing contacts with the same normalized phone number within the account.
-    - Stores the normalized number in both `identifier` and `phone_number` fields.
+) -> ContactRead:
+    """Create a new contact associated with the authenticated user's account.
 
     Args:
-        contact_data: The contact details from the request body.
-        db: The database session dependency.
-        account_id: The account ID dependency from the authenticated user.
+        contact_data (ContactCreate): The contact details from the request body.
+        db (AsyncSession): The database session dependency.
+        auth_context (AuthContext): Authentication context containing account information.
 
     Returns:
-        The newly created contact details.
+        ContactRead: The newly created contact details.
 
     Raises:
-        HTTPException 400: If the phone number is invalid or unparseable.
-        HTTPException 409: If a contact with the same phone number already exists.
-        HTTPException 500: If a database error occurs.
+        HTTPException: 400 if the phone number is invalid or unparseable.
+        HTTPException: 409 if a contact with the same phone number already exists.
+        HTTPException: 500 if a database error occurs.
     """
     account_id = auth_context.account.id
-
     if db is None:
         raise HTTPException(status_code=500, detail="Database session not available")
 
     try:
-        logger.info(f"data: {contact_data}")
+        logger.info(f"Creating contact with data: {contact_data}")
         new_contact = await contact_repo.create_contact(
             db=db, contact_data=contact_data, account_id=account_id
         )
@@ -75,7 +73,10 @@ async def create_new_contact(
     "/contacts",
     response_model=PaginatedContactRead,
     summary="List contacts",
-    description="Retrieves a paginated, searchable, and sortable list of contacts for the current account.",
+    description=(
+        "Retrieves a paginated, searchable, and sortable list of contacts for the current account. "
+        "Filtering is possible by name, email, or phone number."
+    ),
 )
 async def list_contacts(
     db: AsyncSession = Depends(get_db),
@@ -101,35 +102,30 @@ async def list_contacts(
         pattern="^(asc|desc)$",
         description="Sort direction: 'asc' (ascending) or 'desc' (descending).",
     ),
-):
-    """
-    Retrieves a list of contacts belonging to the authenticated user's account,
-    with support for pagination, search, and sorting.
+) -> PaginatedContactRead:
+    """Retrieve contacts belonging to the authenticated user's account with pagination, search, and sorting.
 
     Args:
-        db: The database session dependency.
-        auth_context: Authentication context containing account ID.
-        offset: Pagination offset.
-        limit: Pagination limit.
-        search: Optional search term.
-        sort_by: Optional field to sort by.
-        sort_direction: Sort direction ('asc' or 'desc').
+        db (AsyncSession): The database session dependency.
+        auth_context (AuthContext): Authentication context containing the account ID.
+        offset (int): Pagination offset.
+        limit (int): Pagination limit.
+        search (Optional[str]): Optional search term.
+        sort_by (Optional[str]): Optional field to sort by.
+        sort_direction (str): Sort direction, either "asc" or "desc".
 
     Returns:
-        A paginated response containing the list of contacts and the total count
-        matching the search criteria.
+        PaginatedContactRead: A paginated response containing the list of contacts and the total count.
 
     Raises:
-        HTTPException 500: If a database error occurs.
+        HTTPException: 500 if a database error occurs.
     """
     account_id = auth_context.account.id
     if db is None:
-
         logger.error("Database session not available in list_contacts")
         raise HTTPException(status_code=500, detail="Database session not available")
 
     try:
-
         contacts = await contact_repo.get_contacts(
             db=db,
             account_id=account_id,
@@ -139,11 +135,9 @@ async def list_contacts(
             sort_by=sort_by,
             sort_direction=sort_direction,
         )
-
         total_contacts = await contact_repo.count_contacts(
             db=db, account_id=account_id, search=search
         )
-
         return PaginatedContactRead(total=total_contacts, items=contacts)
     except Exception as e:
         logger.exception(
@@ -166,22 +160,20 @@ async def get_contact_details(
     contact_id: UUID,
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
-):
-    """
-    Retrieves a single contact by its unique ID, ensuring it belongs to the
-    authenticated user's account.
+) -> ContactRead:
+    """Retrieve a single contact by its unique ID, ensuring it belongs to the authenticated user's account.
 
     Args:
-        contact_id: The UUID of the contact to retrieve.
-        db: The database session dependency.
-        account_id: The account ID dependency from the authenticated user.
+        contact_id (UUID): The UUID of the contact to retrieve.
+        db (AsyncSession): The database session dependency.
+        auth_context (AuthContext): Authentication context with account details.
 
     Returns:
-        The details of the specified contact.
+        ContactRead: The details of the specified contact.
 
     Raises:
-        HTTPException 404: If the contact is not found or does not belong to the account.
-        HTTPException 500: If a database error occurs.
+        HTTPException: 404 if the contact is not found or does not belong to the account.
+        HTTPException: 500 if a database error occurs.
     """
     account_id = auth_context.account.id
 
@@ -219,28 +211,27 @@ async def update_existing_contact(
     update_data: ContactUpdate,
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
-):
-    """
-    Updates an existing contact identified by its ID.
+) -> ContactRead:
+    """Update an existing contact identified by its ID.
 
-    - Ensures the contact belongs to the authenticated user's account.
-    - If the phone number is updated, it's normalized and uniqueness is checked.
-    - Updates both `identifier` and `phone_number` fields if the phone number changes.
+    - Normalizes the phone number if updated.
+    - Checks that the contact belongs to the authenticated user's account.
+    - Updates both the `identifier` and `phone_number` fields if the phone number changes.
 
     Args:
-        contact_id: The UUID of the contact to update.
-        update_data: The contact details to update.
-        db: The database session dependency.
-        account_id: The account ID dependency from the authenticated user.
+        contact_id (UUID): The UUID of the contact to update.
+        update_data (ContactUpdate): The contact details to update.
+        db (AsyncSession): The database session dependency.
+        auth_context (AuthContext): Authentication context containing account information.
 
     Returns:
-        The updated contact details.
+        ContactRead: The updated contact details.
 
     Raises:
-        HTTPException 404: If the contact is not found or does not belong to the account.
-        HTTPException 400: If the new phone number is invalid or unparseable.
-        HTTPException 409: If the new phone number conflicts with another contact.
-        HTTPException 500: If a database error occurs.
+        HTTPException: 404 if the contact is not found or does not belong to the account.
+        HTTPException: 400 if the new phone number is invalid or unparseable.
+        HTTPException: 409 if the new phone number conflicts with another contact.
+        HTTPException: 500 if a database error occurs.
     """
     account_id = auth_context.account.id
 
@@ -248,7 +239,6 @@ async def update_existing_contact(
         raise HTTPException(status_code=500, detail="Database session not available")
 
     try:
-        # First, get the existing contact to ensure it exists and belongs to the account
         existing_contact = await contact_repo.find_contact_by_id(
             db=db, contact_id=contact_id, account_id=account_id
         )
@@ -257,8 +247,6 @@ async def update_existing_contact(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Contact with ID {contact_id} not found.",
             )
-
-        # Pass the existing contact and update data to the repository function
         updated_contact = await contact_repo.update_contact(
             db=db, contact=existing_contact, update_data=update_data
         )
@@ -283,23 +271,20 @@ async def delete_existing_contact(
     contact_id: UUID,
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
-):
-    """
-    Deletes a contact identified by its ID.
-
-    - Ensures the contact belongs to the authenticated user's account before deletion.
+) -> None:
+    """Delete a contact identified by its ID, ensuring it belongs to the authenticated user's account.
 
     Args:
-        contact_id: The UUID of the contact to delete.
-        db: The database session dependency.
-        account_id: The account ID dependency from the authenticated user.
+        contact_id (UUID): The UUID of the contact to delete.
+        db (AsyncSession): The database session dependency.
+        auth_context (AuthContext): Authentication context with account information.
 
     Returns:
-        None with a 204 No Content status code on success.
+        None: A 204 No Content response on success.
 
     Raises:
-        HTTPException 404: If the contact is not found or does not belong to the account.
-        HTTPException 500: If a database error occurs during deletion.
+        HTTPException: 404 if the contact is not found or does not belong to the account.
+        HTTPException: 500 if a database error occurs during deletion.
     """
     account_id = auth_context.account.id
 
@@ -315,12 +300,8 @@ async def delete_existing_contact(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Contact with ID {contact_id} not found.",
             )
-
         await contact_repo.delete_contact(db=db, contact=existing_contact)
-
-        # No content to return on successful deletion
         return None
-
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:

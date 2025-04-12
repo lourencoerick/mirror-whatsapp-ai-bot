@@ -2,13 +2,13 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import desc, select, or_, and_, cast, Text, literal, func, asc
+from sqlalchemy import desc, select, or_, and_, cast, Text, literal, func, asc, update
 from typing import Optional, List
 from loguru import logger
 from app.api.schemas.conversation import ConversationSearchResult, MessageSnippet
 from app.api.schemas.contact import ContactBase
 from app.models.message import Message
-from app.models.conversation import Conversation
+from app.models.conversation import Conversation, ConversationStatusEnum
 from app.models.contact_inbox import ContactInbox
 from app.models.inbox_member import InboxMember
 
@@ -18,20 +18,22 @@ MESSAGE_SNIPPET_LENGTH = 100
 async def find_conversation_by_id(
     db: AsyncSession, conversation_id: UUID, account_id: UUID
 ) -> Optional[Conversation]:
-    """Retrieves a conversation by ID.
+    """Retrieve a conversation by ID.
 
     Args:
-        db (AsyncSession): SQLAlchemy AsyncSession.
-        conversation_id (UUID): The ID of the conversation to retrieve.
-        account_id (UUID): The ID of the account to which the conversation belongs.
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        conversation_id (UUID): ID of the conversation to retrieve.
+        account_id (UUID): ID of the account to which the conversation belongs.
 
     Returns:
         Optional[Conversation]: The conversation if found, otherwise None.
     """
     result = await db.execute(
         select(Conversation)
-        .options(selectinload(Conversation.contact_inbox))
         .options(selectinload(Conversation.inbox))
+        .options(
+            selectinload(Conversation.contact_inbox).selectinload(ContactInbox.contact)
+        )
         .filter_by(id=conversation_id, account_id=account_id)
     )
     conversation = result.scalar_one_or_none()
@@ -51,17 +53,17 @@ async def find_conversations_by_inbox(
     limit: int = 20,
     offset: int = 0,
 ) -> List[Conversation]:
-    """Retrieves a list of conversations for a specific inbox.
+    """Retrieve a list of conversations for a specific inbox.
 
-    Conversations are ordered by the timestamp of the last message
-    in descending order, returning the most recent ones first.
+    Conversations are ordered by the timestamp of the last message in descending order,
+    returning the most recent ones first.
 
     Args:
-        db (AsyncSession): SQLAlchemy AsyncSession.
-        inbox_id (UUID): The identifier for the inbox.
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        inbox_id (UUID): The inbox identifier.
         account_id (UUID): The account identifier.
-        limit (int, optional): The maximum number of records to return (default is 20).
-        offset (int, optional): The number of records to skip for pagination (default is 0).
+        limit (int, optional): Maximum number of records to return (default is 20).
+        offset (int, optional): Number of records to skip for pagination (default is 0).
 
     Returns:
         List[Conversation]: A list of Conversation objects.
@@ -95,13 +97,13 @@ async def find_conversation(
     contact_inbox_id: UUID,
     account_id: UUID,
 ) -> Optional[Conversation]:
-    """Retrieves a conversation for a contact within an inbox and account.
+    """Retrieve a conversation for a contact within an inbox and account.
 
     Args:
-        db (AsyncSession): SQLAlchemy AsyncSession.
-        inbox_id (UUID): The ID of the inbox.
-        contact_inbox_id (UUID): The ID of the contact inbox.
-        account_id (UUID): The ID of the account.
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        inbox_id (UUID): The inbox ID.
+        contact_inbox_id (UUID): The contact inbox ID.
+        account_id (UUID): The account ID.
 
     Returns:
         Optional[Conversation]: The conversation if found, otherwise None.
@@ -131,13 +133,13 @@ async def get_or_create_conversation(
     account_id: UUID,
     contact_inbox_id: UUID,
 ) -> Conversation:
-    """Finds or creates a conversation for a given contact in an inbox.
+    """Find or create a conversation for a given contact in an inbox.
 
     Args:
-        db (AsyncSession): SQLAlchemy AsyncSession.
-        inbox_id (UUID): The ID of the inbox.
-        account_id (UUID): The ID of the account.
-        contact_inbox_id (UUID): The ID of the contact inbox.
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        inbox_id (UUID): The inbox ID.
+        account_id (UUID): The account ID.
+        contact_inbox_id (UUID): The contact inbox ID.
 
     Returns:
         Conversation: The conversation object.
@@ -159,9 +161,7 @@ async def get_or_create_conversation(
     result = await db.execute(
         select(ContactInbox)
         .options(joinedload(ContactInbox.contact))
-        .filter_by(
-            id=contact_inbox_id,
-        )
+        .filter_by(id=contact_inbox_id)
     )
     contact_inbox: ContactInbox = result.scalar_one_or_none()
 
@@ -176,14 +176,12 @@ async def get_or_create_conversation(
         account_id=account_id,
         inbox_id=inbox_id,
         contact_inbox_id=contact_inbox_id,
-        status="open",
+        status=ConversationStatusEnum.OPEN,
         additional_attributes=additional_attributes,
     )
     db.add(conversation)
+    # Only flush to generate any necessary defaults; commit and refresh are handled by the upper layer.
     await db.flush()
-    await db.commit()
-    await db.refresh(conversation)
-
     logger.debug(f"[conversation] Created conversation (id={conversation.id})")
     return conversation
 
@@ -194,25 +192,30 @@ async def find_conversations_by_user(
     account_id: UUID,
     limit: int = 20,
     offset: int = 0,
+    status: Optional[List[ConversationStatusEnum]] = None,
+    has_unread: Optional[bool] = None,
 ) -> List[Conversation]:
-    """Retrieves all conversations accessible to a given user based on inbox membership.
+    """Retrieve all conversations accessible to a given user based on inbox membership.
 
     Args:
-        db (AsyncSession): SQLAlchemy AsyncSession.
+        db (AsyncSession): SQLAlchemy asynchronous session.
         user_id (UUID): The user ID.
         account_id (UUID): The account ID.
         limit (int): Pagination limit.
         offset (int): Pagination offset.
+        status (Optional[List[ConversationStatusEnum]]): List of conversation statuses to filter.
+        has_unread (Optional[bool]): Filter for conversations with unread messages.
 
     Returns:
         List[Conversation]: Conversations accessible to the user.
     """
+
     inbox_ids_subquery = (
         select(InboxMember.inbox_id).filter(InboxMember.user_id == user_id)
     ).scalar_subquery()
 
     logger.debug(f"Founded user inbox ids: {inbox_ids_subquery}")
-    query = (
+    stmt = (
         select(Conversation)
         .options(
             selectinload(Conversation.contact_inbox).selectinload(ContactInbox.contact)
@@ -221,11 +224,20 @@ async def find_conversations_by_user(
             Conversation.account_id == account_id,
             Conversation.inbox_id.in_(inbox_ids_subquery),
         )
-        .order_by(Conversation.updated_at.desc())
-        .limit(limit)
-        .offset(offset)
     )
-    result = await db.execute(query)
+
+    if status:
+        stmt = stmt.where(Conversation.status.in_(status))
+
+    if has_unread is True:
+        stmt = stmt.where(Conversation.unread_agent_count > 0)
+    elif has_unread is False:
+        stmt = stmt.where(Conversation.unread_agent_count == 0)
+
+    stmt = stmt.order_by(Conversation.updated_at.desc()).limit(limit).offset(offset)
+
+    result = await db.execute(stmt)
+
     conversations = result.scalars().all()
     return conversations
 
@@ -237,21 +249,28 @@ async def search_conversations(
     query: str,
     offset: int = 0,
     limit: int = 100,
+    status: Optional[List[ConversationStatusEnum]] = None,
+    has_unread: Optional[bool] = None,
 ) -> List[ConversationSearchResult]:
-    """
-    Asynchronously searches conversations with prioritization:
-    1. Matches on contact name or phone number.
-    2. Matches on message content.
-    Includes the ID of the most recent matching message if found via content.
+    """Asynchronously search conversations with prioritization.
+
+    The prioritized search checks for:
+      1. Matches on contact name or phone number.
+      2. Matches on message content.
+    If a match is found via message content, the ID of the most recent matching message is included.
 
     Args:
-        db: The SQLAlchemy AsyncSession.
-        query: The search term.
-        offset: Number of records to skip.
-        limit: Maximum number of records to return.
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        user_id (UUID): The user ID.
+        account_id (UUID): The account ID.
+        query (str): The search term.
+        offset (int): Number of records to skip.
+        limit (int): Maximum number of records to return.
+        status (Optional[List[ConversationStatusEnum]]): Filter by conversation statuses.
+        has_unread (Optional[bool]): Filter conversations by unread message count.
 
     Returns:
-        A list of prioritized and paginated ConversationSearchResult objects.
+        List[ConversationSearchResult]: A list of prioritized and paginated search results.
     """
     search_term = f"%{query}%"
 
@@ -264,7 +283,6 @@ async def search_conversations(
         select(
             Conversation.id.label("conversation_id"),
             literal(1).label("match_rank"),
-            # This is nota a message ID for this rank, so we use a literal None
             literal(None).label("matching_message_id"),
         )
         .select_from(Conversation)
@@ -281,14 +299,11 @@ async def search_conversations(
     ).cte("name_phone_matches")
 
     # --- CTE 2: Message Content Matches (Rank 2) ---
-    # Precisamos encontrar a *mensagem correspondente mais recente* para cada conversa
-    # Usamos ROW_NUMBER() particionado por conversa, ordenado por timestamp DESC
     message_subquery = (
         select(
             Message.conversation_id,
             Message.id.label("message_id"),
             Message.sent_at,
-            # Particiona por conversa, ordena por mais recente, pega a #1
             func.row_number()
             .over(
                 partition_by=Message.conversation_id,
@@ -301,7 +316,6 @@ async def search_conversations(
         .subquery("message_subquery")
     )
 
-    # CTE final para message matches, selecionando apenas a mais recente (rnk=1)
     message_matches_cte = (
         select(
             message_subquery.c.conversation_id.label("conversation_id"),
@@ -330,43 +344,52 @@ async def search_conversations(
     ).cte("combined_matches")
 
     # --- CTE 4: Prioritize using ROW_NUMBER ---
-    # Seleciona a melhor correspondência (menor rank) para cada conversation_id
     prioritized_matches_cte = (
         select(
             combined_matches_cte.c.conversation_id,
             combined_matches_cte.c.match_rank,
             combined_matches_cte.c.matching_message_id,
-            # Particiona por ID da conversa, ordena pelo rank (ASC para priorizar 1), pega a #1
             func.row_number()
             .over(
                 partition_by=combined_matches_cte.c.conversation_id,
-                order_by=asc(
-                    combined_matches_cte.c.match_rank
-                ),  # Ordem crescente de rank
+                order_by=asc(combined_matches_cte.c.match_rank),
             )
             .label("priority_rnk"),
         ).select_from(combined_matches_cte)
     ).cte("prioritized_matches")
 
-    # --- Final Query: Select prioritized conversations, order, and paginate ---
+    # --- Final Query: Select prioritized conversations ---
     final_selection_stmt = (
         select(
             prioritized_matches_cte.c.conversation_id,
             prioritized_matches_cte.c.match_rank,
             prioritized_matches_cte.c.matching_message_id,
-            Conversation.last_message_at,  # Para ordenação final
+            Conversation.last_message_at,
         )
         .select_from(prioritized_matches_cte)
-        # Junta de volta com Conversation para obter last_message_at para ordenação
         .join(
             Conversation, prioritized_matches_cte.c.conversation_id == Conversation.id
         )
-        .where(
-            prioritized_matches_cte.c.priority_rnk == 1
-        )  # Pega apenas a melhor correspondência por conversa
-        # Ordenação final: primeiro por rank (ASC), depois por atividade mais recente (DESC)
+        .where(prioritized_matches_cte.c.priority_rnk == 1)
         .filter(Conversation.inbox_id.in_(user_inbox_ids_subquery))
-        .order_by(
+    )
+
+    if status:
+        final_selection_stmt = final_selection_stmt.where(
+            Conversation.status.in_(status)
+        )
+
+    if has_unread is True:
+        final_selection_stmt = final_selection_stmt.where(
+            Conversation.unread_agent_count > 0
+        )
+    elif has_unread is False:
+        final_selection_stmt = final_selection_stmt.where(
+            Conversation.unread_agent_count == 0
+        )
+
+    final_selection_stmt = (
+        final_selection_stmt.order_by(
             asc(prioritized_matches_cte.c.match_rank),
             desc(Conversation.last_message_at),
         )
@@ -374,16 +397,13 @@ async def search_conversations(
         .limit(limit)
     )
 
-    # Execute para obter os IDs e informações de rank/mensagem correspondente
     final_selection_result = await db.execute(final_selection_stmt)
-    # Usar mappings para obter dicionários com nomes de coluna
     prioritized_results = final_selection_result.mappings().all()
 
     if not prioritized_results:
         return []
 
     conversation_ids_to_fetch = [res["conversation_id"] for res in prioritized_results]
-    # Mapeamento para fácil acesso ao rank e matching_message_id depois
     result_info_map = {
         res["conversation_id"]: {
             "rank": res["match_rank"],
@@ -392,43 +412,33 @@ async def search_conversations(
         for res in prioritized_results
     }
 
-    # === Fetch Conversation Objects ===
-    conversations_stmt = (
-        select(Conversation).filter(Conversation.id.in_(conversation_ids_to_fetch))
-        # Tentar preservar a ordem (pode ser feito reordenando no Python depois)
+    conversations_stmt = select(Conversation).filter(
+        Conversation.id.in_(conversation_ids_to_fetch)
     )
     conversations_result = await db.execute(conversations_stmt)
-    # Criar um mapa para fácil acesso e reordenação
     conversations_map = {conv.id: conv for conv in conversations_result.scalars().all()}
-    # Reordenar de acordo com a ordem priorizada original
     matched_conversations = [
         conversations_map[id_]
         for id_ in conversation_ids_to_fetch
         if id_ in conversations_map
     ]
 
-    # === Post-process to build results (similar to before, but use rank/matching_id) ===
     results: List[ConversationSearchResult] = []
     for conv in matched_conversations:
         conv_info = result_info_map[conv.id]
         match_rank = conv_info["rank"]
         pre_fetched_matching_message_id = conv_info["matching_message_id"]
 
-        # --- Fetch Matching Message Snippet (se rank=2 e ID existe) ---
         most_recent_matching_message: Optional[Message] = None
         if match_rank == 2 and pre_fetched_matching_message_id:
-            # Busca a mensagem específica que foi identificada na CTE
-            # Isso evita a necessidade de refazer a busca ILIKE aqui
             matching_message_stmt = (
                 select(Message)
                 .where(Message.id == pre_fetched_matching_message_id)
-                .limit(1)  # Deve retornar apenas uma
+                .limit(1)
             )
             matching_message_result = await db.execute(matching_message_stmt)
             most_recent_matching_message = matching_message_result.scalar_one_or_none()
-            # Se, por alguma razão, a mensagem não for encontrada (improvável), ele permanecerá None
 
-        # --- Build Result Item ---
         try:
             contact = ContactBase(
                 name=conv.additional_attributes.get("contact_name"),
@@ -447,7 +457,7 @@ async def search_conversations(
             )
 
             matching_msg_snippet = None
-            if most_recent_matching_message:  # Usar a mensagem buscada pelo ID
+            if most_recent_matching_message:
                 matching_msg_snippet = MessageSnippet(
                     id=most_recent_matching_message.id,
                     content=(most_recent_matching_message.content or "")[
@@ -482,24 +492,22 @@ async def get_message_context(
     limit_before: int = 5,
     limit_after: int = 5,
 ) -> List[Message]:
-    """
-    Fetches a message and its surrounding context within a conversation.
+    """Fetch a message and its surrounding context within a conversation.
 
-    Retrieves a specified number of messages chronologically before and after
-    a target message, including the target message itself.
+    Retrieves a specified number of messages before and after a target message,
+    including the target message itself.
 
     Args:
-        db: The SQLAlchemy AsyncSession.
-        conversation_id: The ID of the conversation.
-        target_message_id: The ID of the message to center the context around.
-        limit_before: Max number of messages to fetch before the target message.
-        limit_after: Max number of messages to fetch after (and including) the target message.
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        account_id (UUID): The account ID.
+        conversation_id (UUID): The conversation ID.
+        target_message_id (UUID): The ID of the message for context.
+        limit_before (int, optional): Maximum messages to fetch before the target (default: 5).
+        limit_after (int, optional): Maximum messages to fetch after the target (default: 5).
 
     Returns:
-        A list of Message objects representing the context, ordered chronologically.
-        Returns an empty list if the target message or conversation is not found.
+        List[Message]: A list of Message objects representing the context, ordered chronologically.
     """
-    # 1. Fetch the target message
     target_msg_stmt = select(Message).where(
         and_(
             Message.account_id == account_id,
@@ -513,7 +521,6 @@ async def get_message_context(
     if not target_message:
         return []
 
-    # 2. Fetching the context messages before the target message
     before_stmt = (
         select(Message)
         .where(
@@ -529,7 +536,6 @@ async def get_message_context(
     before_result = await db.execute(before_stmt)
     messages_before = before_result.scalars().all()
 
-    # 3. Fetching the context messages after the target message
     after_stmt = (
         select(Message)
         .where(
@@ -544,15 +550,173 @@ async def get_message_context(
     after_result = await db.execute(after_stmt)
     messages_after = after_result.scalars().all()
 
-    # Combina e ordena
-    # Reverse 'before' list to have the chronological order
     combined_messages = list(reversed(messages_before)) + messages_after
-
-    # Remove duplicates
-    # final_message_map = {msg.id: msg for msg in combined_messages}
-
-    # Retorna a lista final ordenada (o dicionário não garante ordem, então reordenamos pelas IDs combinadas se necessário, mas a concatenação já deve ter a ordem correta)
-    # A concatenação `list(reversed(messages_before)) + messages_after` já deve estar ordenada corretamente por timestamp/id ASC.
-    # return list(final_message_map.values()) -> Perde a ordem
-
     return combined_messages
+
+
+async def update_conversation_status(
+    db: AsyncSession,
+    *,
+    account_id: UUID,
+    conversation_id: UUID,
+    new_status: ConversationStatusEnum,
+) -> Optional[Conversation]:
+    """Update the status of a specific conversation.
+
+    Args:
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        account_id (UUID): The account ID.
+        conversation_id (UUID): The conversation ID.
+        new_status (ConversationStatusEnum): The new status to set.
+
+    Returns:
+        Optional[Conversation]: The updated Conversation object if found and updated, otherwise None.
+    """
+    try:
+        stmt = (
+            update(Conversation)
+            .where(
+                and_(
+                    Conversation.id == conversation_id,
+                    Conversation.account_id == account_id,
+                )
+            )
+            .values(status=new_status, updated_at=func.now())
+            .returning(Conversation)
+        )
+        result = await db.execute(stmt)
+        updated_conversation = result.scalar_one_or_none()
+
+        if updated_conversation:
+            logger.info(
+                f"Updated conversation {conversation_id} status to {new_status}"
+            )
+            return updated_conversation
+        else:
+            logger.warning(
+                f"Conversation {conversation_id} not found for status update."
+            )
+            return None
+
+    except SQLAlchemyError as e:
+        logger.error(
+            f"Database error updating conversation {conversation_id} status: {e}"
+        )
+        return None
+
+
+async def increment_conversation_unread_count(
+    db: AsyncSession, *, account_id: UUID, conversation_id: UUID, increment_by: int = 1
+) -> Optional[Conversation]:
+    """Atomically increment the unread_agent_count for a conversation.
+
+    Args:
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        account_id (UUID): The account ID.
+        conversation_id (UUID): The conversation ID.
+        increment_by (int, optional): Amount to increment (default: 1).
+
+    Returns:
+        Optional[Conversation]: The updated Conversation object if found, otherwise None.
+    """
+    if increment_by <= 0:
+        logger.warning("Increment value must be positive.")
+        result = await db.execute(select(Conversation).filter_by(id=conversation_id))
+        return result.scalar_one_or_none()
+
+    try:
+        stmt = (
+            update(Conversation)
+            .where(
+                and_(
+                    Conversation.id == conversation_id,
+                    Conversation.account_id == account_id,
+                )
+            )
+            .values(
+                unread_agent_count=Conversation.unread_agent_count + increment_by,
+                updated_at=func.now(),
+            )
+            .returning(Conversation)
+            .execution_options(synchronize_session="fetch")
+        )
+        result = await db.execute(stmt)
+        updated_conversation = result.scalar_one_or_none()
+
+        if updated_conversation:
+            logger.info(
+                f"Incremented unread count for conversation {conversation_id} by {increment_by}"
+            )
+            return updated_conversation
+        else:
+            logger.warning(
+                f"Conversation {conversation_id} not found for unread count increment."
+            )
+            return None
+
+    except SQLAlchemyError as e:
+        logger.error(
+            f"Database error incrementing unread count for {conversation_id}: {e}"
+        )
+        return None
+
+
+async def reset_conversation_unread_count(
+    db: AsyncSession, *, account_id: UUID, conversation_id: UUID
+) -> Optional[Conversation]:
+    """Reset the unread_agent_count for a conversation to zero.
+
+    Args:
+        db (AsyncSession): SQLAlchemy asynchronous session.
+        account_id (UUID): The account ID.
+        conversation_id (UUID): The conversation ID.
+
+    Returns:
+        Optional[Conversation]: The updated Conversation object if found and updated, otherwise None.
+    """
+    try:
+        stmt = (
+            update(Conversation)
+            .where(
+                and_(
+                    Conversation.id == conversation_id,
+                    Conversation.account_id == account_id,
+                    Conversation.unread_agent_count > 0,
+                )
+            )
+            .values(
+                unread_agent_count=0,
+                updated_at=func.now(),
+            )
+            .returning(Conversation)
+            .execution_options(synchronize_session="fetch")
+        )
+        result = await db.execute(stmt)
+        updated_conversation = result.scalar_one_or_none()
+
+        if updated_conversation:
+            logger.info(f"Reset unread count for conversation {conversation_id}")
+            return updated_conversation
+        else:
+            exists_check = await db.execute(
+                select(Conversation.id).filter_by(id=conversation_id)
+            )
+            if not exists_check.scalar_one_or_none():
+                logger.warning(
+                    f"Conversation {conversation_id} not found for unread count reset."
+                )
+            else:
+                logger.info(
+                    f"Unread count for conversation {conversation_id} was already 0 or reset failed."
+                )
+                result = await db.execute(
+                    select(Conversation).filter_by(id=conversation_id)
+                )
+                return result.scalar_one_or_none()
+            return None
+
+    except SQLAlchemyError as e:
+        logger.error(
+            f"Database error resetting unread count for {conversation_id}: {e}"
+        )
+        return None

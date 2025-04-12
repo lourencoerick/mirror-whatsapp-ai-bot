@@ -18,9 +18,17 @@ async def list_account_inboxes(
     db: AsyncSession = Depends(get_db),
     limit: int = 100,
     offset: int = 0,
-):
-    """
-    Retrieves all inboxes associated with the authenticated user's account.
+) -> List[InboxResponse]:
+    """Retrieve all inboxes associated with the authenticated user's account.
+
+    Args:
+        auth_context (AuthContext): Authentication context containing user and account details.
+        db (AsyncSession): Asynchronous database session.
+        limit (int): Maximum number of inboxes to return.
+        offset (int): Number of inboxes to skip.
+
+    Returns:
+        List[InboxResponse]: A list of inboxes for the authenticated account.
     """
     account_id = auth_context.account.id
     logger.info(f"Received request to list inboxes for Account={account_id}")
@@ -32,7 +40,6 @@ async def list_account_inboxes(
     return inboxes
 
 
-# --- CREATE ---
 @router.post(
     "/inboxes", response_model=InboxResponse, status_code=status.HTTP_201_CREATED
 )
@@ -40,8 +47,20 @@ async def create_new_inbox(
     inbox_data: InboxCreate,
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
-):
-    """Creates a new inbox for the authenticated user's account."""
+) -> InboxResponse:
+    """Create a new inbox for the authenticated user's account.
+
+    Args:
+        inbox_data (InboxCreate): Data for creating a new inbox.
+        auth_context (AuthContext): Authentication context containing user and account details.
+        db (AsyncSession): Asynchronous database session.
+
+    Returns:
+        InboxResponse: The newly created inbox.
+
+    Raises:
+        HTTPException: If the inbox creation fails.
+    """
     account_id = auth_context.account.id
     user_id = auth_context.user.id
     logger.info(
@@ -52,7 +71,6 @@ async def create_new_inbox(
         new_inbox = await inbox_repo.create_inbox(
             db=db, account_id=account_id, user_id=user_id, inbox_data=inbox_data
         )
-
         return new_inbox
     except Exception as e:
         logger.error(f"Failed to create inbox for Account={account_id}: {e}")
@@ -62,14 +80,25 @@ async def create_new_inbox(
         )
 
 
-# --- READ (Single) ---
 @router.get("/inboxes/{inbox_id}", response_model=InboxResponse)
 async def get_single_inbox(
     inbox_id: UUID,
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
-):
-    """Retrieves a specific inbox by ID, ensuring it belongs to the user's account."""
+) -> InboxResponse:
+    """Retrieve a specific inbox by ID, ensuring it belongs to the authenticated account.
+
+    Args:
+        inbox_id (UUID): The ID of the inbox to retrieve.
+        auth_context (AuthContext): Authentication context containing user and account details.
+        db (AsyncSession): Asynchronous database session.
+
+    Returns:
+        InboxResponse: The requested inbox.
+
+    Raises:
+        HTTPException: 404 if the inbox is not found or not accessible.
+    """
     account_id = auth_context.account.id
     logger.info(f"Received request to get Inbox ID={inbox_id} for Account={account_id}")
     inbox = await inbox_repo.find_inbox_by_id_and_account(
@@ -86,15 +115,28 @@ async def get_single_inbox(
     return inbox
 
 
-# --- UPDATE ---
 @router.put("/inboxes/{inbox_id}", response_model=InboxResponse)
 async def update_existing_inbox(
     inbox_id: UUID,
     update_data: InboxUpdate,
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
-):
-    """Updates an existing inbox. Ensures the inbox belongs to the user's account."""
+) -> InboxResponse:
+    """Update an existing inbox, ensuring it belongs to the authenticated account.
+
+    Args:
+        inbox_id (UUID): The ID of the inbox to update.
+        update_data (InboxUpdate): Data for updating the inbox.
+        auth_context (AuthContext): Authentication context containing user and account details.
+        db (AsyncSession): Asynchronous database session.
+
+    Returns:
+        InboxResponse: The updated inbox.
+
+    Raises:
+        HTTPException: 404 if the inbox is not found or not accessible.
+        HTTPException: 500 if the inbox update fails.
+    """
     account_id = auth_context.account.id
     logger.info(
         f"Received request to update Inbox ID={inbox_id} for Account={account_id}"
@@ -125,14 +167,26 @@ async def update_existing_inbox(
         )
 
 
-# --- DELETE ---
 @router.delete("/inboxes/{inbox_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_existing_inbox(
     inbox_id: UUID,
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
-):
-    """Deletes an existing inbox, ensuring it belongs to the user's account."""
+) -> None:
+    """Delete an existing inbox, ensuring it belongs to the authenticated account.
+
+    Args:
+        inbox_id (UUID): The ID of the inbox to delete.
+        auth_context (AuthContext): Authentication context containing user and account details.
+        db (AsyncSession): Asynchronous database session.
+
+    Returns:
+        None
+
+    Raises:
+        HTTPException: 404 if the inbox is not found or not accessible.
+        HTTPException: 500 if the inbox deletion fails.
+    """
     account_id = auth_context.account.id
     logger.info(
         f"Received request to delete Inbox ID={inbox_id} for Account={account_id}"

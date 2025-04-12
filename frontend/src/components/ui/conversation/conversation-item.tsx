@@ -1,15 +1,16 @@
-'use client'; // Required for using hooks like useRouter
+'use client';
 
-import Link from 'next/link';
 import React from 'react';
-import { useRouter } from 'next/navigation'; // Use 'next/navigation' for App Router
+import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { User } from 'lucide-react';
 import clsx from 'clsx';
 import { formatLastMessageAt } from "@/lib/utils/date-utils";
 import { formatPhoneNumber } from "@/lib/utils/phone-utils";
 import { truncateText } from "@/lib/utils/text-utils";
+import { ConversationStatusEnum } from '@/types/conversation';
 
+// Define props with unreadCount and status
 type ConversationItemProps = {
   id: string;
   contactName?: string;
@@ -17,10 +18,11 @@ type ConversationItemProps = {
   imageUrl?: string;
   lastMessageContent?: string;
   lastMessageTime?: string;
-  matchingMessageId?: string;
-  matchingMessageContent?: string;
+  matchingMessageId?: string | null;
+  matchingMessageContent?: string | null;
   isSelected?: boolean;
-
+  unreadCount: number;
+  status: ConversationStatusEnum;
 };
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
@@ -33,66 +35,80 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   matchingMessageId,
   matchingMessageContent,
   isSelected = false,
+  unreadCount,
+  status,
 }) => {
   const router = useRouter();
 
   const handleItemClick = () => {
-    // Base URL for the conversation chat page
     const chatUrl = `/dashboard/conversations/${id}`;
-
-    // Conditionally add the highlight query parameter
     const finalUrl = matchingMessageId
       ? `${chatUrl}?highlight=${matchingMessageId}`
       : chatUrl;
-
     console.log(`Navigating to: ${finalUrl}`);
     router.push(finalUrl);
   };
-  console.log(`Rendering matching with ID: ${matchingMessageId}`);
 
-  // Format display values (moved logic here for clarity)
+  // Format display values
   const displayPhoneNumber = formatPhoneNumber(phoneNumber);
-  const displayName = contactName? `| ${contactName}` : '';
-  const displayTitle = truncateText(`${displayPhoneNumber} ${displayName}`, 25);
-  const displayMessage = matchingMessageId? truncateText(matchingMessageContent, 30) :truncateText(lastMessageContent, 30);
+  const displayName = contactName ? `| ${contactName}` : '';
+  const displayTitle = truncateText(`${displayPhoneNumber} ${displayName}`, 30);
+  const displayMessage = matchingMessageId
+    ? truncateText(matchingMessageContent ?? '', 35)
+    : truncateText(lastMessageContent, 35);
   const displayTime = lastMessageTime ? formatLastMessageAt(lastMessageTime) : '';
-
 
   const isMatchResult = !!matchingMessageId;
 
   return (
-      <div
-        onClick={handleItemClick}
-        className={clsx(
-          'flex flex-row items-center px-2 gap-2 truncate border-t border-gray-200 h-20  cursor-pointer',
-          isSelected ? 'bg-background' : 'hover:bg-gray-100'
-        )}
+    <div
+      onClick={handleItemClick}
+      className={clsx(
+        'relative flex flex-row items-center px-2 gap-2 truncate border-t border-gray-200 h-20 cursor-pointer w-xs',
+        isSelected
+          ? 'bg-neutral-200 dark:bg-neutral-800'
+          : 'hover:bg-gray-100 dark:hover:bg-neutral-700',
+        status === ConversationStatusEnum.CLOSED && !isSelected ? 'opacity-70' : ''
+      )}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleItemClick()}
-      >
-        <Avatar>
-          <AvatarImage src={imageUrl} alt={contactName} />
-          <AvatarFallback>
-            <User />
-          </AvatarFallback>
-        </Avatar>
-        <div className='flex flex-col flex-1 min-w-0'>
-          <div className='flex flex-row justify-between gap-2'>
-            <h4 className='text-xs truncate'>
-              <span>{displayTitle}</span>
-            </h4>
-            {displayTime && <p className='text-xs text-muted-foreground truncate'>{displayTime}</p>}
-          </div>
-          {/* Apply different style if it's a search result match */}
-          <p className={clsx(
-            'text-xs truncate',
-            isMatchResult ? 'text-blue-600 font-medium' : 'text-muted-foreground' // Conditional styling
-          )}>
-            {isMatchResult ? `Encontrado: ${displayMessage}` : displayMessage} 
+    >
+      {/* Avatar Section */}
+      <Avatar className="h-10 w-10">
+        <AvatarImage src={imageUrl} alt={contactName} />
+        <AvatarFallback>
+          <User className="h-5 w-5" />
+        </AvatarFallback>
+      </Avatar>
+
+      {/* Text Content Section */}
+      <div className="flex flex-col flex-1 min-w-0">
+        {/* Top Row: Title and Time */}
+        <div className="flex flex-row justify-between items-center gap-2">
+          <h4 className="text-sm font-medium truncate">
+            <span>{displayTitle}</span>
+          </h4>
+          {displayTime && <p className="text-xs text-muted-foreground flex-shrink-0">{displayTime}</p>}
+        </div>
+        {/* Bottom Row: Message Snippet and Unread Count Badge */}
+        <div className="flex items-center justify-between">
+          <p
+            className={clsx(
+              'text-xs truncate flex-grow pr-1',
+              isMatchResult ? 'text-blue-600 font-medium' : 'text-muted-foreground'
+            )}
+          >
+            {isMatchResult ? `Encontrado: ${displayMessage}` : displayMessage}
           </p>
+          {unreadCount > 0 && (
+            <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-medium text-white flex-shrink-0">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </div>
       </div>
+    </div>
   );
 };
 
