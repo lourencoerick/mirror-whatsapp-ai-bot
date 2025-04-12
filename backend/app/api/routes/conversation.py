@@ -15,7 +15,7 @@ from app.api.schemas.conversation import (
 from app.services.repository import contact as contact_repo
 from app.services.repository import conversation as conversation_repo
 from app.services.repository import inbox as inbox_repo
-from app.models.conversation import Conversation
+from app.models.conversation import Conversation, ConversationStatusEnum
 from app.services.helper.websocket import publish_to_account_conversations_ws
 from app.services.helper.conversation import (
     conversations_to_conversations_response,
@@ -53,6 +53,16 @@ async def search_or_list_conversations(
         title="Limit",
         description="Maximum number of records to return",
     ),
+    status: Optional[List[ConversationStatusEnum]] = Query(
+        None,
+        title="Status of the conversation",
+        description="Status of the conversation (`PENDING`, `HUMAN_ACTIVE`, `CLOSED`... )",
+    ),
+    has_unread: Optional[bool] = Query(
+        None,
+        title="Flag indicating if there is unread messages",
+        description="Flag indicating if there is unread messages",
+    ),
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ):
@@ -72,6 +82,8 @@ async def search_or_list_conversations(
                 query=q,
                 offset=offset,
                 limit=limit,
+                status=status,
+                has_unread=has_unread,
             )
             return conversations
         else:
@@ -82,6 +94,8 @@ async def search_or_list_conversations(
                     account_id=account_id,
                     limit=limit,
                     offset=offset,
+                    status=status,
+                    has_unread=has_unread,
                 )
             return conversations_to_conversations_response(conversations)
 

@@ -8,7 +8,7 @@ from loguru import logger
 from app.api.schemas.conversation import ConversationSearchResult, MessageSnippet
 from app.api.schemas.contact import ContactBase
 from app.models.message import Message
-from app.models.conversation import Conversation
+from app.models.conversation import Conversation, ConversationStatusEnum
 from app.models.contact_inbox import ContactInbox
 from app.models.inbox_member import InboxMember
 
@@ -176,7 +176,7 @@ async def get_or_create_conversation(
         account_id=account_id,
         inbox_id=inbox_id,
         contact_inbox_id=contact_inbox_id,
-        status="open",
+        status=ConversationStatusEnum.OPEN,
         additional_attributes=additional_attributes,
     )
     db.add(conversation)
@@ -194,6 +194,8 @@ async def find_conversations_by_user(
     account_id: UUID,
     limit: int = 20,
     offset: int = 0,
+    status: Optional[List[ConversationStatusEnum]] = None,
+    has_unread: Optional[bool] = None,
 ) -> List[Conversation]:
     """Retrieves all conversations accessible to a given user based on inbox membership.
 
@@ -203,6 +205,8 @@ async def find_conversations_by_user(
         account_id (UUID): The account ID.
         limit (int): Pagination limit.
         offset (int): Pagination offset.
+        status: Filter by a list of conversation statuses (e.g., ['PENDING', 'HUMAN_ACTIVE']).
+        has_unread: Filter for conversations with unread messages (unread_agent_count > 0).
 
     Returns:
         List[Conversation]: Conversations accessible to the user.
@@ -212,7 +216,7 @@ async def find_conversations_by_user(
     ).scalar_subquery()
 
     logger.debug(f"Founded user inbox ids: {inbox_ids_subquery}")
-    query = (
+    stmt = (
         select(Conversation)
         .options(
             selectinload(Conversation.contact_inbox).selectinload(ContactInbox.contact)
@@ -221,11 +225,20 @@ async def find_conversations_by_user(
             Conversation.account_id == account_id,
             Conversation.inbox_id.in_(inbox_ids_subquery),
         )
-        .order_by(Conversation.updated_at.desc())
-        .limit(limit)
-        .offset(offset)
     )
-    result = await db.execute(query)
+
+    if status:
+        stmt = stmt.where(Conversation.status.in_(status))
+
+    if has_unread is True:
+        stmt = stmt.where(Conversation.unread_agent_count > 0)
+    elif has_unread is False:
+        stmt = stmt.where(Conversation.unread_agent_count == 0)
+
+    stmt = stmt.order_by(Conversation.updated_at.desc()).limit(limit).offset(offset)
+
+    result = await db.execute(stmt)
+
     conversations = result.scalars().all()
     return conversations
 
@@ -237,6 +250,8 @@ async def search_conversations(
     query: str,
     offset: int = 0,
     limit: int = 100,
+    status: Optional[List[ConversationStatusEnum]] = None,
+    has_unread: Optional[bool] = None,
 ) -> List[ConversationSearchResult]:
     """
     Asynchronously searches conversations with prioritization:
@@ -348,7 +363,7 @@ async def search_conversations(
         ).select_from(combined_matches_cte)
     ).cte("prioritized_matches")
 
-    # --- Final Query: Select prioritized conversations, order, and paginate ---
+    # --- Final Query: Select prioritized conversations ---
     final_selection_stmt = (
         select(
             prioritized_matches_cte.c.conversation_id,
@@ -366,7 +381,25 @@ async def search_conversations(
         )  # Pega apenas a melhor correspondência por conversa
         # Ordenação final: primeiro por rank (ASC), depois por atividade mais recente (DESC)
         .filter(Conversation.inbox_id.in_(user_inbox_ids_subquery))
-        .order_by(
+    )
+
+    if status:
+        final_selection_stmt = final_selection_stmt.where(
+            Conversation.status.in_(status)
+        )
+
+    if has_unread is True:
+        final_selection_stmt = final_selection_stmt.where(
+            Conversation.unread_agent_count > 0
+        )
+    elif has_unread is False:
+        final_selection_stmt = final_selection_stmt.where(
+            Conversation.unread_agent_count == 0
+        )
+
+    # --  order, and paginate  --
+    final_selection_stmt = (
+        final_selection_stmt.order_by(
             asc(prioritized_matches_cte.c.match_rank),
             desc(Conversation.last_message_at),
         )
@@ -556,3 +589,27 @@ async def get_message_context(
     # return list(final_message_map.values()) -> Perde a ordem
 
     return combined_messages
+
+
+async def update_conversation_status(
+    self, db: AsyncSession, *, conversation_id: UUID, new_status: ConversationStatusEnum
+) -> Optional[Conversation]:
+    """Updates the status of a specific conversation."""
+    # Implementation will go here later
+    pass
+
+
+async def increment_conversation_unread_count(
+    self, db: AsyncSession, *, conversation_id: UUID, increment_by: int = 1
+) -> Optional[Conversation]:
+    """Increments the unread count for a conversation."""
+    # Implementation will go here later
+    pass
+
+
+async def reset_conversation_unread_count(
+    self, db: AsyncSession, *, conversation_id: UUID
+) -> Optional[Conversation]:
+    """Resets the unread count for a conversation to zero."""
+    # Implementation will go here later
+    pass
