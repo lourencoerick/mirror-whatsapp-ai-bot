@@ -159,6 +159,7 @@ async def create_inbox(
     await db.flush()
     inbox_member = InboxMember(user_id=user_id, inbox_id=new_inbox.id)
     db.add(inbox_member)
+    await db.flush()
     # Removed commit and refresh here; these are to be handled by the caller.
     logger.info(f"[InboxRepo] New inbox prepared with ID={new_inbox.id}")
     return new_inbox

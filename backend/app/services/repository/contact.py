@@ -194,7 +194,10 @@ async def create_contact(
     if existing_contact:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"An active contact with phone number {contact_data.phone_number} (normalized: {normalized_phone}) already exists.",
+            detail=(
+                f"An active contact with phone number {contact_data.phone_number} "
+                f"(normalized: {normalized_phone}) already exists."
+            ),
         )
 
     # Check for email conflict among active contacts if email is provided
@@ -217,6 +220,7 @@ async def create_contact(
         identifier=normalized_phone,
     )
     db.add(db_contact)
+    await db.flush()  # Flush to assign primary key and update pending state.
     # Do not commit or refresh here. The upper layer should control this.
     return db_contact
 
@@ -271,7 +275,10 @@ async def update_contact(
             if existing_contact and existing_contact.id != contact.id:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"An active contact with phone number {new_phone_number} (normalized: {new_normalized_phone}) already exists.",
+                    detail=(
+                        f"An active contact with phone number {new_phone_number} "
+                        f"(normalized: {new_normalized_phone}) already exists."
+                    ),
                 )
             update_dict["identifier"] = new_normalized_phone
             update_dict["phone_number"] = new_normalized_phone
@@ -301,6 +308,7 @@ async def update_contact(
         setattr(contact, key, value)
 
     db.add(contact)
+    await db.flush()  # Flush changes before returning.
     # Do not commit or refresh here. The upper layer should control this.
     return contact
 
@@ -334,7 +342,6 @@ async def delete_contact(db: AsyncSession, *, contact: Contact) -> None:
         logger.warning(
             f"Contact {contact.id} was not found or was already deleted during soft delete."
         )
-        # The upper layer should handle refreshing or additional checks if needed
         await db.refresh(contact, attribute_names=["deleted_at"])
         if contact.deleted_at is None:
             raise HTTPException(
@@ -392,7 +399,7 @@ async def get_or_create_contact_inbox(
             source_id=source_id,
         )
         db.add(contact_inbox)
-        # Do not commit or refresh here. The upper layer should control this.
+        await db.flush()  # Flush to assign an ID to the new contact_inbox.
     else:
         logger.debug(f"[contact_inbox] Found contact_inbox (id={contact_inbox.id})")
 
