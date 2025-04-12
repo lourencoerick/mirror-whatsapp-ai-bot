@@ -100,7 +100,7 @@ async def get_conversation_messages_paginated(
 @router.post(
     "/conversations/{conversation_id}/messages",
     response_model=MessageResponse,
-    status_code=201,  # Use 201 Created for successful resource creation
+    status_code=201,
     summary="Create Outgoing Message",
     description=(
         "Creates and sends an outgoing message linked to a conversation. The endpoint "
@@ -111,7 +111,7 @@ async def get_conversation_messages_paginated(
 )
 async def create_outgoing_message(
     conversation_id: UUID = Path(..., description="The target conversation ID."),
-    payload: MessageCreatePayload = Body(...),  # Explicitly mark payload as Body
+    payload: MessageCreatePayload = Body(...),
     db: AsyncSession = Depends(get_db),
     auth_context: AuthContext = Depends(get_auth_context),
 ) -> MessageResponse:
@@ -155,19 +155,18 @@ async def create_outgoing_message(
         account_id=conversation.account_id,
         inbox_id=conversation.inbox_id,
         conversation_id=conversation.id,
-        # Ensure contact_id is correctly retrieved if needed, might require loading relation
         contact_id=(
             conversation.contact_inbox.contact_id
             if conversation.contact_inbox
             else None
         ),
         source_id=internal_source_id,
-        user_id=user_id,  # Agent sending the message
+        user_id=user_id,
         direction="out",
-        status="processing",  # Initial status before sending
+        status="processing",
         message_timestamp=datetime.now(timezone.utc),
         content=payload.content,
-        content_type="text",  # Assuming text for now, might need adjustment
+        content_type="text",
         content_attributes={
             "source": "frontend",
             "channel_type": (
@@ -183,7 +182,6 @@ async def create_outgoing_message(
         # Assuming get_or_create_message uses the provided 'db' session and doesn't commit itself
         message = await message_repo.get_or_create_message(db, message_data)
         if not message:
-            # This case might indicate an issue with get_or_create_message logic if it doesn't raise
             logger.error(
                 f"Failed to create message for conversation {conversation_id}, get_or_create returned None."
             )
@@ -210,12 +208,9 @@ async def create_outgoing_message(
             final_updated_conversation = updated_conv_reset
             logger.info(f"Unread count reset for conversation {conversation.id}")
         else:
-            # Log warning, but proceed. The count might have been 0 already.
-            # If find_conversation_by_id failed inside reset_..., it would return None.
             logger.warning(
                 f"Failed to reset unread count for conversation {conversation.id} (maybe already 0 or conversation not found during reset?)."
             )
-            # Keep the previously fetched conversation state if reset fails
 
         # 3. Update Status to HUMAN_ACTIVE if it was PENDING
         if original_status == ConversationStatusEnum.PENDING:
@@ -229,16 +224,14 @@ async def create_outgoing_message(
                 new_status=ConversationStatusEnum.HUMAN_ACTIVE,
             )
             if updated_conv_status:
-                final_updated_conversation = updated_conv_status  # Use the latest state
+                final_updated_conversation = updated_conv_status
                 logger.info(
                     f"Status updated for conversation {conversation.id} to HUMAN_ACTIVE"
                 )
             else:
-                # Log warning, but proceed. update_conversation_status should handle not found.
                 logger.warning(
                     f"Failed to update status for conversation {conversation.id} to HUMAN_ACTIVE."
                 )
-                # Keep the state from the reset step if status update fails
 
         # 4. Update Last Message Snapshot (using the final updated conversation state)
         logger.debug(
@@ -256,17 +249,14 @@ async def create_outgoing_message(
         logger.debug(
             f"Explicitly flushing session after conversation updates for {conversation.id}"
         )
-        # We need to flush the conversation object that was modified by update_last_message_snapshot
-        await db.flush(objects=[final_updated_conversation])
-        # Alternatively, a general flush might work: await db.flush()
+        await db.refresh(final_updated_conversation)
+        await db.flush()
         logger.debug(f"Session flushed after conversation update.")
 
     except Exception as e:
-        # Log the exception that caused the transaction to fail
         logger.exception(
             f"Database error during outgoing message creation/update for conversation {conversation_id}: {e}"
         )
-        # FastAPI will automatically trigger a rollback on the session 'db' here
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to save message or update conversation state.",
@@ -274,7 +264,6 @@ async def create_outgoing_message(
 
     # --- Post-Transaction Operations (Queueing & WebSockets) ---
     # These happen only if the database operations above were successful (no exception raised)
-
     # Enqueue the message ID for the sending worker
     try:
         # Ensure queue is connected (ideally handle connection more robustly)
@@ -287,20 +276,15 @@ async def create_outgoing_message(
                 logger.error(
                     "[queue] Failed to connect to response queue. Cannot enqueue message."
                 )
-                # Decide how critical this is. Maybe raise an error or just log.
-                # For now, log and continue, but the message won't be sent.
             else:
-                await queue.enqueue(
-                    {"message_id": str(message.id)}
-                )  # Ensure UUID is string for JSON
+
+                await queue.enqueue({"message_id": str(message.id)})
                 logger.info(f"[queue] Message {message.id} enqueued for delivery")
         else:
             await queue.enqueue({"message_id": str(message.id)})
             logger.info(f"[queue] Message {message.id} enqueued for delivery")
 
     except Exception as e:
-        # Log error, but don't fail the request, as the message is saved.
-        # Consider adding monitoring or retry logic for queue failures.
         logger.error(
             f"[queue] Failed to enqueue message {message.id} for delivery: {e}"
         )
@@ -309,11 +293,14 @@ async def create_outgoing_message(
     # Publish WebSocket events
     try:
         # Event for the specific conversation (new message)
+        logger.debug(f"Attempting to serialize message {message.id}...")
+        message_payload_ws = jsonable_encoder(message)
+        logger.debug(f"Message {message.id} serialized successfully.")
         await publish_to_conversation_ws(
             conversation_id=conversation.id,
             data={
-                "type": "new_message",  # Or maybe "outgoing_message" to be specific?
-                "payload": jsonable_encoder(message),  # Send the created message object
+                "type": "new_message",
+                "payload": message_payload_ws,
             },
         )
         logger.debug(
@@ -325,11 +312,16 @@ async def create_outgoing_message(
         parsed_conversation = parse_conversation_to_conversation_response(
             final_updated_conversation
         )
+        logger.debug(
+            f"Attempting to serialize conversation {parsed_conversation.id}..."
+        )
+        conversation_payload_ws = jsonable_encoder(parsed_conversation)
+        logger.debug(f"conversation {parsed_conversation.id} serialized successfully.")
         await publish_to_account_conversations_ws(
             final_updated_conversation.account_id,
             {
                 "type": "conversation_updated",
-                "payload": jsonable_encoder(parsed_conversation),
+                "payload": conversation_payload_ws,
             },
         )
         logger.debug(
@@ -337,13 +329,10 @@ async def create_outgoing_message(
         )
 
     except Exception as e:
-        # Log warning, WebSocket failures shouldn't block the response
         logger.warning(
             f"[ws] Failed to publish WebSocket events for message {message.id}: {e}"
         )
 
-    # Return the created message details
-    # Ensure the returned message object is compatible with MessageResponse schema
     return message
 
 
