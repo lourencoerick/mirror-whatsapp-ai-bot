@@ -10,7 +10,7 @@ from app.api.schemas.message import MessageCreate
 
 
 async def find_message_by_id(db: AsyncSession, message_id: UUID) -> Optional[Message]:
-    """Retrieves a message by ID with related contact loaded.
+    """Retrieve a message by its ID with related contact and inbox loaded.
 
     Args:
         db (AsyncSession): Database session.
@@ -42,14 +42,14 @@ async def find_messages_by_conversation(
     limit: int = 20,
     offset: int = 0,
 ) -> List[Message]:
-    """Retrieve messages belonging to a specific conversation, filtered by account.
+    """Retrieve messages belonging to a specific conversation filtered by account.
 
     Args:
         db (AsyncSession): SQLAlchemy database session.
         conversation_id (UUID): The ID of the conversation.
-        limit (int): Max number of messages to return (default: 20).
-        offset (int): How many messages to skip (for pagination).
         account_id (UUID): The account context to enforce RLS isolation.
+        limit (int): Maximum number of messages to return (default is 20).
+        offset (int): Number of messages to skip (for pagination).
 
     Returns:
         List[Message]: A list of messages ordered by message timestamp descending.
@@ -69,7 +69,9 @@ async def get_or_create_message(
     db: AsyncSession, message_data: MessageCreate
 ) -> Message:
     """Retrieve a message by inbox_id and source_id, or create one if it doesn't exist.
-    Ensures idempotent message handling.
+
+    Ensures idempotent message handling. Transaction finalization (commit, refresh, rollback)
+    should be handled by the caller.
 
     Args:
         db (AsyncSession): Database session.
@@ -77,11 +79,14 @@ async def get_or_create_message(
 
     Returns:
         Message: The Message object.
+
+    Raises:
+        ValueError: If source_id is not provided in message_data.
     """
     if not message_data.source_id:
         raise ValueError("source_id is required to identify messages")
 
-    # Check for existing message
+    # Check for an existing message
     result = await db.execute(
         select(Message)
         .options(selectinload(Message.contact))
@@ -93,7 +98,7 @@ async def get_or_create_message(
         logger.debug(f"[message] Reusing existing message (id={message.id})")
         return message
 
-    # Create new message
+    # Create new message if one doesn't exist
     new_message = Message(
         account_id=message_data.account_id,
         inbox_id=message_data.inbox_id,
@@ -113,10 +118,8 @@ async def get_or_create_message(
 
     db.add(new_message)
     await db.flush()
-    await db.commit()
-    await db.refresh(new_message)
+    # Removed commit and refresh: the caller should finalize the transaction.
     logger.info(f"[message] Created new message (id={new_message.id})")
-
     return new_message
 
 
@@ -130,21 +133,22 @@ async def get_messages_paginated(
     after_cursor: Optional[UUID] = None,
 ) -> List[Message]:
     """
-    Fetches a paginated list of messages for a conversation using cursor-based pagination.
+    Fetch a paginated list of messages for a conversation using cursor-based pagination.
 
-    - If 'before_cursor' is provided, fetches messages older than the cursor.
-    - If 'after_cursor' is provided, fetches messages newer than the cursor.
-    - If neither cursor is provided, fetches the latest messages.
+    If 'before_cursor' is provided, fetches messages older than the cursor.
+    If 'after_cursor' is provided, fetches messages newer than the cursor.
+    If neither cursor is provided, fetches the latest messages.
 
     Args:
-        db: The SQLAlchemy AsyncSession.
-        conversation_id: The ID of the conversation.
-        limit: The maximum number of messages to return.
-        before_cursor: The ID of the message before which to fetch older messages.
-        after_cursor: The ID of the message after which to fetch newer messages.
+        db (AsyncSession): The SQLAlchemy AsyncSession.
+        account_id (UUID): The account ID.
+        conversation_id (UUID): The conversation ID.
+        limit (int): The maximum number of messages to return.
+        before_cursor (Optional[UUID]): The ID of the message before which to fetch older messages.
+        after_cursor (Optional[UUID]): The ID of the message after which to fetch newer messages.
 
     Returns:
-        A list of Message objects, sorted chronologically (timestamp ASC, id ASC).
+        List[Message]: A list of Message objects sorted chronologically (timestamp ASC, id ASC).
     """
     # Base statement selecting messages for the conversation
     stmt = select(Message).where(
@@ -156,46 +160,35 @@ async def get_messages_paginated(
     target_cursor = after_cursor or before_cursor
 
     # Fetch the cursor message's timestamp and ID if a cursor is provided
-    # Needed for tuple comparison
     if target_cursor:
         cursor_stmt = select(Message.sent_at, Message.id).where(
             Message.id == target_cursor
-        )  # Assume timestamp is the primary sort key
+        )
         cursor_result = await db.execute(cursor_stmt)
         cursor_data = cursor_result.first()
         if not cursor_data:
-            # Cursor message not found, return empty list or raise error?
-            # Returning empty is usually safer for pagination.
             logger.info(f"Cursor message {target_cursor} not found.")
             return []
         cursor_timestamp, cursor_id = cursor_data
 
     # --- Filtering ---
     if before_cursor:
-        # Fetch messages chronologically *before* the cursor
-        # WHERE (timestamp < cursor_timestamp) OR (timestamp == cursor_timestamp AND id < cursor_id)
-        # Using tuple comparison for conciseness: (timestamp, id) < (cursor_timestamp, cursor_id)
+        # Fetch messages chronologically before the cursor using tuple comparison.
         print(f"Fetching messages before cursor {before_cursor}")
         stmt = stmt.where(
             tuple_(Message.sent_at, Message.id) < (cursor_timestamp, cursor_id)
         )
-        # Order by most recent first (DESC) to get the ones right before the cursor
         stmt = stmt.order_by(desc(Message.sent_at), desc(Message.id))
-
     elif after_cursor:
-        # Fetch messages chronologically *after* the cursor
-        # WHERE (sent_at > cursor_sent_at) OR (sent_at == cursor_timestamp AND id > cursor_id)
-        # Using tuple comparison: (sent_at, id) > (cursor_timestamp, cursor_id)
+        # Fetch messages chronologically after the cursor using tuple comparison.
         print(f"Fetching messages after cursor {after_cursor}")
         stmt = stmt.where(
             tuple_(Message.sent_at, Message.id) > (cursor_timestamp, cursor_id)
         )
-        # Order chronologically (ASC) - already the desired order for newer messages
         stmt = stmt.order_by(asc(Message.sent_at), asc(Message.id))
     else:
-        # --- Default Case: No Cursor (Fetch Latest) ---
+        # Default case: no cursor provided, fetch latest messages.
         print("Fetching latest messages (no cursor)")
-        # Order by most recent first (DESC)
         stmt = stmt.order_by(desc(Message.sent_at), desc(Message.id))
 
     # --- Apply Limit ---
@@ -206,11 +199,9 @@ async def get_messages_paginated(
     messages = result.scalars().all()
 
     # --- Reverse results if needed ---
-    # If fetching 'before' or 'latest' (default), we ordered DESC,
-    # so reverse the list to get chronological ASC order for the final result.
     if before_cursor or not after_cursor:
         messages.reverse()
-        print(f"Reversed message list for 'before' or 'latest' fetch.")
+        print("Reversed message list for 'before' or 'latest' fetch.")
 
     print(f"Returning {len(messages)} messages.")
     return messages
