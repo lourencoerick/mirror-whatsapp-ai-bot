@@ -71,6 +71,9 @@ def parse_conversation_to_conversation_response(
     last_message = attrs.get("last_message", {})
     return ConversationSearchResult(
         id=conversation.id,
+        status=conversation.status,
+        unread_agent_count=conversation.unread_agent_count,
+        is_bot_active=conversation.is_bot_active,
         contact=ContactBase(
             name=attrs.get("contact_name"),
             phone_number=attrs.get("phone_number"),
