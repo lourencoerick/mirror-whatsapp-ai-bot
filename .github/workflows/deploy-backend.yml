@@ -5,7 +5,7 @@ name: Build and Push Backend Docker Image
 on:
   push:
     branches:
-      - main # Triggers on push to the main branch...
+      - master
     paths:
       - 'backend/**'    # ...ONLY IF there are changes INSIDE the 'backend' folder
       - '.github/workflows/deploy-backend.yml' # Optional: Triggers if the workflow file itself changes
