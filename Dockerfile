@@ -21,6 +21,9 @@ COPY ./backend/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
+
+ENV PYTHONPATH /workspace/backend
+
 # --- Final Setup ---
 # Specify the port that the container will expose
 EXPOSE 8000
