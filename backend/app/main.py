@@ -94,10 +94,11 @@ allowed_origins_str = (
     if settings.FRONTEND_ALLOWED_ORIGINS is not None
     else "http://localhost:3000"
 )
+allowed_origins_list = [origin.strip() for origin in allowed_origins_str.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[allowed_origins_str],  # Restrict in production
+    allow_origins=allowed_origins_list,  # Restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
