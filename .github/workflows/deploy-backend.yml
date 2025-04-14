@@ -30,7 +30,7 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
           service_account: ${{ vars.GCP_SA_EMAIL }}
-          audience: 'https://github.com/${{ github.github_org || github.repository_owner }}/${{ github.repository }}'
+          audience: 'https://github.com/${{ github.github_org || github.repository_owner }}'
             
       # --- Configure Docker and Authenticate with Artifact Registry ---
       - name: Set up Docker Buildx
