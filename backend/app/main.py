@@ -89,11 +89,15 @@ app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
 # --- Middleware ---
 # CORS Middleware (Essential for frontend interaction)
-frontend_domain = os.getenv("FRONTEND_DOMAIN", "http://localhost:3000")
-frontend_domain = "http://localhost:3000"
+allowed_origins_str = (
+    settings.FRONTEND_ALLOWED_ORIGINS
+    if settings.FRONTEND_ALLOWED_ORIGINS is not None
+    else "http://localhost:3000"
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_domain],  # Restrict in production
+    allow_origins=[allowed_origins_str],  # Restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

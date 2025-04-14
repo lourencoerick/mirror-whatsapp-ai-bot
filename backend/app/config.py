@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List
 
 
 class Settings(BaseSettings):
@@ -12,7 +12,16 @@ class Settings(BaseSettings):
     BACKEND_BASE_URL: str = "http://localhost:8000"
 
     # --- Database ---
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/chatbotdb"
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://user:password@whatsapp_bot_db_dev:5432/chatbotdb"
+    )
+    # DATABASE_URL: str = (
+    #     "postgresql+psycopg2://user:password@whatsapp_bot_db_dev:5432/chatbotdb"
+    # )
+    # DATABASE_URL=
+    # DATABASE_URL_: str = (
+    #     "postgresql+asyncpg://user:password@whatsapp_bot_db_dev:5432/chatbotdb"
+    # )
 
     # --- Redis ---
     # Sugestão: Geralmente apenas REDIS_URL é suficiente, a menos que
@@ -36,6 +45,13 @@ class Settings(BaseSettings):
     CLERK_JWKS_URL: str = "clerk-jwks-url"
     CLERK_ISSUER: str = "clerk-issuer"
     CLERK_AUDIENCE: str = "clerk-aud"
+
+    # --- Storage ---
+    GCS_BUCKET_NAME: str = "wappbot-import-bucket"
+    GOOGLE_APPLICATION_CREDENTIALS: str = "credentials.json"
+
+    FRONTEND_ALLOWED_ORIGINS: Optional[List[str]] = None
+
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True
