@@ -8,6 +8,8 @@ on:
       - master
     paths:
       - 'backend/**'    # ...ONLY IF there are changes INSIDE the 'backend' folder
+      - 'Dockerfile'   # ...ONLY IF the Dockerfile itself changes
+      - 'docker-compose.dev.yml' # Optional: Triggers if the docker-compose file itself changes
       - '.github/workflows/deploy-backend.yml' # Optional: Triggers if the workflow file itself changes
 
   # Optional: Also trigger manually
