@@ -1,10 +1,10 @@
-# Base do DevContainer com Python 3.11
+# DevContainer Base with Python 3.11
 FROM mcr.microsoft.com/vscode/devcontainers/python:0-3.11-bullseye
 
-# Define o diretório de trabalho
+# Set the working directory
 WORKDIR /workspace
 
-# Atualiza os pacotes do sistema e instala dependências essenciais
+# Update system packages and install essential dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     build-essential \
@@ -15,8 +15,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     redis-tools && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Copia os arquivos do projeto para dentro do container
+# --- Python Dependencies Installation ---
+COPY ./backend/requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# --- Final Setup ---
+# Specify the port that the container will expose
+EXPOSE 8000
+
+# Copy the project files into the container
 COPY . .
 
-# Define o usuário padrão
-CMD ["bash"]
+# Set the default user command
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

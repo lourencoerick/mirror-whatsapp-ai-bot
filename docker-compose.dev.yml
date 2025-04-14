@@ -13,7 +13,7 @@ services:
       - chatbot-network
     environment:
       PYTHONPATH: /workspace/backend/app
-      DATABASE_URL: postgresql://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@database:5432/${POSTGRES_DB:-chatbotdb}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-user}:${POSTGRES_PASSWORD:-password}@database:5432/${POSTGRES_DB:-chatbotdb}
       REDIS_URL: redis://redis:6379/0
     depends_on:
       database:
@@ -39,7 +39,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-chatbotdb}"]
       interval: 10s
       timeout: 5s
       retries: 5
