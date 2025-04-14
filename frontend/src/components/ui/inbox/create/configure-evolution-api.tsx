@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Terminal, CheckCircle, RefreshCw, WifiOff } from 'lucide-react';
 import { useInboxSocket } from '@/hooks/use-evolution-inbox-socket'; // Ensure correct path
 
+import { Event as RwsEvent } from 'reconnecting-websocket'; 
 // Type definitions
 type ConnectionStatus = 'IDLE' | 'CREATING_INSTANCE' | 'FETCHING_QR' | 'WAITING_SCAN' | 'CONNECTED' | 'ERROR' | 'TIMEOUT' | 'SOCKET_ERROR';
 
@@ -31,7 +32,7 @@ interface ConfigureEvolutionApiStepProps {
     onConnectionSuccess: () => void; // Still useful for feedback
     onValidityChange?: (isValid: boolean) => void; // Optional for editing, indicates connection status
     onStatusChange?: (status: ConnectionStatus, error?: string | null) => void; // *** NEW: More granular status reporting ***
-    // isLoading prop removed as internal status is more detailed
+    isLoading?: boolean; // Optional: Loading state for parent component
 }
 
 /**
@@ -92,7 +93,7 @@ export const ConfigureEvolutionApiStep: React.FC<ConfigureEvolutionApiStepProps>
         updateStatus('ERROR', msg);
     }, [updateStatus]);
 
-    const handleSocketError = useCallback((_event?: Event) => {
+    const handleSocketError = useCallback((_event?: RwsEvent) => {
         const msg = "Erro de conexão com o servidor de atualizações. Verifique sua conexão.";
         updateStatus('SOCKET_ERROR', msg);
     }, [updateStatus]);
@@ -158,7 +159,7 @@ export const ConfigureEvolutionApiStep: React.FC<ConfigureEvolutionApiStepProps>
             });
             const data: EvolutionInstanceDetails = await response.json();
             if (!response.ok) {
-                throw new Error(data.detail || 'Falha ao criar instância no backend.');
+                throw new Error('Falha ao criar instância no backend.');
             }
             if (!data.id) {
                 throw new Error('Resposta inválida (sem ID) do backend.');
