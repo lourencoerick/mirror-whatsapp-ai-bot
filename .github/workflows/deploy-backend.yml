@@ -28,9 +28,10 @@ jobs:
       - id: 'auth'
         uses: 'google-github-actions/auth@v2'
         with:
-          workload_identity_provider: 'projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/providers/PROVIDER_ID' # Get from Terraform output 'wif_provider_name'
-          service_account: 'github-actions-sa-dev@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com' # Get from Terraform output 'github_actions_service_account_email'
-
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          audience: ${{ vars.GCP_WIF_PROVIDER_NAME }}
+            
       # --- Configure Docker and Authenticate with Artifact Registry ---
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
