@@ -5,7 +5,6 @@ name: Build and Push Backend Docker Image
 on:
   push:
     branches:
-      - feat/converation_filters
       - master
     paths:
       - 'backend/**'    # ...ONLY IF there are changes INSIDE the 'backend' folder
