@@ -33,7 +33,6 @@ class Settings(BaseSettings):
 
     # --- Evolution API ---
     EVOLUTION_API_KEY: str = "your-api-key"
-    EVOLUTION_BACKEND_API_KEY: str = "your-api-key"
     EVOLUTION_API_SHARED_URL: str = "http://localhost:8080"
     EVOLUTION_INSTANCE: str = "680df327-c714-40a3-aec5-86ccbb57fa19"
     SECRET_KEY_FOR_ENCRYPTION: str = (
