@@ -149,10 +149,12 @@ const ContactImportDialog: React.FC = () => {
                 } catch { /* Ignore */ }
                 throw new Error(errorText);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error submitting file:", error);
-            setMessage({ text: `Erro ao enviar arquivo: ${error.message || 'Tente novamente.'}`, type: 'error' });
-        } finally {
+            const errorText = error instanceof Error ? error.message : 'Tente novamente.';
+            setMessage({ text: `Erro ao enviar arquivo: ${errorText}`, type: 'error' });
+          }
+           finally {
             setIsSubmitting(false);
         }
     };

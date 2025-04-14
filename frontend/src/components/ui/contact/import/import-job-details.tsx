@@ -31,6 +31,7 @@ const JobStatusDetails: React.FC<JobStatusDetailsProps> = ({ jobId, fetchFn }) =
 
     // Fetcher function specific to this component
     const fetcher = (
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         [_url, currentJobId]: [string, string]
       ): Promise<ContactImportJobStatusResponse> => {
         // Use the fetchFn passed as a prop

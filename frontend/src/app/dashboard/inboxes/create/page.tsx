@@ -29,7 +29,7 @@ const WIZARD_STEPS = [
 ];
 
 type ChannelType = 'whatsapp_evolution_api' | 'whatsapp_cloud_api' | string;
-interface EvolutionApiDetails { instance_id: string; shared_api_url: string; logical_token_encrypted?: string; }
+interface EvolutionApiDetails { id: string; shared_api_url?: string; logical_token_encrypted?: string; }
 interface CloudApiDetails { phoneNumberId: string; wabaId: string; accessToken: string; verifyToken: string; }
 interface ConfiguredChannelDetails { evolution?: EvolutionApiDetails; cloud?: CloudApiDetails; }
 interface CreateInboxResponse { id: string; name: string; channel_type: string; }
@@ -154,7 +154,7 @@ export default function CreateInboxPage() {
         if (!selectedChannelType) { setFormError("O tipo de canal não foi selecionado."); setCurrentStep(1); return; }
         if (!configuredDetails) { setFormError("Os detalhes de configuração do canal estão faltando."); setCurrentStep(3); return; }
 
-        let channelDetailsPayload: EvolutionApiDetails | CloudApiDetails | {} = {};
+        let channelDetailsPayload: Partial<EvolutionApiDetails> | Partial<CloudApiDetails> = {};
         let isValidPayload = false;
 
         if (selectedChannelType === 'whatsapp_evolution_api' && configuredDetails.evolution) {
@@ -214,13 +214,16 @@ export default function CreateInboxPage() {
             });
             setTimeout(() => router.push('/dashboard/inboxes'), 3000);
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error creating inbox:", err);
-            const errorMsg = err.message || "Ocorreu um erro inesperado."; 
+            let errorMsg = "Ocorreu um erro inesperado.";
+            if (err instanceof Error && err.message) {
+              errorMsg = err.message;
+            }
             toast.error("Falha na Criação", { id: toastId, description: errorMsg });
             setFormError(errorMsg);
             setIsLoading(false);
-        }
+          }
     }, [
         inboxName, selectedChannelType, configuredDetails, isEvolutionConnected,
         authenticatedFetch, router

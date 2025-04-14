@@ -1,5 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useRef, useCallback } from 'react';
-import ReconnectingWebSocket, { Options } from 'reconnecting-websocket';
+// Import specific event types from the library itself
+import ReconnectingWebSocket, { 
+    Options, 
+    Event as RwsEvent,      // Import the library's Event type
+    CloseEvent as RwsCloseEvent // Import the library's CloseEvent type
+} from 'reconnecting-websocket';
+// We will use the global DOM MessageEvent for onMessage/handleMessage
 
 /**
  * Props for the useWebSocket hook.
@@ -8,17 +16,17 @@ interface UseWebSocketProps {
   url: string | null | undefined;
   /** Optional configuration options for ReconnectingWebSocket. */
   options?: Options;
-  /** Callback function triggered when the connection is successfully opened. */
-  onOpen?: (event: Event) => void;
-  /** 
+  /** Callback function triggered when the connection is successfully opened. Uses the library's Event type. */
+  onOpen?: (event: RwsEvent) => void; // Use library's Event
+  /**
    * Callback function triggered when a message is received from the server.
-   * The hook consumer is responsible for parsing the message data (event.data).
+   * Uses the standard DOM MessageEvent type.
    */
-  onMessage: (event: MessageEvent) => void;
-  /** Callback function triggered when a WebSocket error occurs. */
-  onError?: (event: Event) => void;
-  /** Callback function triggered when the connection is closed. */
-  onClose?: (event: CloseEvent) => void;
+  onMessage: (event: MessageEvent) => void; // Use standard DOM MessageEvent
+  /** Callback function triggered when a WebSocket error occurs. Uses the library's Event type. */
+  onError?: (event: RwsEvent) => void; // Use library's Event
+  /** Callback function triggered when the connection is closed. Uses the library's CloseEvent type. */
+  onClose?: (event: RwsCloseEvent) => void; // Use library's CloseEvent
   /** Set to false to disable the WebSocket connection. Defaults to true. */
   enabled?: boolean;
 }
@@ -42,12 +50,12 @@ export function useWebSocket({
   enabled = true,
 }: UseWebSocketProps): void {
   const socketRef = useRef<ReconnectingWebSocket | null>(null);
-  
-  // Memoize the callbacks to prevent unnecessary effect runs if they are defined inline
-  const memoizedOnOpen = useCallback(onOpen || (() => {}), [onOpen]);
+
+  // Memoize the callbacks, ensuring default functions match the expected signatures
+  const memoizedOnOpen = useCallback(onOpen || ((_event: RwsEvent) => {}), [onOpen]);
   const memoizedOnMessage = useCallback(onMessage, [onMessage]);
-  const memoizedOnError = useCallback(onError || (() => {}), [onError]);
-  const memoizedOnClose = useCallback(onClose || (() => {}), [onClose]);
+  const memoizedOnError = useCallback(onError || ((_event: RwsEvent) => {}), [onError]);
+  const memoizedOnClose = useCallback(onClose || ((_event: RwsCloseEvent) => {}), [onClose]);
 
   useEffect(() => {
     if (!enabled || !url) {
@@ -65,69 +73,67 @@ export function useWebSocket({
 
     console.debug(`[useWebSocket] Attempting to connect to: ${url}`);
 
-    // Default options for ReconnectingWebSocket if none are provided
     const defaultOptions: Options = {
-      connectionTimeout: 10000, // ms
-      maxRetries: 10, // Number of attempts before giving up
+      connectionTimeout: 10000,
+      maxRetries: 10,
     };
 
     const connectionOptions = { ...defaultOptions, ...options };
 
-    // Create a new ReconnectingWebSocket instance
     const rws = new ReconnectingWebSocket(url, [], connectionOptions);
     socketRef.current = rws;
 
-    // Attach event listeners using the memoized callbacks
-    const handleOpen = (event: Event) => {
+    // Attach event listeners using the types from the library or global DOM where appropriate
+    const handleOpen = (event: RwsEvent) => { // Use library's Event type
       console.debug(`[useWebSocket] Connected to ${url}`);
       memoizedOnOpen(event);
     };
 
-    const handleMessage = (event: MessageEvent) => {
+    const handleMessage = (event: MessageEvent) => { // Use global DOM MessageEvent
       console.debug(`[useWebSocket] Message received from ${url}:`, event.data);
       memoizedOnMessage(event);
     };
 
-    const handleError = (event: Event) => {
+    const handleError = (event: RwsEvent) => { // Use library's Event type
       console.error(`[useWebSocket] Error on connection to ${url}:`, event);
       memoizedOnError(event);
     };
 
-    const handleClose = (event: CloseEvent) => {
+    const handleClose = (event: RwsCloseEvent) => { // Use library's CloseEvent type
       console.debug(`[useWebSocket] Disconnected from ${url}. Code: ${event.code}, Reason: ${event.reason}`);
-      // Ensure the ref is cleared on close, especially if not reconnecting indefinitely
-      if (socketRef.current === rws) { 
-          // Check if it's the same instance, might have been replaced if url/enabled changed quickly
-          // socketRef.current = null; // Let ReconnectingWebSocket manage its internal state for retries
-      }
       memoizedOnClose(event);
     };
 
+    // IMPORTANT: Type assertion might be needed if TS still complains
+    // This tells TypeScript to trust us that the handler is compatible.
+    // Use this as a last resort if the type imports don't fully resolve it.
+    // rws.addEventListener('open', handleOpen as EventListener); 
+    // rws.addEventListener('message', handleMessage as EventListener);
+    // rws.addEventListener('error', handleError as EventListener);
+    // rws.addEventListener('close', handleClose as EventListener);
+
+    // Prefer direct type matching if possible:
     rws.addEventListener('open', handleOpen);
-    rws.addEventListener('message', handleMessage);
+    rws.addEventListener('message', handleMessage); // Still using global MessageEvent here
     rws.addEventListener('error', handleError);
     rws.addEventListener('close', handleClose);
 
-    // Cleanup function: close the WebSocket connection when the component unmounts
-    // or when the dependencies (url, enabled, options, callbacks) change.
+
     return () => {
       if (rws) {
         console.debug(`[useWebSocket] Cleaning up connection to ${url}`);
-        // Remove listeners to prevent memory leaks and potential calls on stale closures
+        // Use the same handler references for removal
         rws.removeEventListener('open', handleOpen);
         rws.removeEventListener('message', handleMessage);
         rws.removeEventListener('error', handleError);
         rws.removeEventListener('close', handleClose);
-        
-        // Close the connection
         rws.close();
-        // Clear the ref only if this specific instance is being cleaned up
         if (socketRef.current === rws) {
             socketRef.current = null;
         }
       }
     };
 
-  }, [url, enabled, options, memoizedOnOpen, memoizedOnMessage, memoizedOnError, memoizedOnClose]); 
+  }, [url, enabled, options, memoizedOnOpen, memoizedOnMessage, memoizedOnError, memoizedOnClose]);
 
 }

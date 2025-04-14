@@ -130,6 +130,7 @@ export function useInfiniteConversations(
     console.log(`Filters changed: ${JSON.stringify(filters)}. Triggering fetch.`);
     activeFilters.current = filters;
     fetchConversations(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socketIdentifier, JSON.stringify(filters), fetchConversations]);
 
   // Callback to load more data

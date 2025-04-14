@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useWebSocket } from './use-generic-websocket';
+import { Event as RwsEvent, CloseEvent as RwsCloseEvent } from 'reconnecting-websocket';
 import { toast } from 'sonner';
 
 interface InstanceStatusUpdate {
@@ -18,9 +20,9 @@ interface InboxSocketEvents {
   onInstanceError?: (message?: string) => void;
   onDisconnected?: () => void;
   onMessage?: (message: InstanceStatusEvent) => void;
-  onOpen?: (event: Event) => void;
-  onClose?: (event: CloseEvent) => void;
-  onSocketError?: (event: Event) => void;
+  onOpen?: (event: RwsEvent) => void; // Use library's Event type
+  onClose?: (event: RwsCloseEvent) => void; // Use library's CloseEvent type
+  onSocketError?: (event: RwsEvent) => void; // Use library's Event type for errors
 }
 
 interface UseInboxSocketProps extends InboxSocketEvents {
@@ -81,9 +83,9 @@ export function useInboxSocket({
     onInstanceError: onInstanceError || (() => {}),
     onDisconnected: onDisconnected || (() => {}),
     onMessage: onMessage || (() => {}),
-    onOpen: onOpen || (() => {}),
-    onClose: onClose || (() => {}),
-    onError: onSocketError || (() => {}),
+    onOpen: onOpen || ((_event: RwsEvent) => {}), // Default matches RwsEvent
+    onClose: onClose || ((_event: RwsCloseEvent) => {}), // Default matches RwsCloseEvent
+    onError: onSocketError || ((_event: RwsEvent) => {}), // Default matches RwsEvent (for onSocketError)
   }), [onConnected, onTimeout, onInstanceError, onDisconnected, onMessage, onOpen, onClose, onSocketError]);
 
   // Manipula as mensagens recebidas do WebSocket

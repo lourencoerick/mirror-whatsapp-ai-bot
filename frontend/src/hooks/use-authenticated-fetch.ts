@@ -6,6 +6,7 @@ import { log } from 'next-axiom';
 /**
  * Interface for fetch options, extending the standard RequestInit.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface AuthenticatedFetchOptions extends RequestInit {}
 
 /**

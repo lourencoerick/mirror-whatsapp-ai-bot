@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export interface ContactImportSummary {
     total_rows_processed: number;

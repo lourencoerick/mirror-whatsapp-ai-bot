@@ -63,8 +63,9 @@ export async function startConversation({
     revalidatePath(`/dashboard/conversations/${data.conversation_id}`);
 
     return { success: true, conversation_id: data.conversation_id };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[startConversation] Error:', e);
-    return { success: false, error: e.message };
-  }
+    const errorMsg = e instanceof Error ? e.message : 'Erro inesperado';
+    return { success: false, error: errorMsg };
+  }  
 }

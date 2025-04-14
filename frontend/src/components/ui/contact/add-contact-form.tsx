@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react'; 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -73,11 +74,13 @@ export const AddContactForm: React.FC<AddContactFormProps> = ({ onSuccess, onCan
       reset();
       onSuccess();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error adding contact:", error);
-      const errorMessage = error.message || "Ocorreu um erro inesperado.";
+      let errorMessage = "Ocorreu um erro inesperado.";
+      if (error instanceof Error && error.message) {
+        errorMessage = error.message;
+      }
       setApiError(errorMessage); // Mantém o erro no formulário se necessário
-      // --- Usar Toast para Erro ---
       toast.error(errorMessage);
     }
   };

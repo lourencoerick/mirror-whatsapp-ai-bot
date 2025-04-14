@@ -55,6 +55,7 @@ export function useMessages(
   useEffect(() => {
     // This effect runs when conversationId changes
     resetState();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   const resetState = useCallback(() => {

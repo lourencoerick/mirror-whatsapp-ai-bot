@@ -10,7 +10,6 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-    DialogClose
 } from "@/components/ui/dialog";
 import { StartConversationForm } from "@/components/ui/conversation/start-conversation-form"; 
 import { startConversation } from "@/lib/actions/start-conversation";
@@ -59,9 +58,12 @@ export default function StartConversationDialog({
       } else {
         toast.error("Falha ao iniciar", { id: toastId, description: res.error || "Não foi possível iniciar a conversa." });
       }
-    } catch (err: any) {
-      toast.error("Ocorreu um erro inesperado", { id: toastId, description: err.message || "Por favor, tente novamente." });
+    } catch (err: unknown) {
+      const errorDescription =
+        err instanceof Error ? err.message : "Por favor, tente novamente.";
+      toast.error("Ocorreu um erro inesperado", { id: toastId, description: errorDescription });
     }
+    
   };
 
   const dialogTitle = initialContact ? `Enviar para ${initialContact.name || initialContact.phone_number}` : "Iniciar Nova Conversa";

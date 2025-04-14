@@ -39,6 +39,7 @@ const ChatPage = () => {
   const messagesRef = useRef<HTMLDivElement>(null);
 
   const [input, setInput] = useState('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [conversationDetails, setConversationDetails] = useState<Conversation | null>(null);
@@ -113,23 +114,28 @@ const ChatPage = () => {
   }, [conversationId, conversationDetails]);
 
   // Handlers of input and  message sender 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value);
-
-  const handleSend = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const submitMessage = async () => {
     if (!input.trim() || !conversationId) return;
     try {
       await sendMessage(input.trim(), conversationId);
       setInput('');
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error sending message:', err);
     }
-  }, [input, conversationId, sendMessage]);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value);
+
+  const handleSend = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await submitMessage()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input, conversationId, submitMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend(e as any);
+      submitMessage();
     }
   };
 

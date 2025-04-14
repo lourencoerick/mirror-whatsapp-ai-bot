@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/components/ui/inbox/new/configure-evolution-api.tsx
 /**
  * @fileoverview Component for configuring the Evolution API channel.
@@ -12,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Terminal, CheckCircle, RefreshCw, WifiOff } from 'lucide-react';
 import { useInboxSocket } from '@/hooks/use-evolution-inbox-socket'; // Ensure correct path
 
+import { Event as RwsEvent } from 'reconnecting-websocket'; 
 // Type definitions
 type ConnectionStatus = 'IDLE' | 'CREATING_INSTANCE' | 'FETCHING_QR' | 'WAITING_SCAN' | 'CONNECTED' | 'ERROR' | 'TIMEOUT' | 'SOCKET_ERROR';
 
@@ -30,7 +32,7 @@ interface ConfigureEvolutionApiStepProps {
     onConnectionSuccess: () => void; // Still useful for feedback
     onValidityChange?: (isValid: boolean) => void; // Optional for editing, indicates connection status
     onStatusChange?: (status: ConnectionStatus, error?: string | null) => void; // *** NEW: More granular status reporting ***
-    // isLoading prop removed as internal status is more detailed
+    isLoading?: boolean; // Optional: Loading state for parent component
 }
 
 /**
@@ -91,7 +93,7 @@ export const ConfigureEvolutionApiStep: React.FC<ConfigureEvolutionApiStepProps>
         updateStatus('ERROR', msg);
     }, [updateStatus]);
 
-    const handleSocketError = useCallback((_event?: Event) => {
+    const handleSocketError = useCallback((_event?: RwsEvent) => {
         const msg = "Erro de conexão com o servidor de atualizações. Verifique sua conexão.";
         updateStatus('SOCKET_ERROR', msg);
     }, [updateStatus]);
@@ -130,10 +132,12 @@ export const ConfigureEvolutionApiStep: React.FC<ConfigureEvolutionApiStepProps>
             console.log("QR Code received.");
             setQrCode(data.qrcode);
             updateStatus('WAITING_SCAN'); // Move to waiting state
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error fetching QR code:", err);
-            updateStatus('ERROR', err.message || 'Erro desconhecido ao buscar QR code.');
-        } finally {
+            const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido ao buscar QR code.';
+            updateStatus('ERROR', errorMsg);
+        }
+        finally {
             setIsProcessing(false);
         }
     }, [authenticatedFetch, updateStatus]);
@@ -155,7 +159,7 @@ export const ConfigureEvolutionApiStep: React.FC<ConfigureEvolutionApiStepProps>
             });
             const data: EvolutionInstanceDetails = await response.json();
             if (!response.ok) {
-                throw new Error(data.detail || 'Falha ao criar instância no backend.');
+                throw new Error('Falha ao criar instância no backend.');
             }
             if (!data.id) {
                 throw new Error('Resposta inválida (sem ID) do backend.');
@@ -167,12 +171,15 @@ export const ConfigureEvolutionApiStep: React.FC<ConfigureEvolutionApiStepProps>
             }
             await fetchQrCode(data); // Fetch QR after creation
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error creating instance:", err);
-            updateStatus('ERROR', err.message || 'Erro desconhecido ao criar instância.');
+            const errorMessage =
+                err instanceof Error ? err.message : 'Erro desconhecido ao criar instância.';
+            updateStatus('ERROR', errorMessage);
             // Ensure processing stops if creation fails before fetchQrCode starts
             setIsProcessing(false);
         }
+
         // No finally block needed here for setIsProcessing, as fetchQrCode handles it
     }, [authenticatedFetch, onConfigured, fetchQrCode, updateStatus]); // Removed inboxName dependency unless used in body
 

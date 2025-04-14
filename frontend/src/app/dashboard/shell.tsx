@@ -57,15 +57,20 @@ export function DashboardShell({ children }: DashboardShellProps) {
                         try {
                             const errorData = await response.json();
                             errorDetail = errorData.detail || errorDetail;
-                        } catch (e) {}
+                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        } catch (e) { }
                         throw new Error(errorDetail);
                     }
                     const data: UserContextData = await response.json();
                     console.log("[DashboardShell] User context received:", data);
                     setUserContext(data);
-                } catch (error: any) {
+                } catch (error: unknown) {
                     console.error("[DashboardShell] Error fetching user context:", error);
-                    setContextError(error.message || "Failed to load user context");
+                    let errorMsg = "Failed to load user context";
+                    if (error instanceof Error && error.message) {
+                        errorMsg = error.message;
+                    }
+                    setContextError(errorMsg);
                     setUserContext(null);
                 } finally {
                     setContextLoading(false);

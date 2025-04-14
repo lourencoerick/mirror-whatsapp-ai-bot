@@ -6,13 +6,12 @@ import Link from 'next/link';
 import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch'; // Ajuste o caminho se necessário
 import { useLayoutContext } from '@/contexts/layout-context'; // Ajuste o caminho se necessário
 import { Inbox, InboxUpdatePayload } from '@/types/inbox'; // Ajuste o caminho se necessário
-import { EvolutionInstance, EvolutionInstanceStatus } from '@/types/evolution-instance'; // Ajuste o caminho se necessário
+import { EvolutionInstanceStatus } from '@/types/evolution-instance'; // Ajuste o caminho se necessário
 import * as evolutionInstanceService from '@/lib/api/evolution-instance'; // Ajuste o caminho se necessário
 import * as inboxService from '@/lib/api/inbox'; // Ajuste o caminho se necessário
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,8 +62,7 @@ export default function EditInboxPage() {
     const getEvolutionInstanceId = (): string | null => {
         if (inboxData?.channel_type === 'whatsapp_evolution_api') {
             if (inboxData.channel_details && typeof inboxData.channel_details === 'object') {
-                // *** Ajuste a chave 'id' se o backend usar outro nome em channel_details ***
-                const detailsId = (inboxData.channel_details as any).id;
+                const detailsId = inboxData.channel_details.id;
                 if (detailsId) return detailsId;
             }
             // Alternativa para channel_id se details não tiver 'id' ou estiver ausente
@@ -347,7 +345,7 @@ export default function EditInboxPage() {
                 <CardHeader>
                     <CardTitle>Configurações da Caixa de Entrada</CardTitle>
                     <CardDescription>
-                        Atualize o nome e as configurações da sua caixa de entrada '{inboxData.name}'.
+                        Atualize o nome e as configurações da sua caixa de entrada &apos;{inboxData.name}&apos;.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -474,7 +472,7 @@ export default function EditInboxPage() {
                         )}
                         {/* Exibe alerta se o ID da instância estiver ausente */}
                         {!evolutionInstanceId && (
-                             <Alert variant="warning">
+                             <Alert variant="default">
                                 <Terminal className="h-4 w-4" />
                                 <AlertTitle>ID da Instância Ausente</AlertTitle>
                                 <AlertDescription>

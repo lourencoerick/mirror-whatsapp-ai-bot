@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { cn } from "@/lib/utils"; 
 
 
-import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch'; 
+import { useAuthenticatedFetch, FetchFunction } from '@/hooks/use-authenticated-fetch'; 
 import { listContactImportJobs  } from '@/lib/api/contact'; 
 import { PaginatedImportJobListResponse, ImportJobListItem  } from '@/types/contact-import'; 
 
@@ -26,15 +26,15 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Info } from 'lucide-react';
-
+import { BadgeProps } from '@/components/ui/badge'
 const ITEMS_PER_PAGE = 10;
 
 /**
  * Maps job status strings to Badge variants.
  * @param {string | undefined} status - The job status string.
- * @returns {import('@/components/ui/badge').BadgeProps['variant']} The badge variant.
+ * @returns { BadgeProps } The badge variant.
  */
-const getStatusVariant = (status?: string): import('@/components/ui/badge').BadgeProps['variant'] => {
+const getStatusVariant = (status?: string): BadgeProps['variant'] => {
     switch (status?.toUpperCase()) {
         case 'COMPLETE':
             return 'success';
@@ -87,8 +87,9 @@ const ContactImportJobsTable: React.FC = () => {
      * @returns {Promise<PaginatedImportJobListResponse>} Paginated job list.
      */
     const fetcher = (
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         [_url, page, size]: [string, number, number],
-        fetchFn: any
+        fetchFn: FetchFunction
     ): Promise<PaginatedImportJobListResponse> => {
         return listContactImportJobs(page, size, fetchFn);
     };

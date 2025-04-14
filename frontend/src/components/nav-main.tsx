@@ -1,5 +1,3 @@
-/* eslint-disable react-hooks/rules-of-hooks */
-// src/components/layout/nav-main.tsx
 "use client";
 
 import * as React from "react";
@@ -130,6 +128,7 @@ function NavItemRenderer({ item, currentPathname }: { item: NavItem; currentPath
   const [isOpen, setIsOpen] = React.useState(() => isActive || isChildActive);
 
   // Effect to potentially update open state if path changes affect active status
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   React.useEffect(() => {
     // Use the updated helper functions here too
     const shouldBeOpen = isItemActive(item, currentPathname) || isAnyChildActive(item, currentPathname);

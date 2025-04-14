@@ -136,9 +136,13 @@ export default function ContactsPage() {
       mutate();
       toast.success(`Contato "${contactToDelete.name || contactToDelete.id}" excluído com sucesso!`);
       setContactToDelete(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error deleting contact:", err);
-      toast.error(`Erro ao excluir contato: ${err.message}`);
+      if (err instanceof Error) {
+        toast.error(`Erro ao excluir contato: ${err.message}`);
+      } else {
+        toast.error("Erro ao excluir contato: Erro desconhecido.");
+      }
     } finally {
       setIsDeleting(false);
     }

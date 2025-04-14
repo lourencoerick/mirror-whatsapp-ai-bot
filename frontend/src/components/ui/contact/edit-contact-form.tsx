@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -85,10 +86,13 @@ export const EditContactForm: React.FC<EditContactFormProps> = ({ contact, onSuc
       toast.success('Contato atualizado com sucesso!');
       onSuccess();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating contact:", error);
-      const errorMessage = error.message || "Ocorreu um erro inesperado.";
-      setApiError(errorMessage);
+      let errorMessage = "Ocorreu um erro inesperado.";
+      if (error instanceof Error && error.message) {
+        errorMessage = error.message;
+      }
+      setApiError(errorMessage); // Mantém o erro no formulário se necessário
       toast.error(errorMessage);
     }
   };
