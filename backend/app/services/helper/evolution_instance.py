@@ -23,7 +23,7 @@ async def create_logical_evolution_instance(
     Creates a logical Evolution API instance on a shared server.
     """
     shared_url = settings.EVOLUTION_API_SHARED_URL
-    backend_key = settings.EVOLUTION_BACKEND_API_KEY
+    backend_key = settings.EVOLUTION_API_KEY
 
     headers = {"apikey": backend_key, "Content-Type": "application/json"}
 
@@ -61,7 +61,7 @@ async def generate_connection_qrcode(
     shared_url: str, instance_name: str, api_key: str
 ) -> Dict[str, Any]:
     shared_api_url = settings.EVOLUTION_API_SHARED_URL
-    backend_key = settings.EVOLUTION_BACKEND_API_KEY
+    backend_key = settings.EVOLUTION_API_KEY
 
     headers = {
         "apikey": api_key,
@@ -160,7 +160,7 @@ async def fetch_evolution_connection_state(
     # TODO: remove the general EVOLUTION_API_SHARED_URL
     # after hosting the Evolution manager
     shared_api_url = settings.EVOLUTION_API_SHARED_URL
-    backend_key = settings.EVOLUTION_BACKEND_API_KEY
+    backend_key = settings.EVOLUTION_API_KEY
 
     shared_url = shared_api_url
 
