@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { cn } from "@/lib/utils"; 
 
 
-import { useAuthenticatedFetch } from '@/hooks/use-authenticated-fetch'; 
+import { useAuthenticatedFetch, FetchFunction } from '@/hooks/use-authenticated-fetch'; 
 import { listContactImportJobs  } from '@/lib/api/contact'; 
 import { PaginatedImportJobListResponse, ImportJobListItem  } from '@/types/contact-import'; 
 
@@ -87,8 +87,9 @@ const ContactImportJobsTable: React.FC = () => {
      * @returns {Promise<PaginatedImportJobListResponse>} Paginated job list.
      */
     const fetcher = (
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         [_url, page, size]: [string, number, number],
-        fetchFn: any
+        fetchFn: FetchFunction
     ): Promise<PaginatedImportJobListResponse> => {
         return listContactImportJobs(page, size, fetchFn);
     };

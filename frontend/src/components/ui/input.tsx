@@ -32,6 +32,7 @@ export const inputVariants = cn(
 /**
  * Props for the Input component, extending standard HTML input attributes.
  */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
 
 /**

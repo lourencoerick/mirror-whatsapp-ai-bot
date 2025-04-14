@@ -11,6 +11,7 @@ interface ButtonCodeblockProps {
   lang: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function CodeDisplayBlock({ code, lang }: ButtonCodeblockProps) {
   const [isCopied, setisCopied] = React.useState(false);
   const { theme } = useTheme();

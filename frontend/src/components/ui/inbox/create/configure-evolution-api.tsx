@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/components/ui/inbox/new/configure-evolution-api.tsx
 /**
  * @fileoverview Component for configuring the Evolution API channel.
@@ -130,10 +131,12 @@ export const ConfigureEvolutionApiStep: React.FC<ConfigureEvolutionApiStepProps>
             console.log("QR Code received.");
             setQrCode(data.qrcode);
             updateStatus('WAITING_SCAN'); // Move to waiting state
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error fetching QR code:", err);
-            updateStatus('ERROR', err.message || 'Erro desconhecido ao buscar QR code.');
-        } finally {
+            const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido ao buscar QR code.';
+            updateStatus('ERROR', errorMsg);
+        }
+        finally {
             setIsProcessing(false);
         }
     }, [authenticatedFetch, updateStatus]);
@@ -167,12 +170,15 @@ export const ConfigureEvolutionApiStep: React.FC<ConfigureEvolutionApiStepProps>
             }
             await fetchQrCode(data); // Fetch QR after creation
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error creating instance:", err);
-            updateStatus('ERROR', err.message || 'Erro desconhecido ao criar instância.');
+            const errorMessage =
+                err instanceof Error ? err.message : 'Erro desconhecido ao criar instância.';
+            updateStatus('ERROR', errorMessage);
             // Ensure processing stops if creation fails before fetchQrCode starts
             setIsProcessing(false);
         }
+
         // No finally block needed here for setIsProcessing, as fetchQrCode handles it
     }, [authenticatedFetch, onConfigured, fetchQrCode, updateStatus]); // Removed inboxName dependency unless used in body
 

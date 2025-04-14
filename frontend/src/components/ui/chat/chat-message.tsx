@@ -7,6 +7,7 @@ interface ChatMessageProps {
   loading?: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(({ content, direction, loading = false }, ref) => {
   return (
     <ChatBubble variant={direction === "out" ? "sent" : "received"}>

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import useSWR from 'swr';
-import { Check, Loader2, X } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 
 import { Button } from "@/components/ui/button";

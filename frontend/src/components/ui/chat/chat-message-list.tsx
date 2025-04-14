@@ -1,4 +1,6 @@
 import * as React from "react";
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 interface ChatMessageListProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 

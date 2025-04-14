@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Represents the structure of an Inbox object received from the API.
  */
@@ -6,6 +7,7 @@ export interface Inbox {
     account_id?: string; // UUID represented as string in JSON
     name: string;
     channel_type: string;
+    connection_status: string;
     channel_id?: string | null; // Optional identifier from the channel provider
     channel_details?: Record<string, any> | null; // Channel specific config
     enable_auto_assignment?: boolean; // Auto assignment setting

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useRef, useCallback } from 'react';
 import ReconnectingWebSocket, { Options } from 'reconnecting-websocket';
 

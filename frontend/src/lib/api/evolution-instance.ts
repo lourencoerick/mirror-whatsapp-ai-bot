@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { EvolutionInstance } from '@/types/evolution-instance'; 
 import { FetchFunction } from '@/hooks/use-authenticated-fetch'; 
 

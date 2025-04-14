@@ -58,6 +58,7 @@ export const ConfigureCloudApiStep: React.FC<ConfigureCloudApiStepProps> = ({
             setConfig(prev => ({ ...prev, verifyToken: suggestedVerifyToken }));
         }
         setIsMounted(true); // Mark as mounted after initial setup
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [suggestedVerifyToken]);
 
 
@@ -88,7 +89,7 @@ export const ConfigureCloudApiStep: React.FC<ConfigureCloudApiStepProps> = ({
 
 
     // ATTENTION: Get this base URL from the backend or an environment variable.
-    const webhookBaseUrl = process.env.NEXT_PUBLIC_WEBHOOK_BASE_URL || "http://localhost:8000";
+    const webhookBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
     const webhookUrl = `${webhookBaseUrl}/api/v1/webhooks/whatsapp/cloud`;
 
     return (
@@ -153,7 +154,7 @@ export const ConfigureCloudApiStep: React.FC<ConfigureCloudApiStepProps> = ({
             <Alert>
                  <Info className="h-4 w-4" />
                  <AlertDescription className="text-xs">
-                     Configure a seguinte URL de Webhook no seu App Meta (na seção WhatsApp > Configuração) e use o Token de Verificação definido acima:
+                     Configure a seguinte URL de Webhook no seu App Meta (na seção WhatsApp {'>'} Configuração) e use o Token de Verificação definido acima:
                      <code className="mt-1 block break-all rounded bg-muted px-2 py-1 font-mono text-xs">
                          {webhookUrl}
                      </code>
