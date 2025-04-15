@@ -85,7 +85,9 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI app instance
-app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
+# app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
+app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
+
 
 # --- Middleware ---
 # CORS Middleware (Essential for frontend interaction)
