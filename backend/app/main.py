@@ -210,6 +210,17 @@ async def test_clerk_connection():
             "message": "CLERK_JWKS_URL environment variable not set.",
         }
 
+    logger.info("Attempting connection to Google.com")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:  # Ou 30.0
+            response_google = await client.get("https://www.google.com")
+            response_google.raise_for_status()
+        logger.info(
+            f"Successfully connected to Google.com. Status: {response_google.status_code}"
+        )
+    except Exception as e:
+        logger.error(f"Error connecting to Google.com: {e}")
+
     logger.info(f"Testing connection to: {clerk_jwks_url}")
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:  # Timeout de 10s
@@ -221,6 +232,7 @@ async def test_clerk_connection():
         return {
             "status": "success",
             "message": f"Successfully connected. Status: {response.status_code}",
+            "googe_response": response_google.status_code,
         }
     except httpx.RequestError as exc:
         logger.error(f"HTTPX RequestError connecting to Clerk JWKS: {exc}")
@@ -231,6 +243,7 @@ async def test_clerk_connection():
             "status": "error",
             "message": f"RequestError: {exc}",
             "details": error_details,
+            "googe_response": response_google.status_code,
         }
     except Exception as exc:
         logger.error(f"Unexpected error connecting to Clerk JWKS: {exc}")
@@ -240,4 +253,5 @@ async def test_clerk_connection():
             "status": "error",
             "message": f"Unexpected error: {exc}",
             "details": error_details,
+            "googe_response": response_google.status_code,
         }
