@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI app instance
-# app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
+# app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan) # testing
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 
 
