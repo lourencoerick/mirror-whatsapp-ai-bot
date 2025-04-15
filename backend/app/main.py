@@ -211,6 +211,7 @@ async def test_clerk_connection():
         }
 
     logger.info("Attempting connection to Google.com")
+    response_google = None
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:  # Ou 30.0
             response_google = await client.get("https://www.google.com")
