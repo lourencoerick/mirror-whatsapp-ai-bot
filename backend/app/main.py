@@ -194,3 +194,50 @@ def get_authenticated_user_context(
         "active_account_id": active_account.id,
         "active_account_name": active_account.name,
     }
+
+
+import httpx
+import traceback
+
+
+@app.get("/test-clerk-connection", tags=["Test"])
+async def test_clerk_connection():
+    """Tries to connect to Clerk JWKS URL and returns status."""
+    clerk_jwks_url = os.getenv("CLERK_JWKS_URL")  # Pega da env var
+    if not clerk_jwks_url:
+        return {
+            "status": "error",
+            "message": "CLERK_JWKS_URL environment variable not set.",
+        }
+
+    logger.info(f"Testing connection to: {clerk_jwks_url}")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:  # Timeout de 10s
+            response = await client.get(clerk_jwks_url)
+            response.raise_for_status()  # Lança exceção para erros HTTP (4xx, 5xx)
+        logger.info(
+            f"Successfully connected to Clerk JWKS. Status: {response.status_code}"
+        )
+        return {
+            "status": "success",
+            "message": f"Successfully connected. Status: {response.status_code}",
+        }
+    except httpx.RequestError as exc:
+        logger.error(f"HTTPX RequestError connecting to Clerk JWKS: {exc}")
+        # Captura o traceback para mais detalhes
+        error_details = traceback.format_exc()
+        logger.error(f"Traceback: {error_details}")
+        return {
+            "status": "error",
+            "message": f"RequestError: {exc}",
+            "details": error_details,
+        }
+    except Exception as exc:
+        logger.error(f"Unexpected error connecting to Clerk JWKS: {exc}")
+        error_details = traceback.format_exc()
+        logger.error(f"Traceback: {error_details}")
+        return {
+            "status": "error",
+            "message": f"Unexpected error: {exc}",
+            "details": error_details,
+        }
