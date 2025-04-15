@@ -2,7 +2,7 @@ import axios, { InternalAxiosRequestConfig } from 'axios';
 import { getClientAuthToken } from './get-token';
 import qs from 'qs';
 
-const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:8000';
+const backendApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 const api = axios.create({
   baseURL: backendApiUrl,

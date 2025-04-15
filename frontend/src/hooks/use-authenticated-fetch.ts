@@ -79,7 +79,7 @@ export function useAuthenticatedFetch(): FetchFunction {
     }
     // 6. Construct the Full Backend URL
     // Read the backend base URL from frontend environment variables
-    const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:8000'; // Default for local dev
+    const backendApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'; // Default for local dev
     // Ensure the final URL is absolute
     const fullUrl = url.startsWith('http') ? url : (url.startsWith('/') ? `${backendApiUrl}${url}` : `${backendApiUrl}/${url}`);
 
