@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - master
+      - feat/frontend_deploy
     paths:
       - 'backend/**'    # ...ONLY IF there are changes INSIDE the 'backend' folder
       - 'Dockerfile'   # ...ONLY IF the Dockerfile itself changes
