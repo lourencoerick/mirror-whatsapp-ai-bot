@@ -212,7 +212,7 @@ async def test_clerk_connection():
 
     logger.info(f"Testing connection to: {clerk_jwks_url}")
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:  # Timeout de 10s
+        async with httpx.AsyncClient(timeout=30.0) as client:  # Timeout de 10s
             response = await client.get(clerk_jwks_url)
             response.raise_for_status()  # Lança exceção para erros HTTP (4xx, 5xx)
         logger.info(
