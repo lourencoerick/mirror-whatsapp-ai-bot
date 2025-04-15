@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     GCS_BUCKET_NAME: str = "wappbot-import-bucket"
     GOOGLE_APPLICATION_CREDENTIALS: str = "credentials.json"
 
-    FRONTEND_ALLOWED_ORIGINS: Optional[List[str]] = None
+    FRONTEND_ALLOWED_ORIGINS: Optional[str] = None
 
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
