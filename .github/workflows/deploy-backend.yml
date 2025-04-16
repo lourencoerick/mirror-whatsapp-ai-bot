@@ -1,18 +1,14 @@
-# .github/workflows/deploy-backend.yml
-
-
 name: Build and Push Backend Docker Image
 
 on:
   push:
     branches:
       - master
-      - feat/frontend_deploy
     paths:
-      - 'backend/**'    # ...ONLY IF there are changes INSIDE the 'backend' folder
-      - 'Dockerfile'   # ...ONLY IF the Dockerfile itself changes
-      - 'docker-compose.dev.yml' # Optional: Triggers if the docker-compose file itself changes
-      - '.github/workflows/deploy-backend.yml' # Optional: Triggers if the workflow file itself changes
+      - 'backend/**'    
+      - 'Dockerfile'   
+      - 'docker-compose.dev.yml' 
+      - '.github/workflows/deploy-backend.yml' 
 
   # Optional: Also trigger manually
   workflow_dispatch:
@@ -21,8 +17,8 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # Required for OIDC authentication with GCP WIF
-      contents: read  # Required to check out the code
+      id-token: write 
+      contents: read  
 
     steps:
       - name: Checkout code
