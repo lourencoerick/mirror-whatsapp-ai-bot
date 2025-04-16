@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI):
 
         logger.info("Application shutdown complete.")
 
-logger.info(f"Verifying: {settings.DATABASE_URL}")
+
 # Create FastAPI app instance
 # app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan) # testing
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
