@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     CLERK_WEBHOOK_SECRET: str = "your-secret-key"
     CLERK_JWKS_URL: str = "clerk-jwks-url"
     CLERK_ISSUER: str = "clerk-issuer"
-    CLERK_AUDIENCE: str = "clerk-aud"
+    CLERK_AUDIENCE: Optional[str] = None
 
     # --- Storage ---
     GCS_BUCKET_NAME: str = "wappbot-import-bucket"
