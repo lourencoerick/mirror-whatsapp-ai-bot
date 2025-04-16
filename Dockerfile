@@ -31,5 +31,9 @@ EXPOSE 8000
 # Copy the project files into the container
 COPY . .
 
+# --- Entrypoint Setup ---
+COPY ./backend/start.sh /start.sh
+RUN chmod +x /start.sh
+
 # Set the default user command
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/start.sh"]
