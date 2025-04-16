@@ -1,5 +1,6 @@
 from sqlalchemy.engine.url import URL
 from pydantic_settings import BaseSettings
+from loguru import logger
 from pydantic import Field
 from functools import lru_cache
 from typing import Optional, List
@@ -48,6 +49,7 @@ class Settings(BaseSettings):
 
     @property
     def DATABASE_URL(self) -> str:
+        logger.info(f"Vefirying: {self.DATABASE_PASSWORD}")
         return str(
             URL.create(
                 drivername="postgresql+asyncpg",
