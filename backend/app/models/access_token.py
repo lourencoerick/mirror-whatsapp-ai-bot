@@ -20,6 +20,6 @@ class AccessToken(BaseModel):
     owner_type = Column(String(255), nullable=True)
     owner_id = Column(UUID(as_uuid=True), default=uuid.uuid4)
     token = Column(String(255), nullable=True)
-    expires_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
     revoked = Column(Boolean, default=False, nullable=False)
     scopes = Column(String(255), nullable=True)

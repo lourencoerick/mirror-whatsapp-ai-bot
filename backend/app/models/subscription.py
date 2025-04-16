@@ -10,7 +10,7 @@ class Subscription(BaseModel):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.id"), nullable=False)
     pricing_version = Column(String(255), nullable=True)
-    expiry = Column(DateTime, nullable=True)
+    expiry = Column(DateTime(timezone=True), nullable=True)
     billing_plan = Column(String(255), nullable=True)
     stripe_customer_id = Column(String(255), nullable=True)
     state = Column(Integer, nullable=True)

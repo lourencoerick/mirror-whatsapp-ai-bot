@@ -60,8 +60,8 @@ class Conversation(BaseModel):
     assignee_id = Column(UUID(as_uuid=True), nullable=True)
     display_id = Column(String(255), nullable=True)
 
-    user_last_seen_at = Column(DateTime, nullable=True)
-    agent_last_seen_at = Column(DateTime, nullable=True)
+    user_last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    agent_last_seen_at = Column(DateTime(timezone=True), nullable=True)
 
     status = Column(
         SQLEnum(
