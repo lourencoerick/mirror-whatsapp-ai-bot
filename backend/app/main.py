@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
     # You might want to add error handling or checks for pubsub_task startup
 
     try:
-        yield
+        yield  # Application runs here
     finally:
         # Clean up resources on shutdown
         logger.info("Application shutdown sequence initiated...")
