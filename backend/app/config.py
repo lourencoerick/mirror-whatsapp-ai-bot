@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         logger.info(f"Vefirying: {self.DATABASE_PASSWORD}")
+        return f"postgresql+asyncpg://{self.DATABASE_USER}:{self.DATABASE_PASSWORD}@{self.DATABASE_HOST}:{self. DATABASE_PORT}/{self. DATABASE_NAME})"
         return str(
             URL.create(
                 drivername="postgresql+asyncpg",
