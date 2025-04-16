@@ -2,7 +2,7 @@ from sqlalchemy.engine.url import URL
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from functools import lru_cache
-from typing import Optional, List, 
+from typing import Optional, List
 
 
 class Settings(BaseSettings):
@@ -38,7 +38,9 @@ class Settings(BaseSettings):
 
     # --- Storage ---
     GCS_BUCKET_NAME: str = "wappbot-import-bucket"
-    GOOGLE_APPLICATION_CREDENTIALS: str = Field(..., env="GOOGLE_APPLICATION_CREDENTIALS")
+    GOOGLE_APPLICATION_CREDENTIALS: str = Field(
+        ..., env="GOOGLE_APPLICATION_CREDENTIALS"
+    )
 
     FRONTEND_ALLOWED_ORIGINS: Optional[str] = None
 
@@ -46,28 +48,27 @@ class Settings(BaseSettings):
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True
 
-
     @property
     def DATABASE_URL(self) -> str:
-        return str(URL.create(
-            drivername="postgresql+asyncpg",
-            username=self.DATABASE_USER,
-            password=self.DATABASE_PASSWORD,
-            host=self.DATABASE_HOST,
-            port=self.DATABASE_PORT,
-            database=self.DATABASE_NAME,
-        ))    
-    
+        return str(
+            URL.create(
+                drivername="postgresql+asyncpg",
+                username=self.DATABASE_USER,
+                password=self.DATABASE_PASSWORD,
+                host=self.DATABASE_HOST,
+                port=self.DATABASE_PORT,
+                database=self.DATABASE_NAME,
+            )
+        )
+
     @property
     def REDIS_URL(self) -> str:
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-    
+
     # --- Pydantic Settings Config ---
     class ConfigDict:
         case_sensitive = True
         extra = "ignore"
-
-
 
 
 @lru_cache()
