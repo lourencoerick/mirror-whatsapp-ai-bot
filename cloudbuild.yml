@@ -47,6 +47,8 @@ images:
   - '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:$SHORT_SHA'
   - '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:latest'
 
+options:
+  logging: CLOUD_LOGGING_ONLY
 
 timeout: 1200s
 
