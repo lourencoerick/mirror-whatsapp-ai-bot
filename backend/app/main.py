@@ -36,7 +36,7 @@ load_dotenv()
 
 # --- Initialization ---
 pubsub_bridge = RedisPubSubBridge()
-settings = get_settings()  # Load settings if needed for config below
+settings = get_settings()
 
 
 @asynccontextmanager
@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
             #     await pubsub_task
             # except asyncio.CancelledError:
             #     logger.info("PubSub bridge task cancelled.")
-            pass  # Assuming start() completes or is handled elsewhere
+            pass
 
         # Close ARQ Redis pool
         logger.info("Closing ARQ Redis pool...")
@@ -85,7 +85,6 @@ async def lifespan(app: FastAPI):
 
 
 # Create FastAPI app instance
-# app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan) # testing
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
 
@@ -102,7 +101,7 @@ logger.info(f"Allowed origins for CORS: {allowed_origins_list}")
 # CORS Middleware (Essential for frontend interaction)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins_list,  # Restrict in production
+    allow_origins=allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -164,7 +163,6 @@ app.include_router(ws_routes.router, prefix="", tags=["WebSockets"])
 # --- Root and Health Check ---
 @app.get("/", tags=["Root"])
 def home():
-    # Consider removing the Auth0 message if not using Auth0
     return {"message": f"{settings.APP_NAME} API"}
 
 
