@@ -1,0 +1,59 @@
+steps:
+  # 1. Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+        'build',
+        '-t',
+        '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:$SHORT_SHA', # Tag with commit SHA
+        '-t',
+        '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:latest',    # Also tag with latest
+        '-f', # Specify Dockerfile location if not at root
+        './Dockerfile', # Assumes Dockerfile is at the root of the repo being built
+        '.' # Build context is the root of the repo
+      ]
+    id: Build
+
+  # 2. Push the Docker image to Artifact Registry
+  # Uses the $SHORT_SHA tag first
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:$SHORT_SHA']
+    id: PushShaTag
+    waitFor: ['Build'] # Wait for build to complete
+
+  # Push the :latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:latest']
+    id: PushLatestTag
+    waitFor: ['PushShaTag'] # Wait for the SHA tag push
+
+  # 3. Deploy to Cloud Run using the specific SHA-tagged image
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args: [
+        'run',
+        'deploy',
+        '${_CLOUD_RUN_SERVICE}', # Service name from substitution
+        '--image=${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:$SHORT_SHA', # Deploy specific SHA
+        '--region=${_GCP_REGION}',
+        '--project=$PROJECT_ID',
+        '--service-account=${_CLOUD_RUN_SA}', # SA the Cloud Run service runs as
+        '--quiet' # Suppress interactive prompts
+      ]
+    id: Deploy
+    waitFor: ['PushLatestTag'] # Wait for push to complete
+
+# Define the images to be pushed by this build
+images:
+  - '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:$SHORT_SHA'
+  - '${_GCP_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO_ID}/${_IMAGE_NAME}:latest'
+
+
+timeout: 1200s
+
+# Define substitutions
+substitutions:
+  _GCP_REGION: us-central1 
+  _AR_REPO_ID: app-images-dev
+  _IMAGE_NAME: fastapi-backend
+  _CLOUD_RUN_SERVICE: fastapi-backend-dev
+  _CLOUD_RUN_SA: fastapi-backend-sa-dev@lambdalabs-gcp.iam.gserviceaccount.com
