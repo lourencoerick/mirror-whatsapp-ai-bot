@@ -38,9 +38,7 @@ class Settings(BaseSettings):
 
     # --- Storage ---
     GCS_BUCKET_NAME: str = "wappbot-import-bucket"
-    GOOGLE_APPLICATION_CREDENTIALS: str = Field(
-        ..., env="GOOGLE_APPLICATION_CREDENTIALS"
-    )
+    GOOGLE_APPLICATION_CREDENTIALS: str = "credentials.json"
 
     FRONTEND_ALLOWED_ORIGINS: Optional[str] = None
 
