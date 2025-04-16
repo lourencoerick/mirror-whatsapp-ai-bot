@@ -98,6 +98,8 @@ allowed_origins_str = (
 )
 allowed_origins_list = [origin.strip() for origin in allowed_origins_str.split(",")]
 
+logger.info(f"Allowed origins for CORS: {allowed_origins_list}")
+# CORS Middleware (Essential for frontend interaction)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins_list,  # Restrict in production
