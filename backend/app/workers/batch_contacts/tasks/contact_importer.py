@@ -71,7 +71,6 @@ async def _create_contact_in_db_async(
         return None
 
     try:
-        contact_data.identifier = normalized_phone
         contact_data.phone_number = normalized_phone
         new_contact = await contact_repo.create_contact(
             db=db, contact_data=contact_data, account_id=account_id
@@ -207,7 +206,6 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
                         contact_input = ContactCreate(
                             name=row["name"].strip(),
                             phone_number=cleaned_phone,
-                            identifier=cleaned_phone,
                             email=row.get("email", "").strip() or None,
                         )
 
