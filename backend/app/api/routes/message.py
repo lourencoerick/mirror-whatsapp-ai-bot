@@ -213,7 +213,11 @@ async def create_outgoing_message(
             )
 
         # 3. Update Status to HUMAN_ACTIVE if it was PENDING
-        if original_status == ConversationStatusEnum.PENDING:
+        if original_status in (
+            ConversationStatusEnum.OPEN,
+            ConversationStatusEnum.BOT,
+            ConversationStatusEnum.PENDING,
+        ):
             logger.debug(
                 f"Updating status for conversation {conversation.id} from PENDING to HUMAN_ACTIVE"
             )
