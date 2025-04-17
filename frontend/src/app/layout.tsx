@@ -2,6 +2,7 @@ import { type Metadata } from 'next'
 import {
   ClerkProvider,
 } from '@clerk/nextjs'
+import { ptBR } from "@clerk/localizations";
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 
@@ -27,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider afterSignOutUrl="/sign-in" afterMultiSessionSingleSignOutUrl="/sign-in">
+    <ClerkProvider afterSignOutUrl="/sign-in" afterMultiSessionSingleSignOutUrl="/sign-in" localization={ptBR}>
       <html lang="pt-BR">
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
           {children}
