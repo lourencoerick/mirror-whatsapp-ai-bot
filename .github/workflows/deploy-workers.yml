@@ -31,7 +31,7 @@ jobs:
             consumer:
               - 'backend/app/workers/consumer/**'
             response_sender:
-              - 'backend/app/workers/response-sender/**'
+              - 'backend/app/workers/response_sender/**'
             batch_contacts:
               - 'backend/app/workers/batch_contacts/**'
 
