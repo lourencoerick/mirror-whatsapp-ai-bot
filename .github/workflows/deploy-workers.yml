@@ -1,5 +1,3 @@
-
-
 name: Build and Push Worker Docker Images
 
 on:
@@ -7,92 +5,107 @@ on:
     branches:
       - master
       - feat/workers_deploy
+    # dispara se mudar qualquer coisa de workers, Dockerfile ou o próprio workflow
     paths:
-      - 'backend/app/workers/consumer/**'
-      - 'backend/app/workers/response-sender/**'
-      - 'backend/app/workers/batch_contacts/**'
+      - 'backend/app/workers/**'
       - 'backend/app/workers/Dockerfile'
       - '.github/workflows/deploy-workers.yml'
-
   workflow_dispatch:
 
 jobs:
-  build-and-push-workers:
+  # 1) Detecta alterações
+  detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      consumer:   ${{ steps.filter.outputs.consumer }}
+      response:   ${{ steps.filter.outputs.response_sender }}
+      batch:      ${{ steps.filter.outputs.batch_contacts }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Filtrar paths
+        uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            consumer:
+              - 'backend/app/workers/consumer/**'
+            response_sender:
+              - 'backend/app/workers/response-sender/**'
+            batch_contacts:
+              - 'backend/app/workers/batch_contacts/**'
+
+  # 2) Build & Push (um único job, mas cada step só roda se o filtro pedir)
+  build-and-push:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    if: >
+      needs.detect-changes.outputs.consumer == 'true' ||
+      needs.detect-changes.outputs.response == 'true' ||
+      needs.detect-changes.outputs.batch == 'true'
     permissions:
       id-token: write
-      contents: read 
+      contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- GCP Authentication via WIF ---
-      # Autentica usando Workload Identity Federation configurado no Terraform
-      - id: 'auth'
-        uses: 'google-github-actions/auth@v2'
+      # --- GCP Auth ---
+      - id: auth
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
-          service_account: ${{ vars.GCP_SA_EMAIL }} 
-          audience: 'https://github.com/${{ github.github_org || github.repository_owner }}'
+          service_account:          ${{ vars.GCP_SA_EMAIL }}
+          audience:                 https://github.com/${{ github.github_org || github.repository_owner }}
 
-      # --- Configure Docker and Authenticate with Artifact Registry ---
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Configure Docker for Artifact Registry
-        # Usa a variável de Actions para a região correta
         run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev
 
-      # --- Build and Push Images (Um passo por worker) ---
-
-      - name: Build and Push Consumer Worker
+      # --- Consumer Worker ---
+      - name: Build & Push Consumer
+        if: ${{ needs.detect-changes.outputs.consumer == 'true' }}
         env:
-          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_REGION:    ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
-          IMAGE_NAME: worker-consumer
+          AR_REPO_ID:     ${{ vars.AR_REPO_ID }}
+          IMAGE_NAME:     worker-consumer
         run: |
-          IMAGE_TAG=${{ github.sha }}
-          IMAGE_URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          echo "Building image: ${IMAGE_URL}:${IMAGE_TAG}"
+          TAG=${{ github.sha }}
+          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
+          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
+          docker push "${URL}:${TAG}"
+          docker push "${URL}:latest"
 
-          docker build -t "${IMAGE_URL}:${IMAGE_TAG}" -t "${IMAGE_URL}:latest" -f ./backend/app/workers/Dockerfile .
-          echo "Pushing image: ${IMAGE_URL}:${IMAGE_TAG}"
-          docker push "${IMAGE_URL}:${IMAGE_TAG}"
-          echo "Pushing image: ${IMAGE_URL}:latest"
-          docker push "${IMAGE_URL}:latest"
-
-      - name: Build and Push Response Sender Worker
+      # --- Response Sender Worker ---
+      - name: Build & Push Response Sender
+        if: ${{ needs.detect-changes.outputs.response == 'true' }}
         env:
-          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_REGION:    ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
-          IMAGE_NAME: worker-response-sender 
+          AR_REPO_ID:     ${{ vars.AR_REPO_ID }}
+          IMAGE_NAME:     worker-response-sender
         run: |
-          IMAGE_TAG=${{ github.sha }}
-          IMAGE_URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          echo "Building image: ${IMAGE_URL}:${IMAGE_TAG}"
+          TAG=${{ github.sha }}
+          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
+          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
+          docker push "${URL}:${TAG}"
+          docker push "${URL}:latest"
 
-          docker build -t "${IMAGE_URL}:${IMAGE_TAG}" -t "${IMAGE_URL}:latest" -f ./backend/app/workers/Dockerfile .
-          echo "Pushing image: ${IMAGE_URL}:${IMAGE_TAG}"
-          docker push "${IMAGE_URL}:${IMAGE_TAG}"
-          echo "Pushing image: ${IMAGE_URL}:latest"
-          docker push "${IMAGE_URL}:latest"
-
-      - name: Build and Push ARQ Worker
+      # --- ARQ / Batch Contacts Worker ---
+      - name: Build & Push Batch Contacts
+        if: ${{ needs.detect-changes.outputs.batch == 'true' }}
         env:
-          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_REGION:    ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
-          IMAGE_NAME: worker-arq 
+          AR_REPO_ID:     ${{ vars.AR_REPO_ID }}
+          IMAGE_NAME:     worker-arq
         run: |
-          IMAGE_TAG=${{ github.sha }}
-          IMAGE_URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          echo "Building image: ${IMAGE_URL}:${IMAGE_TAG}"
-
-          docker build -t "${IMAGE_URL}:${IMAGE_TAG}" -t "${IMAGE_URL}:latest" -f ./backend/app/workers/Dockerfile .
-          echo "Pushing image: ${IMAGE_URL}:${IMAGE_TAG}"
-          docker push "${IMAGE_URL}:${IMAGE_TAG}"
-          echo "Pushing image: ${IMAGE_URL}:latest"
-          docker push "${IMAGE_URL}:latest"
+          TAG=${{ github.sha }}
+          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
+          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
+          docker push "${URL}:${TAG}"
+          docker push "${URL}:latest"

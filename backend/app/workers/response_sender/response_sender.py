@@ -9,6 +9,7 @@ from app.services.sender.evolution import send_message as evolution_send_message
 from app.services.repository import message as message_repo
 
 
+# Testando
 class ResponseSender:
     """
     Background worker responsible for sending messages to external providers (e.g., Evolution).
