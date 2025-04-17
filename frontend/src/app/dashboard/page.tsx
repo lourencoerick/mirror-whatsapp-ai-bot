@@ -69,10 +69,10 @@ export default function DashboardPage() {
   const onboardingSteps: OnboardingStepProps[] = [
     {
       icon: Inbox,
-      title: "1. Conectar Inbox", // Título revisado
+      title: "1. Caixa de Entrada", // Título revisado
       description: "Vincule seu canal do WhatsApp (Cloud API ou Evolution API) para começar a enviar e receber mensagens.",
       link: "/dashboard/inboxes",
-      linkLabel: "Criar Inbox", // Label revisado
+      linkLabel: "Criar Caixa de Entrada", // Label revisado
     },
     {
       icon: UserPlus,
