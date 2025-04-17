@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -342,7 +341,7 @@ export default function EditInboxPage() {
                 <CardHeader>
                     <CardTitle>Configurações da Caixa de Entrada</CardTitle>
                     <CardDescription>
-                        Atualize o nome e as configurações da sua caixa de entrada '{inboxData.name}'.
+                        Atualize o nome e as configurações da sua caixa de entrada &apos;{inboxData.name}&apos;.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
