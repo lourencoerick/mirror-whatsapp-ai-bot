@@ -103,7 +103,7 @@ export default function DashboardPage() {
       {/* Seção de Onboarding */}
       <Card className="bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-purple-950">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">Boas-vindas! Vamos começar</CardTitle>
+          <CardTitle className="text-2xl font-bold">Seja bem-vindo(a), vamos começar!</CardTitle>
           <CardDescription>
             Siga estes passos para configurar sua plataforma de automação de vendas pelo WhatsApp.
           </CardDescription>
