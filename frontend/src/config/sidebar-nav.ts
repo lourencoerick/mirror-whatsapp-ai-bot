@@ -96,6 +96,7 @@ import {
         { name: 'Templates de Mensagem', href: '/dashboard/seller-setup/templates', icon: FileText },
         { name: 'Base de Conhecimento', href: '/dashboard/seller-setup/documents', icon: BookOpen },
       ],
+      hidden: true,
     },
     {
       name: 'Desempenho',
