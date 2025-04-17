@@ -8,7 +8,7 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { GalleryVerticalEnd } from "lucide-react"; // Example icon
+import { UserCheck } from "lucide-react"; // Example icon
 
 // --- Configuration Import ---
 import { sidebarNavItems } from "@/config/sidebar-nav";
@@ -19,9 +19,9 @@ import { NavMain, type NavItem as NavMainItem } from "@/components/nav-main";
 // TODO: use the account route to get the data from backend
 // or use org hook from clerk
 const accountData = {
-  name: "Acme Inc",
-  logo: GalleryVerticalEnd,
-  plan: "Enterprise",
+  name: "Conta Individual", 
+  logo: UserCheck,
+  plan: "Plano PME",
 };
 
 // --- Helper Function for Data Mapping ---
