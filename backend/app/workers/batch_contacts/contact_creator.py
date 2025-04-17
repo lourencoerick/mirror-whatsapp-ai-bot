@@ -41,3 +41,10 @@ class WorkerSettings:
 
     async def on_shutdown(ctx):
         logger.info("Worker shutting down...")
+
+
+if __name__ == "__main__":
+    import asyncio
+    from arq.worker import create_worker
+
+    asyncio.run(create_worker(WorkerSettings).main())
