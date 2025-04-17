@@ -273,7 +273,7 @@ const ContactImportJobsTable: React.FC = () => {
                     <TableCaption className="mt-4 mb-2 px-4">
                         {totalItems > 0
                             ? `Mostrando ${startItem}-${endItem} de ${totalItems} importações.`
-                            : 'Nenhuma importação para mostrar.'}
+                            : ''}
                     </TableCaption>
                     <TableHeader>
                         <TableRow>
