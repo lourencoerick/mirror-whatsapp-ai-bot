@@ -214,6 +214,7 @@ export default function ContactsPage() {
         sortBy={sortBy}
         sortDirection={sortDirection}
         onSortChange={handleSortChange}
+        mutate={mutate} 
       />
 
       {/* Pagination Controls */}
