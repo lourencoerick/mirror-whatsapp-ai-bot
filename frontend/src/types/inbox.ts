@@ -2,10 +2,14 @@
 /**
  * Represents the structure of an Inbox object received from the API.
  */
+
+export type ConversationStatusOption = 'BOT' | 'PENDING' | 'OPEN';
+
 export interface Inbox {
     id: string; // UUID represented as string in JSON
     account_id?: string; // UUID represented as string in JSON
     name: string;
+    initial_conversation_status: ConversationStatusOption; // e.g., 'OPEN', 'PENDING'
     channel_type: string;
     connection_status: string;
     channel_id?: string | null; // Optional identifier from the channel provider
@@ -21,6 +25,7 @@ export interface Inbox {
    */
   export interface InboxCreatePayload {
     name: string;
+    initial_conversation_status: ConversationStatusOption; // e.g., 'OPEN', 'PENDING'
     channel_type: string; // e.g., 'whatsapp'
     channel_details?: Record<string, any> | null;
     enable_auto_assignment?: boolean;
@@ -32,6 +37,7 @@ export interface Inbox {
    */
   export interface InboxUpdatePayload {
     name?: string;
+    initial_conversation_status?: ConversationStatusOption; // e.g., 'OPEN', 'PENDING'
     channel_type?: string;
     channel_details?: Record<string, any> | null;
     enable_auto_assignment?: boolean;

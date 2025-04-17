@@ -8,22 +8,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Loader2, Terminal, ArrowLeft } from "lucide-react";
+import { Loader2, Terminal, ArrowLeft, Bot, Users } from "lucide-react";
 import { toast } from "sonner";
 import { StepIndicator } from '@/components/ui/inbox/create/step-indicator';
 import { ChooseChannelStep } from '@/components/ui/inbox/create/choose-channel-step';
 import { ConfigureEvolutionApiStep } from '@/components/ui/inbox/create/configure-evolution-api';
 import { ConfigureCloudApiStep } from '@/components/ui/inbox/create/configure-cloud-api';
 import { useLayoutContext } from '@/contexts/layout-context';
-
+import { ConversationStatusOption } from '@/types/inbox'; // Ajuste o caminho se necessário
 /**
  * Definition of the wizard steps with PT-BR text for UI.
  * @constant
  */
 const WIZARD_STEPS = [
     { id: 1, name: 'Escolha o Canal', description: 'Selecione o canal de comunicação.' },
-    { id: 2, name: 'Nomeie a Inbox', description: 'Dê um nome para sua Inbox.' },
+    { id: 2, name: 'Nomeie a Caixa de Entrada', description: 'Dê um nome para sua Caixa de Entrada.' },
     { id: 3, name: 'Configure o Canal', description: 'Conecte ou configure os detalhes do canal.' },
     { id: 4, name: 'Finalizar', description: 'Revise e complete a configuração.' },
 ];
@@ -33,6 +40,8 @@ interface EvolutionApiDetails { id: string; shared_api_url?: string; logical_tok
 interface CloudApiDetails { phoneNumberId: string; wabaId: string; accessToken: string; verifyToken: string; }
 interface ConfiguredChannelDetails { evolution?: EvolutionApiDetails; cloud?: CloudApiDetails; }
 interface CreateInboxResponse { id: string; name: string; channel_type: string; }
+
+const DEFAULT_INITIAL_STATUS: ConversationStatusOption = 'BOT';
 
 /**
  * Page component for the multi-step wizard to create a new Inbox.
@@ -53,6 +62,8 @@ export default function CreateInboxPage() {
     const [configuredDetails, setConfiguredDetails] = useState<ConfiguredChannelDetails | null>(null);
     const [isChannelConfigValid, setIsChannelConfigValid] = useState<boolean>(false);
     const [isEvolutionConnected, setIsEvolutionConnected] = useState<boolean>(false);
+    const [initialConversationStatus, setInitialConversationStatus] = useState<ConversationStatusOption>(DEFAULT_INITIAL_STATUS);
+
 
 
     // --- Set Page Title ---
@@ -69,7 +80,7 @@ export default function CreateInboxPage() {
                 </span>
             </div>
         );
-    }, [setPageTitle, isLoading]);    
+    }, [setPageTitle, isLoading]);
 
     // --- Navigation and Callback Handlers (Logic remains, error messages in PT-BR) ---
 
@@ -103,7 +114,7 @@ export default function CreateInboxPage() {
         setFormError(null);
         if (!isChannelConfigValid) {
             if (selectedChannelType === 'whatsapp_evolution_api' && !isEvolutionConnected) {
-                 setFormError("Por favor, complete o processo de conexão do WhatsApp (escaneie o QR code).");
+                setFormError("Por favor, complete o processo de conexão do WhatsApp (escaneie o QR code).");
             } else {
                 setFormError("A configuração do canal está incompleta ou inválida. Verifique os detalhes.");
             }
@@ -164,15 +175,15 @@ export default function CreateInboxPage() {
                 setCurrentStep(3);
                 return;
             }
-             isValidPayload = true;
+            isValidPayload = true;
         } else if (selectedChannelType === 'whatsapp_cloud_api' && configuredDetails.cloud) {
-             channelDetailsPayload = configuredDetails.cloud;
-             if (!configuredDetails.cloud.phoneNumberId || !configuredDetails.cloud.wabaId || !configuredDetails.cloud.accessToken) {
-                 setFormError("A configuração da API Cloud está incompleta. Preencha todos os campos obrigatórios.");
-                 setCurrentStep(3);
-                 return;
-             }
-             isValidPayload = true;
+            channelDetailsPayload = configuredDetails.cloud;
+            if (!configuredDetails.cloud.phoneNumberId || !configuredDetails.cloud.wabaId || !configuredDetails.cloud.accessToken) {
+                setFormError("A configuração da API Cloud está incompleta. Preencha todos os campos obrigatórios.");
+                setCurrentStep(3);
+                return;
+            }
+            isValidPayload = true;
         }
 
         if (!isValidPayload) {
@@ -218,12 +229,12 @@ export default function CreateInboxPage() {
             console.error("Error creating inbox:", err);
             let errorMsg = "Ocorreu um erro inesperado.";
             if (err instanceof Error && err.message) {
-              errorMsg = err.message;
+                errorMsg = err.message;
             }
             toast.error("Falha na Criação", { id: toastId, description: errorMsg });
             setFormError(errorMsg);
             setIsLoading(false);
-          }
+        }
     }, [
         inboxName, selectedChannelType, configuredDetails, isEvolutionConnected,
         authenticatedFetch, router
@@ -247,9 +258,9 @@ export default function CreateInboxPage() {
                 );
 
             case 2: // Name Inbox
-                 if (!selectedChannelType) {
-                     return <p className="text-destructive">Por favor, volte e selecione um canal primeiro.</p>;
-                 }
+                if (!selectedChannelType) {
+                    return <p className="text-destructive">Por favor, volte e selecione um canal primeiro.</p>;
+                }
                 return (
                     <Card className="w-full max-w-2xl">
                         <CardHeader>
@@ -258,8 +269,8 @@ export default function CreateInboxPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                 {/* PT-BR Label */}
-                                <Label htmlFor="inboxName">Nome da Inbox *</Label>
+                                {/* PT-BR Label */}
+                                <Label htmlFor="inboxName">Nome da Caixa de Entrada *</Label>
                                 <Input
                                     id="inboxName"
                                     value={inboxName}
@@ -273,12 +284,43 @@ export default function CreateInboxPage() {
                                     disabled={isLoading}
                                     aria-describedby="inboxNameHelp"
                                 />
-                                 {/* PT-BR Description */}
+                                {/* PT-BR Description */}
                                 <p id="inboxNameHelp" className="text-sm text-muted-foreground">
-                                    Usado para identificar esta inbox na plataforma (máx 100 caracteres).
+                                    Usado para identificar esta caixa de entrada na plataforma (máx 100 caracteres).
                                 </p>
                             </div>
-                             {formError && (
+                            {/* Initial status selection */}
+                            <div className="space-y-2">
+                                <Label htmlFor="initialStatus">Status Inicial da Conversa</Label>
+                                <Select
+                                    value={initialConversationStatus}
+                                    onValueChange={(value: ConversationStatusOption) => setInitialConversationStatus(value)}
+                                    disabled={isLoading}
+                                >
+                                    <SelectTrigger id="initialStatus" aria-describedby="initialStatusHelp">
+                                        <SelectValue placeholder="Selecione o status padrão..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="BOT">
+                                            <div className="flex items-center gap-2">
+                                                <Bot className="h-4 w-4" />
+                                                <span>Começar com Robô</span>
+                                            </div>
+                                        </SelectItem>
+                                        <SelectItem value="PENDING">
+                                            <div className="flex items-center gap-2">
+                                                <Users className="h-4 w-4" />
+                                                <span>Começar Pendente (Requer Humano)</span>
+                                            </div>
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p id="initialStatusHelp" className="text-sm text-muted-foreground">
+                                    Escolha se novas conversas são inicialmente tratadas pelo robô ou colocadas na fila para um agente humano.
+                                </p>
+                            </div>
+
+                            {formError && (
                                 <Alert variant="destructive" className="mt-4">
                                     <AlertDescription>{formError}</AlertDescription>
                                 </Alert>
@@ -306,7 +348,7 @@ export default function CreateInboxPage() {
                 return (
                     <Card className="w-full max-w-2xl">
                         <CardHeader>
-                             <CardTitle>{stepTitle}</CardTitle>
+                            <CardTitle>{stepTitle}</CardTitle>
                             <CardDescription>
                                 {selectedChannelType === 'whatsapp_evolution_api' && 'Conecte sua instância da Evolution API escaneando o QR code.'}
                                 {selectedChannelType === 'whatsapp_cloud_api' && 'Insira os detalhes da sua API Cloud do WhatsApp abaixo.'}
@@ -329,14 +371,14 @@ export default function CreateInboxPage() {
                                     isLoading={isLoading}
                                 />
                             )}
-                             {formError && (
+                            {formError && (
                                 <Alert variant="destructive" className="mt-4">
                                     <AlertDescription>{formError}</AlertDescription>
                                 </Alert>
                             )}
                         </CardContent>
                         <CardFooter className="flex justify-between mt-6">
-                             <Button type="button" variant="outline" onClick={handleGoToPreviousStep} disabled={isLoading}>
+                            <Button type="button" variant="outline" onClick={handleGoToPreviousStep} disabled={isLoading}>
                                 Voltar
                             </Button>
                             <Button
@@ -350,24 +392,24 @@ export default function CreateInboxPage() {
                     </Card>
                 );
 
-             case 4: // Finalize / Review
+            case 4: // Finalize / Review
                 if (!selectedChannelType || !inboxName.trim() || !configuredDetails) {
-                     return <p className="text-destructive">Faltam informações obrigatórias. Por favor, volte.</p>;
-                 }
+                    return <p className="text-destructive">Faltam informações obrigatórias. Por favor, volte.</p>;
+                }
 
-                 let channelFriendlyName = 'Desconhecido';
-                 if (selectedChannelType === 'whatsapp_evolution_api') channelFriendlyName = 'WhatsApp (Evolution API)'; // Keep technical name
-                 if (selectedChannelType === 'whatsapp_cloud_api') channelFriendlyName = 'WhatsApp (API Oficial Cloud)'; // Keep technical name
+                let channelFriendlyName = 'Desconhecido';
+                if (selectedChannelType === 'whatsapp_evolution_api') channelFriendlyName = 'WhatsApp (Evolution API)'; // Keep technical name
+                if (selectedChannelType === 'whatsapp_cloud_api') channelFriendlyName = 'WhatsApp (API Oficial Cloud)'; // Keep technical name
 
-                 return (
-                     <Card className="w-full max-w-2xl">
-                         <CardHeader>
-                              <CardTitle>{stepTitle}</CardTitle>
-                              <CardDescription>{stepDescription}</CardDescription>
-                         </CardHeader>
-                         <CardContent className="space-y-4">
-                             <h3 className="mb-2 text-lg font-medium">Revise os Detalhes:</h3>
-                             <div className="space-y-1 rounded-md border bg-muted/50 p-4 text-sm">
+                return (
+                    <Card className="w-full max-w-2xl">
+                        <CardHeader>
+                            <CardTitle>{stepTitle}</CardTitle>
+                            <CardDescription>{stepDescription}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <h3 className="mb-2 text-lg font-medium">Revise os Detalhes:</h3>
+                            <div className="space-y-1 rounded-md border bg-muted/50 p-4 text-sm">
                                 <p><strong>Nome da Inbox:</strong> {inboxName}</p>
                                 <p><strong>Tipo de Canal:</strong> {channelFriendlyName}</p>
                                 {selectedChannelType === 'whatsapp_evolution_api' && configuredDetails.evolution && (
@@ -384,25 +426,25 @@ export default function CreateInboxPage() {
                                         <p><strong>Token de Verificação:</strong> {configuredDetails.cloud.verifyToken || '(Não definido)'}</p> {/* PT-BR Status Text */}
                                     </>
                                 )}
-                             </div>
-                             {formError && (
+                            </div>
+                            {formError && (
                                 <Alert variant="destructive">
                                     <Terminal className="h-4 w-4" />
                                     <AlertTitle>Erro</AlertTitle>
                                     <AlertDescription>{formError}</AlertDescription>
                                 </Alert>
-                             )}
-                         </CardContent>
-                         <CardFooter className="flex justify-between">
-                             <Button type="button" variant="outline" onClick={handleGoToPreviousStep} disabled={isLoading}>
-                                 Voltar
-                             </Button>
-                             <Button type="button" onClick={handleFinalSubmit} disabled={isLoading}>
-                                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando Inbox...</> : 'Confirmar e Criar Inbox'}
-                             </Button>
-                         </CardFooter>
-                     </Card>
-                 );
+                            )}
+                        </CardContent>
+                        <CardFooter className="flex justify-between">
+                            <Button type="button" variant="outline" onClick={handleGoToPreviousStep} disabled={isLoading}>
+                                Voltar
+                            </Button>
+                            <Button type="button" onClick={handleFinalSubmit} disabled={isLoading}>
+                                {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Criando Inbox...</> : 'Confirmar e Criar Inbox'}
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                );
 
             default:
                 return <p className="text-muted-foreground">Passo desconhecido.</p>;
