@@ -4,9 +4,9 @@ import json
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services.queue.redis_queue import RedisQueue
-from app.workers.message_consumer import MessageConsumer
+from workers.consumer.message_consumer import MessageConsumer
 from app.workers.message_processor import MessageProcessor
-from app.workers.response_sender import ResponseSender
+from workers.response_sender.response_sender import ResponseSender
 from app.api.schemas.response import ResponseMessage
 from app.services.sender import evolution as evolution_sender
 from app.database import SessionLocal
