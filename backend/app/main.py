@@ -41,8 +41,8 @@ settings = get_settings()
 
 logger.info("Verifying environment variables...")
 # Verify required environment variables
-logger.info("GCS BUCKET: {CONTACT_IMPORT_GCS_BUCKET_NAME}")
-logger.info("Evolution URL: {EVOLUTION_API_SHARED_URL}")
+logger.info(f"GCS BUCKET: {settings.CONTACT_IMPORT_GCS_BUCKET_NAME}")
+logger.info(f"Evolution URL: {settings.EVOLUTION_API_SHARED_URL}")
 
 
 @asynccontextmanager
