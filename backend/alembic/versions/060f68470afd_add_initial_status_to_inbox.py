@@ -32,6 +32,7 @@ def upgrade() -> None:
                 "HUMAN_ACTIVE",
                 "CLOSED",
                 "OPEN",
+                "BOT",
                 name="conversation_status_enum",
             ),
             nullable=True,
