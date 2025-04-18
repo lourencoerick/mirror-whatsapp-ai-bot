@@ -205,3 +205,25 @@ async def get_messages_paginated(
 
     print(f"Returning {len(messages)} messages.")
     return messages
+
+
+async def update_message_status_by_source_id(
+    db: AsyncSession,
+    *,
+    account_id: UUID,
+    source_id: UUID,
+    status: str,
+) -> None:
+    result = await db.execute(
+        select(Message).filter_by(source_id=source_id, account_id=account_id)
+    )
+    message = result.scalar_one_or_none()
+
+    if message:
+        logger.debug(f"[message] Found message {message.id} via source_id {source_id}")
+        if message.status != status:
+            message.status = status
+            db.add(message)
+    else:
+        logger.warning(f"[message] Not found: {source_id}")
+        return
