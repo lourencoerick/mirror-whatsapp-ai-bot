@@ -5,12 +5,16 @@ from uuid import UUID, uuid4
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from datetime import datetime, timezone
 
 # Database and Queue imports (adjust paths as needed)
 from app.database import AsyncSessionLocal
 from app.services.queue.redis_queue import RedisQueue
 from app.services.repository import message as message_repo
+from app.services.repository import conversation as conversation_repo
+
 from app.models.message import Message  # Import the Message model for type hinting
+from app.api.schemas.message import MessageCreate
 
 # AI Reply Service import
 from app.services.ai_reply import processor as ai_processor
@@ -63,9 +67,8 @@ class AiReplier:
             message_id_str = payload.get("message_id")
             conversation_id_str = payload.get("conversation_id")
             account_id = payload.get("account_id")
-            sender_id = payload.get("sender_id")  # Needed for context/creating reply
 
-            if not all([message_id_str, conversation_id_str, account_id, sender_id]):
+            if not all([message_id_str, conversation_id_str, account_id]):
                 logger.warning(
                     f"[ai_replier] Task payload missing required fields: {payload}"
                 )
@@ -88,7 +91,6 @@ class AiReplier:
                         message_id=message_id,
                         conversation_id=conversation_id,
                         account_id=account_id,
-                        sender_id=sender_id,
                     )
                     # Commit happens here if _handle_ai_request succeeds
                     await db.commit()
@@ -159,7 +161,6 @@ class AiReplier:
         message_id: UUID,
         account_id: UUID,
         conversation_id: UUID,
-        sender_id: str,
     ):
         """
         Handles the AI reply generation and queuing for a specific message.
@@ -169,7 +170,6 @@ class AiReplier:
             message_id: The ID of the original incoming message.
             conversation_id: The ID of the conversation thread.
             account_id: The company identifier.
-            sender_id: The identifier of the original sender (contact).
         """
         # 1. Fetch Original Message (to get text and context like contact_id, inbox_id)
         # Using find_message_by_id like in ResponseSender for consistency
@@ -233,20 +233,41 @@ class AiReplier:
         logger.info(
             f"[ai_replier] Creating outgoing message record for AI reply to {message_id}..."
         )
+
+        conversation = await conversation_repo.find_conversation_by_id(
+            db, conversation_id=conversation_id, account_id=account_id
+        )
+        # Generate an internal source_id for tracking
+        internal_source_id = f"ai-replier-{uuid4().hex}"
+
+        message_data = MessageCreate(
+            account_id=account_id,
+            inbox_id=conversation.inbox_id,
+            conversation_id=conversation.id,
+            contact_id=(
+                conversation.contact_inbox.contact_id
+                if conversation.contact_inbox
+                else None
+            ),
+            source_id=internal_source_id,
+            direction="out",
+            status="processing",
+            message_timestamp=datetime.now(timezone.utc),
+            content=ai_response_text,
+            content_type="text",
+            content_attributes={
+                "source": "ai-replier",
+                "channel_type": (
+                    conversation.inbox.channel_type if conversation.inbox else None
+                ),
+            },
+        )
         try:
             # Assuming a repository function exists to create the message
             # You might need to adjust parameters based on your actual function/model
-            ai_message = await message_repo.create_message(  # Or specific create_outgoing_message
+            ai_message = await message_repo.get_or_create_message(
                 db=db,
-                content=ai_response_text,
-                direction="out",  # Indicate it's an outgoing message
-                status="pending",  # Initial status before sender picks it up
-                conversation_id=conversation_id,
-                contact_id=contact_id,  # From original message
-                inbox_id=inbox_id,  # From original message
-                account_id=account_id,  # Pass account_id if your model needs it
-                is_private=False,
-                # source_id=f"ai-replier-{uuid4().hex}",
+                message_data=message_data,
             )
             # Flush to get the ai_message.id assigned by the DB
             await db.flush()
