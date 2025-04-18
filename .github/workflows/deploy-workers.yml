@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - feat/workers_deploy
     # dispara se mudar qualquer coisa de workers, Dockerfile ou o próprio workflow
     paths:
       - 'backend/app/workers/**'
