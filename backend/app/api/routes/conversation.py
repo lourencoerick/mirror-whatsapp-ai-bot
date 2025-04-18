@@ -235,6 +235,7 @@ async def start_conversation(
         account_id=account_id,
         inbox_id=inbox.id,
         contact_inbox_id=contact_inbox.id,
+        status=inbox.initial_conversation_status,
     )
 
     try:
