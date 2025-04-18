@@ -27,6 +27,7 @@ class ConversationStatusEnum(str, enum.Enum):
     HUMAN_ACTIVE = "HUMAN_ACTIVE"
     CLOSED = "CLOSED"
     OPEN = "OPEN"
+    BOT = "BOT"
 
 
 class Conversation(BaseModel):
