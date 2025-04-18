@@ -25,7 +25,7 @@ export interface Inbox {
    */
   export interface InboxCreatePayload {
     name: string;
-    initial_conversation_status: ConversationStatusOption; // e.g., 'OPEN', 'PENDING'
+    initial_conversation_status: ConversationStatusOption;
     channel_type: string; // e.g., 'whatsapp'
     channel_details?: Record<string, any> | null;
     enable_auto_assignment?: boolean;
