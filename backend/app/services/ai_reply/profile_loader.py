@@ -11,7 +11,7 @@ from app.api.schemas.company_profile import CompanyProfileSchema
 # Define the base directory for company profiles
 # Consider making this configurable via environment variables later
 # For example: PROFILE_DIR = os.getenv("COMPANY_PROFILE_DIR", "company_profiles")
-PROFILE_DIR = "company_profiles"
+PROFILE_DIR = "data/company_profiles"
 
 
 def load_company_profile(company_id: str) -> Optional[CompanyProfileSchema]:
