@@ -1,30 +1,35 @@
 # backend/app/services/ai_reply/processor.py
 
+import os
 from typing import Optional, List
-from uuid import UUID
-
-# Import Loguru's logger
+from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
+from uuid import UUID
 
 # Import necessary components from within the service
 from . import profile_loader, prompt_builder, llm_client
 
-# Import schemas for type hinting
+# Import schemas and models for type hinting
 from app.api.schemas.company_profile import CompanyProfileSchema
+from app.models.message import Message
 from langchain_core.messages import BaseMessage
 
-# --- Constants ---
 
-# Default fallback message if profile loading fails or no specific fallback is defined
+from app.services.repository import message as message_repo
+
+# --- Constants ---
 DEFAULT_FALLBACK_MESSAGE = (
     "Sorry, I'm currently unable to process your request. Please try again in a moment."
 )
+
+AI_HISTORY_LIMIT = int(os.getenv("AI_HISTORY_LIMIT", 50))
+
 
 # --- Core Processing Function ---
 
 
 async def process_message(
-    account_id: UUID, message_text: str, conversation_id: str
+    db: AsyncSession, account_id: UUID, message_text: str, conversation_id: UUID
 ) -> Optional[str]:
     """
     Orchestrates the process of generating an AI reply for a given message.
@@ -35,11 +40,10 @@ async def process_message(
     errors or fallbacks.
 
     Args:
-        company_id: The unique identifier for the company whose profile
-                    should be used.
-        message_text: The text content of the incoming user message.
-        conversation_id: The identifier for the conversation thread (currently
-                         unused but planned for future context).
+        db: The SQLAlchemy AsyncSession.
+        account_id: The identifier for the company (UUID).
+        message_text: The text content of the user's message.
+        conversation_id: The identifier for the conversation thread (UUID).
 
     Returns:
         A string containing the generated AI response or a fallback message.
@@ -71,9 +75,34 @@ async def process_message(
 
     # 2. Build Prompt Messages
     # ------------------------
+
+    chat_history: List[Message] = []
+    try:
+        logger.debug(
+            f"Fetching last {AI_HISTORY_LIMIT} messages for conversation {conversation_id}"
+        )
+
+        chat_history = await message_repo.find_messages_by_conversation(
+            db=db,
+            conversation_id=conversation_id,
+            account_id=account_id,
+            limit=AI_HISTORY_LIMIT,
+            offset=1,  # Fetch the very latest including the current one if already saved
+            # Or use offset=1 if the current message_text is not yet in DB when this runs
+        )
+        # The list is currently newest-to-oldest. We'll reverse it in the prompt builder helper.
+        logger.debug(f"Fetched {len(chat_history)} messages for history.")
+
+    except Exception as history_exc:
+        logger.warning(
+            f"Failed to fetch chat history for conversation {conversation_id}: {history_exc}. Proceeding without history."
+        )
+        chat_history = []
+
     prompt_messages: List[BaseMessage] = prompt_builder.build_llm_prompt_messages(
-        profile, message_text
+        profile=profile, message_text=message_text, chat_history=chat_history
     )
+
     if not prompt_messages:
         logger.error(
             f"Failed to build prompt messages for account='{account_id}'. Using fallback."
