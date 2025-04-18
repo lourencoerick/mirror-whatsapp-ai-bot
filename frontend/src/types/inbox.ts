@@ -9,7 +9,7 @@ export interface Inbox {
     id: string; // UUID represented as string in JSON
     account_id?: string; // UUID represented as string in JSON
     name: string;
-    initial_conversation_status: ConversationStatusOption; // e.g., 'OPEN', 'PENDING'
+    initial_conversation_status: ConversationStatusOption;
     channel_type: string;
     connection_status: string;
     channel_id?: string | null; // Optional identifier from the channel provider
