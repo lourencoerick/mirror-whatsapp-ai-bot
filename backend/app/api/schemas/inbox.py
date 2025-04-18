@@ -50,7 +50,7 @@ class InboxUpdate(BaseModel):
         None, description="Update auto assignment setting"
     )
 
-    initial_status: Optional[ConversationStatusEnum] = Field(
+    initial_conversation_status: Optional[ConversationStatusEnum] = Field(
         None,
         description="New default status for new conversations (OPEN or PENDING)",
     )
@@ -76,6 +76,10 @@ class InboxResponse(InboxBase):
     account_id: UUID = Field(
         ..., description="Identifier of the account this inbox belongs to"
     )
+    initial_conversation_status: Optional[ConversationStatusEnum] = Field(
+        None,
+        description="New default status for new conversations (OPEN or PENDING)",
+    )
     channel_id: Optional[str] = Field(
         None,
         description="Identifier used by the channel provider (e.g., instanceId, phone_number_id)",
@@ -93,6 +97,7 @@ class InboxResponse(InboxBase):
                 "id": "e8a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9f",
                 "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
                 "name": "Sales WhatsApp",
+                "initial_conversation_status": "OPEN",
                 "channel_type": "whatsapp",
                 "channel_id": "instance_xyz",
                 "channel_details": {
