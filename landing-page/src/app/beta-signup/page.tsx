@@ -2,7 +2,7 @@
 'use client';
 
 
-import { useState } from 'react'; 
+import { useState } from 'react';
 import { useRouter } from "next/navigation";
 
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,10 @@ import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pa
 import Navbar from "@/components/ui/home/navbar";
 
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { Loader2 } from "lucide-react"; 
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { useForm } from "react-hook-form"; 
+import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -76,27 +76,36 @@ const BetaSignupForm = () => {
   // State to manage the loading status of the form submission
   const [isLoading, setIsLoading] = useState(false);
 
+  async function hashSHA256(value: string): Promise<string> {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(value.trim().toLowerCase());
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
   function gtag_report_conversion(url?: string) {
     const callback = function () {
       if (url) {
         window.location.href = url;
       }
     };
-    
-    if (typeof (window as any).gtag === "function") { 
-      (window as any).gtag("event", "conversion", { 
+
+    if (typeof (window as any).gtag === "function") {
+      (window as any).gtag("event", "conversion", {
         send_to: "AW-16914772618/VzaiCJzk26gaEIrly4E_",
         event_callback: callback,
       });
     } else {
-        console.warn("gtag function not found on window object.");
-        
-        callback();
+      console.warn("gtag function not found on window object.");
+
+      callback();
     }
-    return false; 
+    return false;
   }
 
-  
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -120,38 +129,50 @@ const BetaSignupForm = () => {
         body: JSON.stringify(data),
       });
 
-     
+
       if (!response.ok) {
-         
-          let errorMsg = "Ocorreu um erro ao enviar seus dados.";
-          try {
-              const errorResult = await response.json();
-              errorMsg = errorResult.detail || errorMsg;
+
+        let errorMsg = "Ocorreu um erro ao enviar seus dados.";
+        try {
+          const errorResult = await response.json();
+          errorMsg = errorResult.detail || errorMsg;
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          } catch (parseError) {
-              // Ignore if response body is not JSON or empty
-          }
-          throw new Error(errorMsg); 
+        } catch (parseError) {
+          // Ignore if response body is not JSON or empty
+        }
+        throw new Error(errorMsg);
       }
 
       const result = await response.json();
 
       // Assuming backend returns { result: "success" } on success
       if (result.result === "success") {
+
+        const hashedEmail = await hashSHA256(data.email);
+        const hashedName = await hashSHA256(data.name);
+
+
+        if (typeof window !== "undefined" && typeof (window as any).gtag === "function") {
+          (window as any).gtag('set', 'user_data', {
+            email: hashedEmail,
+            first_name: hashedName,
+          });
+        }
+
         toast.success("Cadastro realizado com sucesso!");
-        gtag_report_conversion(); 
+        gtag_report_conversion();
         form.reset();
-        router.push('/'); 
+        router.push('/');
       } else {
-        
+
         toast.error(result.message || "Falha no cadastro. Tente novamente.");
       }
     } catch (error) {
       console.error("Submission error:", error);
-      
+
       toast.error(error instanceof Error ? error.message : "Erro ao conectar com o servidor.");
     } finally {
-      setIsLoading(false); 
+      setIsLoading(false);
     }
   }
 
@@ -166,7 +187,7 @@ const BetaSignupForm = () => {
             <FormItem>
               <FormLabel>Nome</FormLabel>
               <FormControl>
-                 {/* Optionally disable input during loading */}
+                {/* Optionally disable input during loading */}
                 <Input placeholder="Seu nome" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage /> {/* Shows validation errors */}
@@ -180,7 +201,7 @@ const BetaSignupForm = () => {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                 {/* Optionally disable input during loading */}
+                {/* Optionally disable input during loading */}
                 <Input placeholder="Seu email" type="email" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage /> {/* Shows validation errors */}
