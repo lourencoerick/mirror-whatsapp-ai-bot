@@ -1,4 +1,4 @@
-from app.workers.message_consumer import MessageConsumer
+from workers.consumer.message_consumer import MessageConsumer
 
 if __name__ == "__main__":
     consumer = MessageConsumer()

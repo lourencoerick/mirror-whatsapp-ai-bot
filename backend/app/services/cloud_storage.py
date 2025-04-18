@@ -30,18 +30,22 @@ def get_gcs_bucket():
             detail="Google Cloud Storage service is not configured or available.",
         )
     try:
-        bucket = storage_client.bucket(settings.GCS_BUCKET_NAME)
+        bucket = storage_client.bucket(settings.CONTACT_IMPORT_GCS_BUCKET_NAME)
         if not bucket.exists():
             # Optional: Create bucket if it doesn't exist (requires storage.buckets.create permission)
             # Or raise an error if it's expected to exist
-            logger.warning(f"Bucket {settings.GCS_BUCKET_NAME} does not exist.")
+            logger.warning(
+                f"Bucket {settings.CONTACT_IMPORT_GCS_BUCKET_NAME} does not exist."
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"GCS Bucket '{settings.GCS_BUCKET_NAME}' not found.",
+                detail=f"GCS Bucket '{settings.CONTACT_IMPORT_GCS_BUCKET_NAME}' not found.",
             )
         return bucket
     except GoogleAPICallError as e:
-        logger.exception(f"Error accessing GCS bucket {settings.GCS_BUCKET_NAME}: {e}")
+        logger.exception(
+            f"Error accessing GCS bucket {settings.CONTACT_IMPORT_GCS_BUCKET_NAME}: {e}"
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Could not access GCS Bucket: {e.message}",
@@ -106,7 +110,7 @@ async def save_import_file_gcs(file: UploadFile, job_id: uuid.UUID) -> str:
         )
 
         print(
-            f"File uploaded to GCS: gs://{settings.GCS_BUCKET_NAME}/{blob_name}"
+            f"File uploaded to GCS: gs://{settings.CONTACT_IMPORT_GCS_BUCKET_NAME}/{blob_name}"
         )  # Logging
         return blob_name  # Return the object path/name
 

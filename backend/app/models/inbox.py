@@ -10,9 +10,11 @@ from sqlalchemy import (
     Index,
     UniqueConstraint,
     JSON,
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
+from app.models.conversation import ConversationStatusEnum
 
 
 class Inbox(BaseModel):
@@ -33,6 +35,14 @@ class Inbox(BaseModel):
     channel_id = Column(String(255), nullable=False)
     name = Column(String(255), nullable=False)
     channel_type = Column(String(255), nullable=False)
+    initial_conversation_status = Column(
+        SQLEnum(
+            ConversationStatusEnum, name="conversation_status_enum", create_type=True
+        ),
+        default=ConversationStatusEnum.PENDING,
+        nullable=True,
+        comment="Initial status of the conversation when created",
+    )
     enable_auto_assignment = Column(Boolean, nullable=True)
     channel_details = Column(MutableDict.as_mutable(JSON), nullable=True, default=dict)
 

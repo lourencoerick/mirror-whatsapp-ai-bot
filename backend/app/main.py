@@ -34,9 +34,15 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+
 # --- Initialization ---
 pubsub_bridge = RedisPubSubBridge()
 settings = get_settings()
+
+logger.info("Verifying environment variables...")
+# Verify required environment variables
+logger.info("GCS BUCKET: {CONTACT_IMPORT_GCS_BUCKET_NAME}")
+logger.info("Evolution URL: {EVOLUTION_API_SHARED_URL}")
 
 
 @asynccontextmanager

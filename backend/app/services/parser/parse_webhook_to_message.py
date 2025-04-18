@@ -77,12 +77,15 @@ async def parse_webhook_to_message(
         source_id=source_id,
     )
 
+    initial_status = inbox.initial_conversation_status
+
     # Step 4 - Conversation (get or create)
     conversation = await conversation_repo.get_or_create_conversation(
         db=db,
         account_id=account_id,
         inbox_id=inbox.id,
         contact_inbox_id=contact_inbox.id,
+        status=initial_status,
     )
 
     # Step 5 - Finalize message DTO

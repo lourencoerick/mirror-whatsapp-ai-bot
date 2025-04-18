@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - feat/workers_deploy
     paths:
       - 'backend/**'    
       - 'Dockerfile'   

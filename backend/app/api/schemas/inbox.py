@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
+from app.models.conversation import ConversationStatusEnum
 
 
 class InboxBase(BaseModel):
@@ -47,6 +48,11 @@ class InboxUpdate(BaseModel):
     )
     enable_auto_assignment: Optional[bool] = Field(
         None, description="Update auto assignment setting"
+    )
+
+    initial_status: Optional[ConversationStatusEnum] = Field(
+        None,
+        description="New default status for new conversations (OPEN or PENDING)",
     )
 
     class Config:

@@ -18,6 +18,11 @@ class ContactBase(BaseModel):
     phone_number: str = Field(
         ..., max_length=255, description="Contact's primary phone number (required)"
     )
+    identifier: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Internal identifier (e.g., normalized phone or WhatsApp ID)",
+    )
     profile_picture_url: Optional[str] = Field(
         None, max_length=255, description="URL of the contact's profile picture"
     )

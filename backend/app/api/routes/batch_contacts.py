@@ -100,7 +100,7 @@ async def initiate_contact_import(
     try:
         gcs_blob_name = await save_import_file_gcs(file=file, job_id=job_id)
         logger.success(
-            f"File uploaded to GCS. Bucket: {settings.GCS_BUCKET_NAME}, Blob: {gcs_blob_name}"
+            f"File uploaded to GCS. Bucket: {settings.CONTACT_IMPORT_GCS_BUCKET_NAME}, Blob: {gcs_blob_name}"
         )
     except HTTPException as http_exc:
 
