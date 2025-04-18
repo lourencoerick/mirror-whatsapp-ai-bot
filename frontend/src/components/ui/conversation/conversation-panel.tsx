@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import React, { useMemo } from 'react';
@@ -7,8 +6,8 @@ import ConversationsList from './conversation-list';
 import Search from './search';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ConversationStatusEnum } from '@/types/conversation'; // Adjust path if needed
-import { ConversationFilters } from '@/hooks/use-conversations'; // Adjust path if needed
+import { ConversationStatusEnum } from '@/types/conversation'; 
+import { ConversationFilters } from '@/hooks/use-conversations';
 
 interface ConversationPanelProps {
   socketIdentifier: string;
@@ -25,7 +24,6 @@ function getValidFilterPreset(filterParam: string | null): FilterPreset {
   if (filterParam === 'all' || filterParam === 'unread' || filterParam === 'closed') {
     return filterParam;
   }
-  // Defaults to 'human' if param is null, empty, or invalid
   return 'human';
 }
 
@@ -68,7 +66,6 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ socketIdentifier 
           query: baseQuery,
         };
       default:
-        // Fallback (shouldn't happen with getValidFilterPreset)
         return {
           status: [ConversationStatusEnum.PENDING, ConversationStatusEnum.HUMAN_ACTIVE],
           has_unread: null,
@@ -79,15 +76,11 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ socketIdentifier 
 
   const handleFilterChange = (newFilter: FilterPreset) => {
     const current = new URLSearchParams(Array.from(searchParams.entries()));
-
-    // Default state ('human') removes the param for cleaner URL
     if (newFilter === 'human') {
       current.delete('filter');
     } else {
-      // Explicitly set for 'unread', 'closed', and 'all'
       current.set('filter', newFilter);
     }
-
     const search = current.toString();
     const queryStr = search ? `?${search}` : "";
     router.replace(`${pathname}${queryStr}`);
@@ -101,12 +94,17 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ socketIdentifier 
       </div>
 
       {/* Filter Buttons */}
-      <div className="py-2 px-2 flex space-x-0.5 w-xs">
+      <div className="py-2 px-2 flex space-x-0.5 w-full"> {/* Ajustado para w-full */}
         <Button
           variant={activeFilter === 'human' ? 'secondary' : 'ghost'}
           size="xs"
           onClick={() => handleFilterChange('human')}
-          className={cn("flex-1", activeFilter === 'human' && "font-semibold")}
+          className={cn(
+            "flex-1 rounded-none", 
+            activeFilter === 'human'
+              ? "font-semibold border-b-2 border-primary" 
+              : "border-b-2 border-transparent" 
+          )}
         >
           Atendimento
         </Button>
@@ -114,25 +112,38 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({ socketIdentifier 
           variant={activeFilter === 'unread' ? 'secondary' : 'ghost'}
           size="xs"
           onClick={() => handleFilterChange('unread')}
-          className={cn("flex-1", activeFilter === 'unread' && "font-semibold")}
+          className={cn(
+            "flex-1 rounded-none",
+            activeFilter === 'unread'
+              ? "font-semibold border-b-2 border-primary"
+              : "border-b-2 border-transparent"
+          )}
         >
           Não Lidas
         </Button>
-        <Button
+         <Button
           variant={activeFilter === 'closed' ? 'secondary' : 'ghost'}
           size="xs"
           onClick={() => handleFilterChange('closed')}
-          className={cn("flex-1", activeFilter === 'closed' && "font-semibold")}
+          className={cn(
+            "flex-1 rounded-none",
+            activeFilter === 'closed'
+              ? "font-semibold border-b-2 border-primary"
+              : "border-b-2 border-transparent"
+          )}
         >
           Fechadas
         </Button>
-
-        {/* 'Todas' button */}
         <Button
           variant={activeFilter === 'all' ? 'secondary' : 'ghost'}
           size="xs"
           onClick={() => handleFilterChange('all')}
-          className={cn("flex-1", activeFilter === 'all' && "font-semibold")}
+          className={cn(
+            "flex-1 rounded-none",
+            activeFilter === 'all'
+              ? "font-semibold border-b-2 border-primary"
+              : "border-b-2 border-transparent"
+          )}
         >
           Todas
         </Button>
