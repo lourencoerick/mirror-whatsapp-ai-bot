@@ -1,6 +1,7 @@
 # backend/app/workers/ai_replier.py
-
+import os
 import asyncio
+import random
 from uuid import UUID, uuid4
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,18 @@ from app.services.ai_reply import processor as ai_processor
 # Consider moving queue names to environment variables/settings
 AI_REPLY_QUEUE_NAME = "ai_reply_queue"
 RESPONSE_SENDER_QUEUE_NAME = "response_queue"  # Queue the ResponseSender listens to
+
+# Base delay in seconds
+AI_DELAY_BASE_SECONDS = float(os.getenv("AI_DELAY_BASE_SECONDS", 0.5))
+
+# Adjust for desired "typing speed"
+AI_DELAY_PER_CHAR_SECONDS = float(os.getenv("AI_DELAY_PER_CHAR_SECONDS", 0.025))
+# Maximum random variation (plus/minus) in seconds
+AI_DELAY_RANDOM_SECONDS = float(os.getenv("AI_DELAY_RANDOM_SECONDS", 1.5))
+# Absolute minimum delay
+AI_DELAY_MIN_SECONDS = float(os.getenv("AI_DELAY_MIN_SECONDS", 2.0))
+# Absolute maximum delay
+AI_DELAY_MAX_SECONDS = float(os.getenv("AI_DELAY_MAX_SECONDS", 3.0))
 
 
 class AiReplier:
@@ -49,6 +62,20 @@ class AiReplier:
         logger.info(
             f"[ai_replier:init] Initialized queues: input='{input_queue_name}', output='{output_queue_name}'"
         )
+
+    def _compute_delay(self, response_text: str) -> float:
+        response_length = len(response_text)
+        # Calculate delay based on length
+        length_delay = response_length * AI_DELAY_PER_CHAR_SECONDS
+        # Add base delay
+        base_calculated_delay = AI_DELAY_BASE_SECONDS + length_delay
+        # Add random variation (+/-)
+        random_offset = random.uniform(
+            -AI_DELAY_RANDOM_SECONDS, AI_DELAY_RANDOM_SECONDS
+        )
+        total_delay = base_calculated_delay + random_offset
+        # Apply min and max limits
+        return max(AI_DELAY_MIN_SECONDS, min(AI_DELAY_MAX_SECONDS, total_delay))
 
     async def _process_one_task(self):
         """
@@ -213,6 +240,7 @@ class AiReplier:
         # 2. Generate AI Response using the processor
         logger.info(f"[ai_replier] Generating AI reply for message {message_id}...")
         ai_response_text = await ai_processor.process_message(
+            db=db,
             account_id=account_id,
             message_text=original_message.content,
             conversation_id=str(
@@ -282,6 +310,28 @@ class AiReplier:
             )
             # Raise exception to trigger rollback
             raise ValueError("Failed to create outgoing message record") from create_exc
+
+        final_delay = self._compute_delay(ai_response_text)
+        response_length = len(ai_response_text)
+        try:
+            if final_delay > 0:
+                logger.debug(
+                    f"[ai_replier] Applying dynamic delay of {final_delay:.2f}s (length: {response_length}) before enqueueing message {ai_message.id}..."
+                )
+                await asyncio.sleep(final_delay)
+                logger.debug(
+                    f"[ai_replier] Delay finished for message {ai_message.id}."
+                )
+            else:
+                logger.debug(
+                    f"[ai_replier] Calculated delay is zero or negative, skipping sleep for message {ai_message.id}."
+                )
+
+        except Exception as delay_exc:
+            # Log if delay calculation fails, but don't stop the process
+            logger.warning(
+                f"[ai_replier] Error calculating dynamic delay for message {ai_message.id}: {delay_exc}. Proceeding without delay."
+            )
 
         # 4. Enqueue the new message ID for the ResponseSender
         sender_payload = {"message_id": str(ai_message.id)}
