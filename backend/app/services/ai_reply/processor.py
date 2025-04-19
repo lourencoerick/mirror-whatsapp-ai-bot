@@ -60,8 +60,8 @@ async def process_message(
     profile_identifier = str(account_id)
     logger.debug(f"Using profile identifier: {profile_identifier}")
 
-    profile: Optional[CompanyProfileSchema] = profile_loader.load_company_profile(
-        profile_identifier
+    profile: Optional[CompanyProfileSchema] = await profile_loader.load_company_profile(
+        db=db, account_id=account_id
     )
     if not profile:
         logger.error(

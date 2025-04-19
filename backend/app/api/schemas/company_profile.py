@@ -93,6 +93,7 @@ class CompanyProfileSchema(BaseModel):
     )
 
     class Config:
+        from_attributes = True
         schema_extra = {
             "example": {
                 "company_name": "Padaria Central",

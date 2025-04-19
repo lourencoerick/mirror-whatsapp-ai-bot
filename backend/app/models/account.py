@@ -50,3 +50,10 @@ class Account(BaseModel):
     evolution_instances = relationship(
         "EvolutionInstance", back_populates="account", cascade="all, delete-orphan"
     )
+
+    profile = relationship(
+        "CompanyProfile",
+        back_populates="account",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
