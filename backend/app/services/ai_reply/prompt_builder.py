@@ -1,8 +1,7 @@
 # backend/app/services/ai_reply/prompt_builder.py
-
 from typing import List, Dict, Any, Sequence
 
-# Schemas and Models
+
 from app.api.schemas.company_profile import CompanyProfileSchema, OfferingInfo
 from app.models.message import Message
 
@@ -18,17 +17,18 @@ from langchain_core.messages import (
     AIMessage,
 )
 
-
 from loguru import logger
 
-# --- Template Strings ---
+# --- Template Strings  ---
 SYSTEM_MESSAGE_TEMPLATE = """
 You are an AI Sales Assistant for '{company_name}'.
 Your goal is: {ai_objective}.
 Communicate in {language} with a {sales_tone} tone.
 
 Company Description: {business_description}
+{company_address_info}
 {target_audience_info}
+{opening_hours_info}
 
 Key Selling Points:
 {key_selling_points}
@@ -37,10 +37,16 @@ Our Offerings:
 {offering_summary}
 IMPORTANT: Only offer products or services listed in the 'Our Offerings' section above. Do not mention or suggest items not listed here.
 
+Delivery/Pickup Options:
+{delivery_options_info}
+
 Communication Guidelines:
 {communication_guidelines}
+IMPORTANT: Only provide information explicitly given in your instructions (company profile, offerings, guidelines,) or in the conversation history. Do NOT invent details like addresses, phone numbers, specific opening hours, or prices unless they are provided here.
 
 {fallback_instructions}
+
+Current Date and Time: {current_datetime}. Use this information to answer time-sensitive questions like opening hours.
 
 Use the provided conversation history to understand the context, but respond only to the latest customer message.
 Always adhere to these instructions and guidelines when responding to the user.
@@ -49,7 +55,7 @@ Always adhere to these instructions and guidelines when responding to the user.
 HUMAN_MESSAGE_TEMPLATE = "{customer_message}"
 
 
-# --- Helper Functions ---
+# --- Helper Functions  ---
 def _format_offerings(offerings: List[OfferingInfo]) -> str:
     if not offerings:
         return "No specific offerings listed."
@@ -70,7 +76,6 @@ def _format_list_items(items: List[str], prefix: str = "- ") -> str:
 
 
 def _format_history_messages(history: List[Message]) -> List[BaseMessage]:
-    """Converts database Message objects into LangChain BaseMessage objects."""
     formatted_history: List[BaseMessage] = []
     for msg in reversed(history):
         if msg.direction == "in":
@@ -78,24 +83,21 @@ def _format_history_messages(history: List[Message]) -> List[BaseMessage]:
                 formatted_history.append(HumanMessage(content=msg.content))
         elif msg.direction == "out":
             if msg.content:
-                # TODO: How to know if an 'out' message was from AI or Human Agent?
-                # Assuming 'out' means AI for now. Might need a 'sender_type' field later.
                 formatted_history.append(AIMessage(content=msg.content))
     logger.debug(f"Formatted {len(formatted_history)} messages for chat history.")
     return formatted_history
 
 
-# --- Main Function ---
-
-
+# --- Main Function  ---
 def build_llm_prompt_messages(
     profile: CompanyProfileSchema,
     message_text: str,
     chat_history: List[Message],
+    current_datetime: str,
 ) -> List[BaseMessage]:
     """
     Constructs the list of messages for the LLM using ChatPromptTemplate,
-    including conversation history.
+    including conversation history, address, and delivery options.
 
     Args:
         profile: The loaded CompanyProfileSchema object.
@@ -117,6 +119,22 @@ def build_llm_prompt_messages(
             "language": profile.language,
             "sales_tone": profile.sales_tone,
             "business_description": profile.business_description,
+            "company_address_info": (
+                f"Company Address: {profile.address}"
+                if profile.address
+                else "Company address not specified."
+            ),
+            "opening_hours_info": (
+                f"Opening Hours: {profile.opening_hours}"
+                if profile.opening_hours
+                else "Opening hours not specified."
+            ),
+            "current_datetime": current_datetime,
+            "delivery_options_info": (
+                _format_list_items(profile.delivery_options)
+                if profile.delivery_options
+                else "Delivery/pickup options not specified."
+            ),
             "target_audience_info": (
                 f"Target Audience: {profile.target_audience}"
                 if profile.target_audience
@@ -133,11 +151,10 @@ def build_llm_prompt_messages(
                 else "If you cannot answer the query, politely state that you cannot help with that specific request."
             ),
         }
+        logger.info(f"prompt variables: {system_vars}")
 
         formatted_history = _format_history_messages(chat_history)
 
-        # All variables needed by the combined templates
-        logger.info(f"Chat history Messages: {formatted_history}")
         all_input_vars = {
             **system_vars,
             "chat_history": formatted_history,
@@ -152,9 +169,8 @@ def build_llm_prompt_messages(
             ]
         )
 
-        # Ensure all expected variables are present before formatting
-        # Note: 'chat_history' is now an expected variable for the placeholder
         expected_vars = list(system_vars.keys()) + ["chat_history", "customer_message"]
+
         # Simple check (can be more robust)
         missing_keys = [key for key in expected_vars if key not in all_input_vars]
         if missing_keys:
@@ -165,7 +181,7 @@ def build_llm_prompt_messages(
         formatted_messages = chat_template.format_messages(**all_input_vars)
 
         logger.debug(
-            f"Generated prompt messages for account {profile.company_name} including history."
+            f"Generated prompt messages for account {profile.company_name} including history, address, delivery."
         )
         return formatted_messages
 

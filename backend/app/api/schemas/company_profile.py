@@ -1,3 +1,5 @@
+# backend/app/schemas/company_profile.py
+
 from pydantic import BaseModel, Field, HttpUrl
 from typing import List, Optional
 
@@ -17,17 +19,25 @@ class OfferingInfo(BaseModel):
         None,
         description="Brief pricing information (e.g., 'Starts at $X', 'Contact for quote').",
     )
+    # Note: Specific delivery options per item deferred for future refinement.
 
 
 class CompanyProfileSchema(BaseModel):
     """
     Defines the configuration and knowledge base for the AI seller
-    representing a specific company (Phase 1 Focus).
+    representing a specific company. Includes address and general delivery options.
     """
 
     company_name: str = Field(..., description="Official name of the company.")
     website: Optional[HttpUrl] = Field(
         None, description="Company's primary website URL."
+    )
+    opening_hours: Optional[str] = Field(
+        None,
+        description="Company opening hours, including timezone if possible (e.g., 'Seg-Sex 9h-18h BRT', 'Todos os dias 8h-20h').",
+    )
+    address: Optional[str] = Field(
+        None, description="Physical store address, if applicable and should be shared."
     )
     business_description: str = Field(
         ...,
@@ -49,12 +59,11 @@ class CompanyProfileSchema(BaseModel):
     )
     communication_guidelines: List[str] = Field(
         default_factory=list,
-        description="Specific DOs and DON'Ts for the AI (e.g., 'DO always ask clarifying questions').",
+        description="Specific DOs and DON'Ts for the AI (e.g., 'DO always ask clarifying questions', 'DO NOT invent information not provided').",
     )
 
     # --- Objectives and Selling Strategy ---
     ai_objective: str = Field(
-        # Changed default to be more generic for broader use cases initially
         default="Engage customers, answer questions about offerings, and guide them towards a purchase or next step.",
         description="Main goal of the AI (e.g., close sales, qualify leads, provide product info).",
     )
@@ -66,11 +75,16 @@ class CompanyProfileSchema(BaseModel):
         default_factory=list,
         description="List of key products/services with short details.",
     )
+    # ADDED: General delivery options field
+    delivery_options: List[str] = Field(
+        default_factory=list,
+        description="List of available delivery/pickup options for the company (e.g., 'Delivery in X area', 'In-store pickup').",
+    )
 
     # --- Fallback and Error Handling ---
     fallback_contact_info: Optional[str] = Field(
         None,
-        description="What the AI should say when it cannot help (e.g., email or phone number).",
+        description="What the AI should say when it cannot help (e.g., email or phone number). Should include instructions NOT to invent details.",
     )
 
     # --- Versioning ---
@@ -78,15 +92,13 @@ class CompanyProfileSchema(BaseModel):
         default=1, description="Version number of the profile schema."
     )
 
-    # --- NOTE: Follow-up configuration deferred to a later phase ---
-    # follow_up: Optional[FollowUpConfig] = Field(None, description="Rules for follow-up (Phase 5+)")
-
     class Config:
         schema_extra = {
-            # Example updated slightly to reflect the refined fields
             "example": {
                 "company_name": "Padaria Central",
-                "website": "https://padariacentral.com.br",
+                "opening_hours": "Seg-Sáb 8h às 18h (Horário de Brasília)",
+                "website": "https://padariacentral.com.br/",  # Added trailing slash based on previous test adjustment
+                "address": "Rua das Flores, 123 - Bairro Central",  # Added example address
                 "business_description": "Padaria de bairro especializada em pães artesanais e bolos caseiros.",
                 "target_audience": "Moradores da região, pessoas que valorizam produtos frescos e de qualidade.",
                 "sales_tone": "descontraído, simpático e acolhedor",
@@ -95,8 +107,9 @@ class CompanyProfileSchema(BaseModel):
                     "DO use emoji with moderation",
                     "DON'T offer discounts unless explicitly configured",
                     "DO emphasize freshness and handmade nature",
+                    "DO NOT invent information like specific opening hours unless provided.",
                 ],
-                "ai_objective": "vender produtos diretamente pelo WhatsApp e atrair clientes para a loja física",  # Example objective
+                "ai_objective": "vender produtos diretamente pelo WhatsApp e atrair clientes para a loja física",
                 "key_selling_points": [
                     "Pães assados na hora",
                     "Ingredientes naturais e sem conservantes",
@@ -106,10 +119,7 @@ class CompanyProfileSchema(BaseModel):
                     {
                         "name": "Pão Francês",
                         "short_description": "Crocante por fora, macio por dentro.",
-                        "key_features": [
-                            "Assado no dia",
-                            "Sem aditivos",
-                        ],  # Price removed from features as it's in price_info
+                        "key_features": ["Assado no dia", "Sem aditivos"],
                         "price_info": "R$ 0,80/unidade",
                     },
                     {
@@ -122,7 +132,12 @@ class CompanyProfileSchema(BaseModel):
                         "price_info": "R$ 30,00",
                     },
                 ],
-                "fallback_contact_info": "Em caso de dúvidas, fale com a gente no (11) 99999-9999 ou visite a loja.",
+                # Added example delivery options
+                "delivery_options": [
+                    "Retirada na loja durante o horário comercial (8h às 18h).",
+                    "Delivery disponível no bairro Central via app parceiro (taxa aplicável).",
+                ],
+                "fallback_contact_info": "Para informações mais detalhadas ou se eu não puder ajudar, fale com a gente no (11) 99999-9999 ou visite a loja na Rua das Flores, 123.",
                 "profile_version": 1,
             }
         }

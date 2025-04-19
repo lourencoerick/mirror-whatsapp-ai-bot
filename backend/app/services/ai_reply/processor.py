@@ -5,6 +5,7 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 from uuid import UUID
+from datetime import datetime, timezone
 
 # Import necessary components from within the service
 from . import profile_loader, prompt_builder, llm_client
@@ -99,8 +100,20 @@ async def process_message(
         )
         chat_history = []
 
+    try:
+        now_utc = datetime.now(timezone.utc)
+        formatted_datetime = now_utc.strftime("%Y-%m-%d %H:%M:%S %Z")
+        logger.debug(f"Current datetime for prompt: {formatted_datetime}")
+    except Exception as time_exc:
+        # Handle potential errors getting time, though unlikely
+        logger.error(f"Failed to get or format current time: {time_exc}")
+        formatted_datetime = "Time unavailable"
+
     prompt_messages: List[BaseMessage] = prompt_builder.build_llm_prompt_messages(
-        profile=profile, message_text=message_text, chat_history=chat_history
+        profile=profile,
+        message_text=message_text,
+        chat_history=chat_history,
+        current_datetime=formatted_datetime,
     )
 
     if not prompt_messages:
