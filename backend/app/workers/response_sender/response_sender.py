@@ -152,6 +152,7 @@ class ResponseSender:
                 )
 
             message.status = status_from_provider
+            message.source_id = external_id
             db.add(message)
 
             logger.info(

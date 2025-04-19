@@ -132,6 +132,7 @@ async def get_or_create_conversation(
     inbox_id: UUID,
     account_id: UUID,
     contact_inbox_id: UUID,
+    status: ConversationStatusEnum = ConversationStatusEnum.PENDING,
 ) -> Conversation:
     """Find or create a conversation for a given contact in an inbox.
 
@@ -176,7 +177,7 @@ async def get_or_create_conversation(
         account_id=account_id,
         inbox_id=inbox_id,
         contact_inbox_id=contact_inbox_id,
-        status=ConversationStatusEnum.OPEN,
+        status=status,
         additional_attributes=additional_attributes,
     )
     db.add(conversation)
