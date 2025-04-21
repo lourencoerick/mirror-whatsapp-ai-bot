@@ -8,7 +8,7 @@ const siteMetadata = {
   siteUrl: 'https://app.lambdalabs.com.br',
   // siteRepo: 'https://github.com/lambda-labs-ai',
   siteLogo: `${process.env.BASE_PATH || ''}/logo.svg`,
-  // socialBanner: `${process.env.BASE_PATH || ''}/social-banner.png`,
+  socialBanner: `${process.env.BASE_PATH || ''}/social-banner.png`,
   email: 'tecnologia@lambdalabs.com.br',
   // github: 'https://github.com/lambda-labs-ai',
   // linkedin: 'https://www.linkedin.com/company/lambda-labs-ai',
