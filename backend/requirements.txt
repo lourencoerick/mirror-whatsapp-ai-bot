@@ -45,3 +45,5 @@ google-cloud-storage
 langchain==0.3.23
 langchain-openai==0.3.14
 langgraph==0.3.31
+
+sentence_transformers==4.1.0
