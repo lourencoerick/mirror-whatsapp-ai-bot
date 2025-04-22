@@ -28,6 +28,10 @@ class CompanyProfileSchema(BaseModel):
     representing a specific company. Includes address and general delivery options.
     """
 
+    id: Optional[str] = Field(
+        None,
+        description="Unique identifier for the company profile. Auto-generated if not provided.",
+    )
     company_name: str = Field(..., description="Official name of the company.")
     website: Optional[HttpUrl] = Field(
         None, description="Company's primary website URL."

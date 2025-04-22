@@ -6,6 +6,9 @@ from app.models.conversation import ConversationStatusEnum
 
 
 class InboxBase(BaseModel):
+    id: Optional[UUID] = Field(
+        None, description="Unique identifier for the inbox (UUID)"
+    )
     name: str = Field(
         ..., min_length=1, max_length=255, description="Name of the inbox"
     )
