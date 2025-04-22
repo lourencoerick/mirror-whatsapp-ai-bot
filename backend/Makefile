@@ -40,10 +40,13 @@ onboarding: ## Run onboarding setup
 	PYTHONPATH=$(APP_DIR) $(PYTHON) scripts/setup_onboarding.py
 
 worker-consumer: ## Run Consumer
-	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/message_consumer.py 
+	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/consumer/message_consumer.py 
 
 worker-response: ## Run Response sender
-	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/response_sender.py
+	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/response_sender/response_sender.py
+
+worker-ai: ## Run Response sender
+	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/ai_replier.py
 
 worker-arq: ## Run Response sender
 	PYTHONPATH=$(APP_DIR) arq app.workers.batch_contacts.contact_creator.WorkerSettings
