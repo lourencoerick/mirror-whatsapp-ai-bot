@@ -4,6 +4,9 @@ from loguru import logger
 from pydantic import Field
 from functools import lru_cache
 from typing import Optional, List
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
