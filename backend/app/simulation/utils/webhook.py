@@ -1,8 +1,7 @@
-# backend/app/simulation/utils/webhook_utils.py
-
 import asyncio
 import json
 import uuid
+import time
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 from datetime import datetime, timezone
@@ -12,87 +11,76 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# App Imports (ajuste os caminhos se necessário)
 from app.config import get_settings
-from app.api.schemas.webhooks.evolution import (  # Schema para criar o payload
+from app.api.schemas.webhooks.evolution import (
     EvolutionWebhookPayload,
     EvolutionWebhookMessage,
     EvolutionWebhookData,
     EvolutionWebhookKey,
 )
-from app.models.message import Message  # Modelo para buscar a resposta da IA
-from app.simulation.config import (  # Configs para IDs e parâmetros de polling
+from app.models.message import Message
+from app.simulation.config import (
+    SIMULATION_ACCOUNT_ID,
     SIMULATION_INBOX_ID,
     SIMULATION_CONTACT_ID,
     SIMULATION_CHANNEL_ID,
     POLL_INTERVAL_SECONDS,
     MAX_POLL_ATTEMPTS,
+    WEBHOOK_URL,
 )
-
-# Importar definições da persona e enums para a função de checagem
 from app.simulation.schemas.persona_definition import PersonaDefinition
 from app.models.simulation.simulation import SimulationOutcomeEnum
 from app.models.simulation.simulation_event import SimulationEventTypeEnum
 
-
 settings = get_settings()
-
-# --- Funções Movidas e Adaptadas ---
 
 
 def create_message_payload(
-    message_text: str, conversation_id: Optional[UUID] = None
+    message_text: str, identifier: str, conversation_id: Optional[UUID] = None
 ) -> Dict[str, Any]:
     """
     Generates an EvolutionWebhookPayload dictionary for sending a message.
 
     Args:
         message_text: The content of the message to send.
-        conversation_id: Optional conversation ID if continuing an existing chat.
+        identifier: The unique identifier of the simulated contact.
+        conversation_id: Optional conversation ID for continuing an existing chat.
 
     Returns:
         A dictionary representing the JSON payload for the webhook.
     """
-    # Usar IDs fixos da configuração
     account_id = SIMULATION_ACCOUNT_ID
     inbox_id = SIMULATION_INBOX_ID
     contact_id = SIMULATION_CONTACT_ID
     channel_id = SIMULATION_CHANNEL_ID
-    # Gerar um ID único para esta mensagem simulada
-    message_sim_id = f"sim-{uuid.uuid4()}"
-    # Usar um identificador consistente para o contato simulado
-    remote_jid = f"sim_contact_{contact_id}@simulated.whatsapp.net"  # Exemplo
 
-    # Monta a estrutura do payload (baseado no seu schema EvolutionWebhookPayload)
-    # Adapte conforme a estrutura exata que seu webhook espera
+    message_sim_id = f"sim-{uuid.uuid4()}"
+    remote_jid = f"{identifier}@simulated.whatsapp.net"
+
+    current_epoch_timestamp = int(time.time())
+
     payload = EvolutionWebhookPayload(
-        event="messages.upsert",  # Ou o evento correto
-        instance=str(channel_id),  # ID da instância/canal
+        event="messages.upsert",
+        instance=channel_id,
         data=EvolutionWebhookData(
             key=EvolutionWebhookKey(
                 remoteJid=remote_jid,
-                fromMe=False,  # Mensagem da persona (simulando cliente) é recebida
+                fromMe=False,
                 id=message_sim_id,
-                participant=None,  # Ajuste se necessário
             ),
-            pushName=f"sim_contact_{contact_id}",  # Nome do contato simulado
-            message=EvolutionWebhookMessage(
-                conversation=message_text,
-                # Adicione outros campos se seu schema/parser esperar (e.g., messageContextInfo)
-            ),
-            messageType="conversation",  # Ou o tipo correto
-            messageTimestamp=int(time.time()),  # Usar time.time() é mais simples aqui
-            instanceId=str(channel_id),
-            source="simulation_script",  # Identificar a origem
+            pushName=f"sim_contact_{contact_id}",
+            message=EvolutionWebhookMessage(conversation=message_text),
+            messageType="conversation",
+            messageTimestamp=current_epoch_timestamp,
+            instanceId=channel_id,
+            source="sim-evolution",
         ),
-        # Campos adicionais que seu webhook pode esperar
-        destination=f"{contact_id}@{inbox_id}",  # Exemplo de destino interno
+        destination=f"{SIMULATION_CONTACT_ID}@{SIMULATION_INBOX_ID}",
         date_time=datetime.now(timezone.utc).isoformat(),
-        server_url=settings.BACKEND_BASE_URL,  # Usar config
-        apikey="simulation_key",  # Usar uma chave específica ou omitir se não aplicável
+        server_url="sim-server-url",
+        apikey="sim-api-key",
     )
 
-    # Retorna como dicionário, excluindo Nones, pronto para JSON
     return payload.model_dump(exclude_none=True, mode="json")
 
 
@@ -106,7 +94,7 @@ async def send_message_to_webhook(payload: Dict[str, Any]) -> Optional[Dict[str,
     Returns:
         The JSON response from the webhook if successful, otherwise None.
     """
-    webhook_url = f"{settings.BACKEND_BASE_URL}/webhooks/evolution/{SIMULATION_CHANNEL_ID}"  # Constrói URL dinamicamente
+    webhook_url = WEBHOOK_URL
     logger.debug(f"Sending payload to webhook: {webhook_url}")
     async with httpx.AsyncClient() as client:
         try:
@@ -120,10 +108,7 @@ async def send_message_to_webhook(payload: Dict[str, Any]) -> Optional[Dict[str,
                 return response.json()
             except json.JSONDecodeError:
                 logger.warning("Webhook response was not valid JSON.")
-                return {
-                    "status": "success",
-                    "conversation_id": None,
-                }  # Retorna um dict padrão
+                return {"status": "success", "conversation_id": None}
         except httpx.RequestError as exc:
             logger.error(f"HTTP Request error sending to webhook: {exc}")
             return None
@@ -162,13 +147,11 @@ async def poll_for_ai_response(
             stmt = (
                 select(Message)
                 .where(Message.conversation_id == conversation_id)
-                .where(Message.direction == "out")  # Busca mensagens de saída (da IA)
+                .where(Message.direction == "out")  # Fetching outgoing messages
             )
-            # Compara com created_at da mensagem no DB
             if last_message_timestamp:
                 stmt = stmt.where(Message.created_at > last_message_timestamp)
 
-            # Ordena pela data de criação para pegar a mais recente
             stmt = stmt.order_by(Message.created_at.desc()).limit(1)
 
             result = await db.execute(stmt)
@@ -179,8 +162,6 @@ async def poll_for_ai_response(
                 return ai_message
         except Exception as poll_exc:
             logger.error(f"Error during DB poll for AI response: {poll_exc}")
-            # Decide se continua ou para em caso de erro no poll
-            # Por enquanto, continua tentando
 
     logger.warning(
         f"Polling timed out after {MAX_POLL_ATTEMPTS * POLL_INTERVAL_SECONDS}s. No new AI response found."
@@ -188,7 +169,6 @@ async def poll_for_ai_response(
     return None
 
 
-# --- Nova Função ---
 def check_explicit_failure_criteria(
     persona: PersonaDefinition,
     turn: int,
@@ -224,7 +204,6 @@ def check_explicit_failure_criteria(
                     logger.warning(
                         f"Failure criterion met: Event '{required_event_type.value}' occurred."
                     )
-                    # Map failure event to outcome
                     if (
                         required_event_type
                         == SimulationEventTypeEnum.AI_FALLBACK_DETECTED
@@ -240,12 +219,10 @@ def check_explicit_failure_criteria(
                         == SimulationEventTypeEnum.AI_PROCESSING_ERROR
                     ):
                         return SimulationOutcomeEnum.AI_ERROR
-                    else:  # Default for other failure events like PERSONA_GAVE_UP (if logged as event)
+                    else:
                         return SimulationOutcomeEnum.USER_GAVE_UP
             except ValueError:
                 logger.error(
                     f"Invalid event type in failure criterion: {required_event_type_str}"
                 )
-        # Adicione outras checagens de critério de falha aqui se necessário
-
     return None  # No explicit failure criterion met
