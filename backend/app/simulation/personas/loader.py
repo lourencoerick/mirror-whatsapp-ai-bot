@@ -11,7 +11,7 @@ from app.simulation.schemas.persona_definition import PersonaDefinition
 
 from app.simulation.config import (
     PERSONA_DIR,
-)  # Assumindo que PERSONA_DIR está em config.py
+)
 
 
 async def load_persona(persona_id: str) -> Optional[PersonaDefinition]:
@@ -30,23 +30,19 @@ async def load_persona(persona_id: str) -> Optional[PersonaDefinition]:
         return None
 
     persona_filename = f"{persona_id}.json"
-    # Usa a variável PERSONA_DIR importada da configuração
+
     persona_path = os.path.join(PERSONA_DIR, persona_filename)
     logger.info(f"Attempting to load persona '{persona_id}' from {persona_path}")
 
     try:
-        # Verifica se o diretório existe
         if not os.path.isdir(PERSONA_DIR):
             logger.error(f"Persona directory not found: {PERSONA_DIR}")
             return None
 
-        # Abre e lê o arquivo JSON
         with open(persona_path, "r", encoding="utf-8") as f:
             raw_persona_data: Dict[str, Any] = json.load(f)
         logger.debug(f"Loaded raw persona data for {persona_id}")
 
-        # Valida os dados brutos usando o schema Pydantic
-        # Não há mais processamento de embeddings aqui
         persona = PersonaDefinition.model_validate(raw_persona_data)
 
         logger.success(f"Persona '{persona_id}' loaded and validated successfully.")
@@ -60,7 +56,6 @@ async def load_persona(persona_id: str) -> Optional[PersonaDefinition]:
         return None
     except ValidationError as e:
         logger.error(f"Persona validation failed for {persona_path}: {e}")
-        # logger.error(e.errors()) # Para mais detalhes do erro de validação
         return None
     except Exception as e:
         logger.exception(f"Unexpected error loading persona {persona_id}: {e}")
