@@ -1,5 +1,3 @@
-# backend/app/models/simulation_message.py
-
 import uuid
 from sqlalchemy import (
     Column,
@@ -15,13 +13,13 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
 
-from app.models.base import BaseModel  # Import Base from your database setup
+from app.models.base import BaseModel
 
 
 class SimulationMessageRoleEnum(str, enum.Enum):
-    USER = "user"  # Message from the simulated persona
-    ASSISTANT = "assistant"  # Message from our AI Seller
-    SYSTEM = "system"  # Could store the initial system prompt here if desired
+    USER = "user"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
 
 
 class SimulationMessage(BaseModel):
@@ -39,9 +37,7 @@ class SimulationMessage(BaseModel):
     )
     simulation_id = Column(
         PG_UUID(as_uuid=True),
-        ForeignKey(
-            "simulations.id", ondelete="CASCADE"
-        ),  # Link to the parent simulation
+        ForeignKey("simulations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         doc="FK to the Simulation this message belongs to.",
