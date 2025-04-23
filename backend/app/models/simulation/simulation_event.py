@@ -1,37 +1,26 @@
-# backend/app/models/simulation_event.py (Novo arquivo)
-
 import uuid
 import enum
-from sqlalchemy import Column, DateTime, ForeignKey, JSON, Enum as SAEnum, Text, Integer
+from sqlalchemy import Column, DateTime, ForeignKey, JSON, Enum as SAEnum, Integer
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from app.models.base import BaseModel  # Import Base from your database setup
+from app.models.base import BaseModel
 
 
-# Enum para tipos de eventos (expandir conforme necessário)
 class SimulationEventTypeEnum(str, enum.Enum):
     SIMULATION_START = "simulation_start"
-    TURN_START = "turn_start"  # Indica início de um turno (user+assistant)
+    TURN_START = "turn_start"
     USER_MESSAGE_SENT = "user_message_sent"
     AI_RESPONSE_RECEIVED = "ai_response_received"
-    AI_FALLBACK_DETECTED = "ai_fallback_detected"  # IA usou a mensagem de fallback
-    PERSONA_OBJECTIVE_MET = (
-        "persona_objective_met"  # Lógica da persona detectou sucesso
-    )
-    PERSONA_GAVE_UP = "persona_gave_up"  # Lógica da persona decidiu desistir
-    RULE_VIOLATION_DETECTED = (
-        "rule_violation_detected"  # Se tivermos regras automáticas
-    )
-    LLM_EVALUATION_TRIGGERED = "llm_evaluation_triggered"  # Se usarmos LLM-as-judge
-    AI_PROCESSING_ERROR = "ai_processing_error"  # Erro específico no fluxo da IA
-    SIMULATION_ENGINE_ERROR = (
-        "simulation_engine_error"  # Erro no próprio script do simulador
-    )
-    TURN_LIMIT_WARNING = (
-        "turn_limit_warning"  # Aviso de que está chegando perto do limite
-    )
+    AI_FALLBACK_DETECTED = "ai_fallback_detected"
+    PERSONA_OBJECTIVE_MET = "persona_objective_met"
+    PERSONA_GAVE_UP = "persona_gave_up"
+    RULE_VIOLATION_DETECTED = "rule_violation_detected"
+    LLM_EVALUATION_TRIGGERED = "llm_evaluation_triggered"
+    AI_PROCESSING_ERROR = "ai_processing_error"
+    SIMULATION_ENGINE_ERROR = "simulation_engine_error"
+    TURN_LIMIT_WARNING = "turn_limit_warning"
     SIMULATION_END = "simulation_end"
 
 
@@ -50,9 +39,7 @@ class SimulationEvent(BaseModel):
     )
     simulation_id = Column(
         PG_UUID(as_uuid=True),
-        ForeignKey(
-            "simulations.id", ondelete="CASCADE"
-        ),  # Link to the parent simulation
+        ForeignKey("simulations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         doc="FK to the Simulation this event belongs to.",
@@ -69,13 +56,13 @@ class SimulationEvent(BaseModel):
         index=True,
         doc="The type of event that occurred.",
     )
-    turn_number = Column(  # Adicionar turno ao evento pode ser útil
+    turn_number = Column(
         Integer,
-        nullable=True,  # Pode ser nulo para eventos de início/fim da simulação
+        nullable=True,
         doc="The conversation turn number when the event occurred, if applicable.",
     )
     details = Column(
-        JSON,  # Use JSON for flexible event details
+        JSON,
         nullable=True,
         doc="Optional JSON field for additional details about the event (e.g., error message, rule violated).",
     )
