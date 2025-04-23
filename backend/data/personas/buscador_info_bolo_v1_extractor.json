@@ -1,0 +1,24 @@
+{
+    "persona_id": "buscador_info_bolo_v1_extractor",
+    "simulation_contact_identifier": "5511922223333", 
+    "description": "Cliente interessado no bolo de cenoura, usa LLM Extrator para obter detalhes de tamanho, preço e entrega.",
+    "initial_message": "Olá! Gostaria de saber mais sobre o bolo de cenoura.",
+    "objective": "Obter informações sobre tamanho/porções, preço e opções de entrega para o bolo de cenoura.",
+    "information_needed": [
+        {"entity": "Bolo de Cenoura com Chocolate", "attribute": "size"},
+        {"entity": "Bolo de Cenoura com Chocolate", "attribute": "price"},
+        {"entity": "Bolo de Cenoura com Chocolate", "attribute": "delivery_options"}
+    ],
+    "info_attribute_to_question_template": {
+        "size": "Qual o tamanho desse bolo? Serve quantas pessoas?",
+        "price": "E qual o valor do bolo?",
+        "delivery_options": "Como funciona a entrega ou retirada?"
+    },
+    "success_criteria": [
+        "state:all_info_extracted"
+    ],
+    "failure_criteria": [
+        "event:ai_fallback_detected",
+        "turn_count > 8"
+    ]
+}
