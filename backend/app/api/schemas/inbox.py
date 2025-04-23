@@ -16,6 +16,11 @@ class InboxBase(BaseModel):
     channel_details: Optional[Dict[str, Any]] = Field(
         None, description="Channel specific configuration details (JSON)"
     )
+
+    initial_conversation_status: Optional[ConversationStatusEnum] = Field(
+        None,
+        description="New default status for new conversations (OPEN or PENDING)",
+    )
     enable_auto_assignment: Optional[bool] = Field(
         True, description="Enable automatic assignment for this inbox"
     )  # Default to True?
