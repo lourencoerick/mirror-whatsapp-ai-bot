@@ -1,16 +1,32 @@
-# backend/app/simulation/schemas/persona_definition.py
-
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+
+
+class InfoRequest(BaseModel):
+    """Defines a specific piece of information the persona needs."""
+
+    entity: str = Field(
+        ..., description="The entity the information is about (e.g., 'Pão Francês')."
+    )
+    attribute: str = Field(
+        ...,
+        description="The attribute needed for the entity (e.g., 'price', 'size'). Must match keys in info_attribute_to_question_template.",
+    )
 
 
 class PersonaDefinition(BaseModel):
     """
     Defines the characteristics and behavior of a simulated customer persona
-    using an LLM Extractor approach via trustcall for conversation logic.
+    using an LLM Extractor (trustcall) to populate a list of extracted facts.
     """
 
     persona_id: str = Field(..., description="Unique identifier/name for the persona.")
+
+    simulation_contact_identifier: str = Field(
+        ...,
+        description="The unique identifier for the contact (e.g., '+5511...', 'sim_user@example.com'). Used in webhook payload 'from' field.",
+    )
+
     description: str = Field(
         ..., description="Brief description of the persona's characteristics."
     )
@@ -21,48 +37,40 @@ class PersonaDefinition(BaseModel):
         ..., description="Clear description of what the persona wants to achieve."
     )
 
-    # --- Informações Necessárias e Perguntas ---
-    information_needed: List[str] = Field(
+    information_needed: List[InfoRequest] = Field(
         default_factory=list,
-        description="List of specific information keys (MUST match fields in PersonaState) the persona needs to obtain.",
+        description="List of specific entity-attribute pairs the persona needs to find.",
     )
-    info_to_question_map: Dict[str, str] = Field(
+    info_attribute_to_question_template: Dict[str, str] = Field(
         default_factory=dict,
-        description="Maps an information key (from information_needed) to the question the persona asks to get it.",
+        description="Maps an attribute name to a question template. Use '{entity}' for substitution.",
     )
-    # -------------------------------------------
 
-    # Critérios de sucesso/falha
     success_criteria: List[str] = Field(
-        default=["state:info_needed_empty"],
-        description="Conditions indicating the persona's objective was met (e.g., 'state:info_needed_empty').",
+        default=["state:all_info_extracted"],
+        description="Conditions indicating the persona's objective was met (e.g., 'state:all_info_extracted').",
     )
     failure_criteria: List[str] = Field(
         default_factory=list,
-        description="Conditions causing the persona to 'give up' (e.g., 'event:AI_FALLBACK_DETECTED', 'turn_count > 8').",
+        description="Conditions causing the persona to 'give up' (e.g., 'event:ai_fallback_detected', 'turn_count > 8').",
     )
-
-    # REMOVIDO: response_triggers: List[ResponseTrigger] = Field(...)
-    # REMOVIDO: default_response: str = Field(...)
 
     class Config:
         schema_extra = {
             "example": {
-                "persona_id": "buscador_info_bolo_v3_trustcall",
-                "description": "Cliente interessado no bolo de cenoura, usa trustcall.",
-                "initial_message": "Olá! Gostaria de saber mais sobre o bolo de cenoura.",
-                "objective": "Obter informações sobre tamanho/porções, preço e opções de entrega para o bolo de cenoura.",
+                "persona_id": "comparador_preco_v2_extractor",
+                "description": "Cliente focado em obter preços de itens específicos.",
+                "initial_message": "Oi, bom dia! Gostaria de saber os preços de alguns itens.",
+                "objective": "Obter os preços do Pão Francês e do Bolo de Cenoura.",
                 "information_needed": [
-                    "size",
-                    "price",
-                    "delivery_options",
-                ],  # Chaves devem bater com PersonaState
-                "info_to_question_map": {
-                    "size": "Qual o tamanho desse bolo? Serve quantas pessoas?",
-                    "price": "E qual o valor do bolo?",
-                    "delivery_options": "Como funciona a entrega ou retirada?",
+                    {"entity": "Pão Francês", "attribute": "price"},
+                    {"entity": "Bolo de Cenoura", "attribute": "price"},
+                ],
+                "info_attribute_to_question_template": {
+                    "price": "Poderia me informar o preço de {entity}, por favor?",
+                    "size": "Qual o tamanho disponível para {entity}?",
                 },
-                "success_criteria": ["state:info_needed_empty"],
-                "failure_criteria": ["event:AI_FALLBACK_DETECTED", "turn_count > 8"],
+                "success_criteria": ["state:all_info_extracted"],
+                "failure_criteria": ["event:AI_FALLBACK_DETECTED", "turn_count > 7"],
             }
         }
