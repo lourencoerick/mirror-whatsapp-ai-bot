@@ -1,5 +1,3 @@
-# backend/app/simulation/repositories/simulation_event_repo.py
-
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 
@@ -7,7 +5,6 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import Models
 from app.models.simulation.simulation_event import (
     SimulationEvent,
     SimulationEventTypeEnum,
@@ -48,7 +45,7 @@ async def create_event(
         db.add(db_event)
         await db.flush()
         await db.refresh(db_event)
-        # logger.debug(f"Simulation event created with ID: {db_event.id}") # Log menos verboso
+
         return db_event
     except Exception as e:
         logger.error(f"Error creating simulation event for sim_id={simulation_id}: {e}")
@@ -72,7 +69,7 @@ async def get_events_by_simulation_id(
     stmt = (
         select(SimulationEvent)
         .where(SimulationEvent.simulation_id == simulation_id)
-        .order_by(SimulationEvent.timestamp)  # Order by time occurred
+        .order_by(SimulationEvent.timestamp)
     )
     result = await db.execute(stmt)
     events = result.scalars().all()

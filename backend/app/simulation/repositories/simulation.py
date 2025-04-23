@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-# Import Models and Schemas
+
 from app.models.simulation.simulation import (
     Simulation,
     SimulationStatusEnum,
@@ -16,7 +16,7 @@ from app.models.simulation.simulation import (
 )
 from app.simulation.schemas.persona_definition import (
     PersonaDefinition,
-)  # Para criar a partir da definição
+)
 
 
 async def create_simulation(
@@ -36,13 +36,13 @@ async def create_simulation(
     logger.info(
         f"Creating new simulation record for persona '{persona_def.persona_id}'"
     )
-    # Exclui campos não persistidos como 'embeddings' antes de salvar
+
     persona_data_to_save = persona_def.model_dump(exclude={"embeddings"})
 
     db_simulation = Simulation(
         company_profile_id=profile_id,
         persona_definition=persona_data_to_save,
-        status=SimulationStatusEnum.RUNNING,  # Estado inicial
+        status=SimulationStatusEnum.RUNNING,
     )
     try:
         db.add(db_simulation)
@@ -52,7 +52,7 @@ async def create_simulation(
         return db_simulation
     except Exception as e:
         logger.error(f"Error creating simulation record: {e}")
-        raise  # Propaga a exceção para rollback
+        raise
 
 
 async def get_simulation_by_id(
@@ -107,7 +107,7 @@ async def update_simulation(
             )
 
     try:
-        db.add(db_simulation)  # Adiciona o objeto modificado
+        db.add(db_simulation)
         await db.flush()
         await db.refresh(db_simulation)
         logger.info(
@@ -117,6 +117,3 @@ async def update_simulation(
     except Exception as e:
         logger.error(f"Error updating simulation {sim_id}: {e}")
         raise
-
-
-# Poderíamos adicionar list_simulations, etc., se necessário no futuro

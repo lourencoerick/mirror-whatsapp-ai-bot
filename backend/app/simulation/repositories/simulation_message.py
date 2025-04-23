@@ -1,5 +1,3 @@
-# backend/app/simulation/repositories/simulation_message_repo.py
-
 from typing import Optional, List
 from uuid import UUID
 
@@ -7,7 +5,7 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import Models
+
 from app.models.simulation.simulation_message import (
     SimulationMessage,
     SimulationMessageRoleEnum,
@@ -21,7 +19,7 @@ async def create_message(
     turn: int,
     role: SimulationMessageRoleEnum,
     content: str,
-    original_message_id: Optional[UUID] = None,  # Opcional
+    original_message_id: Optional[UUID] = None,
 ) -> SimulationMessage:
     """
     Creates a new simulation message record.
@@ -51,7 +49,7 @@ async def create_message(
         db.add(db_message)
         await db.flush()
         await db.refresh(db_message)
-        # logger.debug(f"Simulation message created with ID: {db_message.id}") # Log menos verboso
+
         return db_message
     except Exception as e:
         logger.error(
