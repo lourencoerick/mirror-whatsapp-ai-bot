@@ -721,3 +721,59 @@ async def reset_conversation_unread_count(
             f"Database error resetting unread count for {conversation_id}: {e}"
         )
         return None
+
+
+async def find_conversation_by_contact_inbox(
+    db: AsyncSession, *, contact_id: UUID, inbox_id: UUID
+) -> Optional[Conversation]:
+    """
+    Retrieve a conversation based on the specific contact and inbox combination.
+
+    This function finds the ContactInbox linking the contact and inbox,
+    and then retrieves the associated Conversation.
+
+    Args:
+        db: The SQLAlchemy async session.
+        contact_id: The UUID of the contact.
+        inbox_id: The UUID of the inbox.
+
+    Returns:
+        The Conversation object if found, otherwise None.
+    """
+    logger.debug(
+        f"Finding conversation for contact_id={contact_id} and inbox_id={inbox_id}"
+    )
+    try:
+        stmt = (
+            select(Conversation)
+            .join(ContactInbox, Conversation.contact_inbox_id == ContactInbox.id)
+            .options(
+                selectinload(Conversation.inbox),
+                selectinload(Conversation.contact_inbox).selectinload(
+                    ContactInbox.contact
+                ),
+            )
+            .where(
+                and_(
+                    ContactInbox.contact_id == contact_id,
+                    ContactInbox.inbox_id == inbox_id,
+                )
+            )
+        )
+        result = await db.execute(stmt)
+        conversation = result.scalars().first()
+
+        if conversation:
+            logger.debug(
+                f"Found conversation {conversation.id} via contact/inbox link."
+            )
+        else:
+            logger.info(
+                f"No conversation found for contact_id={contact_id}, inbox_id={inbox_id}"
+            )
+
+        return conversation
+
+    except SQLAlchemyError as e:
+        logger.error(f"Database error finding conversation by contact/inbox: {e}")
+        raise e
