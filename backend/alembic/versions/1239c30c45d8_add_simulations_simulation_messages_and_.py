@@ -44,6 +44,7 @@ def upgrade() -> None:
                 "TURN_LIMIT_REACHED",
                 "AI_ERROR",
                 "SIMULATION_ERROR",
+                "TIMEOUT",
                 name="simulationoutcomeenum",
             ),
             nullable=True,
