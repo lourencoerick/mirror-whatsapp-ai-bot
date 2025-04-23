@@ -5,6 +5,7 @@ import os
 import sys
 from uuid import UUID
 from loguru import logger
+import json
 
 
 from sqlalchemy import select
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from app.api.schemas.inbox import InboxCreate
+from app.api.schemas.company_profile import CompanyProfileSchema
 from app.api.schemas.contact import ContactCreate
 from app.models.conversation import ConversationStatusEnum
 
@@ -25,22 +27,26 @@ if project_root not in sys.path:
 # --- App Imports ---
 from app.database import AsyncSessionLocal
 
+
 from app.models.account import Account
 from app.models.user import User
 from app.services.repository import inbox as inbox_repo
 from app.services.repository import contact as contact_repo
+from app.services.repository import company_profile as profile_repo
 
-
-SIMULATION_ACCOUNT_ID = UUID("11111111-aaaa-bbbb-cccc-123456789abc")
-SIMULATION_USER_ID = UUID("11111111-5d8f-41d3-94bc-63f20c6f3e4a")
-SIMULATION_INBOX_ID = UUID("11111111-dead-beef-cafe-abcdefabcdef")
-SIMULATION_CONTACT_ID = UUID("11111111-0000-4444-8888-ffffffffffff")
-SIMULATION_CHANNEL_ID = UUID("11111111-1234-5678-90ab-cdef12345678")
-SIMULATION_ACCOUNT_NAME = "Simulation Account"
-SIMULATION_USER_NAME = "Simulation User"
-SIMULATION_INBOX_NAME = "Simulation Inbox"
-SIMULATION_CONTACT_NAME = "Simulation Contact"
-SIMULATION_CONTACT_PHONE_NUMBER = "5511999999999"
+from app.simulation.config import (
+    SIMULATION_ACCOUNT_ID,
+    SIMULATION_COMPANY_PROFILE_ID,
+    SIMULATION_USER_ID,
+    SIMULATION_INBOX_ID,
+    SIMULATION_CONTACT_ID,
+    SIMULATION_CHANNEL_ID,
+    SIMULATION_ACCOUNT_NAME,
+    SIMULATION_USER_NAME,
+    SIMULATION_INBOX_NAME,
+    SIMULATION_CONTACT_NAME,
+    SIMULATION_CONTACT_PHONE_NUMBER,
+)
 
 
 async def setup_entities():
@@ -68,7 +74,26 @@ async def setup_entities():
                     f"Account '{account.name}' (ID: {account.id}) already exists."
                 )
 
-            # 1. Get or Create Account
+            file_path = os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "..",
+                "data",
+                "company_profiles",
+                f"padaria_central.json",
+            )
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            data["id"] = str(SIMULATION_COMPANY_PROFILE_ID)
+            profile_schema = CompanyProfileSchema(**data)
+
+            await profile_repo.get_or_create_profile(
+                db=db,
+                account_id=account.id,
+                profile_defaults=profile_schema.model_dump(),  # Pass defaults as dict
+            )
+
             result = await db.execute(
                 select(User).filter_by(
                     id=SIMULATION_USER_ID,
@@ -78,7 +103,7 @@ async def setup_entities():
             if not user:
                 logger.info("User not found, creating a new one...")
                 user = User(
-                    id=SIMULATION_ACCOUNT_ID,
+                    id=SIMULATION_USER_ID,
                     name=SIMULATION_USER_NAME,
                     uid="simulation_uid",
                     provider="simulation",
@@ -107,6 +132,7 @@ async def setup_entities():
                     channel_type="evolution",
                     initial_conversation_status=ConversationStatusEnum.BOT,
                     channel_details={"id": str(SIMULATION_CHANNEL_ID)},
+                    enable_auto_assignment=None,
                 )
 
                 inbox = await inbox_repo.create_inbox(
