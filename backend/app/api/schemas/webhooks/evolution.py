@@ -32,10 +32,34 @@ class ConnectionUpdateData(BaseModel):
     profilePictureUrl: Optional[str] = None
 
 
+class EvolutionWebhookKey(BaseModel):
+    """Represents the 'key' data often nested in webhook payloads."""
+
+    remoteJid: str
+    fromMe: bool
+    id: str
+
+
+class EvolutionWebhookMessage(BaseModel):
+    conversation: str
+
+
+class EvolutionWebhookData(BaseModel):
+    """Represents the 'data' data often nested in webhook payloads."""
+
+    key: EvolutionWebhookKey
+    pushName: str
+    message: EvolutionWebhookMessage | Dict[str, Any]
+    messageType: str
+    messageTimestamp: int
+    instanceId: str
+    source: str
+
+
 class EvolutionWebhookPayload(BaseModel):
     event: str
     instance: str
-    data: ConnectionUpdateData | Dict[str, Any]
+    data: ConnectionUpdateData | EvolutionWebhookData | Dict[str, Any]
     destination: str
     date_time: datetime
     server_url: str
