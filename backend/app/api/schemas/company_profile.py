@@ -99,7 +99,7 @@ class CompanyProfileSchema(BaseModel):
 
     class Config:
         from_attributes = True
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "company_name": "Padaria Central",
                 "opening_hours": "Seg-Sáb 8h às 18h (Horário de Brasília)",
