@@ -104,9 +104,13 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 message_text=persona.initial_message,
                 identifier=persona.simulation_contact_identifier,
             )
+
+            last_message_time = datetime.now(timezone.utc)
+
             webhook_response = await webhook_utils.send_message_to_webhook(
                 initial_payload
             )
+
             if webhook_response is None:
                 raise Exception("Failed to send initial message to webhook.")
 
@@ -132,7 +136,6 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 details={"content": persona.initial_message},
             )
             events_occurred.append(event_type)
-            last_message_time = datetime.now(timezone.utc)
 
             # Conversation loop
             while turn < MAX_CONVERSATION_TURNS:
