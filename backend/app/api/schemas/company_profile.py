@@ -1,6 +1,7 @@
 # backend/app/schemas/company_profile.py
 
 from pydantic import BaseModel, Field, HttpUrl
+from uuid import UUID
 from typing import List, Optional
 
 
@@ -28,7 +29,7 @@ class CompanyProfileSchema(BaseModel):
     representing a specific company. Includes address and general delivery options.
     """
 
-    id: Optional[str] = Field(
+    id: Optional[UUID] = Field(
         None,
         description="Unique identifier for the company profile. Auto-generated if not provided.",
     )
