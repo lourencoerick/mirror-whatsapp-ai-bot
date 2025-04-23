@@ -29,6 +29,9 @@ async def reset_simulation_conversation(
         f"Attempting to reset conversation for contact '{contact_identifier}' in inbox '{inbox.id}'"
     )
 
+    if not inbox:
+        raise ValueError(f"Inbox {inbox_id} not found. Cannot reset conversation.")
+
     # Find contact
     contact = await contact_repo.find_contact_by_identifier(
         db, account_id=account_id, identifier=contact_identifier
