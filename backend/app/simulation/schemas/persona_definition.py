@@ -56,7 +56,7 @@ class PersonaDefinition(BaseModel):
     )
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "persona_id": "comparador_preco_v2_extractor",
                 "description": "Cliente focado em obter preços de itens específicos.",
