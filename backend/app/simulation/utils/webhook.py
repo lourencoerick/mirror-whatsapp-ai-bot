@@ -10,6 +10,7 @@ import httpx
 from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import re
 
 from app.config import get_settings
 from app.api.schemas.webhooks.evolution import (
@@ -186,16 +187,21 @@ def check_explicit_failure_criteria(
         The SimulationOutcomeEnum if a failure criterion is met, otherwise None.
     """
     for criterion in persona.failure_criteria:
-        if criterion.startswith("turn_count > "):
+        turn_match = re.match(r"turn_count\s*>\s*(\d+)", criterion)
+        if turn_match:
             try:
-                limit = int(criterion.split(" > ")[1])
+                limit = int(turn_match.group(1))
                 if turn > limit:
                     logger.warning(
-                        f"Failure criterion met: Turn count {turn} exceeded limit {limit}."
+                        f"Failure criterion met: Turn count {turn} exceeded limit {limit} defined in '{criterion}'."
                     )
                     return SimulationOutcomeEnum.TURN_LIMIT_REACHED
-            except (ValueError, IndexError):
-                logger.error(f"Invalid turn_count criterion format: {criterion}")
+            except ValueError:
+                logger.error(
+                    f"Invalid number found in turn_count criterion: {criterion}"
+                )
+            continue
+
         elif criterion.startswith("event:"):
             required_event_type_str = criterion.split(":", 1)[1]
             try:
@@ -204,6 +210,7 @@ def check_explicit_failure_criteria(
                     logger.warning(
                         f"Failure criterion met: Event '{required_event_type.value}' occurred."
                     )
+
                     if (
                         required_event_type
                         == SimulationEventTypeEnum.AI_FALLBACK_DETECTED
@@ -225,4 +232,11 @@ def check_explicit_failure_criteria(
                 logger.error(
                     f"Invalid event type in failure criterion: {required_event_type_str}"
                 )
+            continue
+
+        else:
+            logger.warning(
+                f"Ignoring unrecognized failure criterion format: {criterion}"
+            )
+
     return None  # No explicit failure criterion met

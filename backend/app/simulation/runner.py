@@ -74,10 +74,6 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 )
                 await db.commit()
                 logger.info("Reset transaction committed.")
-            else:
-                raise ValueError(
-                    f"Inbox {inbox_id} not found. Cannot reset conversation."
-                )
 
             # Create initial simulation record
             simulation = await simulation_repo.create_simulation(

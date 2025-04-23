@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy import select
 from datetime import datetime, timezone
+import logging
+from loguru import logger
 
 # Model and App Imports
 from app.models.base import Base
@@ -24,10 +26,12 @@ from app.models.conversation import Conversation
 from app.models.contact_inbox import ContactInbox
 from app.models.contact import Contact
 from app.models.inbox_member import InboxMember
+from app.models.company_profile import CompanyProfile
 from app.main import app
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
 
+from app.simulation.schemas.persona_definition import PersonaDefinition, InfoRequest
 
 # --- Core Test Setup ---
 
@@ -278,3 +282,76 @@ def valid_evolution_payload() -> Dict[str, Any]:
         "server_url": "url_teste",
         "apikey": "api_key",
     }
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_simulation_company_profile(
+    db_session: AsyncSession, test_account: Account  # Reutiliza a fixture test_account
+) -> CompanyProfile:
+    """Creates and returns a persisted test CompanyProfile for simulation tests."""
+    # Use o SIMULATION_ACCOUNT_ID se quiser consistência com os scripts,
+    # mas usar o test_account da fixture garante um account_id válido no DB do teste.
+    profile = CompanyProfile(
+        id=uuid4(),
+        account_id=test_account.id,  # Usa o ID da conta criada pela fixture test_account
+        company_name="SimTest Corp",
+        business_description="Company for simulation testing.",
+        ai_objective="Simulate interactions.",
+        language="pt-BR",  # Adicione outros campos obrigatórios do seu modelo
+        sales_tone="neutral",
+        # Garanta que todos os campos NOT NULL sem default estejam aqui
+        communication_guidelines=[],
+        key_selling_points=[],
+        offering_overview=[],
+        delivery_options=[],
+    )
+    db_session.add(profile)
+    await db_session.flush()  # Usar flush em vez de commit dentro da fixture
+    await db_session.refresh(profile)
+    return profile
+
+
+@pytest.fixture(scope="function")
+def sample_persona_def() -> PersonaDefinition:
+    """Provides a sample valid PersonaDefinition object."""
+
+    return PersonaDefinition(
+        persona_id="test_persona_fixture",
+        # Adicionar os campos obrigatórios simulation_contact_id/identifier se já estiverem no schema
+        simulation_contact_identifier="5511999991111",
+        description="Fixture persona",
+        initial_message="Fixture init",
+        objective="Fixture objective",
+        information_needed=[InfoRequest(entity="Test Entity", attribute="test_attr")],
+        info_attribute_to_question_template={"test_attr": "Question for {entity}?"},
+        success_criteria=["state:all_info_extracted"],
+        failure_criteria=[],
+    )
+
+
+@pytest.fixture(autouse=True)  # autouse=True aplica a todas as funções no escopo
+def caplog_for_loguru(caplog):
+    """
+    Fixture to correctly capture Loguru logs with pytest's caplog.
+    """
+    # Define o nível mínimo que caplog deve capturar
+    caplog.set_level(logging.DEBUG)  # Captura tudo a partir de DEBUG
+
+    # Configura o handler do Loguru para propagar para o root logger
+    # que o caplog escuta.
+    class PropagateHandler(logging.Handler):
+        def emit(self, record):
+            logging.getLogger(record.name).handle(record)
+
+    # Remove handlers padrão do loguru para evitar duplicação se já configurado
+    # logger.remove() # Cuidado: pode remover handlers úteis se já configurados
+    # Adiciona o handler de propagação
+    # level=0 garante que TUDO do loguru seja passado para o handler
+    try:
+        # Tenta adicionar o handler. Pode falhar se já existir um com o mesmo nome.
+        logger.add(PropagateHandler(), format="{message}", level=0, diagnose=False)
+    except ValueError:
+        # Handler já pode existir de uma execução anterior ou config global
+        pass
+
+    yield  # O teste roda aqui
