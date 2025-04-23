@@ -17,6 +17,9 @@ from .webhook import Webhook
 from .channels.evolution_instance import EvolutionInstance
 from .import_job import ImportJob
 from .company_profile import CompanyProfile
+from .simulation.simulation import Simulation
+from .simulation.simulation_event import SimulationEvent
+from .simulation.simulation_message import SimulationMessage
 
 __all__ = [
     "AccessToken",
@@ -38,4 +41,7 @@ __all__ = [
     "EvolutionInstance",
     "ImportJob",
     "CompanyProfile",
+    "Simulation",
+    "SimulationEvent",
+    "SimulationMessage",
 ]

@@ -11,6 +11,9 @@ PHONE_REGEX = re.compile(r"^[0-9\+\-\s\(\)]+$")
 class ContactBase(BaseModel):
     """Base schema for contact attributes."""
 
+    id: Optional[uuid.UUID] = Field(
+        None, description="Unique identifier for the contact (UUID)"
+    )
     name: Optional[str] = Field(None, max_length=255, description="Contact's full name")
     email: Optional[EmailStr] = Field(
         None, description="Contact's email address (must be unique within the account)"

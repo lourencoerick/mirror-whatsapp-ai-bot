@@ -1,0 +1,22 @@
+{
+    "persona_id": "comprador_decidido_pao_v1_extractor",
+    "simulation_contact_identifier": "5511911112222", 
+    "description": "Cliente decidido que quer confirmar disponibilidade/preço do Pão Francês e pedir 5 unidades. Usa LLM Extrator.",
+    "initial_message": "Tem pão francês fresquinho?",
+    "objective": "Confirmar disponibilidade e preço do Pão Francês e fazer o pedido de 5 unidades.",
+    "information_needed": [
+        {"entity": "Pão Francês", "attribute": "availability"},
+        {"entity": "Pão Francês", "attribute": "price"}
+    ],
+    "info_attribute_to_question_template": {
+        "availability": "Ok, mas tem Pão Francês disponível agora?",
+        "price": "Entendi. E qual o preço da unidade do Pão Francês?"
+    },
+    "success_criteria": [
+        "state:all_info_extracted" 
+    ],
+    "failure_criteria": [
+        "event:ai_fallback_detected",
+        "turn_count > 5" 
+    ]
+}

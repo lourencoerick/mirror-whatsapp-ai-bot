@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
-from sqlalchemy import desc, select, tuple_, asc
+from sqlalchemy import desc, select, tuple_, asc, delete
 from typing import List, Optional
 from loguru import logger
 from app.models.message import Message
@@ -227,3 +227,33 @@ async def update_message_status_by_source_id(
     else:
         logger.warning(f"[message] Not found: {source_id}")
         return
+
+
+async def delete_messages_by_conversation(
+    db: AsyncSession, conversation_id: UUID
+) -> int:
+    """
+    Deletes all messages associated with a specific conversation ID.
+
+    Args:
+        db: The SQLAlchemy async session.
+        conversation_id: The UUID of the conversation whose messages are to be deleted.
+
+    Returns:
+        The number of messages deleted.
+    """
+    logger.warning(f"Deleting all messages for conversation_id: {conversation_id}")
+    stmt = delete(Message).where(Message.conversation_id == conversation_id)
+    try:
+        result = await db.execute(stmt)
+
+        deleted_count = result.rowcount
+
+        logger.info(
+            f"Deleted {deleted_count} messages for conversation {conversation_id}."
+        )
+        return deleted_count
+    except Exception as e:
+        logger.error(f"Error deleting messages for conversation {conversation_id}: {e}")
+        # Propaga a exceção para permitir rollback na chamada
+        raise

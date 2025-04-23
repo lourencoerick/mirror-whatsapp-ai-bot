@@ -158,7 +158,11 @@ async def handle_message(
         await queue.enqueue(message)
         logger.info(f"[webhook] Enqueued Evolution message: {message.get('source_id')}")
 
-        return {"status": "message enqueued", "source_id": message.get("source_id")}
+        return {
+            "status": "message enqueued",
+            "source_id": message.get("source_id"),
+            "conversation_id": str(message.get("conversation_id")),
+        }
 
     except HTTPException as e:
         logger.error(f"[webhook] {e}")

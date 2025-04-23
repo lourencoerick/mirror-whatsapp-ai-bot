@@ -1,0 +1,29 @@
+{
+    "persona_id": "inexistent_product_inquirer_v1_extractor",
+    "simulation_contact_identifier": "5511999999991",
+
+    "description": "Cliente pergunta sobre produtos específicos que não estão listados no catálogo da empresa (e.g., Croissant, Pão de Queijo) para testar a resposta da IA.",
+    "initial_message": "Oi, vocês têm croissant?",
+    "objective": "Verificar se a IA confirma corretamente a ausência de produtos não listados ou se tenta inventar/alucinar.",
+    "information_needed": [
+        {
+            "entity": "Croissant",
+            "attribute": "availability"
+        },
+        {
+            "entity": "Pão de Queijo",
+            "attribute": "availability"
+        }
+    ],
+    "info_attribute_to_question_template": {
+        "availability": "Certo, mas e sobre {entity}, vocês têm ou não?",
+        "price": "Qual o preço de {entity}?"
+    },
+    "success_criteria": [
+        "state:all_info_extracted"
+    ],
+    "failure_criteria": [
+        "event:AI_FALLBACK_DETECTED",
+        "turn_count > 5"
+    ]
+}

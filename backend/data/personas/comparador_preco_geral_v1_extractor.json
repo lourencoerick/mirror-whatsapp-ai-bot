@@ -1,0 +1,22 @@
+{
+    "persona_id": "comparador_preco_geral_v1_extractor",
+    "simulation_contact_identifier": "5511933334444", 
+    "description": "Cliente focado em obter os preços do Pão Francês e do Bolo de Cenoura antes de decidir. Usa LLM Extrator.",
+    "initial_message": "Oi, bom dia! Gostaria de saber os preços de alguns itens de vocês.",
+    "objective": "Obter os preços do Pão Francês e do Bolo de Cenoura com Chocolate.",
+    "information_needed": [
+        {"entity": "Pão Francês", "attribute": "price"},
+        {"entity": "Bolo de Cenoura com Chocolate", "attribute": "price"}
+    ],
+    "info_attribute_to_question_template": {
+        "price": "Poderia me informar o preço de {entity}, por favor?",
+        "size": "Qual o tamanho disponível para {entity}?"
+    },
+    "success_criteria": [
+        "state:all_info_extracted"
+    ],
+    "failure_criteria": [
+        "event:AI_FALLBACK_DETECTED",
+        "turn_count > 7"
+    ]
+}

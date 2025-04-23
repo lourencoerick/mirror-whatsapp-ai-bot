@@ -6,12 +6,20 @@ from app.models.conversation import ConversationStatusEnum
 
 
 class InboxBase(BaseModel):
+    id: Optional[UUID] = Field(
+        None, description="Unique identifier for the inbox (UUID)"
+    )
     name: str = Field(
         ..., min_length=1, max_length=255, description="Name of the inbox"
     )
     channel_type: str = Field(..., description="Type of the channel (e.g., 'whatsapp')")
     channel_details: Optional[Dict[str, Any]] = Field(
         None, description="Channel specific configuration details (JSON)"
+    )
+
+    initial_conversation_status: Optional[ConversationStatusEnum] = Field(
+        None,
+        description="New default status for new conversations (OPEN or PENDING)",
     )
     enable_auto_assignment: Optional[bool] = Field(
         True, description="Enable automatic assignment for this inbox"
