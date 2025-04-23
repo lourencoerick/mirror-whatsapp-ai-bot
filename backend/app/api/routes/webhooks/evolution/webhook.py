@@ -1,5 +1,13 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Body
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Response,
+    Body,
+)
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict
 from loguru import logger
@@ -35,8 +43,20 @@ async def handle_evolution_webhook(
     event_type = payload.event
     handler = EVENT_HANDLERS.get(event_type, handle_unknown_event)
     try:
-        await handler(platform_instance_id, payload, db)
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+        response: Dict[str, Any] = await handler(platform_instance_id, payload, db)
+        logger.info(
+            f"Handler {handler.__name__} processed event {event_type} for instance {platform_instance_id}. Response: {response}"
+        )
+        if event_type == "messages.upsert":
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "message": "Message upserted",
+                    "conversation_id": response.get("conversation_id"),
+                },
+            )
+        else:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     except HTTPException as http_exc:
         logger.warning(
@@ -51,5 +71,5 @@ async def handle_evolution_webhook(
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error processing webhook event.",
-        )
+            detail=f"Internal server error processing webhook event. {e}",
+        ) from e
