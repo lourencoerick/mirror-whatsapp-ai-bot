@@ -1,5 +1,6 @@
 import os
 from uuid import UUID
+from app.config import get_settings, Settings
 
 SIMULATION_COMPANY_PROFILE_ID = UUID("11111111-aaaa-bbbb-cccc-123456789abc")
 SIMULATION_ACCOUNT_ID = UUID("11111111-aaaa-bbbb-cccc-123456789abc")
@@ -16,3 +17,13 @@ SIMULATION_CONTACT_PHONE_NUMBER = "5511999999999"
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PERSONA_DIR = os.path.join(project_root, "data/personas")
+
+
+settings: Settings = get_settings()
+WEBHOOK_URL = os.getenv(
+    "SIMULATION_WEBHOOK_URL",
+    f"{settings.BACKEND_BASE_URL}/webhooks/evolution/{SIMULATION_CHANNEL_ID}",
+)
+POLL_INTERVAL_SECONDS = 3
+MAX_POLL_ATTEMPTS = 20
+MAX_CONVERSATION_TURNS = 15
