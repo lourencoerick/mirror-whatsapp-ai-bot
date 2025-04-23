@@ -1,5 +1,3 @@
-# backend/scripts/setup_simulation_entities.py
-
 import asyncio
 import os
 import sys
