@@ -1,12 +1,8 @@
-# backend/app/models/simulation.py
-
 import uuid
 from sqlalchemy import (
     Column,
     Boolean,
     Text,
-    String,
-    DateTime,
     ForeignKey,
     JSON,
     Enum as SAEnum,
@@ -14,13 +10,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 import enum
 
-from app.models.base import BaseModel  # Import Base from your database setup
+from app.models.base import BaseModel
 
 
-# Define Enum for Simulation Status
 class SimulationStatusEnum(str, enum.Enum):
     RUNNING = "running"
     COMPLETED = "completed"
@@ -28,19 +22,16 @@ class SimulationStatusEnum(str, enum.Enum):
     TIMEOUT = "timeout"
 
 
-# Define Enum for Simulation Outcome (customize as needed)
 class SimulationOutcomeEnum(str, enum.Enum):
-    # Success Outcomes
-    SALE_COMPLETED = "sale_completed"  # Persona decided to buy
-    LEAD_QUALIFIED = "lead_qualified"  # Persona reached qualification criteria
-    INFO_OBTAINED = "info_obtained"  # Persona got the info it needed
-    # Failure/Neutral Outcomes
-    USER_GAVE_UP = "user_gave_up"  # Persona logic decided to end conversation
-    AI_USED_FALLBACK = "ai_used_fallback"  # AI used its fallback message
+    SALE_COMPLETED = "sale_completed"
+    LEAD_QUALIFIED = "lead_qualified"
+    INFO_OBTAINED = "info_obtained"
+    USER_GAVE_UP = "user_gave_up"
+    AI_USED_FALLBACK = "ai_used_fallback"
     TURN_LIMIT_REACHED = "turn_limit_reached"
-    AI_ERROR = "ai_error"  # Error during AI processing detected
-    SIMULATION_ERROR = "simulation_error"  # Error in the simulation script itself
-    # Add more specific outcomes as needed
+    AI_ERROR = "ai_error"
+    SIMULATION_ERROR = "simulation_error"
+    TIMEOUT = "timeout"
 
 
 class Simulation(BaseModel):
@@ -56,18 +47,15 @@ class Simulation(BaseModel):
         default=uuid.uuid4,
         doc="Unique identifier for the simulation run.",
     )
-    # Foreign key to the profile used in this simulation
+
     company_profile_id = Column(
         PG_UUID(as_uuid=True),
-        ForeignKey(
-            "company_profiles.id", ondelete="SET NULL"
-        ),  # Keep simulation record even if profile deleted
-        nullable=True,  # Or False if profile must exist
+        ForeignKey("company_profiles.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
         doc="FK to the CompanyProfile used in this simulation.",
     )
-    # Store persona details (name or definition snapshot)
-    # Using JSON allows flexibility if personas are complex or LLM-generated
+
     persona_definition = Column(
         JSON, nullable=False, doc="JSON representation of the PersonaDefinition used."
     )
@@ -80,11 +68,11 @@ class Simulation(BaseModel):
     )
     outcome = Column(
         SAEnum(SimulationOutcomeEnum),
-        nullable=True,  # Null while running or if failed before outcome
+        nullable=True,
         index=True,
         doc="Final result/outcome of the simulation.",
     )
-    # Store basic metrics directly or in JSON
+
     turn_count = Column(
         Integer,
         nullable=True,
@@ -100,7 +88,7 @@ class Simulation(BaseModel):
         nullable=True,
         doc="Indicates if the AI used its fallback message during the simulation.",
     )
-    # JSON field for additional or complex metrics/evaluation results
+
     evaluation_metrics = Column(
         JSON,
         nullable=True,
@@ -111,12 +99,12 @@ class Simulation(BaseModel):
     )
 
     # --- Relationships ---
-    # Relationship to the messages of this simulation
+
     messages = relationship(
         "SimulationMessage",
         back_populates="simulation",
-        order_by="SimulationMessage.turn_number",  # Order messages by turn
-        cascade="all, delete-orphan",  # Delete messages if simulation is deleted
+        order_by="SimulationMessage.turn_number",
+        cascade="all, delete-orphan",
     )
 
     events = relationship(
