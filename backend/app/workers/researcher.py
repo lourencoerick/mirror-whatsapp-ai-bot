@@ -1,37 +1,35 @@
 # backend/app/workers/researcher.py
 
+import os
+import asyncio
 from uuid import UUID
-from loguru import logger
 from typing import Optional
 from arq.connections import RedisSettings
 from loguru import logger
 
-from app.config import get_settings, Settings
-
-
-# --- Arq and Asyncio ---
-# Ensure arq is installed: pip install arq
-# from arq import Retry # Import if using Arq's retry mechanism
+# --- Arq Imports ---
+# from arq import Retry # Uncomment if using Arq's retry mechanism
 
 # --- Project Imports ---
-# Orchestrator
+# Graph related imports
 try:
-    from app.services.researcher.orchestrator import research_and_create_profile
+    from app.services.researcher.graph import create_research_graph
+    from app.services.researcher.graph_state import ResearchState
 
-    ORCHESTRATOR_AVAILABLE = True
-except ImportError:
-    logger.error("Orchestrator function 'research_and_create_profile' not found.")
-    ORCHESTRATOR_AVAILABLE = False
+    GRAPH_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Failed to import research graph components: {e}")
+    GRAPH_AVAILABLE = False
 
-# LLM Client Base (for type hint) & Concrete Client (for startup)
+# LLM Client
 try:
+    from langchain_openai import ChatOpenAI
     from langchain_core.language_models import BaseChatModel
-    from langchain_openai import ChatOpenAI  # Example, adjust as needed
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
-    logger.error("LangChain core components not found.")
     LANGCHAIN_AVAILABLE = False
+    logger.warning("LangChain components not found. LLM functionality limited.")
 
     class BaseChatModel:
         pass
@@ -40,121 +38,157 @@ except ImportError:
         pass  # Dummy
 
 
-# Database Session (for type hint and startup)
+# Search Client
+try:
+    from app.services.search.client import SearchService
+
+    SEARCH_AVAILABLE = True
+except ImportError:
+    SEARCH_AVAILABLE = False
+    logger.warning("SearchService not found. Search functionality disabled.")
+
+    class SearchService:  # Dummy
+        def __init__(self, api_key):
+            pass
+
+
+# Database Session & Config
 try:
     from sqlalchemy.ext.asyncio import (
         AsyncSession,
         create_async_engine,
         async_sessionmaker,
     )
-    from app.config import get_settings  # Assuming settings has DATABASE_URL
+
+    # Assuming settings are correctly loaded elsewhere or directly via config
+    from app.config import get_settings
 
     settings = get_settings()
+
     SQLALCHEMY_AVAILABLE = True
 except ImportError:
-    logger.error("SQLAlchemy components not found.")
     SQLALCHEMY_AVAILABLE = False
+    logger.error("SQLAlchemy components or settings not found.")
     AsyncSession = None  # type: ignore
     async_sessionmaker = None  # type: ignore
     create_async_engine = None  # type: ignore
-    settings = type("obj", (object,), {"DATABASE_URL": None})()  # Dummy settings
+    # Minimal dummy settings if import fails
+    settings = type("obj", (object,), {"DATABASE_URL": None})()
 
 
-# --- Arq Task Definition ---
+# ==============================================================================
+# Arq Task Definition
+# ==============================================================================
 
 
 async def run_profile_research(ctx: dict, url: str, account_id: UUID):
     """
-    Arq task to perform website research, extract profile, and save to DB.
+    Arq task to run the LangGraph-based research agent.
 
-    Args:
-        ctx: The Arq context dictionary, containing 'db_session_factory' and 'llm'.
-        url: The URL of the website to research.
-        account_id: The UUID of the account associated with the profile.
+    Retrieves dependencies (DB factory, LLM, Search client) from the worker
+    context (`ctx`) and invokes the research graph.
     """
-    task_id = ctx.get("job_id", "unknown_job")  # Get Arq job ID if available
+    task_id = ctx.get("job_id", "unknown_job")
     logger.info(
-        f"[ResearcherTask:{task_id}] Starting for URL: {url}, Account: {account_id}"
+        f"[ResearcherGraphTask:{task_id}] Starting for URL: {url}, Account: {account_id}"
     )
 
-    # --- Get Dependencies from Context ---
-    session_factory = ctx.get("db_session_factory")
+    # --- Get Dependencies from Worker Context ---
+    db_session_factory = ctx.get("db_session_factory")
     llm_client: Optional[BaseChatModel] = ctx.get("llm")
+    search_client: Optional[SearchService] = ctx.get("search_client")
 
-    if not session_factory or not llm_client:
-        logger.error(
-            f"[ResearcherTask:{task_id}] Missing dependencies in Arq context (db_session_factory or llm). Aborting."
+    # --- Validate Dependencies ---
+    if not db_session_factory or not llm_client or not search_client:
+        error_msg = (
+            f"[ResearcherGraphTask:{task_id}] Missing dependencies in Arq context "
+            f"(db_factory={bool(db_session_factory)}, llm={bool(llm_client)}, "
+            f"search={bool(search_client)}). Aborting."
         )
-        # Optionally raise Retry or another exception if needed
-        return  # Or raise an exception
+        logger.error(error_msg)
+        raise ValueError("Worker context missing essential dependencies.")  # Fail fast
 
-    if not ORCHESTRATOR_AVAILABLE:
-        logger.error(
-            f"[ResearcherTask:{task_id}] Orchestrator function not available. Aborting."
-        )
-        return  # Or raise
+    if not GRAPH_AVAILABLE:
+        error_msg = f"[ResearcherGraphTask:{task_id}] Research graph definition not available. Aborting."
+        logger.error(error_msg)
+        raise ValueError("Research graph definition unavailable.")  # Fail fast
 
-    # --- Execute Orchestrator within a DB Session ---
+    # --- Prepare Graph Input and Config ---
     try:
-        # Create a new session for this task
-        async with session_factory() as db:
-            try:
-                logger.debug(f"[ResearcherTask:{task_id}] Calling orchestrator...")
-                saved_profile = await research_and_create_profile(
-                    url=url,
-                    account_id=account_id,
-                    llm=llm_client,
-                    db=db,
-                )
-
-                if saved_profile:
-                    profile_id = getattr(saved_profile, "id", "N/A")
-                    logger.success(
-                        f"[ResearcherTask:{task_id}] Research and save completed successfully. Profile ID: {profile_id}"
-                    )
-                    # Commit the transaction if orchestrator succeeded
-                    await db.commit()
-                    logger.debug(
-                        f"[ResearcherTask:{task_id}] Database transaction committed."
-                    )
-                else:
-                    logger.warning(
-                        f"[ResearcherTask:{task_id}] Orchestrator finished but returned no profile. Rolling back."
-                    )
-                    # Rollback if orchestrator failed gracefully without raising DB error
-                    await db.rollback()
-
-            except Exception as orchestrator_exc:
-                # Catch errors specifically from the orchestrator or commit
-                logger.exception(
-                    f"[ResearcherTask:{task_id}] Error during orchestration or commit: {orchestrator_exc}. Rolling back."
-                )
-                await db.rollback()
-                # Optionally re-raise or raise Retry for Arq's retry mechanism
-                # raise Retry(defer=10) from orchestrator_exc
-                raise  # Re-raise to let Arq handle the failure
-
-    except Exception as e:
-        # Catch errors related to session creation or general task execution
+        compiled_graph = create_research_graph()  # Compile the graph
+    except Exception as graph_compile_err:
         logger.exception(
-            f"[ResearcherTask:{task_id}] Unexpected error processing task: {e}"
+            f"[ResearcherGraphTask:{task_id}] Failed to compile research graph: {graph_compile_err}"
         )
-        # Depending on Arq setup, this might trigger retries
-        raise  # Re-raise to let Arq handle the failure
+        raise  # Fail fast if graph cannot be compiled
+
+    # Sensible defaults for the initial state
+    initial_input = ResearchState(
+        account_id=account_id,
+        initial_url=url,
+        max_iterations=5,  # Example: Set max iterations
+        urls_to_scrape=[],
+        search_queries=[],
+        scraped_data={},
+        search_results={},
+        combined_context=None,
+        profile_draft=None,
+        missing_info_summary=None,
+        visited_urls=set(),
+        iteration_count=0,
+        error_message=None,
+        next_action=None,
+    )
+
+    # Configuration dictionary to pass dependencies into the graph nodes
+    graph_config = {
+        "configurable": {
+            "llm_instance": llm_client,
+            "db_session_factory": db_session_factory,
+            "search_client": search_client,
+            # Add other shared resources here if needed by nodes
+        }
+    }
+
+    # --- Execute Graph ---
+    try:
+        logger.debug(f"[ResearcherGraphTask:{task_id}] Invoking research graph...")
+        final_state = await compiled_graph.ainvoke(
+            initial_input, config={**graph_config, "recursion_limit": 50}
+        )
+
+        # Log final outcome
+        final_error = final_state.get("error_message")
+        final_iterations = final_state.get("iteration_count")
+        if final_error:
+            logger.error(
+                f"[ResearcherGraphTask:{task_id}] Graph finished with error "
+                f"after {final_iterations} iterations: {final_error}"
+            )
+        else:
+            logger.success(
+                f"[ResearcherGraphTask:{task_id}] Graph finished successfully "
+                f"after {final_iterations} iterations."
+            )
+
+    except Exception as graph_exc:
+        logger.exception(
+            f"[ResearcherGraphTask:{task_id}] Unexpected error invoking research graph: {graph_exc}"
+        )
+        # Re-raise the exception to let Arq handle the job failure (e.g., retries, logging)
+        raise
 
 
-# --- Arq Worker Configuration (WorkerSettings) ---
-# This part defines how the Arq worker starts up, connects to Redis,
-# finds tasks, and manages context like DB sessions and LLM clients.
+# ==============================================================================
+# Arq Worker Configuration Callbacks
+# ==============================================================================
 
 
 async def startup(ctx: dict):
-    """
-    Initialize resources needed by the worker tasks on startup.
-    Creates DB session factory and LLM client, stores them in context.
-    """
+    """Initialize resources: DB factory, LLM client, Search client."""
     logger.info("Researcher worker starting up...")
-    # Initialize Database Session Factory
+
+    # Init DB
     if SQLALCHEMY_AVAILABLE and settings.DATABASE_URL:
         logger.info("Initializing database connection...")
         try:
@@ -164,87 +198,76 @@ async def startup(ctx: dict):
                 engine, expire_on_commit=False, class_=AsyncSession
             )
             ctx["db_session_factory"] = session_factory
-            # Optional: Test connection
-            # async with session_factory() as session:
-            #     await session.execute(text("SELECT 1"))
-            logger.info("Database session factory created successfully.")
+            logger.info("Database session factory created.")
         except Exception as db_init_err:
-            logger.exception(f"Failed to initialize database connection: {db_init_err}")
-            ctx["db_session_factory"] = None  # Ensure it's None if failed
+            logger.exception(f"DB init failed: {db_init_err}")
+            ctx["db_session_factory"] = None
     else:
-        logger.warning(
-            "SQLAlchemy or DATABASE_URL not available/configured. DB operations will fail."
-        )
+        logger.warning("SQLAlchemy/DB URL unavailable. DB operations will fail.")
         ctx["db_session_factory"] = None
 
-    # Initialize LLM Client
+    # Init LLM
     if LANGCHAIN_AVAILABLE:
         logger.info("Initializing LLM client...")
         try:
-            # Configure your LLM client here (e.g., ChatOpenAI)
-            # Ensure API keys are available (e.g., via environment variables)
-            # You might load model name, temperature etc., from settings
-            llm = ChatOpenAI(model="gpt-4o", temperature=0.0)  # Example
+            # Ensure OPENAI_API_KEY is set in environment
+            # Consider loading model name from settings
+            llm = ChatOpenAI(
+                model="gpt-4.1-mini", temperature=0.0
+            )  # Model for extraction/planning
             ctx["llm"] = llm
-            # Optional: Add a test call if feasible/needed
-            # await llm.ainvoke("test")
-            logger.info(
-                f"LLM client ({llm.__class__.__name__}) initialized successfully."
-            )
+            logger.info(f"LLM client ({llm.__class__.__name__}) initialized.")
         except Exception as llm_init_err:
-            logger.exception(f"Failed to initialize LLM client: {llm_init_err}")
+            logger.exception(f"LLM init failed: {llm_init_err}")
             ctx["llm"] = None
     else:
-        logger.warning("LangChain not available. LLM operations will fail.")
+        logger.warning("LangChain unavailable. LLM operations will fail.")
         ctx["llm"] = None
+
+    # Init Search Client
+    if SEARCH_AVAILABLE:
+        logger.info("Initializing Search client (Tavily)...")
+        try:
+            tavily_key = os.getenv("TAVILY_API_KEY")
+            if not tavily_key:
+                raise ValueError("TAVILY_API_KEY environment variable not set.")
+            search_client = SearchService(api_key=tavily_key)
+            ctx["search_client"] = search_client
+            logger.info("Search client initialized.")
+        except Exception as search_init_err:
+            logger.exception(f"Search client init failed: {search_init_err}")
+            ctx["search_client"] = None
+    else:
+        logger.warning("Search client unavailable. Search operations will fail.")
+        ctx["search_client"] = None
 
     logger.info("Researcher worker startup complete.")
 
 
 async def shutdown(ctx: dict):
-    """
-    Clean up resources on worker shutdown.
-    """
+    """Clean up resources."""
     logger.info("Researcher worker shutting down...")
-    # Clean up DB engine if needed (though often managed globally)
-    # engine = ctx.get('db_engine') # If engine was stored directly
-    # if engine:
-    #     await engine.dispose()
-    #     logger.info("Database engine disposed.")
-    # Clean up LLM client if needed (e.g., close sessions)
-    # llm = ctx.get('llm')
-    # if hasattr(llm, 'close'): await llm.close()
+    # Add cleanup if needed (e.g., engine.dispose() if engine stored in ctx)
     logger.info("Researcher worker shutdown complete.")
 
 
-# Define the WorkerSettings class for Arq
-# This tells Arq how to run the worker
+# ==============================================================================
+# Arq Worker Settings Class
+# ==============================================================================
+
+
 class WorkerSettings:
-    """
-    Arq worker settings for the researcher tasks.
-    """
+    """Arq worker settings for the researcher tasks."""
 
-    # List of functions Arq should expose as tasks
     functions = [run_profile_research]
-    # Queue name this worker will listen to
-    queue_name = "researcher_queue"  # Choose a descriptive name
-    # Redis settings (load from environment or config)
-    # redis_settings = RedisSettings(...) # Use arq.connections.RedisSettings
-    settings: Settings = get_settings()
-
+    queue_name = "researcher_queue"  # Ensure this matches API enqueue target
+    on_startup = startup
+    on_shutdown = shutdown
+    job_timeout = 600  # 10 minutes timeout per research job
+    # max_tries = 3 # Example: Allow up to 3 tries per job
     redis_settings = RedisSettings(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
         database=settings.REDIS_DB,
     )
-    # Lifecycle hooks
-    on_startup = startup
-    on_shutdown = shutdown
-    # Other settings like max_jobs, job_timeout, keep_result_forever, etc.
-    job_timeout = 300  # Example: 5 minutes timeout per job
-    # max_tries = 3 # Example: Allow retries
-
-
-# Note: To run this worker, you would typically use the Arq CLI:
-# arq app.workers.researcher.WorkerSettings
-# Ensure Redis is running and accessible.
+    # redis_settings = RedisSettings(...) # Configure Redis connection here if needed
