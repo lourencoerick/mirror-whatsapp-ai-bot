@@ -69,10 +69,9 @@ try:
 except ImportError:
     SQLALCHEMY_AVAILABLE = False
     logger.error("SQLAlchemy components or settings not found.")
-    AsyncSession = None  # type: ignore
-    async_sessionmaker = None  # type: ignore
-    create_async_engine = None  # type: ignore
-    # Minimal dummy settings if import fails
+    AsyncSession = None
+    async_sessionmaker = None
+    create_async_engine = None
     settings = type("obj", (object,), {"DATABASE_URL": None})()
 
 
@@ -126,7 +125,7 @@ async def run_profile_research(ctx: dict, url: str, account_id: UUID):
     initial_input = ResearchState(
         account_id=account_id,
         initial_url=url,
-        max_iterations=5,  # Example: Set max iterations
+        max_iterations=7,
         urls_to_scrape=[],
         search_queries=[],
         scraped_data={},
@@ -135,9 +134,13 @@ async def run_profile_research(ctx: dict, url: str, account_id: UUID):
         profile_draft=None,
         missing_info_summary=None,
         visited_urls=set(),
+        newly_found_links=[],
+        intial_url_found_links=[],
         iteration_count=0,
         error_message=None,
         next_action=None,
+        action_history=[],
+        search_attempted=False,
     )
 
     # Configuration dictionary to pass dependencies into the graph nodes
@@ -263,11 +266,9 @@ class WorkerSettings:
     queue_name = "researcher_queue"  # Ensure this matches API enqueue target
     on_startup = startup
     on_shutdown = shutdown
-    job_timeout = 600  # 10 minutes timeout per research job
-    # max_tries = 3 # Example: Allow up to 3 tries per job
+    job_timeout = 600
     redis_settings = RedisSettings(
         host=settings.REDIS_HOST,
         port=settings.REDIS_PORT,
         database=settings.REDIS_DB,
     )
-    # redis_settings = RedisSettings(...) # Configure Redis connection here if needed
