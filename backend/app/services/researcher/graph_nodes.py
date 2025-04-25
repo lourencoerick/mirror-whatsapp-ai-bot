@@ -699,7 +699,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
             [
                 f"- URL: {link.url} (Anchor Text: '{link.anchor_text or 'N/A'}')"
                 for link in intial_url_found_links[:30]
-            ]  force_search
+            ]
         )
         initial_url_links_summary = f"Potential URLs found in the last scraping cycle (limit 30):\n{links_list_str}"
         if len(intial_url_found_links) > 30:
@@ -710,7 +710,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
             [
                 f"- URL: {link.url} (Anchor Text: '{link.anchor_text or 'N/A'}')"
                 for link in unvisited_candidate_links[:20]
-            ] 
+            ]
         )
         links_summary = f"Potential URLs found in the last scraping cycle (limit 20):\n{links_list_str}"
         if len(unvisited_candidate_links) > 20:
@@ -802,8 +802,8 @@ Use the 'PlannerDecisionSchema'. Respond *only* with the valid JSON object.
                     "search_queries": (
                         decision.search_queries if decision.search_queries else []
                     ),
-                    "error_message": None,  
-                    "newly_found_links": [],  
+                    "error_message": None,
+                    "newly_found_links": [],
                 }
 
                 if (
@@ -830,7 +830,7 @@ Use the 'PlannerDecisionSchema'. Respond *only* with the valid JSON object.
         "error_message": error_msg,
         "next_action": "error",
         "iteration_count": current_iteration,
-        "newly_found_links": [],  
+        "newly_found_links": [],
     }
 
 
