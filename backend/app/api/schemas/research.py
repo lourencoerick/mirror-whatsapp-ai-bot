@@ -3,6 +3,7 @@
 from pydantic import BaseModel, Field, HttpUrl
 from uuid import UUID
 from typing import Optional
+from enum import Enum
 
 
 class ResearchRequest(BaseModel):
@@ -36,5 +37,53 @@ class ResearchResponse(BaseModel):
                 "job_id": "arq:job:e4r5t6y7-u8i9-0o1p-q2w3-e4r5t6y7u8i9",
                 "message": "Company profile research task successfully queued.",
             }
+        }
+    }
+
+
+class ResearchJobStatusEnum(str, Enum):
+    """Possible statuses for an Arq job."""
+
+    QUEUED = "queued"
+    IN_PROGRESS = "in_progress"
+    COMPLETE = "complete"
+    NOT_FOUND = "not_found"
+    FAILED = "failed"
+
+
+class ResearchJobStatusResponse(BaseModel):
+    """
+    Schema for the response when checking the status of a background job.
+    """
+
+    job_id: str = Field(..., description="The ID of the job being checked.")
+    status: ResearchJobStatusEnum = Field(
+        ..., description="The current status of the job."
+    )
+    detail: Optional[str] = Field(
+        None, description="Additional details, like an error message if the job failed."
+    )
+    # result: Optional[Any] = Field(None, description="The result of the job, if completed successfully and returns a value.") # Less useful here
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"job_id": "arq:job:xyz", "status": "in_progress", "detail": None},
+                {
+                    "job_id": "arq:job:abc",
+                    "status": "complete",
+                    "detail": "Profile updated successfully.",
+                },
+                {
+                    "job_id": "arq:job:123",
+                    "status": "failed",
+                    "detail": "ValueError: Worker context missing essential dependencies.",
+                },
+                {
+                    "job_id": "arq:job:invalid",
+                    "status": "not_found",
+                    "detail": "Job ID not found in the queue system.",
+                },
+            ]
         }
     }
