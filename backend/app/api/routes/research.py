@@ -32,16 +32,14 @@ RESEARCH_QUEUE_NAME = "researcher_queue"
 )
 async def start_research_task(
     request: ResearchRequest,
-    # auth_context: AuthContext = Depends(get_auth_context),
+    auth_context: AuthContext = Depends(get_auth_context),
     arq_pool: ArqRedis = Depends(get_arq_pool),
 ) -> ResearchResponse:
     """
     Accepts a URL and enqueues a background job to research and create
     a company profile associated with the authenticated user's active account.
     """
-    account_id: UUID = UUID(
-        "0c59ccfa-dc09-4a68-a1fa-d49726b2d519"
-    )  # auth_context.account.id
+    account_id: UUID = auth_context.account.id
     url_to_research = str(request.url)  # Convert HttpUrl back to string for Arq
 
     logger.info(
