@@ -1,8 +1,19 @@
 # backend/app/services/researcher/graph_state.py
 
-from typing import TypedDict, List, Set, Dict, Optional, Any, Literal  # Added Literal
+from typing import TypedDict, List, Set, Dict, Optional, Any, Literal, Annotated
+
+# from typing_extensions import Annotated
+import operator
 from uuid import UUID
-from pydantic import BaseModel, Field, HttpUrl  # Added BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
+
+
+class LinkInfo(BaseModel):
+    url: str = Field(..., description="The absolute URL of the link.")
+    anchor_text: Optional[str] = Field(
+        None, description="The visible text of the link anchor."
+    )
+
 
 # Import the schema that represents our target output
 try:
@@ -10,7 +21,7 @@ try:
 
     SCHEMA_AVAILABLE = True
 except ImportError:
-    from pydantic import BaseModel as PydanticBaseModel  # Alias to avoid conflict
+    from pydantic import BaseModel as PydanticBaseModel
 
     class CompanyProfileSchema(PydanticBaseModel):
         pass
@@ -19,20 +30,24 @@ except ImportError:
 
 
 class ResearchState(TypedDict):
-    # ... (definição existente do ResearchState) ...
     account_id: UUID
     initial_url: str
     urls_to_scrape: List[str]
     search_queries: List[str]
     scraped_data: Dict[str, str]
+    search_attempted: bool
     search_results: Dict[str, List[Any]]
     combined_context: Optional[str]
     profile_draft: Optional[CompanyProfileSchema]
     missing_info_summary: Optional[str]
     visited_urls: Set[str]
+    newly_found_links: List[LinkInfo]
+    intial_url_found_links: List[LinkInfo]
     max_iterations: int
     iteration_count: int
     error_message: Optional[str]
+    last_action_summary: Optional[str]
+    action_history: Annotated[List[str], operator.add]
     next_action: Optional[str]  # This will be set by the planner
 
 
@@ -44,7 +59,7 @@ class PlannerDecisionSchema(BaseModel):
     Defines the structured output expected from the planning LLM call.
     """
 
-    next_action: Literal["scrape", "search", "finish"] = Field(
+    next_action: Literal["scrape", "search", "search_offerings", "finish"] = Field(
         ...,
         description="The best next action to take: 'scrape' specific URLs, perform 'search' queries, or 'finish' the research.",
     )
