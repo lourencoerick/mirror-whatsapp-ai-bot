@@ -5,11 +5,11 @@ from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
 
-class AgentBotInbox(BaseModel):
-    __tablename__ = "agent_bot_inboxes"
+class BotAgentInbox(BaseModel):
+    __tablename__ = "bot_agent_inboxes"
     __table_args__ = (
         UniqueConstraint(
-            "account_id", "inbox_id", name="uq_agent_bot_inboxes_account_inbox"
+            "account_id", "inbox_id", name="uq_bot_agent_inboxes_account_inbox"
         ),
     )
 
@@ -27,16 +27,16 @@ class AgentBotInbox(BaseModel):
         nullable=False,
         primary_key=True,
     )
-    agent_bot_id = Column(
+    bot_agent_id = Column(
         PG_UUID(as_uuid=True),
-        ForeignKey("agent_bots.id", ondelete="CASCADE"),
+        ForeignKey("bot_agents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
 
-    account = relationship("Account", back_populates="agent_bot_inboxes")
-    inbox = relationship("Inbox", back_populates="agent_bot_inboxes")
-    agent_bot = relationship("AgentBot", back_populates="agent_bot_inboxes")
+    account = relationship("Account", back_populates="bot_agent_inboxes")
+    inbox = relationship("Inbox", back_populates="bot_agent_inboxes")
+    bot_agent = relationship("BotAgent", back_populates="bot_agent_inboxes")
 
     def __repr__(self):
-        return f"<AgentBotInbox(account={self.account_id}, inbox={self.inbox_id}, agent={self.agent_bot_id})>"
+        return f"<BotAgentInbox(account={self.account_id}, inbox={self.inbox_id}, agent={self.bot_agent_id})>"
