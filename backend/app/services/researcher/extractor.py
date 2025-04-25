@@ -110,19 +110,31 @@ def _build_extraction_prompt(website_text: str, schema_description: str) -> str:
 
     # Using the detailed prompt structure again
     return f"""
-Act as an expert business analyst tasked with extracting structured information about a company from its website text.
-Your goal is to populate a Company Profile based *only* on the information provided in the text below.
-Do not invent information or make assumptions beyond what's written. If a specific piece of information is not found, use null/None or an empty list as appropriate for the field type based on the target schema.
+You are a meticulous AI assistant acting as a Business Analyst.
+Your primary task is to analyze the provided 'Website Text' and extract information to populate a structured company profile.
 
-Target Information Fields (extract into the required JSON schema):
+**Core Instructions:**
+1.  **Source Limitation:** Extract information *exclusively* from the 'Website Text' below. Do not infer, assume, add external knowledge, or invent details.
+2.  **Missing Information:** If specific information for a field is not found in the text: Use `null` for optional fields, `[]` for list fields.
+3.  **Language Preservation:** Extracted values MUST match the original language in the 'Website Text'. **DO NOT TRANSLATE**.
+4.  **Semantic Appropriateness:** Ensure extracted values make logical sense for their field.
+5.  **Output Format:** Generate a single, valid JSON object conforming strictly to the 'Target Information Fields' structure. Respond ONLY with this JSON object.
+
+**Specific Guidance for 'offering_overview':**
+*   This field should list the **actual products, services, subscriptions, or plans** the company sells or provides to customers.
+*   **DO NOT** include items that are merely features, payment methods (like 'PIX Payment', 'Credit Card'), delivery methods, general categories (like 'documentaries' if specific documentary titles are listed elsewhere), or company sections (like 'Support Department') in the 'offering_overview' list.
+*   Focus on items a customer would typically choose or purchase.
+*   For each valid offering found, extract its name, description, key features, price info (if available), and a direct link (if available).
+
+**Target Information Fields (CompanyProfileSchema):**
 {schema_description}
 
-Website Text to Analyze:
+**Website Text to Analyze:**
 --- START TEXT ---
 {truncated_text}
 --- END TEXT ---
 
-Now, extract the information and provide it strictly in the JSON format defined by the CompanyProfileSchema.
+Now, perform the extraction according to all instructions, paying close attention to the guidance for 'offering_overview', and provide the JSON object.
 """
 
 
