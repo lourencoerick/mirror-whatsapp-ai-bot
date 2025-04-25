@@ -2,7 +2,6 @@
 
 from typing import TypedDict, List, Set, Dict, Optional, Any, Literal, Annotated
 
-# from typing_extensions import Annotated
 import operator
 from uuid import UUID
 from pydantic import BaseModel, Field, HttpUrl
