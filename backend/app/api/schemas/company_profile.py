@@ -104,7 +104,7 @@ class CompanyProfileSchema(BaseModel):
     fallback_contact_info: Optional[str] = (
         Field(  # Aligned with model: fallback_contact_info
             None,
-            description="What the AI should say when it cannot help (e.g., email or phone number). Should include instructions NOT to invent details.",
+            description="What the AI should say when it cannot help (e.g., email, phone number, faq page etc...). It is very helpful to have a reliable contact informaiton like a email, phone number and/or faq page",
         )
     )
 
