@@ -12,15 +12,9 @@ class ResearchRequest(BaseModel):
     """
 
     url: HttpUrl = Field(..., description="The URL of the company website to research.")
-    # Removed account_id from here
 
     model_config = {
-        "json_schema_extra": {
-            "example": {
-                "url": "https://www.padariadobairro.com.br"
-                # Removed account_id example
-            }
-        }
+        "json_schema_extra": {"example": {"url": "https://www.padariadobairro.com.br"}}
     }
 
 

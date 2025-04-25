@@ -37,79 +37,73 @@ class CompanyProfileSchema(BaseModel):
     id: Optional[UUID] = Field(
         None,
         description="Unique identifier for the company profile. Auto-generated.",
-        exclude=True,  # Usually excluded on create/update input
+        exclude=True,
     )
-    # account_id is handled separately, not usually part of the direct profile data input/output schema
+
     company_name: str = Field(..., description="Official name of the company.")
-    website: Optional[HttpUrl] = Field(  # Aligned with model: website
+    website: Optional[HttpUrl] = Field(
         None, description="Company's primary website URL."
     )
-    address: Optional[str] = Field(  # Aligned with model: address
+    address: Optional[str] = Field(
         None, description="Physical store address, if applicable and should be shared."
     )
-    business_description: str = Field(  # Aligned with model: business_description
+    business_description: str = Field(
         ...,
         description="What the company does, its industry, and its main value proposition.",
     )
-    target_audience: Optional[str] = Field(  # Aligned with model: target_audience
+    target_audience: Optional[str] = Field(
         None,
         description="Brief description of the ideal customer (e.g., 'Small business owners', 'Marketing professionals').",
     )
 
     # --- AI Behavior & Tone ---
-    sales_tone: str = Field(  # Aligned with model: sales_tone
+    sales_tone: str = Field(
         default="friendly, helpful, and professional",
         description="Adjectives describing the desired communication style.",
     )
-    language: str = Field(  # Aligned with model: language
+    language: str = Field(
         default="pt-BR",
         description="Primary language the AI should use (e.g., 'en-US', 'pt-BR').",
     )
-    # Model stores JSON, schema uses List[str]
-    communication_guidelines: List[str] = (
-        Field(  # Aligned with model: communication_guidelines
-            default_factory=list,
-            description="Specific DOs and DON'Ts for the AI (e.g., 'DO always ask clarifying questions', 'DO NOT invent information not provided').",
-        )
+
+    communication_guidelines: List[str] = Field(
+        default_factory=list,
+        description="Specific DOs and DON'Ts for the AI (e.g., 'DO always ask clarifying questions', 'DO NOT invent information not provided').",
     )
 
     # --- Objectives and Selling Strategy ---
-    ai_objective: str = Field(  # Aligned with model: ai_objective
+    ai_objective: str = Field(
         default="Engage customers, answer questions about offerings, and guide them towards a purchase or next step.",
         description="Main goal of the AI (e.g., close sales, qualify leads, provide product info).",
     )
-    # Model stores JSON, schema uses List[str]
-    key_selling_points: List[str] = Field(  # Aligned with model: key_selling_points
+
+    key_selling_points: List[str] = Field(
         default_factory=list,
         description="Unique selling propositions (USPs) or differentiators.",
     )
-    # Model stores JSON, schema uses List[OfferingInfo]
-    offering_overview: List[OfferingInfo] = (
-        Field(  # Aligned with model: offering_overview
-            default_factory=list,
-            description="List of key products/services with short details.",
-        )
+
+    offering_overview: List[OfferingInfo] = Field(
+        default_factory=list,
+        description="List of key products/services with short details.",
     )
-    # Model stores JSON, schema uses List[str]
-    delivery_options: List[str] = Field(  # Aligned with model: delivery_options
+
+    delivery_options: List[str] = Field(
         default_factory=list,
         description="List of available delivery/pickup options for the company (e.g., 'Delivery in X area', 'In-store pickup').",
     )
-    opening_hours: Optional[str] = Field(  # Aligned with model: opening_hours
+    opening_hours: Optional[str] = Field(
         None,
         description="Company opening hours, including timezone if possible (e.g., 'Seg-Sex 9h-18h BRT', 'Todos os dias 8h-20h').",
     )
 
     # --- Fallback and Error Handling ---
-    fallback_contact_info: Optional[str] = (
-        Field(  # Aligned with model: fallback_contact_info
-            None,
-            description="What the AI should say when it cannot help (e.g., email, phone number, faq page etc...). It is very helpful to have a reliable contact informaiton like a email, phone number and/or faq page",
-        )
+    fallback_contact_info: Optional[str] = Field(
+        None,
+        description="What the AI should say when it cannot help (e.g., email, phone number, faq page etc...). It is very helpful to have a reliable contact informaiton like a email, phone number and/or faq page",
     )
 
     # --- Versioning ---
-    profile_version: int = Field(  # Aligned with model: profile_version
+    profile_version: int = Field(
         default=1, description="Version number of the profile schema."
     )
 

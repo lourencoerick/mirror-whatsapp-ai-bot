@@ -54,12 +54,10 @@ async def start_research_task(
         )
 
     try:
-        # Enqueue the job to the queue the researcher worker listens to
-        # The queue name is defined in the worker's WorkerSettings
         job: Optional[Job] = await arq_pool.enqueue_job(
-            RESEARCH_TASK_NAME,  # Name of the task function in researcher.py
-            url=url_to_research,  # Argument for the task function
-            account_id=account_id,  # Argument for the task function
+            RESEARCH_TASK_NAME,
+            url=url_to_research,
+            account_id=account_id,
             _queue_name=RESEARCH_QUEUE_NAME,
         )
 

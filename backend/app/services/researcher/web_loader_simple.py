@@ -1,15 +1,12 @@
-# backend/app/services/researcher/web_loader_simple.py
-
 import asyncio
-from typing import Optional, Dict, Tuple, List  # Added List
-from urllib.parse import urljoin, urlparse  # Added urljoin, urlparse
+from typing import Optional, Dict, Tuple, List
+from urllib.parse import urljoin, urlparse
 
 from loguru import logger
 import sys
 
 # Import LinkInfo schema from graph_state or define it here
 try:
-    # Assuming graph_state is in the same directory or accessible path
     from .graph_state import LinkInfo
 except ImportError:
     from pydantic import BaseModel, Field  # Fallback definition
@@ -178,14 +175,14 @@ def _fetch_page_content_sync(
         return None
 
 
-# --- Core Function (MODIFIED) ---
+# --- Core Function  ---
 
 
-async def fetch_and_extract_text_and_links(  # Renamed function
+async def fetch_and_extract_text_and_links(
     url: str,
     request_timeout: int = DEFAULT_SINGLE_PAGE_TIMEOUT,
     request_headers: Optional[Dict[str, str]] = None,
-) -> Tuple[Optional[str], List[LinkInfo]]:  # Modified return type
+) -> Tuple[Optional[str], List[LinkInfo]]:
     """
     Fetches content from a single URL, extracts cleaned text and internal links.
 
@@ -215,14 +212,14 @@ async def fetch_and_extract_text_and_links(  # Renamed function
     links: List[LinkInfo] = []
 
     try:
-        # Fetch HTML content in thread
+
         html_content = await asyncio.wait_for(
             asyncio.to_thread(_fetch_page_content_sync, url, headers, request_timeout),
-            timeout=float(request_timeout + 5),  # Add buffer
+            timeout=float(request_timeout + 5),
         )
 
         if html_content:
-            # Extract text and links using BeautifulSoup
+
             raw_text, links = _extract_text_and_links_simple(html_content, url)
 
             if raw_text.strip():
@@ -234,14 +231,14 @@ async def fetch_and_extract_text_and_links(  # Renamed function
                 logger.warning(
                     f"No significant text extracted from {url}, but found {len(links)} links."
                 )
-                # Return None for text, but still return found links
+
                 extracted_text = None
         else:
-            # Fetch function already logged the reason
+
             logger.warning(
                 f"Fetch failed or returned no HTML for {url}. No text or links extracted."
             )
-            return None, []  # Return None and empty list
+            return None, []
 
     except asyncio.TimeoutError:
         logger.error(f"Overall operation timeout fetching/processing {url}")
@@ -250,7 +247,6 @@ async def fetch_and_extract_text_and_links(  # Renamed function
         logger.exception(f"Unexpected error during fetch/extract for {url}: {e}")
         return None, []
 
-    # Return the extracted text (or None) and the list of links
     return extracted_text, links
 
 

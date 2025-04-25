@@ -1,5 +1,3 @@
-# backend/app/services/researcher/graph.py
-
 from langgraph.graph import StateGraph, END
 from loguru import logger
 
@@ -13,12 +11,10 @@ from .graph_nodes import (
     analyze_completeness,
     plan_next_step,
     finish_research,
-    # Add error handling node if implemented later
 )
 
+
 # --- Conditional Routing Function ---
-
-
 def route_after_planning(state: ResearchState) -> str:
     """
     Determines the next node to execute based on the planner's decision.
@@ -35,8 +31,7 @@ def route_after_planning(state: ResearchState) -> str:
 
     if error_message:
         logger.warning(f"Routing to finish due to error: {error_message}")
-        # In a more complex setup, could route to a specific error handler node
-        return "finish_research"  # Go to finish even on error to attempt saving
+        return "finish_research"
 
     logger.info(f"Router received planner action: {next_action}")
     if next_action == "scrape":
@@ -48,14 +43,10 @@ def route_after_planning(state: ResearchState) -> str:
     else:
         # Default or unexpected action, treat as error or finish
         logger.error(f"Unexpected next_action '{next_action}' from planner. Finishing.")
-        # Update state to reflect this unexpected situation?
-        # state["error_message"] = f"Unexpected planner action: {next_action}" # Modifying state here is tricky
-        return "finish_research"  # Route to finish as a fallback
+        return "finish_research"
 
 
 # --- Graph Definition ---
-
-
 def create_research_graph() -> StateGraph:
     """
     Builds and compiles the LangGraph StateGraph for the research agent.
@@ -71,7 +62,7 @@ def create_research_graph() -> StateGraph:
     workflow.add_node("analyze_completeness", analyze_completeness)
     workflow.add_node("plan_next_step", plan_next_step)
     workflow.add_node("finish_research", finish_research)
-    # workflow.add_node("handle_error", handle_error_node) # If implementing error node
+    # workflow.add_node("handle_error", handle_error_node) #TODO If implementing error node
 
     # Define the edges (flow)
     logger.debug("Defining edges for the research graph...")
@@ -92,14 +83,13 @@ def create_research_graph() -> StateGraph:
 
     # Conditional branching after planning
     workflow.add_conditional_edges(
-        "plan_next_step",  # Source node
-        route_after_planning,  # Function to determine the route
+        "plan_next_step",
+        route_after_planning,
         {
             # Mapping: Output of router function -> Destination node name
             "scrape_website": "scrape_website",
             "perform_search": "perform_search",
             "finish_research": "finish_research",
-            # Add "error": "handle_error_node" if implementing
         },
     )
 
@@ -112,9 +102,3 @@ def create_research_graph() -> StateGraph:
     logger.info("Research graph compiled successfully.")
 
     return compiled_graph
-
-
-# --- Optional: Get a singleton instance ---
-# research_graph_instance = create_research_graph()
-# def get_research_graph():
-#     return research_graph_instance
