@@ -51,6 +51,9 @@ worker-ai: ## Run Response sender
 worker-arq: ## Run Response sender
 	PYTHONPATH=$(APP_DIR) arq app.workers.batch_contacts.contact_creator.WorkerSettings
 
+worker-researcher: ## Run Response sender
+	PYTHONPATH=$(APP_DIR) arq app.workers.researcher.WorkerSettings
+
 
 run-app: ## Run Fast API app
 	PYTHONPATH=$(APP_DIR) uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
