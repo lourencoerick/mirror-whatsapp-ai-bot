@@ -72,14 +72,8 @@ class InboxUpdate(BaseModel):
         }
 
 
-class InboxResponse(BaseModel):
-    id: UUID
-    name: str
-    channel_type: str
-
-
 # --- Schema for API Response ---
-class InboxResponse(InboxBase):
+class InboxRead(InboxBase):
     id: UUID = Field(..., description="Unique identifier for the inbox")
     account_id: UUID = Field(
         ..., description="Identifier of the account this inbox belongs to"

@@ -6,13 +6,13 @@ from loguru import logger
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.repository import inbox as inbox_repo
-from app.api.schemas.inbox import InboxResponse
+from app.api.schemas.inbox import InboxRead
 
 
 router = APIRouter(prefix="/me", tags=["v1 - Current User"])
 
 
-@router.get("/inboxes", response_model=List[InboxResponse])
+@router.get("/inboxes", response_model=List[InboxRead])
 async def get_my_inboxes(
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
