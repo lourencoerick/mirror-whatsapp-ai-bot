@@ -15,7 +15,38 @@ from app.models.inbox import Inbox
 from app.api.schemas.bot_agent import BotAgentUpdate
 
 
-async def get_agent_by_account_id(
+async def get_bot_agent_by_id(
+    db: AsyncSession,
+    account_id: UUID,
+    bot_agent_id: UUID,
+) -> Optional[BotAgent]:
+    """
+    Retrieves the BotAgent by its ID, ensuring it belongs to the specified account.
+
+    Args:
+        db: The SQLAlchemy async session.
+        account_id: The UUID of the account owner.
+        bot_agent_id: The UUID of the bot agent.
+
+    Returns:
+        The BotAgent object if found and owned by the account, otherwise None.
+    """
+    logger.debug(f"Fetching BotAgent for bot_agent_id: {bot_agent_id}")
+    stmt = select(BotAgent).where(
+        BotAgent.id == bot_agent_id, BotAgent.account_id == account_id
+    )
+    result = await db.execute(stmt)
+    agent = result.scalars().first()
+    if agent:
+        logger.debug(f"Found BotAgent with id: {agent.id} for account {account_id}")
+    else:
+        logger.warning(
+            f"No BotAgent found with id {bot_agent_id} for account {account_id}"
+        )
+    return agent
+
+
+async def get_bot_agent_by_account_id(
     db: AsyncSession, account_id: UUID
 ) -> Optional[BotAgent]:
     """
@@ -40,7 +71,7 @@ async def get_agent_by_account_id(
     return agent
 
 
-async def get_or_create_agent_by_account_id(
+async def get_or_create_bot_agent_by_account_id(
     db: AsyncSession, account_id: UUID
 ) -> BotAgent:
     """
@@ -53,68 +84,61 @@ async def get_or_create_agent_by_account_id(
     Returns:
         The existing or newly created BotAgent object.
     """
-    agent = await get_agent_by_account_id(db, account_id)
+    agent = await get_bot_agent_by_account_id(db, account_id)
     if agent:
         return agent
-
     logger.info(f"No BotAgent found for account {account_id}, creating default.")
-    # Create default agent (name is set by model default)
-    default_agent = BotAgent(account_id=account_id)
+    default_bot_agent = BotAgent(account_id=account_id)
     try:
-        db.add(default_agent)
+        db.add(default_bot_agent)
         await db.flush()
-        await db.refresh(default_agent)
+        await db.refresh(default_bot_agent)
         logger.info(
-            f"Created default BotAgent {default_agent.id} for account {account_id}"
+            f"Created default BotAgent {default_bot_agent.id} for account {account_id}"
         )
-        return default_agent
+        return default_bot_agent
     except Exception as e:
         logger.exception(
             f"Failed to create default BotAgent for account {account_id}: {e}"
         )
-        # Re-raise the exception so the transaction can be rolled back by the caller
         raise
 
 
-async def update_agent(
-    db: AsyncSession, *, db_agent: BotAgent, agent_in: BotAgentUpdate
+async def update_bot_agent(
+    db: AsyncSession, *, bot_agent: BotAgent, agent_in: BotAgentUpdate
 ) -> BotAgent:
     """
     Updates an existing BotAgent record.
 
     Args:
         db: The SQLAlchemy async session.
-        db_agent: The existing BotAgent object to update.
+        bot_agent: The existing BotAgent object to update.
         agent_in: The Pydantic schema containing the fields to update.
 
     Returns:
         The updated BotAgent object.
     """
-    logger.info(f"Updating BotAgent with id: {db_agent.id}")
-    # Get data from schema, excluding unset fields to allow partial updates
+    logger.info(f"Updating BotAgent with id: {bot_agent.id}")
     update_data = agent_in.model_dump(exclude_unset=True)
-
     for field, value in update_data.items():
-        # Check if the field exists in the model before setting
-        if hasattr(db_agent, field):
-            setattr(db_agent, field, value)
+        if hasattr(bot_agent, field):
+            setattr(bot_agent, field, value)
         else:
             logger.warning(
                 f"Attempted to update non-existent field '{field}' on BotAgent"
             )
-
     try:
-        db.add(db_agent)  # Add the modified object to the session
+        db.add(bot_agent)
         await db.flush()
-        await db.refresh(db_agent)
-        logger.info(f"Successfully updated BotAgent {db_agent.id}")
-        return db_agent
+        await db.refresh(bot_agent)
+        logger.info(f"Successfully updated BotAgent {bot_agent.id}")
+        return bot_agent
     except Exception as e:
-        logger.error(f"Error updating BotAgent {db_agent.id}: {e}")
+        logger.error(f"Error updating BotAgent {bot_agent.id}: {e}")
         raise
 
 
-async def get_agent_for_inbox(
+async def get_bot_agent_for_inbox(
     db: AsyncSession, *, inbox_id: UUID, account_id: UUID
 ) -> Optional[BotAgent]:
     """
@@ -135,10 +159,8 @@ async def get_agent_for_inbox(
         select(BotAgent)
         .join(BotAgentInbox, BotAgent.id == BotAgentInbox.bot_agent_id)
         .where(BotAgentInbox.inbox_id == inbox_id)
-        .where(
-            BotAgentInbox.account_id == account_id
-        )  # Ensure it's the correct account
-        .options(selectinload(BotAgent.account))  # Optional: Load account if needed
+        .where(BotAgentInbox.account_id == account_id)
+        .options(selectinload(BotAgent.account))
     )
     result = await db.execute(stmt)
     agent = result.scalars().first()
@@ -149,32 +171,34 @@ async def get_agent_for_inbox(
     return agent
 
 
-async def get_inboxes_for_agent(db: AsyncSession, agent_id: UUID) -> List[Inbox]:
+async def get_inboxes_for_bot_agent(
+    db: AsyncSession, bot_agent_id: UUID
+) -> List[Inbox]:
     """
     Retrieves all Inboxes associated with a specific BotAgent.
 
     Args:
         db: The SQLAlchemy async session.
-        agent_id: The UUID of the BotAgent.
+        bot_agent_id: The UUID of the BotAgent.
 
     Returns:
         A list of associated Inbox objects.
     """
-    logger.debug(f"Fetching Inboxes associated with BotAgent {agent_id}")
+    logger.debug(f"Fetching Inboxes associated with BotAgent {bot_agent_id}")
     stmt = (
         select(Inbox)
         .join(BotAgentInbox, Inbox.id == BotAgentInbox.inbox_id)
-        .where(BotAgentInbox.bot_agent_id == agent_id)
-        .options(joinedload(Inbox.account))  # Eager load account for context
+        .where(BotAgentInbox.bot_agent_id == bot_agent_id)
+        .options(joinedload(Inbox.account))
     )
     result = await db.execute(stmt)
     inboxes = result.scalars().all()
-    logger.debug(f"Found {len(inboxes)} Inboxes for BotAgent {agent_id}")
+    logger.debug(f"Found {len(inboxes)} Inboxes for BotAgent {bot_agent_id}")
     return list(inboxes)
 
 
-async def set_agent_inboxes(
-    db: AsyncSession, *, agent: BotAgent, inbox_ids: List[UUID]
+async def set_bot_agent_inboxes(
+    db: AsyncSession, *, bot_agent: BotAgent, inbox_ids: List[UUID]
 ) -> None:
     """
     Sets the complete list of associated Inboxes for a BotAgent.
@@ -186,15 +210,17 @@ async def set_agent_inboxes(
         agent: The BotAgent object whose associations are being set.
         inbox_ids: The complete list of Inbox UUIDs that should be associated.
     """
-    account_id = agent.account_id
-    agent_id = agent.id
+    account_id = bot_agent.account_id
+    bot_agent_id = bot_agent.id  # Use agent_id consistently now
     logger.info(
-        f"Setting Inboxes for BotAgent {agent_id} (Account: {account_id}) to: {inbox_ids}"
+        f"Setting Inboxes for BotAgent {bot_agent_id} (Account: {account_id}) to: {inbox_ids}"
     )
 
     # 1. Get current associations
     current_assoc_stmt = select(BotAgentInbox.inbox_id).where(
-        BotAgentInbox.bot_agent_id == agent_id
+        # Corrected where condition:
+        BotAgentInbox.bot_agent_id
+        == bot_agent_id
     )
     result = await db.execute(current_assoc_stmt)
     current_inbox_ids = set(result.scalars().all())
@@ -205,7 +231,8 @@ async def set_agent_inboxes(
     if ids_to_remove:
         logger.debug(f"Removing associations for Inboxes: {ids_to_remove}")
         delete_stmt = delete(BotAgentInbox).where(
-            BotAgentInbox.bot_agent_id == agent_id,
+            # Corrected where condition:
+            BotAgentInbox.bot_agent_id == bot_agent_id,
             BotAgentInbox.inbox_id.in_(ids_to_remove),
         )
         await db.execute(delete_stmt)
@@ -216,7 +243,10 @@ async def set_agent_inboxes(
         logger.debug(f"Adding associations for Inboxes: {ids_to_add}")
         new_associations = [
             BotAgentInbox(
-                account_id=account_id, bot_agent_id=agent_id, inbox_id=inbox_id
+                account_id=account_id,
+                # Corrected column name:
+                bot_agent_id=bot_agent_id,
+                inbox_id=inbox_id,
             )
             for inbox_id in ids_to_add
         ]
@@ -225,10 +255,11 @@ async def set_agent_inboxes(
     # Flush changes within this operation
     try:
         await db.flush()
-        logger.info(f"Inbox associations updated successfully for BotAgent {agent_id}")
+        logger.info(
+            f"Inbox associations updated successfully for BotAgent {bot_agent_id}"
+        )
     except Exception as e:
         logger.error(
-            f"Error flushing inbox association changes for BotAgent {agent_id}: {e}"
+            f"Error flushing inbox association changes for BotAgent {bot_agent_id}: {e}"
         )
-        # Re-raise to allow caller (API endpoint) to handle rollback
         raise

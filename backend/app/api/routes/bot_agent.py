@@ -188,7 +188,7 @@ async def set_agent_associated_inboxes(
     )
 
     # Get the agent, ensuring ownership
-    db_agent = await get_agent_or_404(
+    bot_agent = await get_agent_or_404(
         bot_agent_id=bot_agent_id, account_id=account_id, db=db
     )
 
@@ -200,7 +200,7 @@ async def set_agent_associated_inboxes(
 
     try:
         await bot_agent_repo.set_bot_agent_inboxes(
-            db=db, agent=db_agent, inbox_ids=inbox_ids
+            db=db, bot_agent=bot_agent, inbox_ids=inbox_ids
         )
         await db.commit()
         logger.info(f"Successfully set Inboxes for Bot Agent {bot_agent_id}")
