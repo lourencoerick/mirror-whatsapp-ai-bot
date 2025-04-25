@@ -57,16 +57,18 @@ HUMAN_MESSAGE_TEMPLATE = "{customer_message}"
 
 # --- Helper Functions  ---
 def _format_offerings(offerings: List[OfferingInfo]) -> str:
+    """Formats the list of offerings, including the link if available."""
     if not offerings:
         return "No specific offerings listed."
     lines = []
     for offer in offerings:
         features = ", ".join(offer.key_features) if offer.key_features else "N/A"
         price = offer.price_info if offer.price_info else "N/A"
+        link_info = f", Link: {offer.link}" if offer.link else ""
         lines.append(
-            f"- {offer.name}: {offer.short_description} (Features: {features}, Price: {price})"
+            f"- {offer.name}: {offer.short_description} (Features: {features}, Price: {price}{link_info})"
         )
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def _format_list_items(items: List[str], prefix: str = "- ") -> str:
