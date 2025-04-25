@@ -1,0 +1,215 @@
+# backend/app/api/routers/bot_agent.py
+
+from fastapi import APIRouter, Depends, HTTPException, status, Response
+from loguru import logger
+from uuid import UUID
+from typing import List
+
+# SQLAlchemy Session and Models/Schemas
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_db
+from app.models.bot_agent import BotAgent
+from app.models.inbox import Inbox  # Needed for response model hint
+from app.api.schemas.bot_agent import (
+    BotAgentRead,
+    BotAgentUpdate,
+    AgentInboxAssociationUpdate,
+    # AgentInboxAssociationRead, # If needed later
+)
+from app.api.schemas.inbox import InboxRead  # Schema for returning associated inboxes
+
+# Repository Functions
+from app.services.repository import bot_agent as bot_agent_repo
+
+# Auth Context
+from app.core.dependencies.auth import get_auth_context, AuthContext
+
+
+# Define the router
+router = APIRouter(
+    prefix="/bot-agents",  # Base prefix for this router
+    tags=["v1 - Bot Agents"],  # Tag for API documentation
+)
+
+
+# --- Helper Function to Get Agent (and check ownership) ---
+async def get_agent_or_404(
+    bot_agent_id: UUID, account_id: UUID, db: AsyncSession
+) -> BotAgent:
+    """Helper to get agent by ID and verify ownership, raising 404 if not found/owned."""
+    bot_agent = await bot_agent_repo.get_bot_agent_by_id(
+        db, bot_agent_id=bot_agent_id, account_id=account_id
+    )  # Assumes get_agent_by_id exists
+    if not bot_agent or bot_agent.account_id != account_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bot Agent not found."
+        )
+    return bot_agent
+
+
+# --- Endpoints ---
+
+
+@router.get(
+    "/",
+    response_model=List[BotAgentRead],
+    summary="List Bot Agents for Account",
+    description="Retrieves all Bot Agents associated with the authenticated user's active account (currently assumes only one).",
+)
+async def list_bot_agents(
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> List[BotAgent]:  # Return type is List[Model] for FastAPI response_model conversion
+    """Lists Bot Agents for the current account."""
+    account_id = auth_context.account.id
+    logger.info(f"Listing Bot Agents for account {account_id}")
+    # In MVP, we get/create the single one. In future, this might list multiple.
+    bot_agent = await bot_agent_repo.get_or_create_bot_agent_by_account_id(
+        db=db, account_id=account_id
+    )
+    return [bot_agent]  # Return as a list
+
+
+@router.get(
+    "/{bot_agent_id}",
+    response_model=BotAgentRead,
+    summary="Get Bot Agent Details",
+    description="Retrieves details for a specific Bot Agent by its ID, ensuring it belongs to the user's account.",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Bot Agent not found"}},
+)
+async def get_bot_agent_details(
+    bot_agent_id: UUID,
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> BotAgent:
+    """Gets details of a specific Bot Agent."""
+    account_id = auth_context.account.id
+    logger.info(
+        f"Getting details for Bot Agent {bot_agent_id} for account {account_id}"
+    )
+    # Need get_agent_by_id in repo
+    bot_agent = await bot_agent_repo.get_bot_agent_by_id(
+        db=db, bot_agent_id=bot_agent_id, account_id=account_id
+    )
+    if not bot_agent or bot_agent.account_id != account_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bot Agent not found"
+        )
+    return bot_agent
+
+
+@router.put(
+    "/{bot_agent_id}",
+    response_model=BotAgentRead,
+    summary="Update Bot Agent",
+    description="Updates the configuration of a specific Bot Agent.",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Bot Agent not found"}},
+)
+async def update_bot_agent(
+    bot_agent_id: UUID,
+    agent_update: BotAgentUpdate,
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> BotAgent:
+    """Updates a specific Bot Agent's settings."""
+    account_id = auth_context.account.id
+    logger.info(f"Updating Bot Agent {bot_agent_id} for account {account_id}")
+
+    # Get the existing agent, ensuring ownership
+    bot_agent = await get_agent_or_404(
+        bot_agent_id=bot_agent_id, account_id=account_id, db=db
+    )
+
+    try:
+        updated_agent = await bot_agent_repo.update_bot_agent(
+            db=db, bot_agent=bot_agent, agent_in=agent_update
+        )
+        await db.commit()
+        await db.refresh(updated_agent)  # Refresh to get latest state after commit
+        logger.info(f"Bot Agent {bot_agent_id} updated successfully.")
+        return updated_agent
+    except Exception as e:
+        await db.rollback()
+        logger.exception(f"Error updating Bot Agent {bot_agent_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update Bot Agent.",
+        ) from e
+
+
+@router.get(
+    "/{bot_agent_id}/inboxes",
+    response_model=List[InboxRead],  # Use the InboxRead schema
+    summary="List Associated Inboxes",
+    description="Retrieves the list of Inboxes currently associated with the specified Bot Agent.",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Bot Agent not found"}},
+)
+async def get_agent_associated_inboxes(
+    bot_agent_id: UUID,
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> List[Inbox]:  # Return list of Inbox models
+    """Gets Inboxes associated with a Bot Agent."""
+    account_id = auth_context.account.id
+    logger.info(f"Getting Inboxes for Bot Agent {bot_agent_id} (Account: {account_id})")
+
+    # Verify agent exists and belongs to the account
+    await get_agent_or_404(bot_agent_id=bot_agent_id, account_id=account_id, db=db)
+
+    inboxes = await bot_agent_repo.get_inboxes_for_bot_agent(
+        db=db, bot_agent_id=bot_agent_id
+    )
+    return inboxes
+
+
+@router.put(
+    "/{bot_agent_id}/inboxes",
+    status_code=status.HTTP_204_NO_CONTENT,  # No content needed on successful update
+    summary="Set Associated Inboxes",
+    description="Sets the complete list of Inboxes associated with the Bot Agent. Replaces any existing associations.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Bot Agent not found"},
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "One or more Inbox IDs are invalid or do not belong to the account"
+        },
+    },
+)
+async def set_agent_associated_inboxes(
+    bot_agent_id: UUID,
+    association_data: AgentInboxAssociationUpdate,
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Sets the Inboxes associated with a Bot Agent."""
+    account_id = auth_context.account.id
+    inbox_ids = association_data.inbox_ids
+    logger.info(
+        f"Setting Inboxes for Bot Agent {bot_agent_id} (Account: {account_id}) to: {inbox_ids}"
+    )
+
+    # Get the agent, ensuring ownership
+    db_agent = await get_agent_or_404(
+        bot_agent_id=bot_agent_id, account_id=account_id, db=db
+    )
+
+    # **Optional but Recommended:** Validate that all provided inbox_ids exist
+    # and belong to the current account_id before proceeding.
+    # This requires a new repository function like `validate_inbox_ids(db, account_id, inbox_ids)`
+    # if not await validate_inbox_ids(db, account_id, inbox_ids):
+    #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or inaccessible Inbox IDs provided.")
+
+    try:
+        await bot_agent_repo.set_bot_agent_inboxes(
+            db=db, agent=db_agent, inbox_ids=inbox_ids
+        )
+        await db.commit()
+        logger.info(f"Successfully set Inboxes for Bot Agent {bot_agent_id}")
+        # Return 204 No Content on success
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except Exception as e:
+        await db.rollback()
+        logger.exception(f"Error setting Inboxes for Bot Agent {bot_agent_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update Inbox associations.",
+        ) from e
