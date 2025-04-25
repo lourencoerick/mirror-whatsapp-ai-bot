@@ -142,7 +142,6 @@ async def start_research(state: ResearchState) -> Dict[str, Any]:
         "urls_to_scrape": [initial_url],
         "search_queries": [],
         "scraped_data": {},
-        "have_searched_offerings": False,
         "search_results": {},
         "combined_context": None,
         "profile_draft": None,
@@ -270,9 +269,7 @@ async def perform_search(state: ResearchState) -> Dict[str, Any]:
     Updates search_results, last_action_summary, and sets search_attempted flag.
     Clears search_queries.
     """
-    search_attempted_flag = state.get(
-        "search_attempted", False
-    )  # Get current flag state
+    search_attempted_flag = state.get("search_attempted", False)
 
     if not SEARCH_AVAILABLE:
         summary = "Search failed: Service unavailable."
@@ -305,7 +302,7 @@ async def perform_search(state: ResearchState) -> Dict[str, Any]:
     successful_searches = 0
     failed_searches = 0
     total_results = 0
-    errors_encountered = False  # Track if any error occurred
+    errors_encountered = False
 
     for i, result in enumerate(results_list):
         query = queries[i]
@@ -313,7 +310,7 @@ async def perform_search(state: ResearchState) -> Dict[str, Any]:
             logger.error(f"Error searching '{query}': {result}")
             search_results_agg[query] = []
             failed_searches += 1
-            errors_encountered = True  # Mark error
+            errors_encountered = True
         elif isinstance(result, list):
             logger.success(f"Search OK for '{query}'. Found {len(result)}")
             search_results_agg[query] = result
@@ -325,7 +322,7 @@ async def perform_search(state: ResearchState) -> Dict[str, Any]:
             )
             search_results_agg[query] = []
             failed_searches += 1
-            errors_encountered = True  # Mark error
+            errors_encountered = True
 
     action_summary = (
         f"Search attempt finished. Queries: {len(queries)}. "
@@ -336,7 +333,7 @@ async def perform_search(state: ResearchState) -> Dict[str, Any]:
 
     # --- Set search_attempted to True IF at least one search was tried ---
     # We set it even if there were errors, as an *attempt* was made.
-    if queries:  # Check if we actually tried to run any queries
+    if queries:
         search_attempted_flag = True
 
     updates = {
@@ -352,12 +349,17 @@ async def perform_search(state: ResearchState) -> Dict[str, Any]:
 # --- Node: update_profile ---
 async def update_company_profile(state: ResearchState, config: dict) -> Dict[str, Any]:
     """
-    Combines context and uses LLM extractor to update profile_draft.
-    Requires 'llm_instance' in the config.
+    Combines context, uses LLM extractor to get new info, and then uses
+    another LLM call to intelligently merge the new info with the existing
+    profile_draft. Requires 'llm_instance' in the config.
+    Clears scraped_data and search_results.
     """
-    if not EXTRACTOR_AVAILABLE or not SCHEMA_AVAILABLE:
-        logger.error("Extractor or Schema unavailable.")
-        return {"error_message": "Extractor unavailable.", "next_action": "error"}
+    if not all([EXTRACTOR_AVAILABLE, SCHEMA_AVAILABLE, TRUSTCALL_AVAILABLE]):
+        logger.error("Update components (Extractor, Schema, Trustcall) unavailable.")
+        return {
+            "error_message": "Update components unavailable.",
+            "next_action": "error",
+        }
 
     scraped_data = state.get("scraped_data", {})
     search_results = state.get("search_results", {})
@@ -368,18 +370,16 @@ async def update_company_profile(state: ResearchState, config: dict) -> Dict[str
     )
     if not llm_instance:
         logger.error("LLM instance not found in config for update_profile node.")
-        return {
-            "error_message": "LLM unavailable for extraction.",
-            "next_action": "error",
-        }
+        return {"error_message": "LLM unavailable for update.", "next_action": "error"}
 
     # --- Combine Context ---
     combined_parts = []
     if scraped_data:
         combined_parts.append("--- Website Content ---")
         for url, content in scraped_data.items():
-            # Limit content per page shown in context
-            combined_parts.append(f"\n[Source: {url}]\n{content[:10000]}")
+            combined_parts.append(
+                f"\n[Source: {url}]\n{content[:10000]}"
+            )  # Limit content
         combined_parts.append("--- End Website Content ---")
 
     if search_results:
@@ -388,55 +388,136 @@ async def update_company_profile(state: ResearchState, config: dict) -> Dict[str
             combined_parts.append(f"\n[Query: {query}]")
             result_snippets = [
                 f"- Title: {res.get('title', 'N/A')}\n  URL: {res.get('url', 'N/A')}\n  Snippet: {res.get('content', 'N/A')}\n"
-                for res in results  # Assuming results is a list of dicts
+                for res in results
             ]
             combined_parts.append("\n".join(result_snippets))
         combined_parts.append("--- End Search Results ---")
 
     if not combined_parts:
         logger.info("No new data to process. Skipping profile update.")
-        return {"scraped_data": {}, "search_results": {}, "combined_context": None}
+        return {
+            "scraped_data": {},
+            "search_results": {},
+            "combined_context": None,
+            "profile_draft": current_profile_draft,  # Preserve draft
+        }
 
     combined_context = "\n".join(combined_parts)
     logger.info(
-        f"Combined context generated. Length: {len(combined_context)}. "
-        f"Updating profile draft..."
+        f"Combined context generated. Length: {len(combined_context)}. Extracting new info..."
     )
 
-    # --- Call Extractor ---
+    # --- Call Initial Extractor ---
     try:
+
         newly_extracted_profile = await extract_profile_from_text(
             website_text=combined_context,
             llm=llm_instance,
             target_schema=CompanyProfileSchema,
         )
+        logger.debug(f"New profile extracted: {newly_extracted_profile}")
     except Exception as e:
         logger.exception(f"Error calling extract_profile_from_text: {e}")
         return {
             "error_message": f"Extractor failed: {e}",
             "next_action": "error",
-            "scraped_data": {},  # Clear inputs even on error
+            "scraped_data": {},
             "search_results": {},
-            "combined_context": combined_context,  # Keep context for debugging
+            "combined_context": combined_context,
+            "profile_draft": current_profile_draft,
         }
 
-    # --- Update Profile Draft ---
+    # --- Merge Logic ---
     updated_profile_draft = current_profile_draft
-    if newly_extracted_profile:
-        logger.success("Extractor returned new profile schema.")
-        # Simple overwrite strategy
-        updated_profile_draft = newly_extracted_profile
-    else:
-        logger.warning("Extractor did not return valid profile schema.")
-        # Keep existing draft if extraction failed
 
-    updates = {
-        "profile_draft": updated_profile_draft,
-        "scraped_data": {},  # Clear processed data
-        "search_results": {},  # Clear processed data
-        "combined_context": combined_context,  # Store context used
-        "error_message": state.get("error_message"),  # Preserve previous error
-    }
+    if not newly_extracted_profile:
+        logger.warning("Initial extractor returned no profile. Keeping existing draft.")
+        updates = {
+            "profile_draft": current_profile_draft,
+            "scraped_data": {},
+            "search_results": {},
+            "combined_context": combined_context,
+            "error_message": state.get("error_message"),
+        }
+    elif not current_profile_draft:
+
+        logger.info("First successful extraction. Using as initial profile draft.")
+        updated_profile_draft = newly_extracted_profile
+        updates = {
+            "profile_draft": updated_profile_draft,
+            "scraped_data": {},
+            "search_results": {},
+            "combined_context": combined_context,
+            "error_message": state.get("error_message"),
+        }
+    else:
+        # --- Perform LLM Merge ---
+        logger.info("Performing LLM merge of current draft and new extraction...")
+        try:
+            current_draft_json = current_profile_draft.model_dump_json(indent=2)
+            new_extraction_json = newly_extracted_profile.model_dump_json(
+                indent=2, exclude_unset=True
+            )
+
+            merge_prompt = f"""
+            You are an expert data integrator. Your task is to merge two versions of a company profile into a single, comprehensive, and accurate profile.
+
+            **Existing Profile Draft:**
+            ```json
+            {current_draft_json}
+            ```
+            Use code with caution.
+            Python
+            Newly Extracted Information (from latest research):
+            ```json
+            {new_extraction_json}
+            ```
+            Instructions:
+                - Combine information from both versions.
+                - Prioritize values that are more accurate, complete, and up-to-date.
+                - Use 'Newly Extracted Information' if it provides better detail.
+                - Add new information from 'Newly Extracted Information' if missing in the 'Existing Profile Draft'.
+                - Keep existing values if 'Newly Extracted Information' is missing them.
+                - For lists (like 'offering_overview', 'key_selling_points', etc.): Combine items, ensuring uniqueness. For 'offering_overview', merge items with the same name intelligently (combine features, prefer longer descriptions/non-empty price/link).
+                - Ensure the final output strictly adheres to the CompanyProfileSchema format.
+                - Return only the final, merged JSON object representing the CompanyProfileSchema.
+            """
+            merge_agent = create_extractor(
+                llm=llm_instance,
+                tools=[CompanyProfileSchema],
+                tool_choice=CompanyProfileSchema.__name__,
+            )
+            merge_result = await merge_agent.ainvoke(merge_prompt)
+            merge_responses = merge_result.get("responses")
+            if isinstance(merge_responses, list) and len(merge_responses) > 0:
+                merged_profile = merge_responses[0]
+                if isinstance(merged_profile, CompanyProfileSchema):
+                    logger.success("LLM merge successful.")
+                    updated_profile_draft = merged_profile
+                else:
+                    logger.error(
+                        f"LLM merge returned unexpected type: {type(merged_profile)}. Keeping previous draft."
+                    )
+            else:
+                logger.error(
+                    f"LLM merge call failed or returned no response. Keeping previous draft. Result: {merge_result}"
+                )
+
+        except Exception as merge_err:
+            logger.exception(
+                f"Error during LLM merge process: {merge_err}. Keeping previous draft."
+            )
+
+        # Prepare updates after merge attempt
+        updates = {
+            "profile_draft": updated_profile_draft,
+            "scraped_data": {},
+            "search_results": {},
+            "combined_context": combined_context,
+            "error_message": state.get("error_message"),
+        }
+        # --- End LLM Merge ---
+
     return updates
 
 
@@ -512,15 +593,14 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
 
     # --- Get State ---
     iteration_count = state.get("iteration_count", 0)
-    have_searched_offerings = state.get("have_searched_offerings", True)
     max_iterations = state.get("max_iterations", 5)
     error_message = state.get("error_message")
     missing_info = state.get("missing_info_summary", "Analysis not available.")
     profile_draft = state.get("profile_draft")
     initial_url = state.get("initial_url", "N/A")
     action_history = state.get("action_history", [])
-    visited_urls = state.get("visited_urls", set())  # Obter URLs visitadas
-    search_attempted = state.get("search_attempted", True)  # Obter URLs visitadas
+    visited_urls = state.get("visited_urls", set())
+    search_attempted = state.get("search_attempted", True)
     newly_found_links_all = state.get("newly_found_links", [])
     intial_url_found_links_all = state.get("intial_url_found_links", [])
     current_iteration = iteration_count + 1
@@ -533,8 +613,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
     # --- Check Termination Conditions ---
     updates_if_finishing = {
         "iteration_count": current_iteration,
-        "newly_found_links": [],  # Clear links
-        # "last_action_summary": None,  # Clear summary
+        "newly_found_links": [],
     }
     if error_message:
         logger.warning(f"Error detected: {error_message}. Finishing.")
@@ -549,9 +628,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
 
     # --- Logic to Force Search (Example: after iteration 2 if not searched) ---
     force_search = False
-    # Condition: If we are past iteration 2 AND haven't attempted search yet
-    if current_iteration > 4 and not search_attempted:
-        # AND (optional) if basic info exists
+    if current_iteration > 8 and not search_attempted:
         profile_has_basics = bool(
             profile_draft
             and profile_draft.company_name
@@ -570,15 +647,15 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
         forced_queries = [
             f"{company_name} produtos e serviços",
             f"{company_name} planos e preço",
-            f"{company_name} contato para informações",  # Add a general contact search too
+            f"{company_name} contato para informações",
         ]
         # Return only fields to be overwritten
         return {
             "next_action": "search",
             "search_queries": forced_queries,
             "iteration_count": current_iteration,
-            "urls_to_scrape": [],  # Clear scrape list
-            "error_message": None,  # Clear error if forcing search
+            "urls_to_scrape": [],
+            "error_message": None,
         }
     # --- Get LLM ---
     llm_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
@@ -587,7 +664,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
     if not llm_instance:
         logger.error("LLM instance not found in config for planning node.")
         return {
-            **updates_if_finishing,  # Still clear state fields
+            **updates_if_finishing,
             "error_message": "LLM unavailable for planning.",
             "next_action": "error",
         }
@@ -622,7 +699,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
             [
                 f"- URL: {link.url} (Anchor Text: '{link.anchor_text or 'N/A'}')"
                 for link in intial_url_found_links[:30]
-            ]  # Limit links in prompt
+            ]  force_search
         )
         initial_url_links_summary = f"Potential URLs found in the last scraping cycle (limit 30):\n{links_list_str}"
         if len(intial_url_found_links) > 30:
@@ -633,7 +710,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
             [
                 f"- URL: {link.url} (Anchor Text: '{link.anchor_text or 'N/A'}')"
                 for link in unvisited_candidate_links[:20]
-            ]  # Limit links in prompt
+            ] 
         )
         links_summary = f"Potential URLs found in the last scraping cycle (limit 20):\n{links_list_str}"
         if len(unvisited_candidate_links) > 20:
@@ -646,56 +723,52 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
             history_to_show
         )
 
-    logger.info(
-        f"All not newly visited links {len(unvisited_candidate_links)}: {links_summary}"
-    )
-    logger.info(
-        f"All not visited links from inital url {len(intial_url_found_links)}: {initial_url_links_summary}"
-    )
-
     prompt = f"""
-You are an automated research planner. Your goal is to decide the next step to build a **complete and accurate** company profile based on available information.
+You are an automated research planner AI. Your objective is to strategically decide the next step to build a **complete and accurate** company profile using information from a website and external search.
 
-**Primary Goal:** Ensure the profile accurately reflects the company's offerings. Prioritize finding, verifying, and detailing specific **products, services, and pricing/plans**. 
+**Overall Goal:** Create a high-quality company profile suitable for an AI sales assistant.
 
-**Secondary Goal:** Find reliable contact information and FAQ details if is not complete, email, telephone number and / or faq page.
+**Key Priorities:**
+1.  **Offerings (Primary):** Ensure the profile accurately lists and details the company's specific **products, services, and pricing/plans**. This is the most critical information.
+2.  **Contact/FAQ (Secondary):** Find reliable contact methods (email, phone) and FAQ information if missing.
 
-Understand the size of the company and its context, if we captured just a single offer for a big company, for example, it is likely that we are missing something.
+**Decision Factors:** Base your decision on the following context, prioritizing the goals above. Analyze the action history to avoid repeating failed attempts. Consider the likely business type (e.g., online service vs. physical store - an online service might not have 'delivery options').
 
-
-**Context:**
+**Context Provided:**
 *   Target Website: {initial_url}
-*   Target Website Links Found:
-{initial_url_links_summary}
+*   {initial_url_links_summary}
 *   Current Profile Status Summary:
 {profile_summary}
-
 *   Analysis of Missing Information: {missing_info}
 *   {history_log}
-*   Potential New Links Found: 
 *   {links_summary}
 
-**Instructions:**
-Based on the goals and the current context (especially missing info and last action outcome), decide the *single best next action*. Consider the likely business type (e.g., online service vs. physical store) when choosing. Your options are:
+**Instructions:** Choose the *single best next action* from the options below.
 
-1.  **'scrape'**: Choose this if specific *unvisited* website pages (from `Potential New Links Found` or common paths like `/contact`, `/about`, `/products`, `/services`, `/pricing`, `/faq`) seem highly likely to contain the missing information or provide **more detail about offerings/contact/FAQ**.
-    *   Provide the *full URLs* to scrape.
-    *   Do NOT suggest URLs that failed in the 'Last Action Attempted' unless you have a strong reason and state it.
+**Action Options:**
 
-2.  **'search'**: Choose this if:
-    *   Previous scraping attempts for specific info failed (see 'Last Action Attempted').
-    *   External validation or complementary data is needed (e.g., operating hours not listed, specific contact details, reviews).
-    *   Provide specific, targeted search queries (e.g., "[Company Name] product list", "[Company Name] service pricing", "[Company Name] contact phone number", "[Company Name] customer support hours").
-    *   Do NOT repeat failed search queries for the same missing information.
+1.  **'scrape'**:
+    *   **Choose if:** Specific *unvisited candidate URLs* or common paths (like `/contact`, `/about`, `/products`, `/services`, `/pricing`, `/faq`) seem highly likely to contain the missing information, **especially offering details, contact info, or FAQs**.
+    *   **Check History:** Do NOT suggest URLs that recently failed (check history) unless there's a strong reason.
+    *   **Output:** Provide the *full URLs* to scrape in the `urls_to_scrape` field.
 
-3.  **'finish'**: Choose this ONLY if:
-    *   The profile seems reasonably complete, **especially regarding offerings and contact info**.
-    *   You have already attempted targeted scraping AND/OR searching for the key missing information in previous steps (check 'Last Action Attempted').
-    *   Further actions seem unlikely to yield significant improvements for the *specific missing fields*.
+2.  **'search'**:
+    *   **Choose if:**
+        *   Website scraping seems unlikely to yield the missing info (especially detailed offerings/pricing).
+        *   Previous scraping attempts for specific info failed (check history).
+        *   External validation or data is needed (e.g., operating hours, specific contacts, reviews).
+    *   **Check History:** Do NOT repeat failed search queries for the same missing information.
+    *   **Output:** Provide specific, targeted search queries in the `search_queries` field (e.g., "[Company Name] product list", "[Company Name] service pricing", "[Company Name] contact phone number").
+
+3.  **'finish'**:
+    *   **Choose ONLY if:**
+        *   The profile seems reasonably complete, **especially regarding offerings and contact info**.
+        *   The action history shows that targeted scraping AND/OR searching for the key missing information have already been attempted.
+        *   Further actions seem unlikely to yield significant improvements based on the available context and history.
+    *   **Output:** Leave `urls_to_scrape` and `search_queries` empty.
 
 **Output Format:**
-Use the 'PlannerDecisionSchema' to structure your response. Provide *only* the valid JSON object.
-Provide URLs *only* if choosing 'scrape'. Provide queries *only* if choosing 'search'. Leave both empty if choosing 'finish'.
+Use the 'PlannerDecisionSchema'. Respond *only* with the valid JSON object.
 """
     logger.debug("Sending planning request to LLM...")
 
@@ -729,10 +802,8 @@ Provide URLs *only* if choosing 'scrape'. Provide queries *only* if choosing 'se
                     "search_queries": (
                         decision.search_queries if decision.search_queries else []
                     ),
-                    "error_message": None,  # Clear error on successful planning
-                    # "last_action_summary": None,  # Clear summary
-                    "newly_found_links": [],  # Clear links
-                    "have_searched_offerings": have_searched_offerings,
+                    "error_message": None,  
+                    "newly_found_links": [],  
                 }
 
                 if (
@@ -759,9 +830,7 @@ Provide URLs *only* if choosing 'scrape'. Provide queries *only* if choosing 'se
         "error_message": error_msg,
         "next_action": "error",
         "iteration_count": current_iteration,
-        # "last_action_summary": None,  # Clear summary on error
-        "newly_found_links": [],  # Clear links on error
-        "have_searched_offerings": have_searched_offerings,
+        "newly_found_links": [],  
     }
 
 
