@@ -31,13 +31,25 @@ async def list_account_inboxes(
         List[InboxRead]: A list of inboxes for the authenticated account.
     """
     account_id = auth_context.account.id
-    logger.info(f"Received request to list inboxes for Account={account_id}")
+    logger.info(f"Listing inboxes with association for account {account_id}")
 
-    inboxes = await inbox_repo.find_inboxes_by_account(
+    results = await inbox_repo.find_inboxes_with_association_by_account(
         db=db, account_id=account_id, limit=limit, offset=offset
     )
-    logger.info(f"Found {len(inboxes)} inboxes for account {account_id}")
-    return inboxes
+
+    response_data = []
+    for inbox_model, agent_id in results:
+        try:
+            inbox_dict = InboxRead.model_validate(inbox_model).model_dump()
+        except Exception as e:
+            logger.warning(
+                f"Failed to validate inbox model {inbox_model.id}: {e}. Skipping."
+            )
+            continue
+        inbox_dict["associated_agent_id"] = agent_id
+        response_data.append(InboxRead(**inbox_dict))
+
+    return response_data
 
 
 @router.post("/inboxes", response_model=InboxRead, status_code=status.HTTP_201_CREATED)

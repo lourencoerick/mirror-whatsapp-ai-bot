@@ -1,11 +1,12 @@
 from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from loguru import logger
 
 from app.models.inbox import Inbox
 from app.models.inbox_member import InboxMember
+from app.models.bot_agent_inbox import BotAgentInbox
 from app.api.schemas.inbox import InboxCreate, InboxUpdate
 
 
@@ -33,6 +34,43 @@ async def find_inbox_by_id_and_account(
             f"[InboxRepo] Inbox ID={inbox_id} not found or not authorized for Account={account_id}"
         )
     return inbox
+
+
+async def find_inboxes_with_association_by_account(
+    db: AsyncSession, *, account_id: UUID, limit: int = 100, offset: int = 0
+) -> List[Tuple[Inbox, Optional[UUID]]]:
+    """
+    Retrieve all inboxes for an account, including the associated BotAgent ID.
+
+    Args:
+        db: The SQLAlchemy async session.
+        account_id: The ID of the account whose inboxes to retrieve.
+        limit: Maximum number of inboxes to return.
+        offset: Number of inboxes to skip.
+
+    Returns:
+        A list of tuples, each containing (Inbox object, associated BotAgent UUID or None).
+    """
+    logger.debug(
+        f"[InboxRepo] Finding inboxes with agent association for Account={account_id} (limit={limit}, offset={offset})"
+    )
+    stmt = (
+        select(Inbox, BotAgentInbox.bot_agent_id)
+        .outerjoin(
+            BotAgentInbox,
+            Inbox.id == BotAgentInbox.inbox_id,
+        )
+        .where(Inbox.account_id == account_id)
+        .order_by(Inbox.name)
+        .limit(limit)
+        .offset(offset)
+    )
+    result = await db.execute(stmt)
+    inboxes_with_assoc: List[Tuple[Inbox, Optional[UUID]]] = result.all()
+    logger.info(
+        f"[InboxRepo] Found {len(inboxes_with_assoc)} inboxes with association info for Account={account_id}"
+    )
+    return inboxes_with_assoc
 
 
 async def find_inbox_by_channel_id(
