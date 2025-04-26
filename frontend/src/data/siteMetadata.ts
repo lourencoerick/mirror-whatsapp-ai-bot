@@ -18,4 +18,4 @@ const siteMetadata = {
   stickyNav: false,
 };
 
-module.exports = siteMetadata;
+export default siteMetadata;
