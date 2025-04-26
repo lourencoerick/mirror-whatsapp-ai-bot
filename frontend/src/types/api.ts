@@ -820,12 +820,6 @@ export interface components {
              */
             first_message?: string | null;
             /**
-             * Is Active
-             * @description Indicates if the agent is active and responding to messages.
-             * @default false
-             */
-            is_active: boolean | null;
-            /**
              * Use Rag
              * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
              * @default false
@@ -850,7 +844,6 @@ export interface components {
          *     All fields are optional on update.
          * @example {
          *       "first_message": "Hello! I'm the virtual assistant for [Company Name]. How can I help you today?",
-         *       "is_active": true,
          *       "name": "Primary Sales Assistant",
          *       "use_rag": false
          *     }
@@ -867,12 +860,6 @@ export interface components {
              * @description Initial message the bot sends to start the conversation (if empty, waits for the user).
              */
             first_message?: string | null;
-            /**
-             * Is Active
-             * @description Indicates if the agent is active and responding to messages.
-             * @default false
-             */
-            is_active: boolean | null;
             /**
              * Use Rag
              * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
@@ -1809,10 +1796,10 @@ export interface components {
              */
             channel_id?: string | null;
             /**
-             * Associated Agent Id
+             * Associated Bot Agent Id
              * @description ID of the BotAgent currently associated with this inbox, if any.
              */
-            associated_agent_id?: string | null;
+            associated_bot_agent_id?: string | null;
             /**
              * Created At
              * Format: date-time

@@ -20,7 +20,6 @@ class BotAgent(BaseModel):
     name = Column(String(255), nullable=False, default="Assistente Principal")
 
     first_message = Column(Text, nullable=True)
-    is_active = Column(Boolean, nullable=False, default=False, index=True)
     use_rag = Column(Boolean, nullable=False, default=False)
 
     account = relationship("Account", back_populates="bot_agent")

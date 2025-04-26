@@ -15,10 +15,7 @@ class BotAgentBase(BaseModel):
         None,
         description="Initial message the bot sends to start the conversation (if empty, waits for the user).",
     )
-    is_active: Optional[bool] = Field(
-        default=False,
-        description="Indicates if the agent is active and responding to messages.",
-    )
+
     use_rag: Optional[bool] = Field(
         default=False,
         description="Indicates if the agent should use the Knowledge Base (RAG) to generate responses.",
@@ -42,7 +39,6 @@ class BotAgentUpdate(BotAgentBase):
             "example": {
                 "name": "Primary Sales Assistant",
                 "first_message": "Hello! I'm the virtual assistant for [Company Name]. How can I help you today?",
-                "is_active": True,
                 "use_rag": False,
             }
         }
