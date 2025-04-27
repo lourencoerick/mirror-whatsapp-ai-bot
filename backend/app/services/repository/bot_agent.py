@@ -7,11 +7,16 @@ from loguru import logger
 from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.exc import IntegrityError
 
 # Import Models and Schemas
+from app.services.repository import conversation as conversation_repo
+from app.services.repository import inbox as inbox_repo
 from app.models.bot_agent import BotAgent
 from app.models.bot_agent_inbox import BotAgentInbox
 from app.models.inbox import Inbox
+from app.models.conversation import ConversationStatusEnum
+
 from app.api.schemas.bot_agent import BotAgentUpdate
 
 
@@ -202,62 +207,127 @@ async def set_bot_agent_inboxes(
 ) -> None:
     """
     Sets the complete list of associated Inboxes for a BotAgent.
-
-    Removes existing associations not in the provided list and adds new ones.
-
+    Removes old associations, checks conflicts, adds new ones, and updates
+    status of conversations in removed inboxes from BOT to PENDING.
     Args:
         db: The SQLAlchemy async session.
-        agent: The BotAgent object whose associations are being set.
+        bot_agent: The BotAgent object whose associations are being set.
         inbox_ids: The complete list of Inbox UUIDs that should be associated.
     """
     account_id = bot_agent.account_id
-    bot_agent_id = bot_agent.id  # Use agent_id consistently now
+    bot_agent_id = bot_agent.id
+    target_inbox_ids = set(inbox_ids)
     logger.info(
-        f"Setting Inboxes for BotAgent {bot_agent_id} (Account: {account_id}) to: {inbox_ids}"
+        f"Setting Inboxes for BotAgent {bot_agent_id} (Account: {account_id}) to: {list(target_inbox_ids)}"
     )
 
-    # 1. Get current associations
+    # 1. Get current associations FOR THIS AGENT
     current_assoc_stmt = select(BotAgentInbox.inbox_id).where(
-        # Corrected where condition:
-        BotAgentInbox.bot_agent_id
-        == bot_agent_id
+        BotAgentInbox.bot_agent_id == bot_agent_id
     )
     result = await db.execute(current_assoc_stmt)
     current_inbox_ids = set(result.scalars().all())
-    target_inbox_ids = set(inbox_ids)
 
-    # 2. Identify associations to remove
+    # 2. Identify associations to remove (for this agent)
     ids_to_remove = current_inbox_ids - target_inbox_ids
     if ids_to_remove:
-        logger.debug(f"Removing associations for Inboxes: {ids_to_remove}")
+        logger.debug(
+            f"Removing associations for Inboxes: {ids_to_remove} from Agent {bot_agent_id}"
+        )
         delete_stmt = delete(BotAgentInbox).where(
-            # Corrected where condition:
             BotAgentInbox.bot_agent_id == bot_agent_id,
             BotAgentInbox.inbox_id.in_(ids_to_remove),
         )
         await db.execute(delete_stmt)
 
-    # 3. Identify associations to add
+        logger.info(
+            f"Updating BOT conversations to PENDING in removed inboxes: {ids_to_remove}"
+        )
+        for inbox_id_to_remove in ids_to_remove:
+            try:
+                updated_count = await conversation_repo.update_status_for_bot_conversations_in_inbox(
+                    db=db,
+                    account_id=account_id,
+                    inbox_id=inbox_id_to_remove,
+                    new_status=ConversationStatusEnum.PENDING,
+                    current_status=ConversationStatusEnum.BOT,
+                )
+                logger.info(
+                    f"Set {updated_count} conversations to PENDING in Inbox {inbox_id_to_remove}"
+                )
+            except Exception as update_exc:
+
+                logger.error(
+                    f"Failed to update conversation status for inbox {inbox_id_to_remove}: {update_exc}"
+                )
+                raise update_exc
+
+            try:
+                await inbox_repo.update_intial_conversation_status(
+                    db=db,
+                    account_id=account_id,
+                    inbox_id=inbox_id_to_remove,
+                    new_status=ConversationStatusEnum.PENDING,
+                )
+                logger.info(
+                    f"Set initial conversation status to PENDING in Inbox {inbox_id_to_remove}"
+                )
+            except Exception as update_exc:
+
+                logger.error(
+                    f"Failed to update initial conversation status for inbox {inbox_id_to_remove}: {update_exc}"
+                )
+                raise update_exc
+
+    # 3. Identify associations to add (for this agent)
     ids_to_add = target_inbox_ids - current_inbox_ids
     if ids_to_add:
-        logger.debug(f"Adding associations for Inboxes: {ids_to_add}")
+        logger.debug(
+            f"Attempting to add associations for Inboxes: {ids_to_add} to Agent {bot_agent_id}"
+        )
+        conflict_check_stmt = select(
+            BotAgentInbox.inbox_id, BotAgentInbox.bot_agent_id
+        ).where(
+            BotAgentInbox.account_id == account_id,
+            BotAgentInbox.inbox_id.in_(ids_to_add),
+        )
+        result = await db.execute(conflict_check_stmt)
+        conflicts = result.all()
+        if conflicts:
+            conflict_details = {
+                inbox_id: conflicting_agent_id
+                for inbox_id, conflicting_agent_id in conflicts
+                if conflicting_agent_id != bot_agent_id
+            }
+            if conflict_details:
+                logger.error(
+                    f"Cannot associate Inboxes to Agent {bot_agent_id}. Conflicts found: {conflict_details}"
+                )
+                raise ValueError(
+                    f"One or more inboxes are already assigned to another agent: {list(conflict_details.keys())}"
+                )
+        logger.debug(
+            f"No conflicts found. Adding associations for Inboxes: {ids_to_add}"
+        )
         new_associations = [
             BotAgentInbox(
-                account_id=account_id,
-                # Corrected column name:
-                bot_agent_id=bot_agent_id,
-                inbox_id=inbox_id,
+                account_id=account_id, bot_agent_id=bot_agent_id, inbox_id=inbox_id
             )
             for inbox_id in ids_to_add
         ]
         db.add_all(new_associations)
 
-    # Flush changes within this operation
+    # 4. Flush changes
     try:
         await db.flush()
         logger.info(
-            f"Inbox associations updated successfully for BotAgent {bot_agent_id}"
+            f"Inbox associations and conversation statuses updated successfully for BotAgent {bot_agent_id}"
         )
+    except IntegrityError as e:
+        logger.error(f"Database integrity error for Agent {bot_agent_id}: {e}")
+        raise ValueError(
+            "Database constraint violation likely due to concurrent assignment."
+        ) from e
     except Exception as e:
         logger.error(
             f"Error flushing inbox association changes for BotAgent {bot_agent_id}: {e}"
