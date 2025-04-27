@@ -88,8 +88,9 @@ export function OfferingForm({
         <Label htmlFor="offering-price" className="mb-1.5 block">
           Price Info
         </Label>
-        <Input
+        <Textarea
           id="offering-price"
+          rows={2}
           placeholder="e.g., Starts at $XX, Contact us"
           {...register("price_info")}
           disabled={disabled}
