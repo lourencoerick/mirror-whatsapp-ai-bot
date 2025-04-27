@@ -4,7 +4,12 @@
 
 import { X as RemoveIcon } from "lucide-react";
 import React, { KeyboardEvent, useState } from "react";
-import { ControllerRenderProps, FieldError } from "react-hook-form";
+import {
+  ControllerRenderProps,
+  FieldError,
+  FieldValues,
+  Path,
+} from "react-hook-form";
 import { toast } from "sonner"; // For user notifications
 
 // UI Components
@@ -25,6 +30,7 @@ import {
   TooltipProvider, // Ensure TooltipProvider wraps the component
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { JSX } from "react/jsx-runtime";
 
 // Defines the possible types for a guideline (using pt-BR terms internally and for display)
 type GuidelineType = "BUSQUE" | "EVITE";
@@ -32,9 +38,12 @@ type GuidelineType = "BUSQUE" | "EVITE";
 /**
  * Props for the GuidelineInput component.
  */
-interface GuidelineInputProps {
+type GuidelineInputProps<
+  TForm extends FieldValues,
+  TName extends Path<TForm>
+> = {
   /** Field object provided by react-hook-form's Controller render prop. Expects a string array value. */
-  field: ControllerRenderProps<any, string[]>;
+  field: ControllerRenderProps<TForm, TName>;
   /** The label text displayed above the input field. */
   label: string;
   /** Unique ID for the input element, used for accessibility and label association. */
@@ -43,7 +52,7 @@ interface GuidelineInputProps {
   placeholder?: string;
   /** Error object from react-hook-form, used to display validation errors. */
   error?: FieldError | any; // Allow 'any' for flexibility if error structure varies
-}
+};
 
 /**
  * A custom input component for managing a list of communication guidelines.
@@ -53,13 +62,16 @@ interface GuidelineInputProps {
  * @param {GuidelineInputProps} props - The component props.
  * @returns {JSX.Element} The rendered guideline input component.
  */
-export function GuidelineInput({
+export function GuidelineInput<
+  TForm extends FieldValues,
+  TName extends Path<TForm>
+>({
   field,
   label,
   id,
   placeholder = "Digite o texto da diretriz...", // Default placeholder in pt-BR
   error,
-}: GuidelineInputProps): JSX.Element {
+}: GuidelineInputProps<TForm, TName>): JSX.Element {
   // State for the currently selected guideline type ('BUSQUE' or 'EVITE')
   const [guidelineType, setGuidelineType] = useState<GuidelineType>("BUSQUE");
   // State for the current value in the text input field

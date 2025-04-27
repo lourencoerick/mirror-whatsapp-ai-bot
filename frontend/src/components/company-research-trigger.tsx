@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { JSX } from "react/jsx-runtime";
 
 // Type definition for the expected API response
 type ResearchResponse = components["schemas"]["ResearchResponse"];

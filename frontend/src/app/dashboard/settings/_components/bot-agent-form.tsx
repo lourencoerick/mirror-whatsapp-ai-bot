@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { JSX } from "react/jsx-runtime";
 
 // Type definitions from the generated API specification
 type BotAgentRead = components["schemas"]["BotAgentRead"];

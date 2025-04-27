@@ -4,7 +4,13 @@
 
 import { X as RemoveIcon } from "lucide-react"; // Icon for removal
 import React, { KeyboardEvent, useState } from "react";
-import { ControllerRenderProps, FieldError } from "react-hook-form"; // RHF types
+import {
+  ControllerRenderProps,
+  FieldError,
+  FieldValues,
+  Path,
+} from "react-hook-form";
+
 import { toast } from "sonner"; // For user feedback
 
 // UI Components
@@ -18,13 +24,17 @@ import {
   TooltipProvider, // Ensure TooltipProvider wraps the component
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { JSX } from "react/jsx-runtime";
 
 /**
  * Props for the StringListInput component.
  */
-interface StringListInputProps {
+type StringListInputProps<
+  TForm extends FieldValues,
+  TName extends Path<TForm>
+> = {
   /** Field object provided by react-hook-form's Controller render prop. Expects a string array value. */
-  field: ControllerRenderProps<any, string[]>; // Changed expected type to string[]
+  field: ControllerRenderProps<TForm, TName>;
   /** The label text displayed above the input field. */
   label: string;
   /** Unique ID for the input element, used for accessibility and label association. */
@@ -33,7 +43,7 @@ interface StringListInputProps {
   placeholder?: string;
   /** Error object from react-hook-form, used to display validation errors. */
   error?: FieldError | any; // Allow 'any' for flexibility
-}
+};
 
 /**
  * A custom input component for managing a list of strings (e.g., tags, keywords).
@@ -43,13 +53,16 @@ interface StringListInputProps {
  * @param {StringListInputProps} props - The component props.
  * @returns {JSX.Element} The rendered string list input component.
  */
-export function StringListInput({
+export function StringListInput<
+  TForm extends FieldValues,
+  TName extends Path<TForm>
+>({
   field, // Contains value, onChange, name, etc. from RHF Controller
   label,
   id,
   placeholder = "Adicione um item e pressione Enter ou Adicionar", // Default placeholder in pt-BR
   error,
-}: StringListInputProps): JSX.Element {
+}: StringListInputProps<TForm, TName>): JSX.Element {
   // State for the current value in the text input field
   const [inputValue, setInputValue] = useState<string>("");
 

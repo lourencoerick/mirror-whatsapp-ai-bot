@@ -21,6 +21,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Child Page Components (already refactored)
 import { CompanyResearchTrigger } from "@/components/company-research-trigger";
+import { JSX } from "react/jsx-runtime";
 import { BotAgentForm } from "./_components/bot-agent-form";
 import { CompanyProfileForm } from "./_components/company-profile-form";
 
@@ -359,8 +360,6 @@ export default function SettingsPage(): JSX.Element {
           variant={
             pollingStatus === "failed" || pollingError
               ? "destructive"
-              : pollingStatus === "complete"
-              ? "success" // Use a success variant if available
               : "default"
           }
           className="mt-4"
@@ -431,7 +430,7 @@ export default function SettingsPage(): JSX.Element {
                 onResearchStarted={handleResearchStarted}
               />
               <CompanyProfileForm
-                initialData={profileData}
+                initialData={profileData ?? null}
                 fetcher={fetcher!}
                 onProfileUpdate={handleProfileUpdate}
                 isResearching={isResearching || isFetchingProfile}
@@ -441,7 +440,7 @@ export default function SettingsPage(): JSX.Element {
             {/* Content for the 'agent' tab */}
             <div className={`${activeTab !== "agent" ? "hidden" : ""}`}>
               <BotAgentForm
-                initialAgentData={agentData}
+                initialAgentData={agentData ?? null}
                 fetcher={fetcher!}
                 onAgentUpdate={handleAgentUpdate}
                 // Optionally disable agent form while profile is researching/refetching

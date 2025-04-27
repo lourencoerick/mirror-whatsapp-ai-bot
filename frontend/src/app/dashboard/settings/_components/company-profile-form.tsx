@@ -56,6 +56,7 @@ import {
 } from "@/lib/validators/company-profile.schema"; // Zod schema and type
 import { components } from "@/types/api"; // API type definitions
 
+import { JSX } from "react/jsx-runtime";
 import { OfferingForm } from "./offering-form"; // Sub-form for offerings
 
 // Type definitions from the generated API specification
