@@ -8,8 +8,13 @@ import { components } from '@/types/api'; // Import from the generated types fil
 
 export type Inbox = components['schemas']['InboxRead'];
 
-export type ConversationStatusOption = 'BOT' | 'PENDING' | 'OPEN';
-
+export type ConversationStatusOption = 
+  | 'BOT'
+  | 'PENDING'
+  | 'OPEN'
+  | 'HUMAN_ACTIVE'
+  | 'CLOSED';
+  
   /**
    * Payload for creating a new Inbox via the API.
    * Matches the backend InboxCreate schema.
