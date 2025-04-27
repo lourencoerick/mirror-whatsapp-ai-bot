@@ -1,11 +1,10 @@
-// app/dashboard/settings/_components/OfferingForm.tsx
 "use client";
 
 import { components } from "@/types/api";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 
-import { StringListInput } from "@/components/custom/single-list-input"; // Reutilizar!
+import { StringListInput } from "@/components/custom/single-list-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,14 +16,13 @@ import {
   offeringValidationSchema,
 } from "@/lib/validators/company-profile.schema";
 
-// Tipo para uma única oferta (do schema gerado)
 type OfferingInfo = components["schemas"]["OfferingInfo"];
 
 interface OfferingFormProps {
-  initialData?: OfferingInfo | null; // Dados para edição (null/undefined para criação)
-  onSubmit: (data: OfferingFormData) => void; // Usar tipo importado para callback
-  onCancel: () => void; // Callback para fechar modal/sheet
-  isLoading: boolean; // Estado de carregamento externo (ex: do Dialog)
+  initialData?: OfferingInfo | null;
+  onSubmit: (data: OfferingFormData) => void;
+  onCancel: () => void;
+  isLoading: boolean;
 }
 
 export function OfferingForm({
@@ -51,13 +49,9 @@ export function OfferingForm({
     formState: { errors, isSubmitting },
   } = form;
 
-  // Usa o isSubmitting interno OU o isLoading externo para desabilitar
   const disabled = isSubmitting || isLoading;
 
   return (
-    // O form é submetido pelo botão dentro dele, não precisa da tag <form> aqui
-    // se os botões estiverem fora (ex: no footer do Dialog/Sheet)
-    // Mas vamos manter por enquanto para clareza.
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
         <Label htmlFor="offering-name" className="mb-1.5 block">
@@ -117,7 +111,6 @@ export function OfferingForm({
         )}
       </div>
 
-      {/* Usar Controller para o StringListInput */}
       <div>
         <Controller
           name="key_features"
@@ -129,14 +122,11 @@ export function OfferingForm({
               id="offering-features"
               placeholder="Add a feature..."
               error={error}
-              // Passar disabled state? O StringListInput precisaria aceitar essa prop.
-              // Por enquanto, não desabilitamos o input de lista.
             />
           )}
         />
       </div>
 
-      {/* Botões podem ficar aqui ou no Footer do Dialog/Sheet */}
       <div className="flex justify-end space-x-2 pt-4">
         <Button
           type="button"
