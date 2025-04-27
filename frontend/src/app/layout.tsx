@@ -1,22 +1,21 @@
-import { type Metadata } from 'next'
-import {
-  ClerkProvider,
-} from '@clerk/nextjs'
+import ReactQueryProvider from "@/components/providers/query-provider";
+import { ClerkProvider } from "@clerk/nextjs";
+import { type Metadata } from "next";
+
+import siteMetadata from "@/data/siteMetadata";
 import { ptBR } from "@clerk/localizations";
-import { Geist, Geist_Mono } from 'next/font/google'
-import './globals.css'
-import siteMetadata from '@/data/siteMetadata'
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
 
 const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-})
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
 
 const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
-
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteMetadata.siteUrl),
@@ -31,13 +30,13 @@ export const metadata: Metadata = {
     url: siteMetadata.siteUrl,
     siteName: siteMetadata.title,
     images: [siteMetadata.socialBanner],
-    locale: 'pt_BR',
-    type: 'website',
+    locale: "pt_BR",
+    type: "website",
   },
   alternates: {
-    canonical: './',
+    canonical: "./",
     types: {
-      'application/rss+xml': `${siteMetadata.siteUrl}/feed.xml`,
+      "application/rss+xml": `${siteMetadata.siteUrl}/feed.xml`,
     },
   },
   robots: {
@@ -46,30 +45,36 @@ export const metadata: Metadata = {
     googleBot: {
       index: true,
       follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
     },
   },
   twitter: {
     title: siteMetadata.title,
-    card: 'summary_large_image',
+    card: "summary_large_image",
     images: [siteMetadata.socialBanner],
   },
-}
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider afterSignOutUrl="/sign-in" afterMultiSessionSingleSignOutUrl="/sign-in" localization={ptBR}>
+    <ClerkProvider
+      afterSignOutUrl="/sign-in"
+      afterMultiSessionSingleSignOutUrl="/sign-in"
+      localization={ptBR}
+    >
       <html lang="pt-BR">
-        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          {children}
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          <ReactQueryProvider>{children}</ReactQueryProvider>
         </body>
       </html>
     </ClerkProvider>
-  )
+  );
 }
