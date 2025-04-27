@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // services/api/profile.ts
 
 import { FetchFunction } from '@/hooks/use-authenticated-fetch';

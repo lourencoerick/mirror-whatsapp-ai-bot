@@ -112,6 +112,7 @@ export function CompanyResearchTrigger({
           result?.message || "Falha ao iniciar a tarefa de pesquisa."
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       const errorMessage = err.message || "Ocorreu um erro inesperado.";
       console.error("Erro ao iniciar pesquisa:", err);

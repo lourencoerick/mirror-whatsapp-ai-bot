@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/custom/StringListInput.tsx
 "use client";
 

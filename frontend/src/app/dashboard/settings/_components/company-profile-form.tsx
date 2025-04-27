@@ -270,6 +270,7 @@ export function CompanyProfileForm({
           "A função de atualização retornou nulo inesperadamente."
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error("Falha ao atualizar perfil:", error);
       toast.error("Erro ao atualizar perfil", {
@@ -482,8 +483,8 @@ export function CompanyProfileForm({
                   <CardContent className="p-0">
                     {offerings.length === 0 ? (
                       <p className="text-sm text-muted-foreground italic text-center py-6 px-6">
-                        Nenhuma oferta adicionada ainda. Clique em "Adicionar
-                        Oferta".
+                        Nenhuma oferta adicionada ainda. Clique em
+                        &quot;Adicionar Oferta&quot;.
                       </p>
                     ) : (
                       <Table>

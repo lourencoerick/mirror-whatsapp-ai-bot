@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/dashboard/settings/_components/BotAgentForm.tsx
 "use client";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -396,9 +397,10 @@ export function BotAgentForm({
                             className="flex flex-col sm:flex-row text-xs"
                           >
                             <span>
-                              Novas conversas iniciam como '{initialStatus}'.
-                              Altere nas configurações da caixa de entrada para
-                              'BOT' para resposta imediata da IA.
+                              Novas conversas iniciam como &apos;{initialStatus}
+                              &apos;. Altere nas configurações da caixa de
+                              entrada para &apos;BOT&apos; para resposta
+                              imediata da IA.
                             </span>
                             {/* Optional: Link to directly edit the inbox settings */}
                             <Link

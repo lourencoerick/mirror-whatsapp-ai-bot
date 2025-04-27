@@ -77,6 +77,7 @@ export default function SettingsPage(): JSX.Element {
     isLoading: isLoadingAgent,
     isError: isErrorAgent,
     error: errorAgent,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isFetching: isFetchingAgent, // Indicates background refetching
   } = useQuery<BotAgentData | null>({
     queryKey: AGENT_QUERY_KEY,
@@ -173,6 +174,8 @@ export default function SettingsPage(): JSX.Element {
         }
       }
       // If status is 'queued' or 'in_progress', polling continues automatically
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       console.error(`Failed to poll job status for ${pollingJobId}:`, error);
       const errorMessage = error.message || "Erro desconhecido";

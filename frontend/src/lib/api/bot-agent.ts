@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // services/api/botAgent.ts
 import { FetchFunction } from '@/hooks/use-authenticated-fetch'; // Adjust path
 import { components } from '@/types/api'; // Import from the generated types file
