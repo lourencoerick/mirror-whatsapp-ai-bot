@@ -18,6 +18,9 @@ from app.api.routes import evolution_instance as evolution_instance_routes
 from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
 from app.api.routes import batch_contacts as batch_contacts_routes
 from app.api.routes import research as research_routes
+from app.api.routes import bot_agent as bot_agent_routes
+from app.api.routes import company_profile as profile_routes
+
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
@@ -135,6 +138,16 @@ app.include_router(
 )
 app.include_router(
     contact_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Contacts"]
+)
+
+app.include_router(
+    profile_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Company Profile"],  # Tag já está no router
+)
+
+app.include_router(
+    bot_agent_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Bot Agent"]
 )
 
 app.include_router(me_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Me"])

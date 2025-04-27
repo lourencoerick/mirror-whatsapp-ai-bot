@@ -374,6 +374,7 @@ async def update_company_profile(state: ResearchState, config: dict) -> Dict[str
 
     # --- Combine Context ---
     combined_parts = []
+    has_search_results = bool(search_results)
     if scraped_data:
         combined_parts.append("--- Website Content ---")
         for url, content in scraped_data.items():
@@ -454,6 +455,16 @@ async def update_company_profile(state: ResearchState, config: dict) -> Dict[str
         # --- Perform LLM Merge ---
         logger.info("Performing LLM merge of current draft and new extraction...")
         try:
+            search_warning_for_merger = ""
+            if search_results:
+                search_warning_for_merger = (
+                    "\n\n**Important Context:** The 'Newly Extracted Information' below was generated using a combination of website content "
+                    "AND external search engine results. Search results might be less reliable or outdated. "
+                    "When merging, prioritize information clearly stated on the company's website (likely reflected in the 'Existing Profile Draft' or the website portions of the new extraction) "
+                    "over potentially conflicting information from search snippets, especially for critical details like pricing, specific features, or contact info. Use search results mainly to fill gaps."
+                )
+
+            logger.warning(f"Warning: {search_warning_for_merger}")
             current_draft_json = current_profile_draft.model_dump_json(indent=2)
             new_extraction_json = newly_extracted_profile.model_dump_json(
                 indent=2, exclude_unset=True
@@ -466,21 +477,21 @@ async def update_company_profile(state: ResearchState, config: dict) -> Dict[str
             ```json
             {current_draft_json}
             ```
-            Use code with caution.
-            Python
+            ---
+
+            {search_warning_for_merger}
             Newly Extracted Information (from latest research):
             ```json
             {new_extraction_json}
             ```
+            
             Instructions:
-                - Combine information from both versions.
-                - Prioritize values that are more accurate, complete, and up-to-date.
-                - Use 'Newly Extracted Information' if it provides better detail.
-                - Add new information from 'Newly Extracted Information' if missing in the 'Existing Profile Draft'.
-                - Keep existing values if 'Newly Extracted Information' is missing them.
-                - For lists (like 'offering_overview', 'key_selling_points', etc.): Combine items, ensuring uniqueness. For 'offering_overview', merge items with the same name intelligently (combine features, prefer longer descriptions/non-empty price/link).
-                - Ensure the final output strictly adheres to the CompanyProfileSchema format.
-                - Return only the final, merged JSON object representing the CompanyProfileSchema.
+                1. Combine the information intelligently into a single, final profile, considering the source context described above if applicable.
+                2. Prioritize values that are most accurate, complete, and likely up-to-date, considering the source context described above if applicable.
+                3. If 'Newly Extracted' provides better/more detail for a field empty in 'Existing', use the new value, , considering the source context described above if applicable.
+                4. If 'Newly Extracted' is missing a value present in 'Existing', keep the existing value.
+                5. For lists (like 'offering_overview', etc.): Combine items uniquely. For 'offering_overview', merge items with the same name intelligently (combine features, prefer longer descriptions, prefer existing price/link if new one is missing or less specific), considering the source context described above if applicable.
+                6. Ensure the final output strictly adheres to the CompanyProfileSchema format.
             """
             merge_agent = create_extractor(
                 llm=llm_instance,

@@ -777,3 +777,57 @@ async def find_conversation_by_contact_inbox(
     except SQLAlchemyError as e:
         logger.error(f"Database error finding conversation by contact/inbox: {e}")
         raise e
+
+
+async def update_status_for_bot_conversations_in_inbox(
+    db: AsyncSession,
+    *,
+    account_id: UUID,
+    inbox_id: UUID,
+    new_status: ConversationStatusEnum,
+    current_status: ConversationStatusEnum = ConversationStatusEnum.BOT,
+) -> int:
+    """
+    Updates the status of active conversations in a specific inbox that currently
+    have a specific status (typically BOT).
+
+    Args:
+        db: The SQLAlchemy async session.
+        account_id: The account ID to scope the update.
+        inbox_id: The inbox ID where conversations should be updated.
+        new_status: The new status to set (e.g., PENDING).
+        current_status: The status conversations must currently have to be updated (e.g., BOT).
+
+    Returns:
+        The number of conversation rows updated.
+    """
+    logger.info(
+        f"Updating conversations in Inbox {inbox_id} (Account: {account_id}) "
+        f"from status '{current_status.value}' to '{new_status.value}'"
+    )
+    try:
+        stmt = (
+            update(Conversation)
+            .where(
+                Conversation.account_id == account_id,
+                Conversation.inbox_id == inbox_id,
+                Conversation.status == current_status,
+                Conversation.status
+                != ConversationStatusEnum.CLOSED,  # Apenas conversas ativas
+            )
+            .values(status=new_status)
+            # synchronize_session=False é geralmente recomendado para updates em massa com asyncio
+            .execution_options(synchronize_session=False)
+        )
+        result = await db.execute(stmt)
+        updated_count = result.rowcount
+        logger.info(
+            f"Updated status for {updated_count} conversations in Inbox {inbox_id}."
+        )
+        return updated_count
+    except Exception as e:
+        logger.exception(
+            f"Error updating conversation statuses in Inbox {inbox_id} "
+            f"from {current_status.value} to {new_status.value}: {e}"
+        )
+        raise  # Re-lançar para rollback na camada superior

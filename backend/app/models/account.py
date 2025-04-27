@@ -43,8 +43,12 @@ class Account(BaseModel):
     events = relationship(
         "Event", back_populates="account", cascade="all, delete-orphan"
     )
-    agent_bot_inboxes = relationship(
-        "AgentBotInbox", back_populates="account", cascade="all, delete-orphan"
+    bot_agent_inboxes = relationship(
+        "BotAgentInbox", back_populates="account", cascade="all, delete-orphan"
+    )
+
+    bot_agent = relationship(
+        "BotAgent", back_populates="account", cascade="all, delete-orphan"
     )
 
     evolution_instances = relationship(

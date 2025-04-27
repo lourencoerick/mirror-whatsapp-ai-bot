@@ -59,8 +59,8 @@ class Inbox(BaseModel):
     inbox_members = relationship(
         "InboxMember", back_populates="inbox", cascade="all, delete-orphan"
     )
-    agent_bot_inboxes = relationship(
-        "AgentBotInbox", back_populates="inbox", cascade="all, delete-orphan"
+    bot_agent_inboxes = relationship(
+        "BotAgentInbox", back_populates="inbox", cascade="all, delete-orphan"
     )
     webhooks = relationship(
         "Webhook", back_populates="inbox", cascade="all, delete-orphan"

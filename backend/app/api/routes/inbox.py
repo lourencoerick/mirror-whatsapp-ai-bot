@@ -6,19 +6,19 @@ from loguru import logger
 
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
-from app.api.schemas.inbox import InboxCreate, InboxUpdate, InboxResponse
+from app.api.schemas.inbox import InboxCreate, InboxUpdate, InboxRead
 from app.services.repository import inbox as inbox_repo
 
 router = APIRouter(prefix="", tags=["v1 - Inboxes"])
 
 
-@router.get("/inboxes", response_model=List[InboxResponse])
+@router.get("/inboxes", response_model=List[InboxRead])
 async def list_account_inboxes(
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
     limit: int = 100,
     offset: int = 0,
-) -> List[InboxResponse]:
+) -> List[InboxRead]:
     """Retrieve all inboxes associated with the authenticated user's account.
 
     Args:
@@ -28,26 +28,36 @@ async def list_account_inboxes(
         offset (int): Number of inboxes to skip.
 
     Returns:
-        List[InboxResponse]: A list of inboxes for the authenticated account.
+        List[InboxRead]: A list of inboxes for the authenticated account.
     """
     account_id = auth_context.account.id
-    logger.info(f"Received request to list inboxes for Account={account_id}")
+    logger.info(f"Listing inboxes with association for account {account_id}")
 
-    inboxes = await inbox_repo.find_inboxes_by_account(
+    results = await inbox_repo.find_inboxes_with_association_by_account(
         db=db, account_id=account_id, limit=limit, offset=offset
     )
-    logger.info(f"Found {len(inboxes)} inboxes for account {account_id}")
-    return inboxes
+
+    response_data = []
+    for inbox_model, agent_id in results:
+        try:
+            inbox_dict = InboxRead.model_validate(inbox_model).model_dump()
+        except Exception as e:
+            logger.warning(
+                f"Failed to validate inbox model {inbox_model.id}: {e}. Skipping."
+            )
+            continue
+        inbox_dict["associated_agent_id"] = agent_id
+        response_data.append(InboxRead(**inbox_dict))
+
+    return response_data
 
 
-@router.post(
-    "/inboxes", response_model=InboxResponse, status_code=status.HTTP_201_CREATED
-)
+@router.post("/inboxes", response_model=InboxRead, status_code=status.HTTP_201_CREATED)
 async def create_new_inbox(
     inbox_data: InboxCreate,
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
-) -> InboxResponse:
+) -> InboxRead:
     """Create a new inbox for the authenticated user's account.
 
     Args:
@@ -56,7 +66,7 @@ async def create_new_inbox(
         db (AsyncSession): Asynchronous database session.
 
     Returns:
-        InboxResponse: The newly created inbox.
+        InboxRead: The newly created inbox.
 
     Raises:
         HTTPException: If the inbox creation fails.
@@ -80,12 +90,12 @@ async def create_new_inbox(
         )
 
 
-@router.get("/inboxes/{inbox_id}", response_model=InboxResponse)
+@router.get("/inboxes/{inbox_id}", response_model=InboxRead)
 async def get_single_inbox(
     inbox_id: UUID,
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
-) -> InboxResponse:
+) -> InboxRead:
     """Retrieve a specific inbox by ID, ensuring it belongs to the authenticated account.
 
     Args:
@@ -94,7 +104,7 @@ async def get_single_inbox(
         db (AsyncSession): Asynchronous database session.
 
     Returns:
-        InboxResponse: The requested inbox.
+        InboxRead: The requested inbox.
 
     Raises:
         HTTPException: 404 if the inbox is not found or not accessible.
@@ -115,13 +125,13 @@ async def get_single_inbox(
     return inbox
 
 
-@router.put("/inboxes/{inbox_id}", response_model=InboxResponse)
+@router.put("/inboxes/{inbox_id}", response_model=InboxRead)
 async def update_existing_inbox(
     inbox_id: UUID,
     update_data: InboxUpdate,
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
-) -> InboxResponse:
+) -> InboxRead:
     """Update an existing inbox, ensuring it belongs to the authenticated account.
 
     Args:
@@ -131,7 +141,7 @@ async def update_existing_inbox(
         db (AsyncSession): Asynchronous database session.
 
     Returns:
-        InboxResponse: The updated inbox.
+        InboxRead: The updated inbox.
 
     Raises:
         HTTPException: 404 if the inbox is not found or not accessible.

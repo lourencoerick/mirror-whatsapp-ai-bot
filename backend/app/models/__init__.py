@@ -1,8 +1,8 @@
 from .access_token import AccessToken
 from .account import Account
 from .account_user import AccountUser
-from .agent_bot import AgentBot
-from .agent_bot_inbox import AgentBotInbox
+from .bot_agent import BotAgent
+from .bot_agent_inbox import BotAgentInbox
 from .base import BaseModel
 from .contact import Contact
 from .contact_inbox import ContactInbox
@@ -25,8 +25,8 @@ __all__ = [
     "AccessToken",
     "Account",
     "AccountUser",
-    "AgentBot",
-    "AgentBotInbox",
+    "BotAgent",
+    "BotAgentInbox",
     "BaseModel",
     "Contact",
     "ContactInbox",

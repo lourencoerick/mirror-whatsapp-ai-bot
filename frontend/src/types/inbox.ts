@@ -3,21 +3,17 @@
  * Represents the structure of an Inbox object received from the API.
  */
 
-export type ConversationStatusOption = 'BOT' | 'PENDING' | 'OPEN';
+import { components } from '@/types/api'; // Import from the generated types file
 
-export interface Inbox {
-    id: string; // UUID represented as string in JSON
-    account_id?: string; // UUID represented as string in JSON
-    name: string;
-    initial_conversation_status: ConversationStatusOption;
-    channel_type: string;
-    connection_status: string;
-    channel_id?: string | null; // Optional identifier from the channel provider
-    channel_details?: Record<string, any> | null; // Channel specific config
-    enable_auto_assignment?: boolean; // Auto assignment setting
-    created_at: string; // ISO 8601 date string
-    updated_at: string; // ISO 8601 date string
-  }
+
+export type Inbox = components['schemas']['InboxRead'];
+
+export type ConversationStatusOption = 
+  | 'BOT'
+  | 'PENDING'
+  | 'OPEN'
+  | 'HUMAN_ACTIVE'
+  | 'CLOSED';
   
   /**
    * Payload for creating a new Inbox via the API.

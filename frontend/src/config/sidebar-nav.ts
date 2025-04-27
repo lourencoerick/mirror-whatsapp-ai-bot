@@ -1,22 +1,22 @@
+import type { LucideIcon } from 'lucide-react';
 import {
-    Home,
-    Inbox,
-    PlusSquare,
-    Users,
-    UserPlus,
-    MessageSquare,
-    UserCheck,
-    Send,
-    Settings,
-    Briefcase,
-    ShoppingBag,
-    FileText,
-    BookOpen,
-    Activity,
-    CreditCard,
-    LifeBuoy,
-  } from 'lucide-react';
-  import type { LucideIcon } from 'lucide-react';
+  Activity,
+  BookOpen,
+  Briefcase,
+  CreditCard,
+  FileText,
+  Home,
+  Inbox,
+  LifeBuoy,
+  MessageSquare,
+  PlusSquare,
+  Send,
+  Settings,
+  ShoppingBag,
+  UserCheck,
+  UserPlus,
+  Users,
+} from 'lucide-react';
   
   /**
    * Interface for a navigation item in the sidebar.
@@ -88,15 +88,15 @@ import {
     },
     {
       name: 'Meu Vendedor IA',
-      href: '/dashboard/seller-setup',
+      href: '/dashboard/settings',
       icon: Settings,
       children: [
-        { name: 'Perfil da Empresa', href: '/dashboard/seller-setup/profile', icon: Briefcase },
-        { name: 'Catálogo de Produtos', href: '/dashboard/seller-setup/catalog', icon: ShoppingBag },
-        { name: 'Templates de Mensagem', href: '/dashboard/seller-setup/templates', icon: FileText },
-        { name: 'Base de Conhecimento', href: '/dashboard/seller-setup/documents', icon: BookOpen },
+        { name: 'Perfil da Empresa', href: '/dashboard/ssettings/profile', icon: Briefcase, hidden: true },
+        { name: 'Catálogo de Produtos', href: '/dashboard/settings/catalog', icon: ShoppingBag, hidden: true },
+        { name: 'Templates de Mensagem', href: '/dashboard/settings/templates', icon: FileText, hidden: true },
+        { name: 'Base de Conhecimento', href: '/dashboard/settings/documents', icon: BookOpen, hidden: true },
       ],
-      hidden: true,
+      hidden: false,
     },
     {
       name: 'Desempenho',
