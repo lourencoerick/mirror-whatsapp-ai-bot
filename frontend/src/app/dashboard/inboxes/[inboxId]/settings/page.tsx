@@ -63,7 +63,7 @@ type ConfigureStepStatus =
   | "SOCKET_ERROR";
 
 // NEW: Default status for new conversations
-const DEFAULT_INITIAL_STATUS: ConversationStatusOption = "BOT";
+const DEFAULT_INITIAL_STATUS: ConversationStatusOption = "PENDING";
 
 /**
  * Edit settings for an existing Inbox.
@@ -168,9 +168,9 @@ export default function EditInboxPage() {
         data.initial_conversation_status ?? DEFAULT_INITIAL_STATUS
       );
       setIsDirty(false);
-      //   setCurrentDbStatus(
-      // (data.connection_status as EvolutionInstanceStatus) ?? "UNKNOWN"
-      //   );
+      setCurrentDbStatus(
+        (data.connection_status as EvolutionInstanceStatus) ?? "UNKNOWN"
+      );
       setShowQrCodeSection(false);
       setIsSyncingStatus(false);
       setConfigureStepStatus("IDLE");
@@ -260,9 +260,9 @@ export default function EditInboxPage() {
       setInitialConversationStatus(
         updatedInbox.initial_conversation_status ?? DEFAULT_INITIAL_STATUS
       );
-      //   setCurrentDbStatus(
-      //     (updatedInbox.connection_status as EvolutionInstanceStatus) ?? "UNKNOWN"
-      //   );
+      setCurrentDbStatus(
+        (updatedInbox.connection_status as EvolutionInstanceStatus) ?? "UNKNOWN"
+      );
       setIsDirty(false);
       // UPDATE: Reverted user-facing text to pt-BR
       toast.success("Caixa de entrada atualizada com sucesso!", {
@@ -306,11 +306,11 @@ export default function EditInboxPage() {
           evolutionInstanceId,
           authenticatedFetch
         );
-      //   setCurrentDbStatus(updatedInstance.status);
+      setCurrentDbStatus(updatedInstance.status);
       // UPDATE: Reverted user-facing text to pt-BR (uses status which might be English, consider mapping if needed)
-      //   toast.success(`Status atualizado: ${updatedInstance.status}`, {
-      // id: toastId,
-      //   });
+      toast.success(`Status atualizado: ${updatedInstance.status}`, {
+        id: toastId,
+      });
 
       setInboxData((prev) =>
         prev
