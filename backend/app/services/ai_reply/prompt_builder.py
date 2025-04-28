@@ -1,6 +1,5 @@
 # backend/app/services/ai_reply/prompt_builder.py
-from typing import List, Dict, Any, Sequence
-
+from typing import List, Dict, Any, Sequence, Optional
 
 from app.api.schemas.company_profile import CompanyProfileSchema, OfferingInfo
 from app.models.message import Message
@@ -19,12 +18,17 @@ from langchain_core.messages import (
 
 from loguru import logger
 
-# --- Template Strings  ---
+
 SYSTEM_MESSAGE_TEMPLATE = """
 You are an AI Sales Assistant for '{company_name}'.
 Your goal is: {ai_objective}.
 Communicate in {language} with a {sales_tone} tone.
 
+**Knowledge Base Context:**
+{retrieved_knowledge}
+--- End Knowledge Base Context ---
+
+**Company Profile Information:**
 Company Description: {business_description}
 {company_address_info}
 {target_audience_info}
@@ -35,22 +39,27 @@ Key Selling Points:
 
 Our Offerings:
 {offering_summary}
-IMPORTANT: Only offer products or services listed in the 'Our Offerings' section above. Do not mention or suggest items not listed here.
+IMPORTANT: Only offer products or services listed in 'Our Offerings'.
 
 Delivery/Pickup Options:
 {delivery_options_info}
 
 Communication Guidelines:
 {communication_guidelines}
-IMPORTANT: Only provide information explicitly given in your instructions (company profile, offerings, guidelines,) or in the conversation history. Do NOT invent details like addresses, phone numbers, specific opening hours, or prices unless they are provided here.
+--- End Company Profile Information ---
+
+**Instructions:**
+1.  **Prioritize Knowledge Base:** Base your answer primarily on the information provided in the 'Knowledge Base Context' section above, if relevant to the user's query.
+2.  **Use Company Profile:** If the Knowledge Base doesn't contain the answer, use the 'Company Profile Information' provided.
+3.  **Adhere to Guidelines:** Always follow the 'Communication Guidelines'.
+4.  **Be Honest:** If the information is not found in either the Knowledge Base or the Company Profile, state that you don't have that specific detail. DO NOT invent information (addresses, phone numbers, prices, features, etc.).
+5.  **Use History:** Refer to the 'Conversation History' below for context.
+6.  **Current Time:** Use the current date and time ({current_datetime}) for time-sensitive questions.
+7.  **Respond to Last Message:** Focus your response on the latest customer message.
 
 {fallback_instructions}
-
-Current Date and Time: {current_datetime}. Use this information to answer time-sensitive questions like opening hours.
-
-Use the provided conversation history to understand the context, but respond only to the latest customer message.
-Always adhere to these instructions and guidelines when responding to the user.
 """
+
 
 HUMAN_MESSAGE_TEMPLATE = "{customer_message}"
 
@@ -72,39 +81,35 @@ def _format_offerings(offerings: List[OfferingInfo]) -> str:
 
 
 def _format_list_items(items: List[str], prefix: str = "- ") -> str:
+    """Formats list items with a prefix and newline separators for the prompt."""
     if not items:
         return "N/A"
-    return "\\n".join([f"{prefix}{item}" for item in items])
+    return "\n".join([f"{prefix}{item}" for item in items])
 
 
-def _format_history_messages(history: List[Message]) -> List[BaseMessage]:
-    formatted_history: List[BaseMessage] = []
-    for msg in reversed(history):
-        if msg.direction == "in":
-            if msg.content:
-                formatted_history.append(HumanMessage(content=msg.content))
-        elif msg.direction == "out":
-            if msg.content:
-                formatted_history.append(AIMessage(content=msg.content))
-    logger.debug(f"Formatted {len(formatted_history)} messages for chat history.")
-    return formatted_history
+def _format_history_lc_messages(history: List[BaseMessage]) -> List[BaseMessage]:
+    """Passes through LangChain BaseMessages, potentially reversing if needed."""
+    logger.debug(f"Using {len(history)} messages for chat history placeholder.")
+    return history
 
 
 # --- Main Function  ---
 def build_llm_prompt_messages(
     profile: CompanyProfileSchema,
-    message_text: str,
-    chat_history: List[Message],
+    chat_history_lc: List[BaseMessage],
     current_datetime: str,
+    retrieved_context: Optional[str] = None,
 ) -> List[BaseMessage]:
     """
     Constructs the list of messages for the LLM using ChatPromptTemplate,
-    including conversation history, address, and delivery options.
+    incorporating RAG context.
 
     Args:
         profile: The loaded CompanyProfileSchema object.
-        message_text: The current incoming message text from the user.
-        chat_history: List of previous Message objects from the database.
+        chat_history_lc: List of previous BaseMessage objects (Human/AI).
+                         The last message is assumed to be the user's input.
+        current_datetime: The current date and time as a string.
+        retrieved_context: Optional string containing relevant snippets from the knowledge base.
 
     Returns:
         A list of BaseMessage objects ready for the chat model. Empty list on error.
@@ -112,8 +117,16 @@ def build_llm_prompt_messages(
     if not profile:
         logger.error("Cannot build prompt messages with invalid profile.")
         return []
+    if not chat_history_lc:
+        logger.error("Cannot build prompt messages with empty chat history.")
+        return []
 
-    # Prepare variables for the template
+    knowledge_text = (
+        "No specific context retrieved from the knowledge base for this query."
+    )
+    if retrieved_context and retrieved_context.strip():
+        knowledge_text = retrieved_context
+
     try:
         system_vars: Dict[str, Any] = {
             "company_name": profile.company_name,
@@ -152,48 +165,35 @@ def build_llm_prompt_messages(
                 if profile.fallback_contact_info
                 else "If you cannot answer the query, politely state that you cannot help with that specific request."
             ),
+            "retrieved_knowledge": knowledge_text,
         }
-        logger.info(f"prompt variables: {system_vars}")
-
-        formatted_history = _format_history_messages(chat_history)
 
         all_input_vars = {
             **system_vars,
-            "chat_history": formatted_history,
-            "customer_message": message_text,
+            "chat_history": chat_history_lc,
         }
 
         chat_template = ChatPromptTemplate.from_messages(
             [
                 ("system", SYSTEM_MESSAGE_TEMPLATE),
-                MessagesPlaceholder(variable_name="chat_history", optional=True),
-                ("human", HUMAN_MESSAGE_TEMPLATE),
+                MessagesPlaceholder(variable_name="chat_history"),
             ]
         )
 
-        expected_vars = list(system_vars.keys()) + ["chat_history", "customer_message"]
-
-        # Simple check (can be more robust)
-        missing_keys = [key for key in expected_vars if key not in all_input_vars]
-        if missing_keys:
-            logger.error(f"Missing keys required by prompt template: {missing_keys}")
-            raise KeyError(f"Missing keys: {missing_keys}")
-
-        # Format the template to get the list of messages
         formatted_messages = chat_template.format_messages(**all_input_vars)
 
         logger.debug(
-            f"Generated prompt messages for account {profile.company_name} including history, address, delivery."
+            f"Generated prompt messages for company {profile.company_name} including RAG context."
         )
         return formatted_messages
 
     except KeyError as e:
         logger.error(
-            f"Missing key when formatting chat prompt for account {profile.company_name}: {e}. Check templates and input variables."
+            f"Missing key when formatting chat prompt for company {profile.company_name}: {e}."
         )
         return []
     except Exception as e:
         logger.exception(
-            f"Error formatting chat prompt for account {profile.company_name}"
+            f"Error formatting chat prompt for company {profile.company_name}"
         )
         return []
