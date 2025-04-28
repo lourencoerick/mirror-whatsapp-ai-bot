@@ -20,6 +20,7 @@ from app.api.routes import batch_contacts as batch_contacts_routes
 from app.api.routes import research as research_routes
 from app.api.routes import bot_agent as bot_agent_routes
 from app.api.routes import company_profile as profile_routes
+from app.api.routes import knowledge as knowledge_routes
 
 
 # Import Dependencies and Context
@@ -164,6 +165,13 @@ app.include_router(
     research_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Researcher"],
+)
+
+logger.info("Including Knowledge router")
+app.include_router(
+    knowledge_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Knowledge"],
 )
 
 

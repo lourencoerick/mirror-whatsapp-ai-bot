@@ -1,57 +1,64 @@
-# backend/app/core/embedding_utils.py
-
 import os
+import asyncio
 from typing import List, Optional, Union
-
 import numpy as np
 from loguru import logger
-from sentence_transformers import SentenceTransformer, util
-
-from openai import OpenAI, APIConnectionError, RateLimitError, APIError
 
 # --- Configuration ---
-# Choose 'local' or 'openai'. Default to 'local'.
-EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "local").lower()
-# Model for local embeddings
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "openai").lower()
 LOCAL_EMBEDDING_MODEL = os.getenv("LOCAL_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-# Model for OpenAI embeddings (ensure compatibility with your API key/plan)
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
 # --- Initialize Models/Clients ---
-local_model: Optional[SentenceTransformer] = None
-openai_client: Optional[OpenAI] = None
+local_model: Optional["SentenceTransformer"] = None
+openai_async_client: Optional["AsyncOpenAI"] = None
 
 if EMBEDDING_PROVIDER == "local":
     try:
+        from sentence_transformers import SentenceTransformer
+
         logger.info(f"Loading local embedding model: {LOCAL_EMBEDDING_MODEL}")
+
         local_model = SentenceTransformer(LOCAL_EMBEDDING_MODEL)
         logger.info("Local embedding model loaded successfully.")
-    except Exception as e:
+    except ImportError:
         logger.error(
-            f"Failed to load local SentenceTransformer model '{LOCAL_EMBEDDING_MODEL}': {e}"
+            "sentence-transformers library not found. pip install sentence-transformers"
         )
-        logger.warning("Embeddings will not work in 'local' mode.")
+        local_model = None
+    except Exception as e:
+        logger.error(f"Failed to load local model '{LOCAL_EMBEDDING_MODEL}': {e}")
+        local_model = None
+
 elif EMBEDDING_PROVIDER == "openai":
     try:
-        logger.info("Initializing OpenAI client for embeddings...")
-        # Assumes OPENAI_API_KEY environment variable is set
-        openai_client = OpenAI()
-        # Optional: Test connection with a dummy call if needed, but usually handled on first real call
-        logger.info("OpenAI client initialized.")
+
+        from openai import AsyncOpenAI, APIConnectionError, RateLimitError, APIError
+
+        logger.info("Initializing AsyncOpenAI client for embeddings...")
+
+        openai_async_client = AsyncOpenAI()
+
+        logger.info("AsyncOpenAI client initialized.")
+    except ImportError:
+        logger.error(
+            "openai library not found or version < 1.0. pip install --upgrade openai"
+        )
+        openai_async_client = None
     except Exception as e:
-        logger.error(f"Failed to initialize OpenAI client: {e}")
-        logger.warning("Embeddings will not work in 'openai' mode.")
+        logger.error(f"Failed to initialize AsyncOpenAI client: {e}")
+        openai_async_client = None
 else:
     logger.error(
         f"Invalid EMBEDDING_PROVIDER: '{EMBEDDING_PROVIDER}'. Choose 'local' or 'openai'."
     )
 
-# --- Core Functions ---
+# --- Core Async Functions ---
 
 
-def get_embedding(text: str) -> Optional[np.ndarray]:
+async def get_embedding(text: str) -> Optional[np.ndarray]:
     """
-    Generates an embedding for a single text string using the configured provider.
+    Generates an embedding for a single text string using the configured provider (async).
 
     Args:
         text: The text to embed.
@@ -62,22 +69,32 @@ def get_embedding(text: str) -> Optional[np.ndarray]:
     if EMBEDDING_PROVIDER == "local":
         if local_model:
             try:
-                # Ensure output is numpy array
-                embedding = local_model.encode(text, convert_to_numpy=True)
-                return embedding
+
+                embedding = await asyncio.to_thread(
+                    local_model.encode, text, convert_to_numpy=True
+                )
+
+                if isinstance(embedding, np.ndarray):
+                    return embedding
+                else:
+                    logger.error(
+                        f"Local model encode did not return np.ndarray, got {type(embedding)}"
+                    )
+                    return None
             except Exception as e:
-                logger.exception(f"Error generating local embedding: {e}")
+                logger.exception(f"Error generating local embedding via thread: {e}")
                 return None
         else:
             logger.error("Local embedding model not available.")
             return None
+
     elif EMBEDDING_PROVIDER == "openai":
-        if openai_client:
+        if openai_async_client:
             try:
-                response = openai_client.embeddings.create(
+
+                response = await openai_async_client.embeddings.create(
                     input=[text], model=OPENAI_EMBEDDING_MODEL
                 )
-                # Return as numpy array
                 return np.array(response.data[0].embedding)
             except (APIConnectionError, RateLimitError, APIError) as api_err:
                 logger.error(f"OpenAI API error during embedding: {api_err}")
@@ -86,23 +103,23 @@ def get_embedding(text: str) -> Optional[np.ndarray]:
                 logger.exception(f"Unexpected error generating OpenAI embedding: {e}")
                 return None
         else:
-            logger.error("OpenAI client not available.")
+            logger.error("AsyncOpenAI client not available.")
             return None
     else:
         logger.error("No valid embedding provider configured.")
         return None
 
 
-def get_embeddings_batch(texts: List[str]) -> Optional[List[np.ndarray]]:
+async def get_embeddings_batch(texts: List[str]) -> Optional[List[np.ndarray]]:
     """
-    Generates embeddings for a batch of text strings using the configured provider.
+    Generates embeddings for a batch of texts using the configured provider (async).
 
     Args:
         texts: A list of text strings to embed.
 
     Returns:
-        A list of numpy arrays representing the embeddings, or None if an error occurs.
-        Returns an empty list if the input list is empty.
+        A list of numpy arrays (embeddings), or None if a fatal error occurs.
+        Returns empty list for empty input.
     """
     if not texts:
         return []
@@ -110,21 +127,34 @@ def get_embeddings_batch(texts: List[str]) -> Optional[List[np.ndarray]]:
     if EMBEDDING_PROVIDER == "local":
         if local_model:
             try:
-                embeddings = local_model.encode(texts, convert_to_numpy=True)
-                return list(embeddings)  # Return as list of arrays
+
+                embeddings = await asyncio.to_thread(
+                    local_model.encode, texts, convert_to_numpy=True
+                )
+
+                if isinstance(embeddings, np.ndarray):
+                    return list(embeddings)
+                else:
+                    logger.error(
+                        f"Local model batch encode did not return np.ndarray, got {type(embeddings)}"
+                    )
+                    return None
             except Exception as e:
-                logger.exception(f"Error generating local embeddings batch: {e}")
+                logger.exception(
+                    f"Error generating local embeddings batch via thread: {e}"
+                )
                 return None
         else:
             logger.error("Local embedding model not available.")
             return None
+
     elif EMBEDDING_PROVIDER == "openai":
-        if openai_client:
+        if openai_async_client:
             try:
-                response = openai_client.embeddings.create(
+
+                response = await openai_async_client.embeddings.create(
                     input=texts, model=OPENAI_EMBEDDING_MODEL
                 )
-                # Return list of numpy arrays
                 return [np.array(data.embedding) for data in response.data]
             except (APIConnectionError, RateLimitError, APIError) as api_err:
                 logger.error(f"OpenAI API error during batch embedding: {api_err}")
@@ -135,40 +165,34 @@ def get_embeddings_batch(texts: List[str]) -> Optional[List[np.ndarray]]:
                 )
                 return None
         else:
-            logger.error("OpenAI client not available.")
+            logger.error("AsyncOpenAI client not available.")
             return None
     else:
         logger.error("No valid embedding provider configured.")
         return None
 
 
-def calculate_cosine_similarity(
+async def calculate_cosine_similarity(
     embedding1: np.ndarray, embedding2: np.ndarray
 ) -> float:
     """
-    Calculates the cosine similarity between two embedding vectors (numpy arrays).
-
-    Args:
-        embedding1: The first embedding vector.
-        embedding2: The second embedding vector.
+    Calculates cosine similarity between two numpy arrays (async wrapper).
 
     Returns:
-        The cosine similarity score (between -1.0 and 1.0), or -1.0 on error.
+        Similarity score [-1.0, 1.0], or -1.0 on error.
     """
-    try:
-        # Using sentence-transformers util for potentially better handling of tensors/numpy
-        # Ensure inputs are tensors if using pytorch_cos_sim
-        # sim = util.pytorch_cos_sim(embedding1, embedding2)[0][0].item()
 
-        # Or using numpy directly:
-        dot_product = np.dot(embedding1, embedding2)
-        norm1 = np.linalg.norm(embedding1)
-        norm2 = np.linalg.norm(embedding2)
-        if norm1 == 0 or norm2 == 0:  # Avoid division by zero
-            return 0.0
-        similarity = dot_product / (norm1 * norm2)
-        # Clamp similarity to [-1, 1] due to potential floating point inaccuracies
-        return float(np.clip(similarity, -1.0, 1.0))
-    except Exception as e:
-        logger.exception(f"Error calculating cosine similarity: {e}")
-        return -1.0  # Return a value indicating error or low similarity
+    def _sync_calc():
+        try:
+            dot_product = np.dot(embedding1, embedding2)
+            norm1 = np.linalg.norm(embedding1)
+            norm2 = np.linalg.norm(embedding2)
+            if norm1 == 0 or norm2 == 0:
+                return 0.0
+            similarity = dot_product / (norm1 * norm2)
+            return float(np.clip(similarity, -1.0, 1.0))
+        except Exception as e:
+            logger.exception(f"Error calculating cosine similarity: {e}")
+            return -1.0
+
+    return await asyncio.to_thread(_sync_calc)

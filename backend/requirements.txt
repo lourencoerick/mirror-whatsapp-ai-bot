@@ -52,3 +52,7 @@ trustcall==0.0.39
 
 beautifulsoup4==4.13.4
 tavily_python==0.6.0
+
+
+pgvector==0.4.1
+pypdf==5.4.0

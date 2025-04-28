@@ -61,3 +61,7 @@ class Account(BaseModel):
         uselist=False,
         cascade="all, delete-orphan",
     )
+
+    knowledge_documents = relationship("KnowledgeDocument", back_populates="account")
+
+    knowledge_chunks = relationship("KnowledgeChunk", back_populates="account")
