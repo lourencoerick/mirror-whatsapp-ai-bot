@@ -12,6 +12,7 @@ from typing import AsyncGenerator
 from loguru import logger
 
 # --- Local Imports ---
+from app.config import get_settings, Settings
 from app.database import AsyncSessionLocal
 from app.models.import_job import ImportJob, ImportJobStatus
 from app.models.contact import Contact
@@ -22,6 +23,7 @@ from app.services.helper.contact import normalize_phone_number
 from app.services.cloud_storage import get_gcs_bucket
 
 
+settings: Settings = get_settings()
 # --- Async Database Session Management for Worker ---
 ARQ_TASK_NAME = "process_contact_csv_task"
 
@@ -147,8 +149,8 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
             try:
                 # 3. Get File from GCS (Run blocking I/O in thread)
                 logger.info(f"Fetching file {db_job.file_key} from GCS...")
-                bucket = (
-                    get_gcs_bucket()
+                bucket = get_gcs_bucket(
+                    settings.CONTACT_IMPORT_GCS_BUCKET_NAME
                 )  # Assuming get_gcs_bucket is synchronous setup
                 blob = bucket.blob(db_job.file_key)
 
@@ -170,10 +172,10 @@ async def process_contact_csv_task(ctx, job_pk: uuid.UUID, account_id: uuid.UUID
                         logger.warning(
                             f"Decoded CSV for job {job_pk} using latin-1 encoding."
                         )
-                    except UnicodeDecodeError:
+                    except UnicodeDecodeError as e:
                         raise ValueError(
                             "Cannot decode CSV file. Ensure it's UTF-8 or Latin-1 encoded."
-                        )
+                        ) from e
 
                 csv_file = io.StringIO(csv_content_string)
 
