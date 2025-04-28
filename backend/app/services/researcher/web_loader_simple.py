@@ -270,7 +270,7 @@ async def main_test():
 
         if extracted_text is not None:
             logger.success(f"Successfully processed URL: {test_url}")
-            print(f"Extracted Text (first 500 chars):")
+            print("Extracted Text (first 500 chars):")
             print(extracted_text[:500] + "...")
         else:
             logger.warning(f"Failed to extract text for URL: {test_url}")
