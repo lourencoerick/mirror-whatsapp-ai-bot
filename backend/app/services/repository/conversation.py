@@ -11,6 +11,8 @@ from app.models.message import Message
 from app.models.conversation import Conversation, ConversationStatusEnum
 from app.models.contact_inbox import ContactInbox
 from app.models.inbox_member import InboxMember
+from app.models.inbox import Inbox
+from app.models.bot_agent_inbox import BotAgentInbox
 
 MESSAGE_SNIPPET_LENGTH = 100
 
@@ -30,11 +32,18 @@ async def find_conversation_by_id(
     """
     result = await db.execute(
         select(Conversation)
-        .options(selectinload(Conversation.inbox))
+        # load Inbox → BotAgentInbox → BotAgent
+        .options(
+            selectinload(Conversation.inbox).options(
+                selectinload(Inbox.bot_agent_inboxes).options(
+                    selectinload(BotAgentInbox.bot_agent)
+                )
+            )
+        )
+        # load ContactInbox → Contact
         .options(
             selectinload(Conversation.contact_inbox).selectinload(ContactInbox.contact)
-        )
-        .filter_by(id=conversation_id, account_id=account_id)
+        ).filter_by(id=conversation_id, account_id=account_id)
     )
     conversation = result.scalar_one_or_none()
 
