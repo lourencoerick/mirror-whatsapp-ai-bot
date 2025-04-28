@@ -20,6 +20,8 @@ from .company_profile import CompanyProfile
 from .simulation.simulation import Simulation
 from .simulation.simulation_event import SimulationEvent
 from .simulation.simulation_message import SimulationMessage
+from .knowledge_chunk import KnowledgeChunk
+from .knowledge_document import KnowledgeDocument
 
 __all__ = [
     "AccessToken",
@@ -44,4 +46,6 @@ __all__ = [
     "Simulation",
     "SimulationEvent",
     "SimulationMessage",
+    "KnowledgeChunk",
+    "KnowledgeDocument",
 ]
