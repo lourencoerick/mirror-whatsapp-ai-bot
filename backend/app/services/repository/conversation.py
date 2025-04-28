@@ -32,12 +32,10 @@ async def find_conversation_by_id(
     """
     result = await db.execute(
         select(Conversation)
-        # load Inbox → BotAgentInbox → BotAgent
+        # load Inbox → BotAgentInbox
         .options(
             selectinload(Conversation.inbox).options(
-                selectinload(Inbox.bot_agent_inboxes).options(
-                    selectinload(BotAgentInbox.bot_agent)
-                )
+                selectinload(Inbox.bot_agent_inboxes)
             )
         )
         # load ContactInbox → Contact
