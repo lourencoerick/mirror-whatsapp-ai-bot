@@ -39,13 +39,12 @@ class ResearchState(TypedDict):
     combined_context: Optional[str]
     profile_draft: Optional[CompanyProfileSchema]
     missing_info_summary: Optional[str]
-    visited_urls: Set[str]
+    visited_urls: Annotated[Set[str], operator.add]
     newly_found_links: List[LinkInfo]
     intial_url_found_links: List[LinkInfo]
     max_iterations: int
     iteration_count: int
     error_message: Optional[str]
-    last_action_summary: Optional[str]
     action_history: Annotated[List[str], operator.add]
     next_action: Optional[str]  # This will be set by the planner
 
@@ -58,7 +57,7 @@ class PlannerDecisionSchema(BaseModel):
     Defines the structured output expected from the planning LLM call.
     """
 
-    next_action: Literal["scrape", "search", "search_offerings", "finish"] = Field(
+    next_action: Literal["scrape", "search", "finish"] = Field(
         ...,
         description="The best next action to take: 'scrape' specific URLs, perform 'search' queries, or 'finish' the research.",
     )

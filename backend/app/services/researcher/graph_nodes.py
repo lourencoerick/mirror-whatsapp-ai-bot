@@ -249,7 +249,7 @@ async def scrape_website(state: ResearchState) -> Dict[str, Any]:
 
     updates = {
         "scraped_data": scraped_data,
-        "visited_urls": visited_urls.union(newly_visited),
+        "visited_urls": newly_visited,
         "urls_to_scrape": [],  # Clear processed list
         found_links_key_to_update: unique_new_links,
         "error_message": state.get("error_message"),
@@ -630,7 +630,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
         logger.warning(f"Error detected: {error_message}. Finishing.")
         return {**updates_if_finishing, "next_action": "finish"}
     if current_iteration > max_iterations:
-        logger.warning(f"Max iterations reached. Finishing.")
+        logger.warning("Max iterations reached. Finishing.")
         return {**updates_if_finishing, "next_action": "finish"}
     # Keep this check, but LLM prompt prioritizes offerings
     # if "all key fields are present" in missing_info:
