@@ -112,7 +112,7 @@ class InboxRead(InboxBase):
                     "phone_number": "15551234567",
                     "provider": "cloud",
                 },
-                "associated_agent_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                "associated_bot_agent_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
                 "enable_auto_assignment": True,
                 "created_at": "2023-10-27T10:00:00Z",
                 "updated_at": "2023-10-27T11:00:00Z",
