@@ -25,7 +25,7 @@ services:
       - "8000:8000"        
 
   database:
-    image: postgres:17.3-alpine
+    image: pgvector/pgvector:pg17
     container_name: whatsapp_bot_db_dev
     restart: always
     environment:
