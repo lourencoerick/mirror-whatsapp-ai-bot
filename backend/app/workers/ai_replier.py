@@ -1,369 +1,436 @@
-# backend/app/workers/ai_replier.py
+# backend/app/workers/ai_replier_arq.py
+
 import os
 import asyncio
 import random
 from uuid import UUID, uuid4
 from loguru import logger
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
-# Database and Queue imports (adjust paths as needed)
-from app.database import AsyncSessionLocal
+# --- Arq Imports ---
+# from arq import Retry
+from arq.connections import ArqRedis, RedisSettings
+
+
+# --- LangGraph Imports ---
+try:
+    from app.services.ai_reply.graph import create_reply_graph
+    from app.services.ai_reply.graph_state import ConversationState
+
+    REPLY_GRAPH_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Failed to import reply graph components: {e}")
+    REPLY_GRAPH_AVAILABLE = False
+
+# --- LangChain Imports ---
+try:
+    from langchain_openai import ChatOpenAI
+    from langchain_core.language_models import BaseChatModel
+    from langchain_core.messages import (
+        BaseMessage,
+        HumanMessage,
+        AIMessage,
+    )
+
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
+    logger.warning("LangChain components unavailable.")
+
+    class BaseChatModel:
+        pass
+
+    class BaseMessage:
+        pass
+
+    class HumanMessage:
+        pass
+
+    class AIMessage:
+        pass
+
+
+# --- Project Imports ---
+# Database & Config
+try:
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+    )
+    from app.database import AsyncSessionLocal
+    from app.config import get_settings
+
+    settings = get_settings()
+    SQLALCHEMY_AVAILABLE = True
+except ImportError:
+    SQLALCHEMY_AVAILABLE = False
+    logger.error("SQLAlchemy/config unavailable.")
+    AsyncSession = None
+    settings = type("obj", (object,), {"DATABASE_URL": None})()
+
+# Repositories
+try:
+    from app.services.repository import message as message_repo
+    from app.services.repository import conversation as conversation_repo
+    from app.services.repository import (
+        company_profile as profile_repo,
+    )
+    from app.services.repository import (
+        bot_agent as bot_agent_repo,
+    )
+
+    REPO_AVAILABLE = True
+except ImportError:
+    REPO_AVAILABLE = False
+    logger.error("One or more repositories unavailable.")
+
+# Models & Schemas
+try:
+    from app.models.message import Message
+    from app.api.schemas.message import MessageCreate
+    from app.api.schemas.company_profile import CompanyProfileSchema
+    from app.api.schemas.bot_agent import BotAgentRead
+
+    MODELS_SCHEMAS_AVAILABLE = True
+except ImportError:
+    MODELS_SCHEMAS_AVAILABLE = False
+    logger.error("Models/Schemas unavailable.")
+
+    class Message:
+        pass
+
+    class MessageCreate:
+        pass
+
+    class CompanyProfileSchema:
+        pass
+
+    class BotAgentRead:
+        pass
+
+
+try:
+    from app.core.embedding_utils import get_embedding
+
+    EMBEDDING_AVAILABLE = True
+except ImportError:
+    EMBEDDING_AVAILABLE = False
+    logger.error("Embedding utils unavailable.")
+
+
 from app.services.queue.redis_queue import RedisQueue
-from app.services.repository import message as message_repo
-from app.services.repository import conversation as conversation_repo
-
-from app.models.message import Message  # Import the Message model for type hinting
-from app.api.schemas.message import MessageCreate
-
-# AI Reply Service import
-from app.services.ai_reply import processor as ai_processor
 
 # --- Configuration ---
-# Consider moving queue names to environment variables/settings
-AI_REPLY_QUEUE_NAME = "ai_reply_queue"
-RESPONSE_SENDER_QUEUE_NAME = "response_queue"  # Queue the ResponseSender listens to
-
-# Base delay in seconds
-AI_DELAY_BASE_SECONDS = float(os.getenv("AI_DELAY_BASE_SECONDS", 0.5))
-
-# Adjust for desired "typing speed"
-AI_DELAY_PER_CHAR_SECONDS = float(os.getenv("AI_DELAY_PER_CHAR_SECONDS", 0.025))
-# Maximum random variation (plus/minus) in seconds
-AI_DELAY_RANDOM_SECONDS = float(os.getenv("AI_DELAY_RANDOM_SECONDS", 1.5))
-# Absolute minimum delay
-AI_DELAY_MIN_SECONDS = float(os.getenv("AI_DELAY_MIN_SECONDS", 2.0))
-# Absolute maximum delay
-AI_DELAY_MAX_SECONDS = float(os.getenv("AI_DELAY_MAX_SECONDS", 3.0))
+RESPONSE_SENDER_QUEUE_NAME = "response_queue"
+AI_DELAY_BASE_SECONDS = float(os.getenv("AI_DELAY_BASE_SECONDS", "0.5"))
+AI_DELAY_PER_CHAR_SECONDS = float(os.getenv("AI_DELAY_PER_CHAR_SECONDS", "0.025"))
+AI_DELAY_RANDOM_SECONDS = float(os.getenv("AI_DELAY_RANDOM_SECONDS", "1.5"))
+AI_DELAY_MIN_SECONDS = float(os.getenv("AI_DELAY_MIN_SECONDS", "0.5"))
+AI_DELAY_MAX_SECONDS = float(os.getenv("AI_DELAY_MAX_SECONDS", "5.0"))
+CONVERSATION_HISTORY_LIMIT = 20
 
 
-class AiReplier:
+# ==============================================================================
+# Helper Functions
+# ==============================================================================
+
+
+def _compute_delay(response_text: str) -> float:
+    response_length = len(response_text)
+    length_delay = response_length * AI_DELAY_PER_CHAR_SECONDS
+    base_calculated_delay = AI_DELAY_BASE_SECONDS + length_delay
+    random_offset = random.uniform(-AI_DELAY_RANDOM_SECONDS, AI_DELAY_RANDOM_SECONDS)
+    total_delay = base_calculated_delay + random_offset
+    return max(AI_DELAY_MIN_SECONDS, min(AI_DELAY_MAX_SECONDS, total_delay))
+
+
+def _format_db_history_to_lc(db_messages: List[Message]) -> List[BaseMessage]:
+    """Converts DB Message history to LangChain BaseMessage list."""
+    formatted_history: List[BaseMessage] = []
+    for msg in reversed(db_messages):
+        if msg.direction == "in" and msg.content:
+            formatted_history.append(HumanMessage(content=msg.content))
+        elif msg.direction == "out" and msg.content:
+            formatted_history.append(AIMessage(content=msg.content))
+    logger.debug(f"Formatted {len(formatted_history)} DB messages to LangChain format.")
+    return formatted_history
+
+
+# ==============================================================================
+# Arq Task Definition
+# ==============================================================================
+
+
+async def handle_ai_reply_request(
+    ctx: dict,
+    account_id: UUID,
+    conversation_id: UUID,
+    trigger_message_id: UUID,
+):
     """
-    Background worker that listens for messages needing an AI reply,
-    processes them using the ai_reply service, creates a new outgoing
-    message record with the AI response, and queues it for sending.
+    Arq task to generate and queue an AI reply using the LangGraph agent.
     """
+    task_id = ctx.get("job_id", "unknown_job")
+    logger.info(
+        f"[AIReplyTask:{task_id}] Starting for Conv: {conversation_id}, TriggerMsg: {trigger_message_id}"
+    )
 
-    def __init__(
-        self,
-        input_queue_name: str = AI_REPLY_QUEUE_NAME,
-        output_queue_name: str = RESPONSE_SENDER_QUEUE_NAME,
-    ):
-        """
-        Initializes the Redis queue listeners/producers.
+    # --- Get Dependencies from Worker Context ---
+    db_session_factory: Optional[Any] = ctx.get("db_session_factory")
+    llm_client: Optional[BaseChatModel] = ctx.get("llm")
+    arq_pool: Optional[ArqRedis] = ctx.get("arq_pool")
 
-        Args:
-            input_queue_name (str): Name of the queue to consume AI requests from.
-            output_queue_name (str): Name of the queue to push sender tasks to.
-        """
-        self.input_queue = RedisQueue(queue_name=input_queue_name)
-        self.output_queue = RedisQueue(queue_name=output_queue_name)
-        logger.info(
-            f"[ai_replier:init] Initialized queues: input='{input_queue_name}', output='{output_queue_name}'"
+    # --- Validate Dependencies ---
+    if not db_session_factory or not llm_client or not arq_pool:
+        error_msg = (
+            "Missing dependencies in Arq context (db_factory, llm, or arq_pool)."
         )
+        logger.error(f"[AIReplyTask:{task_id}] {error_msg}")
+        raise ValueError(f"Worker context missing dependencies for task {task_id}")
 
-    def _compute_delay(self, response_text: str) -> float:
-        response_length = len(response_text)
-        # Calculate delay based on length
-        length_delay = response_length * AI_DELAY_PER_CHAR_SECONDS
-        # Add base delay
-        base_calculated_delay = AI_DELAY_BASE_SECONDS + length_delay
-        # Add random variation (+/-)
-        random_offset = random.uniform(
-            -AI_DELAY_RANDOM_SECONDS, AI_DELAY_RANDOM_SECONDS
-        )
-        total_delay = base_calculated_delay + random_offset
-        # Apply min and max limits
-        return max(AI_DELAY_MIN_SECONDS, min(AI_DELAY_MAX_SECONDS, total_delay))
+    if not REPLY_GRAPH_AVAILABLE or not REPO_AVAILABLE or not MODELS_SCHEMAS_AVAILABLE:
+        error_msg = "Core components unavailable (Graph, Repos, Models/Schemas)."
+        logger.error(f"[AIReplyTask:{task_id}] {error_msg}")
+        raise ValueError(f"Worker missing core components for task {task_id}")
 
-    async def _process_one_task(self):
-        """
-        Processes one task from the input queue: fetches original message,
-        generates AI reply, creates outgoing message, queues for sending.
-        """
-        payload = None
-        try:
-            payload = await self.input_queue.dequeue()
-            if not payload:
-                return  # No task found, wait and try again
+    # --- Prepare Graph Input ---
+    ai_response_text: Optional[str] = None
+    final_state: Optional[ConversationState] = None
+    try:
+        async with db_session_factory() as db:
+            logger.debug(f"[{task_id}] Loading data from DB...")
+            profile = await profile_repo.get_profile_by_account_id(
+                db, account_id=account_id
+            )
+            conversation = await conversation_repo.find_conversation_by_id(
+                db,
+                account_id=account_id,
+                conversation_id=conversation_id,
+            )
 
-            logger.debug(f"[ai_replier] Raw task dequeued: {payload}")
+            agent_config: Optional[BotAgentRead] = None
+            if (
+                conversation
+                and conversation.inbox
+                and conversation.inbox.bot_agent_inboxes
+            ):
+                agent_data = await bot_agent_repo.get_bot_agent_for_inbox(
+                    db,
+                    inbox_id=conversation.inbox.id,
+                    account_id=account_id,
+                )
+                if agent_data:
+                    agent_config = BotAgentRead.model_validate(agent_data)
 
-            # --- Validate Payload ---
-            message_id_str = payload.get("message_id")
-            conversation_id_str = payload.get("conversation_id")
-            account_id = payload.get("account_id")
+            history_db = await message_repo.find_messages_by_conversation(
+                db,
+                account_id=account_id,
+                conversation_id=conversation_id,
+                limit=CONVERSATION_HISTORY_LIMIT,
+            )
 
-            if not all([message_id_str, conversation_id_str, account_id]):
+            if not profile:
+                raise ValueError(f"CompanyProfile not found for account {account_id}")
+            if not conversation:
+                raise ValueError(f"Conversation {conversation_id} not found")
+            if not agent_config:
+                raise ValueError(
+                    f"No active BotAgent configured for inbox {conversation.inbox_id}"
+                )
+            if not history_db:
+                raise ValueError(
+                    f"Cannot reply to conversation {conversation_id} with no history."
+                )
+
+            last_user_message = history_db[0]
+            if last_user_message.direction != "in" or not last_user_message.content:
                 logger.warning(
-                    f"[ai_replier] Task payload missing required fields: {payload}"
+                    f"[{task_id}] Last message is not from user or has no content. Skipping reply."
                 )
                 return
 
-            try:
-                message_id = UUID(message_id_str)
-                conversation_id = UUID(conversation_id_str)
-            except ValueError:
-                logger.warning(
-                    f"[ai_replier] Invalid UUID format in payload: {payload}"
-                )
-                return
+            formatted_history = _format_db_history_to_lc(history_db)
 
-            # --- Process Task ---
-            async with AsyncSessionLocal() as db:
-                try:
-                    await self._handle_ai_request(
-                        db,
-                        message_id=message_id,
-                        conversation_id=conversation_id,
-                        account_id=account_id,
-                    )
-                    # Commit happens here if _handle_ai_request succeeds
-                    await db.commit()
-                    logger.debug(
-                        f"[ai_replier] Successfully processed task for message {message_id}"
-                    )
-                except Exception as handler_exc:
-                    # Log the specific error from the handler
-                    logger.error(
-                        f"[ai_replier] Error handling task for message {message_id}: {handler_exc}"
-                    )
-                    await db.rollback()
-                    # Optionally: Add logic for retries or dead-letter queue here
-                finally:
-                    await db.close()
+            # Graph
+            compiled_reply_graph = create_reply_graph()
 
-        except Exception as e:
-            logger.exception(
-                f"[ai_replier] Unexpected failure processing task. Payload: {payload}. Error: {e}"
+            initial_input = ConversationState(
+                account_id=account_id,
+                conversation_id=conversation_id,
+                bot_agent_id=agent_config.id,
+                company_profile=CompanyProfileSchema.model_validate(profile),
+                agent_config=agent_config,
+                messages=formatted_history,
+                input_message=last_user_message.content,
+                retrieved_context=None,
+                generation=None,
+                error=None,
             )
-            # Optionally: Add logic for retries or dead-letter queue here for dequeue/parsing errors
 
-    async def run(self):
-        """
-        Starts the infinite loop to consume and process tasks from the input queue.
-        Waits until Redis connections are established.
-        """
-        logger.info("[ai_replier] Starting worker...")
+            graph_config = {
+                "configurable": {
+                    "llm_instance": llm_client,
+                    "db_session_factory": db_session_factory,
+                }
+            }
 
-        logger.info("[ai_replier] Attempting to connect to Redis queues...")
-        retry_delay = 5
-        max_retries = 5
-        retries = 0
-        # Wait for both queues to connect
-        while (
-            not (self.input_queue.is_connected and self.output_queue.is_connected)
-            and retries < max_retries
-        ):
-            retries += 1
-            logger.warning(
-                f"[ai_replier] Redis connection status: input={self.input_queue.is_connected}, output={self.output_queue.is_connected}. "
-                f"Retrying attempt {retries}/{max_retries} in {retry_delay}s..."
+            logger.debug(f"[{task_id}] Invoking reply graph...")
+            final_state = await compiled_reply_graph.ainvoke(
+                initial_input, config=graph_config
             )
-            await asyncio.sleep(retry_delay)
-            # Attempt reconnection if needed
-            if not self.input_queue.is_connected:
-                await self.input_queue.connect()
-            if not self.output_queue.is_connected:
-                await self.output_queue.connect()
 
-        if not (self.input_queue.is_connected and self.output_queue.is_connected):
-            logger.critical(
-                "[ai_replier] Could not establish Redis connections after multiple attempts. Exiting."
-            )
-            return
+            graph_error = final_state.get("error")
+            ai_response_text = final_state.get("generation")
 
-        logger.info(
-            "[ai_replier] Redis connections established. Listening for tasks..."
-        )
-        while True:
-            await self._process_one_task()
-            # Small sleep to prevent high CPU usage in case of empty queue
-            await asyncio.sleep(0.1)
+            if graph_error:
+                raise RuntimeError(f"Reply graph execution failed: {graph_error}")
+            if not ai_response_text:
+                raise ValueError("Reply graph finished but generated no response text.")
 
-    async def _handle_ai_request(
-        self,
-        db: AsyncSession,
-        message_id: UUID,
-        account_id: UUID,
-        conversation_id: UUID,
-    ):
-        """
-        Handles the AI reply generation and queuing for a specific message.
+            logger.success(f"[{task_id}] Reply graph generated response successfully.")
 
-        Args:
-            db: Active SQLAlchemy database session.
-            message_id: The ID of the original incoming message.
-            conversation_id: The ID of the conversation thread.
-            account_id: The company identifier.
-        """
-        # 1. Fetch Original Message (to get text and context like contact_id, inbox_id)
-        # Using find_message_by_id like in ResponseSender for consistency
-        original_message: Optional[Message] = await message_repo.find_message_by_id(
-            db, message_id
-        )
-
-        if not original_message:
-            # This shouldn't happen often if the task is created right after the message
-            logger.error(
-                f"[ai_replier] Original message {message_id} not found in DB. Cannot process."
-            )
-            # Raise an exception to trigger rollback in _process_one_task
-            raise ValueError(f"Original message {message_id} not found.")
-
-        if not original_message.content:  # Check if message has text content
-            logger.warning(
-                f"[ai_replier] Original message {message_id} has no text content. Skipping AI reply."
-            )
-            # Optionally update original message status here?
-            # original_message.status = "processed_no_reply_needed"
-            # db.add(original_message)
-            return  # Successfully processed (by skipping), commit will happen
-
-        # Ensure relations needed for creating the reply are loaded
-        # (contact_id, inbox_id might be directly on the message or need refresh)
-        try:
-            await db.refresh(original_message, attribute_names=["contact", "inbox"])
-            contact_id = original_message.contact_id
-            inbox_id = original_message.inbox_id
-            if not contact_id or not inbox_id:
-                raise ValueError("Missing contact_id or inbox_id after refresh")
-        except Exception as refresh_err:
-            logger.error(
-                f"[ai_replier] Failed to refresh message {message_id} relations: {refresh_err}. Cannot create reply."
-            )
-            raise ValueError(
-                f"Failed to load relations for message {message_id}"
-            ) from refresh_err
-
-        # 2. Generate AI Response using the processor
-        logger.info(f"[ai_replier] Generating AI reply for message {message_id}...")
-        ai_response_text = await ai_processor.process_message(
-            db=db,
-            account_id=account_id,
-            message_text=original_message.content,
-            conversation_id=str(
-                conversation_id
-            ),  # Pass as string if processor expects string
-        )
-
-        if not ai_response_text:
-            logger.warning(
-                f"[ai_replier] AI processor returned no response for message {message_id}. No reply will be sent."
-            )
-            # Optionally update original message status
-            # original_message.status = "processed_no_reply_generated"
-            # db.add(original_message)
-            return  # Successfully processed (no reply needed), commit will happen
-
-        # 3. Create the Outgoing Message record in DB
-        logger.info(
-            f"[ai_replier] Creating outgoing message record for AI reply to {message_id}..."
-        )
-
-        conversation = await conversation_repo.find_conversation_by_id(
-            db, conversation_id=conversation_id, account_id=account_id
-        )
-        # Generate an internal source_id for tracking
-        internal_source_id = f"ai-replier-{uuid4().hex}"
-
-        message_data = MessageCreate(
-            account_id=account_id,
-            inbox_id=conversation.inbox_id,
-            conversation_id=conversation.id,
-            contact_id=(
-                conversation.contact_inbox.contact_id
-                if conversation.contact_inbox
-                else None
-            ),
-            source_id=internal_source_id,
-            direction="out",
-            status="processing",
-            message_timestamp=datetime.now(timezone.utc),
-            content=ai_response_text,
-            content_type="text",
-            content_attributes={
-                "source": "ai-replier",
-                "channel_type": (
-                    conversation.inbox.channel_type if conversation.inbox else None
+            logger.info(f"[{task_id}] Creating outgoing message record...")
+            internal_source_id = f"ai-reply-graph-{uuid4().hex}"
+            message_data = MessageCreate(
+                account_id=account_id,
+                inbox_id=conversation.inbox_id,
+                conversation_id=conversation.id,
+                contact_id=(
+                    conversation.contact_inbox.contact_id
+                    if conversation.contact_inbox
+                    else None
                 ),
-            },
-        )
-        try:
-            # Assuming a repository function exists to create the message
-            # You might need to adjust parameters based on your actual function/model
-            ai_message = await message_repo.get_or_create_message(
-                db=db,
-                message_data=message_data,
+                source_id=internal_source_id,
+                direction="out",
+                status="processing",
+                message_timestamp=datetime.now(timezone.utc),
+                content=ai_response_text,
+                content_type="text",
+                content_attributes={
+                    "source": "ai-reply-graph",
+                    "channel_type": conversation.inbox.channel_type,
+                },
+                triggering_message_id=trigger_message_id,
             )
-            # Flush to get the ai_message.id assigned by the DB
-            await db.flush()
+
+            ai_message = await message_repo.create_message(
+                db=db, message_data=message_data
+            )
+
             await db.refresh(ai_message)
             logger.info(
-                f"[ai_replier] Created outgoing AI message record with ID: {ai_message.id}"
+                f"[{task_id}] Created outgoing AI message record with ID: {ai_message.id}"
             )
 
-        except Exception as create_exc:
-            logger.exception(
-                f"[ai_replier] Failed to create outgoing message record in DB for reply to {message_id}"
-            )
-            # Raise exception to trigger rollback
-            raise ValueError("Failed to create outgoing message record") from create_exc
-
-        final_delay = self._compute_delay(ai_response_text)
-        response_length = len(ai_response_text)
-        try:
+            final_delay = _compute_delay(ai_response_text)
             if final_delay > 0:
-                logger.debug(
-                    f"[ai_replier] Applying dynamic delay of {final_delay:.2f}s (length: {response_length}) before enqueueing message {ai_message.id}..."
-                )
+                logger.debug(f"[{task_id}] Applying delay: {final_delay:.2f}s")
                 await asyncio.sleep(final_delay)
-                logger.debug(
-                    f"[ai_replier] Delay finished for message {ai_message.id}."
-                )
-            else:
-                logger.debug(
-                    f"[ai_replier] Calculated delay is zero or negative, skipping sleep for message {ai_message.id}."
-                )
 
-        except Exception as delay_exc:
-            # Log if delay calculation fails, but don't stop the process
-            logger.warning(
-                f"[ai_replier] Error calculating dynamic delay for message {ai_message.id}: {delay_exc}. Proceeding without delay."
-            )
+            sender_payload = {"message_id": str(ai_message.id)}
 
-        # 4. Enqueue the new message ID for the ResponseSender
-        sender_payload = {"message_id": str(ai_message.id)}
-        try:
-            await self.output_queue.enqueue(sender_payload)
+            output_queue = RedisQueue(queue_name=RESPONSE_SENDER_QUEUE_NAME)
+            await output_queue.enqueue(sender_payload)
+
             logger.info(
-                f"[ai_replier] Enqueued message {ai_message.id} to '{self.output_queue.queue_name}' for sending."
+                f"[{task_id}] Enqueued message {ai_message.id} to '{RESPONSE_SENDER_QUEUE_NAME}' for sending."
             )
-        except Exception as enqueue_exc:
-            logger.exception(
-                f"[ai_replier] Failed to enqueue message {ai_message.id} to output queue '{self.output_queue.queue_name}'"
-            )
-            # Raise exception to trigger rollback (important: DB record was created but not queued)
-            raise ValueError("Failed to enqueue message for sender") from enqueue_exc
 
-        # 5. (Optional) Update original message status
-        # original_message.status = "processed_reply_generated"
-        # db.add(original_message)
-        # logger.debug(f"[ai_replier] Updated status for original message {message_id}")
+            await db.commit()
+            logger.debug(f"[{task_id}] DB transaction committed.")
 
-        # If we reach here, all steps succeeded. The commit will happen in _process_one_task.
+    except Exception as e:
+        logger.exception(f"[{task_id}] Error processing AI reply request: {e}")
+        raise
 
 
-# --- Main execution block ---
-async def main():
-    """Main function to start the AI reply worker."""
-    worker = AiReplier()
-    await worker.run()
+# ==============================================================================
+# Arq Worker Configuration Callbacks
+# ==============================================================================
 
 
-if __name__ == "__main__":
-    # Consider adding signal handling for graceful shutdown
-    logger.info("Starting AI Reply Worker...")
-    asyncio.run(main())
-    logger.info("AI Reply Worker stopped.")
+async def startup(ctx: dict):
+    """Initialize resources: DB factory, LLM client, Arq Pool."""
+    logger.info("AI Replier (Arq) worker starting up...")
+
+    # Init DB Factory
+    db_session_factory = None
+    if SQLALCHEMY_AVAILABLE and settings.DATABASE_URL:
+        logger.info("Initializing database connection...")
+        try:
+            db_session_factory = AsyncSessionLocal
+            ctx["db_session_factory"] = db_session_factory
+            logger.info("Database session factory created.")
+        except Exception as db_init_err:
+            logger.exception(f"DB init failed: {db_init_err}")
+            ctx["db_session_factory"] = None
+    else:
+        logger.warning("SQLAlchemy/DB URL unavailable.")
+        ctx["db_session_factory"] = None
+
+    # Init LLM Client
+    if LANGCHAIN_AVAILABLE:
+        logger.info("Initializing LLM client...")
+        try:
+            llm = ChatOpenAI(
+                model="gpt-4o", temperature=0.1
+            )  # Usar modelo principal aqui
+            ctx["llm"] = llm
+            logger.info(f"LLM client ({llm.__class__.__name__}) initialized.")
+        except Exception as llm_init_err:
+            logger.exception(f"LLM init failed: {llm_init_err}")
+            ctx["llm"] = None
+    else:
+        logger.warning("LangChain unavailable.")
+        ctx["llm"] = None
+
+    try:
+        from app.core.arq_manager import _arq_redis_pool
+        from app.core.arq_manager import get_arq_pool
+
+        arq_redis_pool = _arq_redis_pool
+        if arq_redis_pool is None:
+            from app.core.arq_manager import init_arq_pool
+
+            await init_arq_pool()
+            arq_redis_pool = get_arq_pool()
+        if arq_redis_pool:
+            ctx["arq_pool"] = arq_redis_pool
+            logger.info("Using existing ARQ Redis pool.")
+        else:
+            raise ValueError("ARQ Pool from manager is None")
+    except (ImportError, ValueError, Exception) as pool_err:
+        logger.warning(
+            f"Could not get ARQ pool from manager ({pool_err}). Will create separate client if needed."
+        )
+        ctx["arq_pool"] = None
+
+    logger.info("AI Replier (Arq) worker startup complete.")
+
+
+async def shutdown(ctx: dict):
+    """Clean up resources."""
+    logger.info("AI Replier (Arq) worker shutting down...")
+    arq_pool_client = ctx.get("arq_pool")
+    logger.info("AI Replier (Arq) worker shutdown complete.")
+
+
+# ==============================================================================
+# Arq Worker Settings Class
+# ==============================================================================
+
+
+class WorkerSettings:
+    """Arq worker settings for the AI reply tasks."""
+
+    functions = [handle_ai_reply_request]
+    queue_name = "ai_reply_queue"
+    on_startup = startup
+    on_shutdown = shutdown
+    job_timeout = 120
+    # max_tries = 3 # Considerar retentativas
+    redis_settings = RedisSettings(
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        database=0,
+    )

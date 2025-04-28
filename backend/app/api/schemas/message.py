@@ -27,6 +27,7 @@ class MessageCreate(BaseModel):
         "text"
     )
     content_attributes: Optional[dict] = {}
+    triggering_message_id: Optional[UUID] = None
 
 
 class MessageResponse(BaseModel):

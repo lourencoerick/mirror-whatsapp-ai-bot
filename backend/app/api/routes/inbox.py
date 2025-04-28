@@ -46,7 +46,7 @@ async def list_account_inboxes(
                 f"Failed to validate inbox model {inbox_model.id}: {e}. Skipping."
             )
             continue
-        inbox_dict["associated_agent_id"] = agent_id
+        inbox_dict["associated_bot_agent_id"] = agent_id
         response_data.append(InboxRead(**inbox_dict))
 
     return response_data

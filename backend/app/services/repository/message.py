@@ -65,6 +65,47 @@ async def find_messages_by_conversation(
     return messages
 
 
+async def create_message(db: AsyncSession, message_data: MessageCreate) -> Message:
+    """Retrieve a message by inbox_id and source_id, or create one if it doesn't exist.
+
+    Ensures idempotent message handling. Transaction finalization (commit, refresh, rollback)
+    should be handled by the caller.
+
+    Args:
+        db (AsyncSession): Database session.
+        message_data (MessageCreate): The data for the message to create.
+
+    Returns:
+        Message: The Message object.
+
+    Raises:
+        ValueError: If source_id is not provided in message_data.
+    """
+    logger.info("[MessageRepo] Creating new message ")
+
+    new_message = Message(
+        account_id=message_data.account_id,
+        inbox_id=message_data.inbox_id,
+        conversation_id=message_data.conversation_id,
+        contact_id=message_data.contact_id,
+        source_id=message_data.source_id,
+        user_id=message_data.user_id,
+        direction=message_data.direction,
+        message_type=message_data.direction,
+        private=message_data.private,
+        status=message_data.status,
+        sent_at=message_data.message_timestamp,
+        content=message_data.content,
+        content_type=message_data.content_type,
+        content_attributes=message_data.content_attributes,
+    )
+
+    db.add(new_message)
+    await db.flush()
+    logger.info(f"[MessageRepo] New message prepared with ID={new_message.id}")
+    return new_message
+
+
 async def get_or_create_message(
     db: AsyncSession, message_data: MessageCreate
 ) -> Message:

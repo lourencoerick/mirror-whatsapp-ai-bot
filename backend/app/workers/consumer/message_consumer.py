@@ -3,18 +3,41 @@
 import asyncio
 import json
 import time
-
 from typing import Optional, Union, Dict, Any
 from uuid import UUID
 from loguru import logger
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# --- DB Imports ---
 from app.database import AsyncSessionLocal
+
+# --- Repository Imports ---
 from app.services.repository import message as message_repo
 from app.services.repository import conversation as conversation_repo
+
+# --- Queue Imports ---
 from app.services.queue.redis_queue import RedisQueue
+
+# --- Importar Arq ---
+from arq.connections import ArqRedis, Job
+from redis.exceptions import (
+    ConnectionError as ArqConnectionError,
+    TimeoutError as EnqueueTimeout,
+)
+from app.core.arq_manager import (
+    get_arq_pool,
+    init_arq_pool,
+    close_arq_pool,
+)  #
+
+
+# --- Schema & Model Imports ---
 from app.api.schemas.message import MessageCreate
+from app.models.conversation import ConversationStatusEnum, Conversation
+from app.models.message import Message
+
+# --- Helper Imports ---
 from app.services.helper.conversation import (
     update_last_message_snapshot,
     parse_conversation_to_conversation_response,
@@ -23,11 +46,11 @@ from app.services.helper.websocket import (
     publish_to_conversation_ws,
     publish_to_account_conversations_ws,
 )
-from app.models.conversation import ConversationStatusEnum, Conversation
-from app.models.message import Message
+
 
 # --- Configuration ---
 MESSAGE_QUEUE_NAME = "message_queue"
+AI_REPLY_TASK_NAME = "handle_ai_reply_request"
 AI_REPLY_QUEUE_NAME = "ai_reply_queue"
 
 
@@ -35,74 +58,61 @@ class MessageConsumer:
     """
     Message consumer to process messages from the input queue, save them,
     update conversation state, publish WS events, and enqueue tasks
-    for the AI Replier.
+    for the AI Replier Arq worker.
     """
 
     def __init__(
         self,
         input_queue_name: str = MESSAGE_QUEUE_NAME,
-        output_queue_name: str = AI_REPLY_QUEUE_NAME,
     ):
         """
-        Initializes the consumer with input and output queues.
+        Initializes the consumer with the input queue.
+        Arq pool will be initialized in run method.
 
         Args:
-            input_queue_name (str): Name of the input queue.
-            output_queue_name (str): Name of the output queue for AI tasks.
+            input_queue_name (str): Name of the input queue (RedisQueue).
         """
         self.input_queue = RedisQueue(queue_name=input_queue_name)
-        self.output_queue = RedisQueue(queue_name=output_queue_name)
-        # MODIFIED: Log message updated for clarity
+        self.arq_pool: Optional[ArqRedis] = None
         logger.info(
-            f"[MessageConsumer:init] Initialized queues: input='{input_queue_name}', output='{output_queue_name}'"
+            f"[MessageConsumer:init] Initialized input queue: '{input_queue_name}'"
         )
 
     async def run(self):
         """
-        Runs the message consumer in an infinite loop.
-        Waits until the Redis connections are established before starting message processing.
+        Runs the message consumer loop. Initializes Arq pool.
         """
         logger.info("[consumer] Starting message consumer...")
 
-        logger.info("[consumer] Attempting to connect to Redis queues...")
-        # Ensure connections are attempted before the loop
-        await self.input_queue.connect()
-        await self.output_queue.connect()
-
-        retry_delay = 5
-        max_retries = 5
-        retries = 0
-        while (
-            not (self.input_queue.is_connected and self.output_queue.is_connected)
-            and retries < max_retries
-        ):
-            retries += 1
-            logger.warning(
-                f"[consumer] Failed initial Redis connection (Input: {self.input_queue.is_connected}, Output: {self.output_queue.is_connected}). "
-                f"Retrying attempt {retries}/{max_retries} in {retry_delay}s..."
-            )
-            await asyncio.sleep(retry_delay)
-            if not self.input_queue.is_connected:
-                await self.input_queue.connect()
-            if not self.output_queue.is_connected:
-                await self.output_queue.connect()
-
-        if not (self.input_queue.is_connected and self.output_queue.is_connected):
-            logger.error(
-                "[consumer] Could not establish Redis connections after multiple attempts. Exiting."
+        logger.info("[consumer] Initializing ARQ Redis pool...")
+        try:
+            await init_arq_pool()
+            self.arq_pool = await get_arq_pool()
+            if not self.arq_pool:
+                raise ValueError("Failed to get ARQ pool after initialization.")
+            logger.info("[consumer] ARQ Redis pool initialized.")
+        except Exception as pool_err:
+            logger.critical(
+                f"[consumer] Could not initialize ARQ Redis pool: {pool_err}. Exiting."
             )
             return
 
-        logger.info(
-            "[consumer] Redis connections established. Listening for messages..."
-        )
+        logger.info("[consumer] Connecting to input Redis queue...")
+        await self.input_queue.connect()
+        if not self.input_queue.is_connected:
+            logger.critical(
+                "[consumer] Could not connect to input Redis queue. Exiting."
+            )
+            await close_arq_pool()
+            return
+
+        logger.info("[consumer] Connections established. Listening for messages...")
         while True:
-            ai_task_payload: Optional[Dict[str, Any]] = None
+            ai_task_to_enqueue: Optional[Dict[str, Any]] = None
             try:
                 raw_message: Optional[Union[str, dict]] = (
                     await self.input_queue.dequeue()
                 )
-
                 if not raw_message:
                     await asyncio.sleep(0.1)
                     continue
@@ -113,22 +123,13 @@ class MessageConsumer:
                     if isinstance(raw_message, dict)
                     else json.loads(raw_message)
                 )
-
                 start_time = time.time()
+
                 async with AsyncSessionLocal() as db:
                     try:
-                        ai_task_ids = await self._handle_message(db, data)
-
+                        ai_task_to_enqueue = await self._handle_message(db, data)
                         await db.commit()
                         logger.debug("[consumer] Database transaction committed.")
-
-                        if ai_task_ids:
-                            ai_task_payload = {
-                                "message_id": str(ai_task_ids["message_id"]),
-                                "conversation_id": str(ai_task_ids["conversation_id"]),
-                                "account_id": str(ai_task_ids["account_id"]),
-                            }
-
                     except Exception as e:
                         logger.error(
                             f"[consumer] Rolling back transaction due to error: {e}"
@@ -136,16 +137,29 @@ class MessageConsumer:
                         await db.rollback()
                         raise
 
-                if ai_task_payload:
-                    try:
-                        await self.output_queue.enqueue(ai_task_payload)
-                        logger.info(
-                            f"[consumer] Enqueued task for AI Replier: {ai_task_payload}"
+                if ai_task_to_enqueue:
+                    if not self.arq_pool:
+                        logger.error(
+                            "[consumer] CRITICAL: Arq Pool not available for enqueueing AI task AFTER DB commit."
                         )
-                    except Exception as enqueue_err:
-                        logger.exception(
-                            f"[consumer] CRITICAL: Failed to enqueue task to '{self.output_queue.queue_name}' AFTER DB commit. Payload: {ai_task_payload}. Error: {enqueue_err}"
-                        )
+                    else:
+                        try:
+                            await self.arq_pool.enqueue_job(
+                                AI_REPLY_TASK_NAME,
+                                _queue_name=AI_REPLY_QUEUE_NAME,
+                                **ai_task_to_enqueue,
+                            )
+                            logger.info(
+                                f"[consumer] Enqueued task via Arq for AI Replier: {ai_task_to_enqueue}"
+                            )
+                        except (ArqConnectionError, EnqueueTimeout) as q_err:
+                            logger.exception(
+                                f"[consumer] CRITICAL: Arq enqueue error AFTER DB commit. Payload: {ai_task_to_enqueue}. Error: {q_err}"
+                            )
+                        except Exception as enqueue_err:
+                            logger.exception(
+                                f"[consumer] CRITICAL: Unexpected Arq enqueue error AFTER DB commit. Payload: {ai_task_to_enqueue}. Error: {enqueue_err}"
+                            )
 
                 elapsed = time.time() - start_time
                 logger.debug(f"[consumer] Processed message in {elapsed:.2f}s")
@@ -154,27 +168,20 @@ class MessageConsumer:
                 logger.warning("[consumer] Received malformed JSON.")
             except Exception as e:
                 logger.exception(
-                    f"[consumer] Unexpected failure processing message: {type(e).__name__} - {e}"
+                    f"[consumer] Unexpected failure processing message loop: {type(e).__name__} - {e}"
                 )
                 await asyncio.sleep(1)
+
+        # logger.info("[consumer] Shutting down...")
+        # await close_arq_pool()
+        # await self.input_queue.disconnect()
 
     async def _handle_message(
         self, db: AsyncSession, data: dict
     ) -> Optional[Dict[str, Any]]:
         """
-        Processes the message, saves it, updates conversation state, publishes updates,
-        and returns necessary IDs for the AI task payload upon success.
-
-        Args:
-            db (AsyncSession): Database session.
-            data (dict): Message data.
-
-        Returns:
-            A dictionary containing 'message_id', 'conversation_id', 'account_id'
-            if the message should be processed by AI, otherwise None.
-
-        Raises:
-            Exception: Propagates exceptions to allow for transaction rollback.
+        Processes message, saves, updates state, publishes WS events.
+        Returns dict with args for AI task if applicable, otherwise None.
         """
         try:
             message_data = MessageCreate(**data)
@@ -185,9 +192,8 @@ class MessageConsumer:
         message = await message_repo.get_or_create_message(
             db=db, message_data=message_data
         )
-
         if not message:
-            logger.warning("[consumer] Failed to get or create message, skipping.")
+            logger.warning("[consumer] Failed to get or create message.")
             return None
 
         conversation = await conversation_repo.find_conversation_by_id(
@@ -197,13 +203,11 @@ class MessageConsumer:
         )
         if not conversation:
             logger.warning(
-                f"[consumer] Conversation not found: {message.conversation_id}. Skipping AI task."
+                f"[consumer] Conversation not found: {message.conversation_id}."
             )
             return None
 
-        logger.info(
-            f"[consumer] Message logged successfully: {message.id}. Processing conversation updates."
-        )
+        logger.info(f"[consumer] Message logged: {message.id}. Processing updates.")
         final_updated_conversation: Optional[Conversation] = None
         if message.direction == "in":
             updated_conv_increment = (
@@ -213,50 +217,38 @@ class MessageConsumer:
                     conversation_id=conversation.id,
                 )
             )
-            if updated_conv_increment:
-                final_updated_conversation = updated_conv_increment
-            else:
-                final_updated_conversation = conversation
-
+            final_updated_conversation = updated_conv_increment or conversation
             if conversation.status == ConversationStatusEnum.CLOSED:
                 inbox = conversation.inbox
-
-                updated_conv_status = (
-                    await conversation_repo.update_conversation_status(
-                        db=db,
-                        account_id=conversation.account_id,
-                        conversation_id=conversation.id,
-                        new_status=inbox.initial_conversation_status,
+                if inbox:
+                    updated_conv_status = (
+                        await conversation_repo.update_conversation_status(
+                            db=db,
+                            account_id=conversation.account_id,
+                            conversation_id=conversation.id,
+                            new_status=inbox.initial_conversation_status,
+                        )
                     )
-                )
-                if updated_conv_status:
-                    final_updated_conversation = updated_conv_status
+                    if updated_conv_status:
+                        final_updated_conversation = updated_conv_status
         else:
             final_updated_conversation = conversation
-
         if not final_updated_conversation:
-            logger.error(
-                f"Conversation object became None after updates for {conversation.id}."
-            )
             raise Exception(
                 f"Conversation object lost during updates for {conversation.id}"
             )
-
         await update_last_message_snapshot(
             db=db, conversation=final_updated_conversation, message=message
         )
-        # --- End Conversation Updates ---
 
-        # --- WebSocket Publishing (logic remains the same) ---
+        # --- WebSocket Publishing ---
         try:
             await publish_to_conversation_ws(
                 conversation_id=message.conversation_id,
                 data={"type": "incoming_message", "payload": jsonable_encoder(message)},
             )
         except Exception as e:
-            logger.warning(
-                f"[ws] Failed to publish message {message.id} to conversation websocket: {e}"
-            )
+            logger.warning(f"[ws] Failed to publish message {message.id}: {e}")
         try:
             parsed_conversation = parse_conversation_to_conversation_response(
                 final_updated_conversation
@@ -273,40 +265,39 @@ class MessageConsumer:
             )
         except Exception as e:
             logger.warning(
-                f"[ws] Failed to publish conversation update for {final_updated_conversation.id} to account websocket: {e}"
+                f"[ws] Failed to publish conversation update for {final_updated_conversation.id}: {e}"
             )
         # --- End WebSocket Publishing ---
 
-        # Only return IDs if it's an incoming message suitable for AI reply
         if (
             message.direction == "in"
             and message.content
             and final_updated_conversation.status == ConversationStatusEnum.BOT
         ):
-            ai_task_ids = {
-                "message_id": message.id,
-                "conversation_id": message.conversation_id,
+            ai_task_args = {
                 "account_id": message.account_id,
+                "conversation_id": message.conversation_id,
+                "trigger_message_id": message.id,
             }
             logger.debug(
-                f"Message {message.id} is eligible for AI reply. Returning IDs."
+                f"Message {message.id} eligible for AI reply. Returning args: {ai_task_args}"
             )
-            return ai_task_ids
+            return ai_task_args
         else:
-            logger.debug(
-                f"Message {message.id} is not eligible for AI reply (direction='{message.direction}', has_content={bool(message.content)})."
-            )
+            logger.debug(f"Message {message.id} not eligible for AI reply.")
             return None
 
 
-# --- Main execution block (remains the same) ---
 async def main():
-    """
-    Main function to start the message consumer.
-    """
     consumer = MessageConsumer()
     await consumer.run()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        logger.info("Starting Message Consumer...")
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Message Consumer stopped by user.")
+    finally:
+        logger.info("Message Consumer finished.")

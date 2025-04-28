@@ -4,16 +4,20 @@
  */
 
 import { components } from '@/types/api'; // Import from the generated types file
-
-
-export type Inbox = components['schemas']['InboxRead'];
+import { EvolutionInstanceStatus } from "@/types/evolution-instance";
 
 export type ConversationStatusOption = 
-  | 'BOT'
-  | 'PENDING'
-  | 'OPEN'
-  | 'HUMAN_ACTIVE'
-  | 'CLOSED';
+| 'BOT'
+| 'PENDING'
+| 'OPEN'
+| 'HUMAN_ACTIVE'
+| 'CLOSED';
+
+export type InboxRead = components['schemas']['InboxRead'];
+  export interface Inbox extends InboxRead {
+    connection_status: EvolutionInstanceStatus;
+  }
+
   
   /**
    * Payload for creating a new Inbox via the API.
