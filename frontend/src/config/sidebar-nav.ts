@@ -15,7 +15,7 @@ import {
   ShoppingBag,
   UserCheck,
   UserPlus,
-  Users,
+  Users
 } from 'lucide-react';
   
   /**
@@ -86,6 +86,14 @@ import {
       ],
       hidden: true,
     },
+    {
+      name: 'Base de Conhecimento',
+      href: '/dashboard/knowledge',
+      icon: BookOpen,
+      children: [
+      ],
+      hidden: false,
+    },    
     {
       name: 'Meu Vendedor IA',
       href: '/dashboard/settings',
