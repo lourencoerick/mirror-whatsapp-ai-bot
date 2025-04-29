@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
-    Integer,
     Text,
     String,
     JSON,
@@ -12,6 +11,7 @@ from sqlalchemy import (
     Index,
     DateTime,
     text,
+    sql,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -55,6 +55,9 @@ class Message(BaseModel):
         default=lambda: datetime.now(timezone.utc),
     )
 
+    is_simulation = Column(
+        Boolean, nullable=False, default=False, server_default=sql.false(), index=True
+    )
     account = relationship("Account", back_populates="messages")
     inbox = relationship("Inbox", back_populates="messages")
     conversation = relationship("Conversation", back_populates="messages")
