@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from loguru import logger
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
+from fastapi.encoders import jsonable_encoder
 
 # --- Arq Imports ---
 # from arq import Retry
@@ -119,6 +120,9 @@ except ImportError:
 
 
 from app.services.queue.redis_queue import RedisQueue
+from app.services.helper.websocket import (
+    publish_to_conversation_ws,
+)
 
 # --- Configuration ---
 RESPONSE_SENDER_QUEUE_NAME = "response_queue"
@@ -322,19 +326,31 @@ async def handle_ai_reply_request(
                 f"[{task_id}] Created outgoing AI message record with ID: {ai_message.id}"
             )
 
-            final_delay = _compute_delay(ai_response_text)
-            if final_delay > 0:
-                logger.debug(f"[{task_id}] Applying delay: {final_delay:.2f}s")
-                await asyncio.sleep(final_delay)
+            if conversation.is_simulation:
+                logger.debug(f"Attempting to serialize message {ai_message.id}...")
+                message_payload_ws = jsonable_encoder(ai_message)
+                logger.debug(f"Message {ai_message.id} serialized successfully.")
+                await publish_to_conversation_ws(
+                    conversation_id=conversation.id,
+                    data={
+                        "type": "new_message",
+                        "payload": message_payload_ws,
+                    },
+                )
+            else:
+                final_delay = _compute_delay(ai_response_text)
+                if final_delay > 0:
+                    logger.debug(f"[{task_id}] Applying delay: {final_delay:.2f}s")
+                    await asyncio.sleep(final_delay)
 
-            sender_payload = {"message_id": str(ai_message.id)}
+                sender_payload = {"message_id": str(ai_message.id)}
 
-            output_queue = RedisQueue(queue_name=RESPONSE_SENDER_QUEUE_NAME)
-            await output_queue.enqueue(sender_payload)
+                output_queue = RedisQueue(queue_name=RESPONSE_SENDER_QUEUE_NAME)
+                await output_queue.enqueue(sender_payload)
 
-            logger.info(
-                f"[{task_id}] Enqueued message {ai_message.id} to '{RESPONSE_SENDER_QUEUE_NAME}' for sending."
-            )
+                logger.info(
+                    f"[{task_id}] Enqueued message {ai_message.id} to '{RESPONSE_SENDER_QUEUE_NAME}' for sending."
+                )
 
             await db.commit()
             logger.debug(f"[{task_id}] DB transaction committed.")
