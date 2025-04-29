@@ -103,7 +103,11 @@ class Conversation(BaseModel):
         MutableDict.as_mutable(JSONB), default=dict, nullable=True
     )
 
-    account = relationship("Account", back_populates="conversations")
+    account = relationship(
+        "Account",
+        back_populates="conversations",
+        foreign_keys=[account_id],
+    )
     inbox = relationship("Inbox", back_populates="conversations")
     contact_inbox = relationship("ContactInbox", back_populates="conversation")
 

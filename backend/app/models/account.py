@@ -6,6 +6,9 @@ from sqlalchemy import Column, String, ForeignKey
 
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
+from .contact import Contact
+from .inbox import Inbox
+from .conversation import Conversation
 
 
 class Account(BaseModel):
@@ -50,15 +53,7 @@ class Account(BaseModel):
     account_users = relationship(
         "AccountUser", back_populates="account", cascade="all, delete-orphan"
     )
-    contacts = relationship(
-        "Contact", back_populates="account", cascade="all, delete-orphan"
-    )
-    conversations = relationship(
-        "Conversation", back_populates="account", cascade="all, delete-orphan"
-    )
-    inboxes = relationship(
-        "Inbox", back_populates="account", cascade="all, delete-orphan"
-    )
+
     messages = relationship(
         "Message", back_populates="account", cascade="all, delete-orphan"
     )
@@ -93,3 +88,51 @@ class Account(BaseModel):
     knowledge_documents = relationship("KnowledgeDocument", back_populates="account")
 
     knowledge_chunks = relationship("KnowledgeChunk", back_populates="account")
+
+    # ------------------ relacionamentos de produção ------------------
+
+    contacts = relationship(
+        "Contact",
+        back_populates="account",
+        foreign_keys=lambda: [Contact.account_id],  # FK clara
+        cascade="all, delete-orphan",
+    )
+
+    inboxes = relationship(
+        "Inbox",
+        back_populates="account",
+        foreign_keys=lambda: [Inbox.account_id],
+        cascade="all, delete-orphan",
+    )
+
+    conversations = relationship(
+        "Conversation",
+        back_populates="account",
+        foreign_keys=lambda: [Conversation.account_id],
+        cascade="all, delete-orphan",
+    )
+
+    # ------------------ relacionamentos de simulação -----------------
+    simulation_contact = relationship(
+        "Contact",
+        primaryjoin="Account.simulation_contact_id == Contact.id",
+        foreign_keys=[simulation_contact_id],
+        uselist=False,
+        overlaps="contacts",  # evita warning de relação sobreposta
+    )
+
+    simulation_inbox = relationship(
+        "Inbox",
+        primaryjoin="Account.simulation_inbox_id == Inbox.id",
+        foreign_keys=[simulation_inbox_id],
+        uselist=False,
+        overlaps="inboxes",
+    )
+
+    simulation_conversation = relationship(
+        "Conversation",
+        primaryjoin="Account.simulation_conversation_id == Conversation.id",
+        foreign_keys=[simulation_conversation_id],
+        uselist=False,
+        overlaps="conversations",
+    )

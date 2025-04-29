@@ -50,7 +50,11 @@ class Inbox(BaseModel):
     enable_auto_assignment = Column(Boolean, nullable=True)
     channel_details = Column(MutableDict.as_mutable(JSON), nullable=True, default=dict)
 
-    account = relationship("Account", back_populates="inboxes")
+    account = relationship(
+        "Account",
+        back_populates="inboxes",
+        foreign_keys=[account_id],
+    )
     messages = relationship(
         "Message", back_populates="inbox", cascade="all, delete-orphan"
     )
