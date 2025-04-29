@@ -242,6 +242,7 @@ async def update_existing_contact(
         existing_contact = await contact_repo.find_contact_by_id(
             db=db, contact_id=contact_id, account_id=account_id
         )
+        logger.info(f"Got the existing contact ID :{existing_contact.id}")
         if existing_contact is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -250,6 +251,7 @@ async def update_existing_contact(
         updated_contact = await contact_repo.update_contact(
             db=db, contact=existing_contact, update_data=update_data
         )
+        await db.refresh(updated_contact)
         return updated_contact
     except HTTPException as http_exc:
         raise http_exc
