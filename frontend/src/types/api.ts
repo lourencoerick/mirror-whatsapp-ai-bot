@@ -578,6 +578,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge/upload-file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Knowledge File
+         * @description Uploads a file (PDF, TXT, DOCX) to the knowledge base for processing.
+         */
+        post: operations["upload_knowledge_file_api_v1_knowledge_upload_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/add-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Knowledge URL
+         * @description Adds a URL to the knowledge base for scraping and ingestion.
+         */
+        post: operations["add_knowledge_url_api_v1_knowledge_add_url_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/add-text": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Knowledge Text
+         * @description Adds raw text content to the knowledge base for processing.
+         */
+        post: operations["add_knowledge_text_api_v1_knowledge_add_text_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/status/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Knowledge Job Status
+         * @description Checks the status of a previously enqueued Knowledge background job.
+         */
+        get: operations["get_knowledge_job_status_api_v1_knowledge_status__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Knowledge Documents
+         * @description Retrieves a list of knowledge base documents for the authenticated account.
+         */
+        get: operations["list_knowledge_documents_api_v1_knowledge_documents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Knowledge Document
+         * @description Deletes a specific knowledge document and all its associated chunks.
+         */
+        delete: operations["delete_knowledge_document_api_v1_knowledge_documents__document_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instances/evolution": {
         parameters: {
             query?: never;
@@ -769,6 +889,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddTextRequest */
+        AddTextRequest: {
+            /**
+             * Content
+             * @description The text content to be ingested.
+             */
+            content: string;
+            /**
+             * Title
+             * @description A short description for this text source.
+             */
+            title: string;
+        };
+        /** AddUrlRequest */
+        AddUrlRequest: {
+            /**
+             * Url
+             * Format: uri
+             * @description The URL to ingest content from.
+             */
+            url: string;
+        };
         /**
          * AgentInboxAssociationUpdate
          * @description Schema for defining the list of Inboxes associated with an Agent.
@@ -792,6 +934,15 @@ export interface components {
              * File
              * Format: binary
              * @description CSV file containing contacts. Required columns: 'name', 'phone_number'. Optional: 'email'.
+             */
+            file: string;
+        };
+        /** Body_upload_knowledge_file_api_v1_knowledge_upload_file_post */
+        Body_upload_knowledge_file_api_v1_knowledge_upload_file_post: {
+            /**
+             * File
+             * Format: binary
+             * @description The knowledge file to upload.
              */
             file: string;
         };
@@ -1507,6 +1658,11 @@ export interface components {
             status: components["schemas"]["ConversationStatusEnum"];
         };
         /**
+         * DocumentStatus
+         * @enum {string}
+         */
+        DocumentStatus: "pending" | "processing" | "completed" | "failed";
+        /**
          * EvolutionInstanceQRCodeResponse
          * @description Schema for the response of the GET .../qrcode endpoint.
          *     Contains status and QR code data fetched from the shared Evolution server.
@@ -1737,7 +1893,7 @@ export interface components {
          * InboxRead
          * @example {
          *       "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
-         *       "associated_agent_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+         *       "associated_bot_agent_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
          *       "channel_details": {
          *         "phone_number": "15551234567",
          *         "provider": "cloud"
@@ -1846,6 +2002,99 @@ export interface components {
             /** @description New default status for new conversations (OPEN or PENDING) */
             initial_conversation_status?: components["schemas"]["ConversationStatusEnum"] | null;
         };
+        /**
+         * IngestResponse
+         * @description Response after successfully queueing any ingestion task.
+         */
+        IngestResponse: {
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Job Id */
+            job_id: string | null;
+            /** Message */
+            message: string;
+        };
+        /**
+         * JobStatusEnum
+         * @description Possible statuses for an Arq job.
+         * @enum {string}
+         */
+        JobStatusEnum: "queued" | "in_progress" | "complete" | "not_found" | "failed";
+        /**
+         * JobStatusResponse
+         * @description Schema for the response when checking the status of a background job.
+         */
+        JobStatusResponse: {
+            /**
+             * Job Id
+             * @description The ID of the job being checked.
+             */
+            job_id: string;
+            /** @description The current status of the job. */
+            status: components["schemas"]["JobStatusEnum"];
+            /**
+             * Detail
+             * @description Additional details, like an error message if the job failed.
+             */
+            detail?: string | null;
+        };
+        /** KnowledgeDocumentRead */
+        KnowledgeDocumentRead: {
+            /**
+             * Source Type
+             * @description Type of the source ('file', 'url', 'text').
+             */
+            source_type: string;
+            /**
+             * Source Uri
+             * @description URI identifying the source (e.g., GCS path, web URL, text description).
+             */
+            source_uri: string;
+            /**
+             * Original Filename
+             * @description Original filename if source_type is 'file'.
+             */
+            original_filename?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             * @description Unique identifier for the knowledge document.
+             */
+            id: string;
+            /**
+             * Account Id
+             * Format: uuid
+             * @description The account this document belongs to.
+             */
+            account_id: string;
+            /** @description Processing status of the document. */
+            status: components["schemas"]["DocumentStatus"];
+            /**
+             * Error Message
+             * @description Error message if processing failed.
+             */
+            error_message?: string | null;
+            /**
+             * Chunk Count
+             * @description Number of chunks generated from this document.
+             */
+            chunk_count?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             * @description Timestamp when the document record was created.
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description Timestamp when the document record was last updated.
+             */
+            updated_at: string;
+        };
         /** MessageCreatePayload */
         MessageCreatePayload: {
             /**
@@ -1946,6 +2195,19 @@ export interface components {
             size: number;
             /** Items */
             items: components["schemas"]["ImportJobListItem"][];
+        };
+        /** PaginatedKnowledgeDocumentRead */
+        PaginatedKnowledgeDocumentRead: {
+            /**
+             * Total
+             * @description Total number of documents found for the account.
+             */
+            total: number;
+            /**
+             * Items
+             * @description List of documents for the current page.
+             */
+            items: components["schemas"]["KnowledgeDocumentRead"][];
         };
         /**
          * ResearchJobStatusEnum
@@ -3158,6 +3420,227 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    upload_knowledge_file_api_v1_knowledge_upload_file_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_knowledge_file_api_v1_knowledge_upload_file_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_knowledge_url_api_v1_knowledge_add_url_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddUrlRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_knowledge_text_api_v1_knowledge_add_text_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddTextRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_knowledge_job_status_api_v1_knowledge_status__job_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobStatusResponse"];
+                };
+            };
+            /** @description Job ID not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Task queue unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    list_knowledge_documents_api_v1_knowledge_documents_get: {
+        parameters: {
+            query?: {
+                /** @description Number of documents to skip */
+                skip?: number;
+                /** @description Maximum number of documents to return */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedKnowledgeDocumentRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_knowledge_document_api_v1_knowledge_documents__document_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Permission denied to delete this document */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Document not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
             };
         };
     };
