@@ -101,7 +101,9 @@ async def get_contacts(
         A list of active contacts.
     """
     stmt = select(Contact).where(
-        Contact.account_id == account_id, Contact.deleted_at.is_(None)
+        Contact.account_id == account_id,
+        Contact.deleted_at.is_(None),
+        Contact.is_simulation.is_(False),
     )
 
     # Apply search filter if provided
@@ -145,7 +147,9 @@ async def count_contacts(
         The total count of active contacts.
     """
     stmt = select(func.count(Contact.id)).where(
-        Contact.account_id == account_id, Contact.deleted_at.is_(None)
+        Contact.account_id == account_id,
+        Contact.deleted_at.is_(None),
+        Contact.is_simulation.is_(False),
     )
 
     if search:

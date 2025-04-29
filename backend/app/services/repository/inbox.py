@@ -61,7 +61,10 @@ async def find_inboxes_with_association_by_account(
             BotAgentInbox,
             Inbox.id == BotAgentInbox.inbox_id,
         )
-        .where(Inbox.account_id == account_id)
+        .where(
+            Inbox.account_id == account_id,
+            Inbox.is_simulation.is_(False),
+        )
         .order_by(Inbox.name)
         .limit(limit)
         .offset(offset)
@@ -125,7 +128,7 @@ async def find_inboxes_by_account(
     )
     result = await db.execute(
         select(Inbox)
-        .filter(Inbox.account_id == account_id)
+        .filter(Inbox.account_id == account_id, Inbox.is_simulation.is_(False))
         .order_by(Inbox.name)
         .limit(limit)
         .offset(offset)
@@ -157,6 +160,7 @@ async def find_inboxes_by_user_membership(
         .filter(
             InboxMember.user_id == user_id,
             Inbox.account_id == account_id,
+            Inbox.is_simulation.is_(False),
         )
         .order_by(Inbox.name)
     )
