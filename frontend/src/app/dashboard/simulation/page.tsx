@@ -119,7 +119,7 @@ export default function SimulationPage() {
           <AlertDescription className="text-blue-700 dark:text-blue-300">
             <span>
               Você está no modo de simulação. As mensagens enviadas aqui são
-              para testar o agente de IA e <strong>não</strong> afetam conversas
+              para testar o vendedor IA e <strong>não</strong> afetam conversas
               com clientes reais.
             </span>
           </AlertDescription>
