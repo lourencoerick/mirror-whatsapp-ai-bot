@@ -21,6 +21,7 @@ from app.api.routes import research as research_routes
 from app.api.routes import bot_agent as bot_agent_routes
 from app.api.routes import company_profile as profile_routes
 from app.api.routes import knowledge as knowledge_routes
+from app.api.routes import simulation as simulation_routes
 
 
 # Import Dependencies and Context
@@ -139,6 +140,10 @@ app.include_router(
 )
 app.include_router(
     contact_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Contacts"]
+)
+
+app.include_router(
+    simulation_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Simulation"]
 )
 
 app.include_router(

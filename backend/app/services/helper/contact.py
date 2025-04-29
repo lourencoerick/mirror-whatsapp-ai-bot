@@ -5,7 +5,9 @@ from loguru import logger
 
 # --- Helper Function (Synchronous) ---
 def normalize_phone_number(
-    phone_number: str, account_country_code: Optional[str] = "BR"
+    phone_number: str,
+    account_country_code: Optional[str] = "BR",
+    is_simulation: Optional[bool] = False,
 ) -> Optional[str]:
     """
     Normalizes a phone number to E.164 digits format (without the leading '+').
@@ -20,6 +22,9 @@ def normalize_phone_number(
         The normalized phone number digits based on E.164 format (e.g., '5511941986775'),
         or None if parsing fails or number is invalid.
     """
+    if is_simulation:
+        return phone_number
+
     if not phone_number:
         return None
     try:

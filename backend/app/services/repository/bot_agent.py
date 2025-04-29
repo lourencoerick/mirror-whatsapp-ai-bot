@@ -14,6 +14,8 @@ from app.services.repository import conversation as conversation_repo
 from app.services.repository import inbox as inbox_repo
 from app.models.bot_agent import BotAgent
 from app.models.bot_agent_inbox import BotAgentInbox
+
+from app.models.account import Account
 from app.models.inbox import Inbox
 from app.models.conversation import ConversationStatusEnum
 
@@ -94,9 +96,18 @@ async def get_or_create_bot_agent_by_account_id(
         return agent
     logger.info(f"No BotAgent found for account {account_id}, creating default.")
     default_bot_agent = BotAgent(account_id=account_id)
+
     try:
         db.add(default_bot_agent)
         await db.flush()
+
+        account = await db.get(Account, account_id)
+        inbox = await db.get(Inbox, account.simulation_inbox_id)
+        simulation_bot_agent_inbox = BotAgentInbox(
+            account_id=account_id, bot_agent_id=default_bot_agent.id, inbox_id=inbox.id
+        )
+        db.add(simulation_bot_agent_inbox)
+
         await db.refresh(default_bot_agent)
         logger.info(
             f"Created default BotAgent {default_bot_agent.id} for account {account_id}"

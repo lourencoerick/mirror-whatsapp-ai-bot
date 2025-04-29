@@ -85,7 +85,9 @@ async def find_conversations_by_inbox(
                 joinedload(Conversation.contact_inbox).joinedload(ContactInbox.contact)
             )
             .filter(
-                Conversation.account_id == account_id, Conversation.inbox_id == inbox_id
+                Conversation.account_id == account_id,
+                Conversation.inbox_id == inbox_id,
+                Conversation.is_simulation.is_(False),
             )
             .order_by(desc(Conversation.last_message_at))
             .limit(limit)
@@ -231,6 +233,7 @@ async def find_conversations_by_user(
         .filter(
             Conversation.account_id == account_id,
             Conversation.inbox_id.in_(inbox_ids_subquery),
+            Conversation.is_simulation.is_(False),
         )
     )
 
@@ -380,6 +383,11 @@ async def search_conversations(
         )
         .where(prioritized_matches_cte.c.priority_rnk == 1)
         .filter(Conversation.inbox_id.in_(user_inbox_ids_subquery))
+    )
+
+    # remove simulation conversation
+    final_selection_stmt = final_selection_stmt.where(
+        Conversation.is_simulation.is_(False),
     )
 
     if status:

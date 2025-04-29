@@ -11,6 +11,7 @@ from sqlalchemy import (
     UniqueConstraint,
     JSON,
     Enum as SQLEnum,
+    sql,
 )
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -43,10 +44,17 @@ class Inbox(BaseModel):
         nullable=True,
         comment="Initial status of the conversation when created",
     )
+    is_simulation = Column(
+        Boolean, nullable=False, default=False, server_default=sql.false(), index=True
+    )
     enable_auto_assignment = Column(Boolean, nullable=True)
     channel_details = Column(MutableDict.as_mutable(JSON), nullable=True, default=dict)
 
-    account = relationship("Account", back_populates="inboxes")
+    account = relationship(
+        "Account",
+        back_populates="inboxes",
+        foreign_keys=[account_id],
+    )
     messages = relationship(
         "Message", back_populates="inbox", cascade="all, delete-orphan"
     )

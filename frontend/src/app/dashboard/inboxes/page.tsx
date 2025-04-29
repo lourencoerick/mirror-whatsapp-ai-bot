@@ -4,9 +4,9 @@
  */
 "use client";
 
-import React, { useEffect } from 'react';
-import { InboxList } from '@/components/ui/inbox/inbox-list';
-import { useLayoutContext } from '@/contexts/layout-context';
+import { InboxList } from "@/components/ui/inbox/inbox-list";
+import { useLayoutContext } from "@/contexts/layout-context";
+import React, { useEffect } from "react";
 
 /**
  * Renders the main page for managing Inboxes.
@@ -19,10 +19,10 @@ export default function InboxesPage() {
   const { setPageTitle } = useLayoutContext();
 
   useEffect(() => {
-    setPageTitle("Caixas de Entrada");
+    setPageTitle(
+      <h1 className="text-2xl md:text-3xl tracking-tight">Caixas de Entrada</h1>
+    );
   }, [setPageTitle]);
 
-  return (
-    <InboxList />
-  );
+  return <InboxList />;
 }

@@ -1,7 +1,7 @@
 from typing import List, Optional
 from uuid import UUID
 from loguru import logger
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.knowledge_document import KnowledgeDocument, DocumentStatus
@@ -205,3 +205,30 @@ async def delete_document(db: AsyncSession, document_id: UUID) -> bool:
     except Exception:
         logger.exception("Error deleting document.")
         raise
+
+
+async def count_documents(
+    db: AsyncSession, account_id: UUID, search: Optional[str] = None
+) -> int:
+    """Count the documents matching an optional search filter.
+
+    Args:
+        db: The asynchronous database session.
+        account_id: The account UUID owning the documents.
+        search: An optional search term to filter by name.
+
+    Returns:
+        The total count of active contacts.
+    """
+    stmt = select(func.count(KnowledgeDocument.id)).where(
+        KnowledgeDocument.account_id == account_id
+    )
+
+    if search:
+        search_term = f"%{search}%"
+        stmt = stmt.where(
+            KnowledgeDocument.name.ilike(search_term),
+        )
+
+    total = await db.scalar(stmt)
+    return total or 0

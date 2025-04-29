@@ -77,12 +77,25 @@ class KnowledgeDocumentList(BaseModel):
     )
 
 
+class PaginatedKnowledgeDocumentRead(BaseModel):
+    total: int = Field(
+        ..., description="Total number of documents found for the account."
+    )
+    items: List[KnowledgeDocumentRead] = Field(
+        ..., description="List of documents for the current page."
+    )
+
+    class Config:
+        from_attributes = True
+
+
 # --- Schema to Add knowledge  --
 class AddTextRequest(BaseModel):
+
     content: str = Field(
         ..., min_length=10, description="The text content to be ingested."
     )
-    description: str = Field(
+    title: str = Field(
         ...,
         min_length=3,
         max_length=100,

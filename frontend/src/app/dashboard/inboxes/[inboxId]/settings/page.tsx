@@ -139,13 +139,20 @@ export default function EditInboxPage() {
           <span className="font-normal">Caixas de Entrada</span>
         </Link>
         <span className="text-sm text-muted-foreground">/</span>
-        <span className="font-semibold text-md">
-          {isLoading
-            ? "Carregando Configurações..."
-            : inboxData
-            ? `Configurações: ${inboxData.name}`
-            : "Configurações da Caixa de Entrada"}
-        </span>
+
+        {isLoading ? (
+          <span className="font-semibold text-md">
+            Carregando Configurações...
+          </span>
+        ) : inboxData ? (
+          <h1 className="text-2xl md:text-3xl tracking-tight">
+            Configurações: {inboxData.name}
+          </h1>
+        ) : (
+          <h1 className="text-2xl md:text-3xl tracking-tight">
+            Configurações da Caixa de Entrada
+          </h1>
+        )}
       </div>
     );
   }, [setPageTitle, isLoading, inboxData]);

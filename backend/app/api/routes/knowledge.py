@@ -1,17 +1,10 @@
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    status,
-    UploadFile,
-    File,
-)
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 
 # Arq imports
 from arq.connections import ArqRedis, Job
@@ -53,6 +46,8 @@ from app.api.schemas.knowledge_document import (
     IngestResponse,
     JobStatusResponse,
     JobStatusEnum,
+    KnowledgeDocumentRead,
+    PaginatedKnowledgeDocumentRead,
 )
 
 
@@ -368,7 +363,7 @@ async def add_knowledge_text(
     Creates a KnowledgeDocument record for raw text and enqueues the ingestion task.
     """
     account_id: UUID = auth_context.account.id
-    source_identifier = request.description
+    source_identifier = request.title
     text_content = request.content
 
     logger.info(
@@ -578,4 +573,130 @@ async def get_knowledge_job_status(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to check job status.",
+        ) from e
+
+
+# --- List Documents Endpoint ---
+@router.get(
+    "/knowledge/documents",
+    response_model=PaginatedKnowledgeDocumentRead,  # Returns list directly for now
+    # For full pagination use response_model=KnowledgeDocumentList
+    summary="List Knowledge Documents",
+    description="Retrieves a list of knowledge base documents for the authenticated account.",
+)
+async def list_knowledge_documents(
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0, description="Number of documents to skip"),
+    limit: int = Query(
+        100, ge=1, le=200, description="Maximum number of documents to return"
+    ),
+) -> PaginatedKnowledgeDocumentRead:
+    """
+    Fetches knowledge documents associated with the user's active account.
+    """
+    account_id: UUID = auth_context.account.id
+    logger.info(
+        f"Listing knowledge documents for account {account_id} (skip={skip}, limit={limit})"
+    )
+
+    if not DOCUMENT_REPO_AVAILABLE or not knowledge_document_repo:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document repository unavailable.",
+        )
+
+    try:
+        documents = await knowledge_document_repo.list_documents_by_account(
+            db=db, account_id=account_id, skip=skip, limit=limit
+        )
+        count_documents = await knowledge_document_repo.count_documents(
+            db=db, account_id=account_id
+        )
+        return PaginatedKnowledgeDocumentRead(total=count_documents, items=documents)
+
+    except Exception as e:
+        logger.exception(f"Error listing documents for account {account_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve documents.",
+        ) from e
+
+
+# --- Delete Document Endpoint ---
+@router.delete(
+    "/knowledge/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,  # HTTP 204 on successful deletion
+    summary="Delete Knowledge Document",
+    description="Deletes a specific knowledge document and all its associated chunks.",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Document not found"},
+        status.HTTP_403_FORBIDDEN: {
+            "description": "Permission denied to delete this document"
+        },
+    },
+)
+async def delete_knowledge_document(
+    document_id: UUID,
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """
+    Deletes a knowledge document by its ID, ensuring the user owns it.
+    """
+    account_id: UUID = auth_context.account.id
+    logger.warning(
+        f"Attempting to delete document {document_id} by account {account_id}"
+    )
+
+    if not DOCUMENT_REPO_AVAILABLE or not knowledge_document_repo:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document repository unavailable.",
+        )
+
+    try:
+        # Permission check: ensure the document belongs to the user
+        doc_to_delete = await knowledge_document_repo.get_document_by_id(
+            db, document_id
+        )
+        if not doc_to_delete:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Document not found."
+            )
+        if doc_to_delete.account_id != account_id:
+            logger.error(
+                f"Permission denied for account {account_id} to delete document {document_id} owned by {doc_to_delete.account_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Permission denied to delete this document.",
+            )
+
+        # Perform deletion
+        success = await knowledge_document_repo.delete_document(
+            db=db, document_id=document_id
+        )
+        if success:
+            await db.commit()  # Commit transaction on successful deletion
+            logger.info(
+                f"Successfully deleted document {document_id} for account {account_id}"
+            )
+            return None
+        else:
+            await db.rollback()
+            logger.error(f"Unexpected deletion failure for document {document_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to delete document.",
+            )
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.exception(f"Error deleting document {document_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete document.",
         ) from e

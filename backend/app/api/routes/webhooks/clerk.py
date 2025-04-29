@@ -18,6 +18,7 @@ from app.models.account_user import AccountUser, UserRole
 
 from app.models.user import User
 
+from app.simulation.setup_service import setup_simulation_environment
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks Clerk"])
 
@@ -107,6 +108,31 @@ async def process_user_created(data: dict, db: AsyncSession):
             logger.info(
                 f"Linking User {new_user.id} to Account {new_account.id} with role '{default_role}'"
             )
+
+            # -- Creating Simulation environment --
+            try:
+                logger.info(
+                    f"Attempting to set up simulation environment for Account {new_account.id}..."
+                )
+
+                sim_inbox, sim_contact, sim_convo = await setup_simulation_environment(
+                    session=db, account=new_account, user=new_user
+                )
+                logger.info(
+                    f"Simulation environment setup successful for Account {new_account.id}. "
+                    f"Inbox: {sim_inbox.id}, Contact: {sim_contact.id}, Conversation: {sim_convo.id}"
+                )
+            except Exception as sim_error:
+                logger.error(
+                    f"Failed to set up simulation environment for Account {new_account.id} "
+                    f"(User: {new_user.id}). Account/User creation will proceed. Error: {sim_error}",
+                    exc_info=True,  # Include stack trace
+                )
+                # Raise exception to trigger rollback
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"User/Account created, but simulation setup failed: {sim_error}",
+                ) from sim_error
 
             await db.commit()
 
