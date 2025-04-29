@@ -1,11 +1,7 @@
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-from sqlalchemy import (
-    Column,
-    Integer,
-    String,
-)
+from sqlalchemy import Column, String, ForeignKey
 
 
 from sqlalchemy.orm import relationship
@@ -18,6 +14,38 @@ class Account(BaseModel):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     locale = Column(String(5), nullable=True)
+
+    simulation_inbox_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "inboxes.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_account_sim_inbox",
+        ),  # use_alter=True needed for potential circular dependency during creation
+        nullable=True,
+        index=True,  # Index for potential future lookups based on sim inbox
+    )
+    simulation_contact_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "contacts.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_account_sim_contact",
+        ),
+        nullable=True,
+    )
+    simulation_conversation_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey(
+            "conversations.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_account_sim_convo",
+        ),
+        nullable=True,
+    )
 
     account_users = relationship(
         "AccountUser", back_populates="account", cascade="all, delete-orphan"
