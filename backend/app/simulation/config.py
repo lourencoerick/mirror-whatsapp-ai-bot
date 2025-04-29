@@ -12,7 +12,7 @@ SIMULATION_ACCOUNT_NAME = "Conta de Simulação"
 SIMULATION_USER_NAME = "Usuário de Simulação"
 SIMULATION_INBOX_NAME = "Caixa de Entrada de Simulação"
 SIMULATION_CONTACT_NAME = "Contato de Simulação"
-SIMULATION_CONTACT_PHONE_NUMBER = "5511999999999"
+SIMULATION_CONTACT_PHONE_NUMBER = "5500999999999"
 
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))

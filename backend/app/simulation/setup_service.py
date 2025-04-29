@@ -179,6 +179,9 @@ async def setup_simulation_environment(
             phone_number=SIMULATION_CONTACT_PHONE_NUMBER,  # Add phone if needed/required
             # Add other fields from ContactCreate if necessary
         )
+
+        contact_data.is_simulation = True
+
         sim_contact = await contact_repo.create_contact(
             db=session,
             account_id=account.id,
