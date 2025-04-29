@@ -365,6 +365,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/simulation/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Primary Simulation Environment Details
+         * @description Retrieves the IDs for the user's primary simulation inbox, contact, and conversation, stored on their account.
+         */
+        get: operations["get_simulation_details_api_v1_simulation_details_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/simulation/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue a Simulated Incoming Message
+         * @description Accepts a message as if sent by the simulated contact, validates it, and enqueues it for processing by the message consumer (which will save it and trigger AI).
+         */
+        post: operations["enqueue_simulation_message_api_v1_simulation_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile": {
         parameters: {
             query?: never;
@@ -2269,6 +2309,63 @@ export interface components {
              */
             message: string;
         };
+        /**
+         * SimulationDetailsResponse
+         * @description Schema for returning simulation entity IDs.
+         */
+        SimulationDetailsResponse: {
+            /**
+             * Inbox Id
+             * Format: uuid
+             * @description The UUID of the simulation inbox.
+             */
+            inbox_id: string;
+            /**
+             * Contact Id
+             * Format: uuid
+             * @description The UUID of the simulation contact.
+             */
+            contact_id: string;
+            /**
+             * Conversation Id
+             * Format: uuid
+             * @description The UUID of the simulation conversation.
+             */
+            conversation_id: string;
+        };
+        /**
+         * SimulationMessageCreate
+         * @description Schema for creating a message sent *by* the simulated contact.
+         */
+        SimulationMessageCreate: {
+            /**
+             * Content
+             * @description The text content of the message being simulated.
+             */
+            content: string;
+        };
+        /**
+         * SimulationMessageEnqueueResponse
+         * @description Schema for the response after successfully enqueueing a simulation message.
+         */
+        SimulationMessageEnqueueResponse: {
+            /**
+             * Status
+             * @example message enqueued
+             */
+            status: string;
+            /**
+             * Source Id
+             * @description A unique identifier generated for this simulated message attempt.
+             * @example sim_ui_...
+             */
+            source_id: string;
+            /**
+             * Conversation Id
+             * @description The string representation of the target conversation UUID.
+             */
+            conversation_id: string;
+        };
         /** StartConversationRequest */
         StartConversationRequest: {
             /**
@@ -2962,6 +3059,61 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_simulation_details_api_v1_simulation_details_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationDetailsResponse"];
+                };
+            };
+        };
+    };
+    enqueue_simulation_message_api_v1_simulation_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimulationMessageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimulationMessageEnqueueResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
