@@ -53,7 +53,11 @@ const KnowledgeBasePage = () => {
   const { setPageTitle } = useLayoutContext();
 
   useEffect(() => {
-    setPageTitle("Base de Conhecimento");
+    setPageTitle(
+      <h1 className="text-2xl md:text-3xl tracking-tight">
+        Base de Conhecimento
+      </h1>
+    );
   }, [setPageTitle]);
 
   // --- State ---

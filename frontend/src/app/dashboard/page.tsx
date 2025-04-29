@@ -1,11 +1,18 @@
 "use client";
 
-import React, { useEffect } from 'react';
-import Link from 'next/link';
-import { useLayoutContext } from '@/contexts/layout-context';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"; // Ajuste o caminho se necessário
 import { Button } from "@/components/ui/button"; // Ajuste o caminho se necessário
-import { Inbox, UserPlus, MessageSquareText, Bot } from 'lucide-react'; // Ícones para os passos
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"; // Ajuste o caminho se necessário
+import { useLayoutContext } from "@/contexts/layout-context";
+import { Bot, Inbox, MessageSquareText, UserPlus } from "lucide-react"; // Ícones para os passos
+import Link from "next/link";
+import React, { useEffect } from "react";
 
 /**
  * Representa um único passo no guia de onboarding.
@@ -24,7 +31,14 @@ interface OnboardingStepProps {
  * @param {OnboardingStepProps} props - As propriedades para o passo de onboarding.
  * @returns {JSX.Element} O card do passo renderizado.
  */
-const OnboardingStep: React.FC<OnboardingStepProps> = ({ icon: Icon, title, description, link, linkLabel, disabled = false }) => (
+const OnboardingStep: React.FC<OnboardingStepProps> = ({
+  icon: Icon,
+  title,
+  description,
+  link,
+  linkLabel,
+  disabled = false,
+}) => (
   <Card className="flex flex-col">
     <CardHeader className="flex-row items-center gap-4 pb-4">
       <span className="rounded-full bg-primary/10 p-2 text-primary">
@@ -54,7 +68,6 @@ const OnboardingStep: React.FC<OnboardingStepProps> = ({ icon: Icon, title, desc
   </Card>
 );
 
-
 /**
  * A página principal do dashboard, incluindo um guia de onboarding para novos usuários.
  */
@@ -62,7 +75,7 @@ export default function DashboardPage() {
   const { setPageTitle } = useLayoutContext();
 
   useEffect(() => {
-    setPageTitle("Home");
+    setPageTitle(<h1 className="text-2xl md:text-3xl tracking-tight">Home</h1>);
   }, [setPageTitle]);
 
   // Textos traduzidos para pt-BR e títulos revisados para concisão
@@ -70,28 +83,32 @@ export default function DashboardPage() {
     {
       icon: Inbox,
       title: "1. Caixa de Entrada", // Título revisado
-      description: "Vincule seu canal do WhatsApp (Cloud API ou Evolution API) para começar a enviar e receber mensagens.",
+      description:
+        "Vincule seu canal do WhatsApp (Cloud API ou Evolution API) para começar a enviar e receber mensagens.",
       link: "/dashboard/inboxes",
       linkLabel: "Criar Caixa de Entrada", // Label revisado
     },
     {
       icon: UserPlus,
       title: "2. Adicionar Contatos",
-      description: "Importe ou adicione manualmente os contatos com quem você deseja interagir pelo WhatsApp.",
+      description:
+        "Importe ou adicione manualmente os contatos com quem você deseja interagir pelo WhatsApp.",
       link: "/dashboard/contacts",
       linkLabel: "Gerenciar Contatos",
     },
     {
       icon: MessageSquareText,
       title: "3. Iniciar Conversa",
-      description: "Comece sua primeira conversa manualmente ou prepare modelos para automação.",
+      description:
+        "Comece sua primeira conversa manualmente ou prepare modelos para automação.",
       link: "/dashboard/conversations",
       linkLabel: "Ver Conversas",
     },
     {
       icon: Bot,
       title: "4. Configurar IA",
-      description: "Configure seu vendedor IA para lidar com conversas automaticamente com base em seus objetivos.",
+      description:
+        "Configure seu vendedor IA para lidar com conversas automaticamente com base em seus objetivos.",
       link: "#", // Link pode ser '#' ou vazio, já que estará desabilitado
       linkLabel: "Em breve", // Texto alterado
       disabled: true, // Botão desabilitado
@@ -103,9 +120,12 @@ export default function DashboardPage() {
       {/* Seção de Onboarding */}
       <Card className="bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-purple-950">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">Seja bem-vindo(a), vamos começar!</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            Seja bem-vindo(a), vamos começar!
+          </CardTitle>
           <CardDescription>
-            Siga estes passos para configurar sua plataforma de automação de vendas pelo WhatsApp.
+            Siga estes passos para configurar sua plataforma de automação de
+            vendas pelo WhatsApp.
           </CardDescription>
         </CardHeader>
         <CardContent>

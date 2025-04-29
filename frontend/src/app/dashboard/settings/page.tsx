@@ -48,7 +48,9 @@ const MAX_NOT_FOUND_RETRIES = 4; // Max retries if job is not found immediately
 export default function SettingsPage(): JSX.Element {
   const { setPageTitle } = useLayoutContext();
   useEffect(() => {
-    setPageTitle("Configurações");
+    setPageTitle(
+      <h1 className="text-2xl md:text-3xl tracking-tight">Configurações</h1>
+    );
   }, [setPageTitle]);
 
   const fetcher = useAuthenticatedFetch();
