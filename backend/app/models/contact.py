@@ -2,14 +2,13 @@ import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
     Column,
-    Integer,
     String,
     JSON,
     ForeignKey,
-    UniqueConstraint,
     Index,
     DateTime,
     Boolean,
+    sql,
 )
 
 
@@ -35,6 +34,9 @@ class Contact(BaseModel):
     additional_attributes = Column(JSON, nullable=True)
     deleted_at = Column(DateTime(timezone=True), nullable=True, index=False)
 
+    is_simulation = Column(
+        Boolean, nullable=False, default=False, server_default=sql.false(), index=True
+    )
     account = relationship("Account", back_populates="contacts")
 
     contact_inboxes = relationship(

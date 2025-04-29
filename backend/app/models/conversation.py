@@ -7,13 +7,12 @@ from sqlalchemy import (
     Integer,
     Boolean,
     DateTime,
-    JSON,
     ForeignKey,
-    UniqueConstraint,
     Index,
     String,
     text,
     Enum as SQLEnum,
+    sql,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.mutable import MutableDict
@@ -86,6 +85,10 @@ class Conversation(BaseModel):
         Boolean,
         nullable=False,
         default=False,
+    )
+
+    is_simulation = Column(
+        Boolean, nullable=False, default=False, server_default=sql.false(), index=True
     )
 
     locked = Column(Boolean, nullable=True)
