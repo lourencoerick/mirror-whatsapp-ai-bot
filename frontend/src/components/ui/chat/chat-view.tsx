@@ -1,34 +1,32 @@
 // src/components/chat/ConversationChatView.tsx
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
-// Removed useParams, useSearchParams can stay if highlight is needed, or passed as prop
-import { useSearchParams } from "next/navigation";
-// Removed Link and ArrowLeft as navigation is handled by parent page
+import { Button } from "@/components/ui/button";
 import {
   ChatBubble,
   ChatBubbleAvatar,
   ChatBubbleMessage,
-} from "@/components/ui/chat/chat-bubble"; // Adjust path if needed
-import { ChatInputBox } from "@/components/ui/chat/chat-input-box"; // Adjust path if needed
-import { ChatMessage } from "@/components/ui/chat/chat-message"; // Adjust path if needed
-import { ChatMessageList } from "@/components/ui/chat/chat-message-list"; // Adjust path if needed
-import { ChatWebSocketBridge } from "@/components/ui/chat/chat-websocket-bridge"; // Adjust path if needed
-import { useMessages } from "@/hooks/use-messages"; // Adjust path if needed
-import { useSendMessage } from "@/hooks/use-send-message"; // Adjust path if needed
-// Removed useLayoutContext
-import { Button } from "@/components/ui/button"; // Adjust path if needed
-import ConversationNotFound from "@/components/ui/conversation/conversation-notfound"; // Adjust path if needed
+} from "@/components/ui/chat/chat-bubble";
+import { ChatInputBox } from "@/components/ui/chat/chat-input-box";
+import { ChatMessage } from "@/components/ui/chat/chat-message";
+import { ChatMessageList } from "@/components/ui/chat/chat-message-list";
+import { ChatWebSocketBridge } from "@/components/ui/chat/chat-websocket-bridge";
+import ConversationNotFound from "@/components/ui/conversation/conversation-notfound";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"; // Adjust path if needed
-import { Skeleton } from "@/components/ui/skeleton"; // Adjust path if needed
-import api from "@/lib/api"; // Adjust path if needed
-import { Conversation, ConversationStatusEnum } from "@/types/conversation"; // Adjust path if needed
-import { Message } from "@/types/message"; // Adjust path if needed
-import { Archive, MoreVertical, Play, Unlock } from "lucide-react"; // Removed ArrowLeft
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useMessages } from "@/hooks/use-messages";
+import { useSendMessage } from "@/hooks/use-send-message";
+import api from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { Conversation, ConversationStatusEnum } from "@/types/conversation";
+import { Message } from "@/types/message";
+import { Archive, ArrowDown, MoreVertical, Play, Unlock } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface ConversationChatViewProps {
@@ -36,24 +34,28 @@ interface ConversationChatViewProps {
   conversationId: string;
   /** Optional: ID of a message to highlight initially. */
   highlightMessageId?: string | null;
-  userDirection?: "in" | "out"; // <-- PROP ADICIONADA AQUI
+  /**
+   * The direction to assign to messages sent by the current user via the input box.
+   * Defaults to 'out' (agent view). Set to 'in' for simulation view.
+   * @default 'out'
+   */
+  userDirection?: "in" | "out";
 }
 
 /**
  * Component responsible for rendering the chat interface for a specific conversation.
- * Handles message fetching, display, sending, WebSocket updates, and status changes.
+ * Handles message fetching, display, sending, WebSocket updates, status changes,
+ * and includes a 'scroll to bottom' button.
  * @param {ConversationChatViewProps} props - Component props.
  */
 export function ConversationChatView({
   conversationId,
   highlightMessageId,
-  userDirection = "out", // <-- PROP RECEBIDA E COM VALOR PADRÃO
+  userDirection = "out",
 }: ConversationChatViewProps) {
   // --- Hooks and State ---
-  const searchParams = useSearchParams(); // Keep if highlight is still needed from URL
-  // Use prop highlightMessageId if provided, otherwise fallback to URL searchParam
+  const searchParams = useSearchParams();
   const highlightId = highlightMessageId ?? searchParams.get("highlight");
-  // Removed setPageTitle related state/hooks
   const messagesRef = useRef<HTMLDivElement>(null);
 
   const [input, setInput] = useState("");
@@ -65,8 +67,9 @@ export function ConversationChatView({
   const [fetchDetailsError, setFetchDetailsError] = useState<string | null>(
     null
   );
+  // State for scroll-to-bottom button visibility
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
-  // Use the conversationId prop in hooks
   const {
     messages,
     setMessages,
@@ -78,20 +81,17 @@ export function ConversationChatView({
     hasMoreNewer,
     loadOlderMessages,
     loadNewerMessages,
-  } = useMessages(conversationId, highlightId); // Use prop
+  } = useMessages(conversationId, highlightId);
 
   const { sendMessage, sending, error: sendError } = useSendMessage();
 
-  // Removed useEffect for setPageTitle
-
-  // Fetch conversation details - uses conversationId prop
+  // --- Fetch/Update Logic ---
   const fetchConversationData = useCallback(async () => {
-    if (!conversationId) return; // Check prop
-    console.log(`Fetching details for conversation: ${conversationId}`); // Use prop
+    if (!conversationId) return;
+    console.log(`Fetching details for conversation: ${conversationId}`);
     setLoadingDetails(true);
     setFetchDetailsError(null);
     try {
-      // Use prop in API call
       const response = await api.get<Conversation>(
         `/api/v1/conversations/${conversationId}`
       );
@@ -102,24 +102,21 @@ export function ConversationChatView({
     } finally {
       setLoadingDetails(false);
     }
-  }, [conversationId]); // Depend on prop
+  }, [conversationId]);
 
   useEffect(() => {
     fetchConversationData();
   }, [fetchConversationData]);
 
-  // Update conversation status - uses conversationId prop
   const handleUpdateStatus = useCallback(
     async (newStatus: ConversationStatusEnum) => {
-      if (!conversationId) return; // Check prop
+      if (!conversationId) return;
       setIsUpdatingStatus(true);
       const previousDetails = conversationDetails;
-      // Optimistic update
       setConversationDetails((prev) =>
         prev ? { ...prev, status: newStatus } : null
       );
       try {
-        // Use prop in API call
         await api.put(`/api/v1/conversations/${conversationId}/status`, {
           status: newStatus,
         });
@@ -127,27 +124,26 @@ export function ConversationChatView({
       } catch (err) {
         console.error("Failed to update conversation status:", err);
         toast.error("Falha ao atualizar status da conversa.");
-        setConversationDetails(previousDetails); // Revert on error
+        setConversationDetails(previousDetails);
       } finally {
         setIsUpdatingStatus(false);
       }
     },
     [conversationId, conversationDetails]
-  ); // Depend on prop
+  );
 
-  // Send message - uses conversationId prop
+  // --- Send Message Logic ---
   const submitMessage = useCallback(async () => {
-    if (!input.trim() || !conversationId) return; // Check prop
+    if (!input.trim() || !conversationId) return;
     try {
-      await sendMessage(input.trim(), conversationId, userDirection); // <-- AJUSTE AQUI
+      await sendMessage(input.trim(), conversationId, userDirection);
       setInput("");
+      // Scroll to bottom after sending a message
+      setTimeout(() => scrollToBottom("smooth"), 100); // Smooth scroll after send
     } catch (err: unknown) {
       console.error("Error sending message:", err);
-      // Error is handled by useSendMessage hook and displayed below input box
     }
-    // Removed submitMessage from dependency array as it's defined in scope
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, conversationId, sendMessage, userDirection]); // Depend on prop and sendMessage hook
+  }, [input, conversationId, sendMessage, userDirection]); // Added scrollToBottom dependency later
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
     setInput(e.target.value);
@@ -167,23 +163,44 @@ export function ConversationChatView({
     }
   };
 
-  // --- Scroll Handlers (Unchanged) ---
-  const scrollToBottom = useCallback(() => {
-    // ... (implementation unchanged) ...
+  // --- Scroll Handlers ---
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     if (messagesRef.current) {
-      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+      // Set flag to prevent scroll handler from interfering during auto-scroll
+      setIsAutoScrolling(true);
+      messagesRef.current.scrollTo({
+        top: messagesRef.current.scrollHeight,
+        behavior: behavior,
+      });
+      // Reset flag after scroll animation likely finishes
+      // Use a timeout slightly longer than typical smooth scroll duration
+      const scrollTimeout = behavior === "smooth" ? 300 : 50; // Adjust timeout if needed
+      setTimeout(() => {
+        setIsAutoScrolling(false);
+        // Ensure button is hidden after auto-scrolling to bottom
+        setShowScrollToBottom(false);
+      }, scrollTimeout);
     }
-  }, []);
+  }, []); // Empty dependency array for scrollToBottom
+
+  // Add submitMessage dependency after defining scrollToBottom
+  useEffect(() => {
+    // This effect is just to satisfy eslint exhaustive-deps for submitMessage needing scrollToBottom
+  }, [scrollToBottom]);
 
   const handleScroll = useCallback(() => {
-    // ... (implementation unchanged) ...
     const element = messagesRef.current;
-    if (!element || loadingOlder || loadingNewer || isAutoScrolling) return;
-    const tolerance = 50;
+    // Prevent checks during programmatic scroll or while loading
+    if (!element || isAutoScrolling || loadingOlder || loadingNewer) return;
+
+    const tolerance = 50; // Tolerance for loading more messages
+
+    // Load older messages logic
     if (element.scrollTop <= tolerance && hasMoreOlder) {
       console.log("Requesting older messages");
       loadOlderMessages();
     }
+    // Load newer messages logic (less common, but kept for completeness)
     if (
       element.scrollHeight - element.scrollTop - element.clientHeight <=
         tolerance &&
@@ -192,6 +209,11 @@ export function ConversationChatView({
       console.log("Requesting newer messages");
       loadNewerMessages();
     }
+
+    // Check if the user is scrolled up *at all* from the absolute bottom
+    const isAtBottom =
+      element.scrollHeight - element.scrollTop - element.clientHeight < 1; // Use 1px tolerance
+    setShowScrollToBottom(!isAtBottom);
   }, [
     loadOlderMessages,
     loadNewerMessages,
@@ -202,24 +224,25 @@ export function ConversationChatView({
     isAutoScrolling,
   ]);
 
+  // Add/Remove scroll listener
   useEffect(() => {
-    // ... (implementation unchanged) ...
     const element = messagesRef.current;
     if (!element) return;
     element.addEventListener("scroll", handleScroll);
     return () => element.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
 
+  // Initial scroll and scroll on new messages
   useEffect(() => {
-    // ... (implementation unchanged) ...
     if (!loadingOlder) {
-      setTimeout(scrollToBottom, 100);
+      // Scroll immediately ('auto') on initial load or when new messages arrive
+      scrollToBottom("auto");
     }
-  }, [messages, loadingOlder, scrollToBottom]);
+    // Depend on messages length to scroll when new messages are added
+  }, [messages.length, loadingOlder, scrollToBottom]);
 
-  // --- Loading Indicators (Unchanged) ---
+  // --- Loading Indicators ---
   const renderOlderMessagesLoadingIndicator = () => {
-    // ... (implementation unchanged) ...
     if (loadingOlder) {
       return (
         <div className="text-center py-2">
@@ -232,9 +255,7 @@ export function ConversationChatView({
     }
     return null;
   };
-
   const renderNewerMessagesLoadingIndicator = () => {
-    // ... (implementation unchanged) ...
     if (loadingNewer) {
       return (
         <div className="text-center py-2">
@@ -249,26 +270,21 @@ export function ConversationChatView({
   };
 
   // --- Rendering ---
-  // Removed outer page layout/title logic
-
-  // Error fetching initial details
   if (fetchDetailsError && !loadingDetails) {
     return (
       <div className="p-4 text-center text-red-500">{fetchDetailsError}</div>
     );
   }
 
-  // Main chat view structure
   return (
-    // Use flex-grow if this component is placed within a flex container by parent
-    <div className="flex flex-col w-full h-full bg-white dark:bg-neutral-900">
-      {/* Header Section (Conversation Details & Actions) */}
+    // Added relative positioning to the main container
+    <div className="flex flex-col w-full h-full bg-white dark:bg-neutral-900 relative">
+      {/* Header Section */}
       <div className="w-full p-2 border-b flex justify-between items-center gap-2 sticky top-0 bg-background z-10">
         <span className="text-sm font-medium truncate">
           {loadingDetails ? (
             <Skeleton className="h-5 w-40" />
           ) : (
-            // Display contact name/phone from fetched details
             `Conversa com ${
               conversationDetails?.contact?.name ||
               conversationDetails?.contact?.phone_number ||
@@ -276,8 +292,12 @@ export function ConversationChatView({
             }`
           )}
         </span>
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div
+          className={cn(
+            "flex items-center gap-2 ",
+            userDirection === "out" ? "" : "hidden"
+          )}
+        >
           <Button
             variant="outline"
             size="sm"
@@ -289,12 +309,12 @@ export function ConversationChatView({
             }
             aria-label="Fechar Conversa"
           >
-            <Archive className="h-4 w-4 mr-1" />
-            Fechar
+            {" "}
+            <Archive className="h-4 w-4 mr-1" /> Fechar{" "}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
+              <Button // Único filho direto
                 variant="ghost"
                 size="icon"
                 disabled={isUpdatingStatus || loadingDetails}
@@ -314,13 +334,14 @@ export function ConversationChatView({
                   conversationDetails?.status === ConversationStatusEnum.PENDING
                 }
               >
-                <Unlock className="mr-2 h-4 w-4" />
-                <span>Reabrir (Pendente)</span>
+                {" "}
+                <Unlock className="mr-2 h-4 w-4" />{" "}
+                <span>Reabrir (Pendente)</span>{" "}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() =>
                   handleUpdateStatus(ConversationStatusEnum.HUMAN_ACTIVE)
-                } // Assuming HUMAN_ACTIVE exists
+                }
                 disabled={
                   isUpdatingStatus ||
                   loadingDetails ||
@@ -328,69 +349,76 @@ export function ConversationChatView({
                     ConversationStatusEnum.HUMAN_ACTIVE
                 }
               >
-                <Play className="mr-2 h-4 w-4" />
-                <span>Marcar como Ativa</span>
+                {" "}
+                <Play className="mr-2 h-4 w-4" /> <span>Marcar como Ativa</span>{" "}
               </DropdownMenuItem>
-              {/* Add other actions if needed */}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      {/* Message List Area */}
+      {/* Message List Area - Kept relative positioning */}
       <div
-        className="w-full flex-grow overflow-y-auto px-4 mb-4"
+        className="w-full flex-grow overflow-y-auto px-4 mb-4 relative"
         ref={messagesRef}
       >
         {renderOlderMessagesLoadingIndicator()}
-        {/* WebSocket Bridge - uses conversationId prop */}
         <ChatWebSocketBridge
-          conversationId={conversationId} // Use prop
+          conversationId={conversationId}
           onNewMessage={(message) => {
             setMessages((prev: Message[]) => {
-              // Prevent duplicate messages from WS
               if (prev.some((m) => m.id === message.id)) return prev;
               return [...prev, message];
             });
           }}
         />
         <ChatMessageList>
-          {/* Initial Loading Skeleton */}
           {loadingInitial && !messagesError && (
             <ChatBubble variant="received">
               <ChatBubbleAvatar src="" fallback="⏳" />
               <ChatBubbleMessage isLoading />
             </ChatBubble>
           )}
-          {/* Message Loading Error */}
           {messagesError && !loadingInitial && <ConversationNotFound />}
-          {/* Render Messages */}
           {!messagesError &&
             messages.map((message, index) => (
               <ChatMessage
-                key={message.id || index} // Use index as fallback key
+                key={message.id || index}
                 direction={message.direction}
                 content={message.content}
                 userDirection={userDirection}
-                // Pass other message props if needed (timestamp, avatar, etc.)
               />
             ))}
         </ChatMessageList>
         {renderNewerMessagesLoadingIndicator()}
       </div>
 
+      <div
+        className={cn(
+          "absolute bottom-50 left-1/2 transition-opacity duration-300 z-20",
+          showScrollToBottom ? " opacity-100" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <Button
+          variant="secondary"
+          size="icon"
+          className="rounded-full shadow-md h-10 w-10"
+          onClick={() => scrollToBottom("smooth")}
+          aria-label="Rolar para baixo"
+        >
+          <ArrowDown className="h-5 w-5" />
+        </Button>
+      </div>
+
       {/* Input Box Area */}
-      <div className="w-full px-4 pb-4 pt-4 bg-background border-t">
-        {" "}
-        {/* Added border-t */}
+      <div className="w-full flex flex-col px-4 pb-4 pt-4 bg-background border-t">
         <ChatInputBox
           value={input}
           onChange={handleInputChange}
           onSubmit={handleSend}
           onKeyDown={handleKeyDown}
-          disabled={sending || !input.trim()} // Disable while sending or if input is empty
+          disabled={sending || !input.trim()}
         />
-        {/* Display sending error */}
         {sendError && (
           <p className="text-red-500 text-xs text-center mt-2">{sendError}</p>
         )}
@@ -399,5 +427,4 @@ export function ConversationChatView({
   );
 }
 
-// Export the component
-export default ConversationChatView; // Use default export or named export as preferred
+export default ConversationChatView;
