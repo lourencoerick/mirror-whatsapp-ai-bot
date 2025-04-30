@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - refact/workers
     # Atualiza os paths para incluir o AI replier e seus settings
     paths:
       - "backend/app/workers/**"
