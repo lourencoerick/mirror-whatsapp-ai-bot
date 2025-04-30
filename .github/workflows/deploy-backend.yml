@@ -63,10 +63,18 @@ jobs:
 
       # --- Optional: Deploy on Cloud Run ---
       - name: Deploy to Cloud Run
+        env:
+          # Use GitHub environment variables/secrets for these values
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          AR_REPO_ID: ${{ vars.AR_REPO_ID }} # Ex: app-images-dev
+          IMAGE_NAME: fastapi-backend
         run: |
+          IMAGE_URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}:latest"
           gcloud run deploy fastapi-backend-dev \
-            --image=${IMAGE_URL}:${IMAGE_TAG} \
-            --region=${GCP_REGION} \
-            --project=${GCP_PROJECT_ID} \
-            --service-account=${{ secrets.BACKEND_API_SA_EMAIL }} # SA used by the Cloud Run service
-            # Add other flags as needed (allow-unauthenticated, env vars, etc.)
+            --image "$IMAGE_URL" \
+            --region "$GCP_REGION" \
+            --platform managed \
+            --service-account "${{ secrets.BACKEND_API_SA_EMAIL }}" \
+            --project "$GCP_PROJECT_ID" \
+            --quiet
