@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - master
-      - feat/workers_deploy
+      - refact/workers
     paths:
-      - 'backend/**'    
-      - 'Dockerfile'   
-      - 'docker-compose.dev.yml' 
-      - '.github/workflows/deploy-backend.yml' 
+      - "backend/**"
+      - "Dockerfile"
+      - "docker-compose.dev.yml"
+      - ".github/workflows/deploy-backend.yml"
 
   # Optional: Also trigger manually
   workflow_dispatch:
@@ -18,21 +18,21 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write 
-      contents: read  
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       # --- GCP Authentication via WIF ---
-      - id: 'auth'
-        uses: 'google-github-actions/auth@v2'
+      - id: "auth"
+        uses: "google-github-actions/auth@v2"
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
           service_account: ${{ vars.GCP_SA_EMAIL }}
-          audience: 'https://github.com/${{ github.github_org || github.repository_owner }}'
-            
+          audience: "https://github.com/${{ github.github_org || github.repository_owner }}"
+
       # --- Configure Docker and Authenticate with Artifact Registry ---
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
