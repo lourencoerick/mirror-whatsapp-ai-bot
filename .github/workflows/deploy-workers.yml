@@ -1,69 +1,88 @@
-name: Build and Push Worker Docker Images
+# .github/workflows/deploy-workers.yml
+name: Build & Push Worker Docker Images
 
 on:
   push:
-    branches:
-      - master
-      - refact/workers
-    # Atualiza os paths para incluir o AI replier e seus settings
+    branches: [master, refact/workers]
     paths:
       - "backend/app/workers/**"
       - "backend/app/services/researcher/**"
       - "backend/app/services/knowledge/**"
       - "backend/app/services/ai_reply/**"
-      - "backend/app/workers/Dockerfile" # Dockerfile compartilhado
+      - "backend/app/workers/Dockerfile"
       - ".github/workflows/deploy-workers.yml"
   workflow_dispatch:
 
+env:
+  # Evita repetir a expressão
+  DOCKERFILE_PATH: ./backend/app/workers/Dockerfile
+
 jobs:
-  # 1) Detecta alterações
+  # 1) Detecta alterações e calcula matriz ------------------------------------
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      consumer: ${{ steps.filter.outputs.consumer }}
-      response: ${{ steps.filter.outputs.response_sender }}
-      batch: ${{ steps.filter.outputs.batch }}
-      ai_replier: ${{ steps.filter.outputs.ai_replier }} # Adiciona output para AI Replier
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Filtrar paths
-        uses: dorny/paths-filter@v2
         id: filter
+        uses: dorny/paths-filter@v2
         with:
           filters: |
             consumer:
               - 'backend/app/workers/consumer/**'
             response_sender:
               - 'backend/app/workers/response_sender/**'
-
             batch:
               - 'backend/app/workers/batch/**'
-              - 'backend/app/services/researcher/**' 
-              - 'backend/app/services/knowledge/**' 
+              - 'backend/app/services/researcher/**'
+              - 'backend/app/services/knowledge/**'
             ai_replier:
-              - 'backend/app/workers/ai_replier/**' 
+              - 'backend/app/workers/ai_replier/**'
               - 'backend/app/services/ai_reply/**'
 
-  # 2) Build & Push (um único job, mas cada step só roda se o filtro pedir)
+      # Gera a matriz dinâmica em JSON
+      - name: Criar matriz de builds
+        id: set-matrix
+        run: |
+          images=()
+          if [[ "${{ steps.filter.outputs.consumer }}" == 'true' ]]; then images+=("worker-consumer"); fi
+          if [[ "${{ steps.filter.outputs.response_sender }}" == 'true' ]]; then images+=("worker-response-sender"); fi
+          if [[ "${{ steps.filter.outputs.batch }}" == 'true' ]]; then images+=("batch-arq-worker"); fi
+          if [[ "${{ steps.filter.outputs.ai_replier }}" == 'true' ]]; then images+=("ai-replier-worker"); fi
+
+          # Constrói JSON no formato { "include": [ { "img": "..." }, ... ] }
+          json='{"include":['
+          first=true
+          for img in "${images[@]}"; do
+            if [ "$first" = true ]; then first=false; else json+=','; fi
+            json+='{"img":"'"$img"'"}'
+          done
+          json+=']}'
+
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+  # 2) Build & Push em paralelo ------------------------------------------------
   build-and-push:
     needs: detect-changes
+    # Se nada mudou, pula o job inteiro
+    if: ${{ needs.detect-changes.outputs.matrix != '{"include":[]}' }}
     runs-on: ubuntu-latest
-    # Atualiza a condição para incluir o AI Replier
-    if: >
-      needs.detect-changes.outputs.consumer == 'true' ||
-      needs.detect-changes.outputs.response == 'true' ||
-      needs.detect-changes.outputs.batch == 'true' ||
-      needs.detect-changes.outputs.ai_replier == 'true'
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # --- GCP Auth ---
+      # -- Autenticação GCP ---------------------------------------------------
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -71,79 +90,31 @@ jobs:
           service_account: ${{ vars.GCP_SA_EMAIL }}
           audience: https://github.com/${{ github.github_org || github.repository_owner }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Configure Docker for Artifact Registry
+      - name: Configurar Docker para o Artifact Registry
         run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
 
-      # --- Consumer Worker ---
-      - name: Build & Push Consumer
-        if: ${{ needs.detect-changes.outputs.consumer == 'true' }}
+      # -- Build + Push -------------------------------------------------------
+      - name: Build & Push ${{ matrix.img }}
         env:
           GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
           AR_REPO_ID: ${{ vars.AR_REPO_ID }}
-          IMAGE_NAME: worker-consumer # Nome da imagem no Artifact Registry
         run: |
+          IMAGE_NAME=${{ matrix.img }}
           TAG=${{ github.sha }}
           URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          echo "Building and pushing Consumer image: ${URL}:${TAG} and :latest"
-          # Assumindo que o Dockerfile compartilhado está em ./backend/app/workers/
-          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
-          docker push "${URL}:${TAG}"
-          docker push "${URL}:latest"
 
-      # --- Response Sender Worker ---
-      - name: Build & Push Response Sender
-        if: ${{ needs.detect-changes.outputs.response == 'true' }}
-        env:
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
-          IMAGE_NAME: worker-response-sender # Nome da imagem no Artifact Registry
-        run: |
-          TAG=${{ github.sha }}
-          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          echo "Building and pushing Response Sender image: ${URL}:${TAG} and :latest"
-          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
-          docker push "${URL}:${TAG}"
-          docker push "${URL}:latest"
+          echo "▶️  Building $IMAGE_NAME → $URL:$TAG"
+          docker buildx build \
+            -t "$URL:$TAG" -t "$URL:latest" \
+            -f "$DOCKERFILE_PATH" . \
+            --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max
 
-      # --- ARQ / Batch Worker ---
-      # Renomeado o nome da etapa para clareza
-      - name: Build & Push Batch ARQ Worker
-        # Atualiza a condição para usar o output 'batch'
-        if: ${{ needs.detect-changes.outputs.batch == 'true' }}
-        env:
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
-          # Atualiza o nome da imagem para corresponder ao Terraform (se necessário)
-          IMAGE_NAME: batch-arq-worker # Nome da imagem no Artifact Registry (ex: batch-arq-worker)
-        run: |
-          TAG=${{ github.sha }}
-          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          echo "Building and pushing Batch ARQ Worker image: ${URL}:${TAG} and :latest"
-          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
-          docker push "${URL}:${TAG}"
-          docker push "${URL}:latest"
-
-      # --- AI Replier Worker (NOVA ETAPA) ---
-      - name: Build & Push AI Replier Worker
-        # Condição baseada no novo output 'ai_replier'
-        if: ${{ needs.detect-changes.outputs.ai_replier == 'true' }}
-        env:
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
-          # Usa o nome da imagem definido no Terraform
-          IMAGE_NAME: ai-replier-worker # Nome da imagem no Artifact Registry
-        run: |
-          TAG=${{ github.sha }}
-          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          echo "Building and pushing AI Replier Worker image: ${URL}:${TAG} and :latest"
-          # Usa o mesmo Dockerfile compartilhado
-          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
-          docker push "${URL}:${TAG}"
-          docker push "${URL}:latest"
+# Opcional: evita que builds do mesmo branch se acumulem
+concurrency:
+  group: build-workers-${{ github.ref }}
+  cancel-in-progress: true
