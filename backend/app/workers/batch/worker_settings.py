@@ -15,9 +15,7 @@ try:
 
     settings = get_settings()
     # Define a default queue name for BATCH tasks
-    DEFAULT_BATCH_QUEUE_NAME = getattr(
-        settings, "ARQ_BATCH_QUEUE_NAME", "arq_batch_queue"
-    )
+    DEFAULT_BATCH_QUEUE_NAME = getattr(settings, "BATCH_ARQ_QUEUE_NAME", "batch_queue")
     logger.info("Loaded settings via get_settings()")
 except ImportError:
     logger.warning("app.config.get_settings not found. Relying solely on os.getenv.")
@@ -33,7 +31,7 @@ except ImportError:
         },
     )()
     DEFAULT_BATCH_QUEUE_NAME = os.getenv(
-        "ARQ_MAIN_QUEUE_NAME", "arq_batch_queue"
+        "BATCH_ARQ_QUEUE_NAME", "batch_queue"
     )  # Use ARQ_MAIN_QUEUE_NAME from Terraform
 
 
@@ -334,7 +332,7 @@ class WorkerSettings:
     )
 
     # Queue Name for BATCH tasks (MUST match Terraform var.batch_arq_queue_name)
-    queue_name: str = os.getenv("ARQ_MAIN_QUEUE_NAME", DEFAULT_BATCH_QUEUE_NAME)
+    queue_name: str = os.getenv("BATCH_ARQ_QUEUE_NAME", DEFAULT_BATCH_QUEUE_NAME)
 
     # --- Lifecycle Hooks ---
     on_startup: Optional[Callable[..., Any]] = on_startup
