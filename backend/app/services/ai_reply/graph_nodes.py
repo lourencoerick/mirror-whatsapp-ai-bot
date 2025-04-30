@@ -166,7 +166,7 @@ async def generate_response_node(
     Args:
         state: The current conversation state. Requires 'messages', 'company_profile',
                'agent_config', 'retrieved_context'.
-        config: The graph configuration. Requires 'llm_instance'.
+        config: The graph configuration. Requires 'llm_primary_instance'.
 
     Returns:
         A dictionary containing the 'generation' (the AI's response text)
@@ -179,8 +179,8 @@ async def generate_response_node(
     profile = state.get("company_profile")
     agent_config = state.get("agent_config")
     retrieved_context = state.get("retrieved_context")
-    llm_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
-        "llm_instance"
+    llm_primary_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_primary_instance"
     )
 
     if not messages:
@@ -193,11 +193,7 @@ async def generate_response_node(
             f"[{node_name}] Invalid or missing Company Profile. Cannot generate response."
         )
         return {"error": "Generation failed: Invalid company profile."}
-    # agent_config pode ser opcional inicialmente
-    # if not agent_config or not isinstance(agent_config, BotAgentRead):
-    #     logger.error(f"[{node_name}] Invalid or missing Agent Config. Cannot generate response.")
-    #     return {"error": "Generation failed: Invalid agent config."}
-    if not llm_instance:
+    if not llm_primary_instance:
         logger.error(f"[{node_name}] LLM instance not found in config.")
         return {"error": "Generation failed: LLM unavailable."}
     if not PROMPT_BUILDER_AVAILABLE:
@@ -225,7 +221,7 @@ async def generate_response_node(
     # --- Chamar LLM ---
     try:
         logger.debug(f"[{node_name}] Invoking LLM...")
-        ai_response: BaseMessage = await llm_instance.ainvoke(prompt_messages)
+        ai_response: BaseMessage = await llm_primary_instance.ainvoke(prompt_messages)
 
         if not isinstance(ai_response, AIMessage) or not ai_response.content:
             logger.error(
