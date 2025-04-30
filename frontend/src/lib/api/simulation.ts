@@ -138,3 +138,33 @@ export const sendSimulationMessage = async (
     }
   }
 };
+
+export const deleteSimulationCheckpoint = async (
+  fetcher: FetchFunction,
+  conversationId: string
+): Promise<void> => {
+  const endpoint = `/api/v1/simulation/conversations/${conversationId}/checkpoint`;
+  console.log(`[API Client] Deleting simulation checkpoint: ${endpoint}`);
+  try {
+    const response = await fetcher(endpoint, { method: "DELETE" });
+    if (!response.ok && response.status !== 204) {
+      // 204 is success for DELETE
+      let errorDetail = `API returned status ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorDetail = errorData.detail || errorDetail;
+      } catch (e) {}
+      throw new Error(`Failed to delete simulation checkpoint: ${errorDetail}`);
+    }
+    console.log("[API Client] Successfully deleted simulation checkpoint.");
+  } catch (error) {
+    console.error("[API Client] Error in deleteSimulationCheckpoint:", error);
+    if (error instanceof Error) {
+      throw error;
+    } else {
+      throw new Error(
+        "An unknown error occurred while deleting the simulation checkpoint."
+      );
+    }
+  }
+};
