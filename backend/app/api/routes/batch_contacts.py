@@ -37,13 +37,14 @@ from app.core.dependencies.auth import get_auth_context, AuthContext
 
 
 from app.services.cloud_storage import save_import_file_gcs
-from app.workers.batch_contacts.tasks.contact_importer import (
+from app.workers.batch.contacts.tasks.contact_importer import (
     ARQ_TASK_NAME as CONTACT_IMPORTER_ARQ_TASK_NAME,
 )
 from app.config import get_settings, Settings
 
 settings: Settings = get_settings()
 
+BATCH_ARQ_QUEUE_NAME = settings.BATCH_ARQ_QUEUE_NAME
 # --- Router Setup ---
 router = APIRouter(
     prefix="",
@@ -154,6 +155,7 @@ async def initiate_contact_import(
             _job_id=f"contact_import_{job_id}",
             job_pk=db_job.id,
             account_id=db_job.account_id,
+            _queue_name=BATCH_ARQ_QUEUE_NAME,
         )
         if not arq_task:
 

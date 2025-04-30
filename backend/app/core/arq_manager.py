@@ -5,7 +5,7 @@ from typing import Optional
 from loguru import logger
 
 
-from app.workers.batch_contacts.contact_creator import (
+from app.workers.batch.contacts.contact_creator import (
     redis_settings,
 )
 

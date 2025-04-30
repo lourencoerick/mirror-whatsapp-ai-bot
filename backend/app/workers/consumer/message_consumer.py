@@ -51,7 +51,7 @@ from app.services.helper.websocket import (
 # --- Configuration ---
 MESSAGE_QUEUE_NAME = "message_queue"
 AI_REPLY_TASK_NAME = "handle_ai_reply_request"
-AI_REPLY_QUEUE_NAME = "ai_reply_queue"
+AI_REPLY_QUEUE_NAME = settings.AI_REPLY_QUEUE_NAME
 
 
 class MessageConsumer:
