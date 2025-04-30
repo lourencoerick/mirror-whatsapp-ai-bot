@@ -1,9 +1,9 @@
 # .github/workflows/deploy-workers.yml
-name: Build & Push Worker Docker Images
+name: Build, Push, and Deploy Worker Docker Images
 
 on:
   push:
-    branches: [master, refact/workers]
+    branches: [master, refact/workers] # Monitora ambas as branches
     paths:
       - "backend/app/workers/**"
       - "backend/app/services/researcher/**"
@@ -14,7 +14,6 @@ on:
   workflow_dispatch:
 
 env:
-  # Evita repetir a expressão
   DOCKERFILE_PATH: ./backend/app/workers/Dockerfile
 
 jobs:
@@ -23,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      needs_job: ${{ steps.set-matrix.outputs.needs_job }} # Output para saber se algum job precisa rodar
     steps:
       - uses: actions/checkout@v4
 
@@ -36,66 +36,85 @@ jobs:
             response_sender:
               - 'backend/app/workers/response_sender/**'
             batch:
-              - 'backend/app/workers/batch/**'
+              - 'backend/app/workers/batch_contacts/**' 
+              - 'backend/app/workers/researcher/**' 
+              - 'backend/app/workers/knowledge_ingester/**' 
               - 'backend/app/services/researcher/**'
               - 'backend/app/services/knowledge/**'
             ai_replier:
-              - 'backend/app/workers/ai_replier/**'
+              - 'backend/app/workers/ai_replier/**' 
               - 'backend/app/services/ai_reply/**'
 
-      # Gera a matriz dinâmica em JSON
+      # Gera a matriz dinâmica em JSON e um flag se a matriz não está vazia
       - name: Criar matriz de builds
         id: set-matrix
         run: |
           images=()
-          if [[ "${{ steps.filter.outputs.consumer }}" == 'true' ]]; then images+=("worker-consumer"); fi
-          if [[ "${{ steps.filter.outputs.response_sender }}" == 'true' ]]; then images+=("worker-response-sender"); fi
-          if [[ "${{ steps.filter.outputs.batch }}" == 'true' ]]; then images+=("batch-arq-worker"); fi
-          if [[ "${{ steps.filter.outputs.ai_replier }}" == 'true' ]]; then images+=("ai-replier-worker"); fi
+          # Mapeia o nome lógico para o nome real da imagem/serviço
+          declare -A image_map
+          image_map["consumer"]="worker-consumer"
+          image_map["response_sender"]="worker-response-sender"
+          image_map["batch"]="batch-arq-worker"
+          image_map["ai_replier"]="ai-replier-worker"
 
-          # Constrói JSON no formato { "include": [ { "img": "..." }, ... ] }
+          # Mapeia o nome lógico para a SA do serviço Cloud Run
+          declare -A sa_map
+          sa_map["consumer"]="${{ vars.WORKER_CONSUMER_SA_EMAIL }}"
+          sa_map["response_sender"]="${{ vars.WORKER_RESPONSE_SENDER_SA_EMAIL }}"
+          sa_map["batch"]="${{ vars.WORKER_BATCH_SA_EMAIL }}"
+          sa_map["ai_replier"]="${{ vars.WORKER_AI_REPLIER_SA_EMAIL }}"
+
+          # Mapeia o nome lógico para o nome do serviço Cloud Run
+          declare -A service_map
+          service_map["consumer"]="${{ vars.WORKER_CONSUMER_SERVICE_NAME }}"
+          service_map["response_sender"]="${{ vars.WORKER_RESPONSE_SENDER_SERVICE_NAME }}"
+          service_map["batch"]="${{ vars.WORKER_BATCH_SERVICE_NAME }}"
+          service_map["ai_replier"]="${{ vars.WORKER_AI_REPLIER_SERVICE_NAME }}"
+
+
           json='{"include":['
           first=true
-          for img in "${images[@]}"; do
-            if [ "$first" = true ]; then first=false; else json+=','; fi
-            json+='{"img":"'"$img"'"}'
+          needs_job="false" # Flag para saber se algum build/deploy é necessário
+
+          for key in "${!image_map[@]}"; do
+            filter_output=$(echo steps.filter.outputs.$key | bash -c 'cat') # Obtém o valor do output do filtro
+            if [[ "${{ steps.filter.outputs.$key }}" == 'true' ]]; then
+              needs_job="true" # Marca que pelo menos um job precisa rodar
+              if [ "$first" = true ]; then first=false; else json+=','; fi
+              # Adiciona imagem, SA e nome do serviço à matriz
+              json+='{"img":"'"${image_map[$key]}"'","sa":"'"${sa_map[$key]}"'","service":"'"${service_map[$key]}"'"}'
+              images+=("${image_map[$key]}") # Mantém a lista de imagens (opcional)
+            fi
           done
           json+=']}'
 
           echo "matrix=$json" >> "$GITHUB_OUTPUT"
+          echo "needs_job=$needs_job" >> "$GITHUB_OUTPUT" # Exporta o flag
 
   # 2) Build & Push em paralelo ------------------------------------------------
   build-and-push:
     needs: detect-changes
-    # Se nada mudou, pula o job inteiro
-    if: ${{ needs.detect-changes.outputs.matrix != '{"include":[]}' }}
+    # Roda apenas se a matriz não estiver vazia
+    if: ${{ needs.detect-changes.outputs.needs_job == 'true' }}
     runs-on: ubuntu-latest
-
     strategy:
       fail-fast: false
+      # Usa a matriz gerada que agora contém img, sa, service
       matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
-
     permissions:
       id-token: write
       contents: read
-
     steps:
       - uses: actions/checkout@v4
-
-      # -- Autenticação GCP ---------------------------------------------------
-      - id: auth
+      - id: auth # Autenticação GCP
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
-          service_account: ${{ vars.GCP_SA_EMAIL }}
-          audience: https://github.com/${{ github.github_org || github.repository_owner }}
-
+          service_account: ${{ vars.GCP_SA_EMAIL }} # SA do GitHub Actions
+          audience: https://github.com/${{ github.repository_owner }}
       - uses: docker/setup-buildx-action@v3
-
       - name: Configurar Docker para o Artifact Registry
         run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
-
-      # -- Build + Push -------------------------------------------------------
       - name: Build & Push ${{ matrix.img }}
         env:
           GCP_REGION: ${{ vars.GCP_REGION }}
@@ -105,7 +124,6 @@ jobs:
           IMAGE_NAME=${{ matrix.img }}
           TAG=${{ github.sha }}
           URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-
           echo "▶️  Building $IMAGE_NAME → $URL:$TAG"
           docker buildx build \
             -t "$URL:$TAG" -t "$URL:latest" \
@@ -114,7 +132,50 @@ jobs:
             --cache-from type=gha \
             --cache-to type=gha,mode=max
 
-# Opcional: evita que builds do mesmo branch se acumulem
+  # 3) Deploy em paralelo (NOVO JOB) ------------------------------------------
+  deploy-workers:
+    needs: [detect-changes, build-and-push] # Depende de ambos os jobs anteriores
+    # Roda apenas se a matriz não estiver vazia
+    if: ${{ needs.detect-changes.outputs.needs_job == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Usa a MESMA matriz gerada que contém img, sa, service
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      # -- Autenticação GCP (Necessária novamente neste job) -----------------
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
+          service_account: ${{ vars.GCP_SA_EMAIL }} # SA do GitHub Actions
+          audience: https://github.com/${{ github.repository_owner }}
+
+      # -- Deploy -------------------------------------------------------------
+      - name: Deploy ${{ matrix.service }}
+        env:
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
+        run: |
+          IMAGE_NAME=${{ matrix.img }}
+          SERVICE_NAME=${{ matrix.service }}
+          SERVICE_ACCOUNT=${{ matrix.sa }}
+          IMAGE_URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}:latest" # Usa :latest por padrão
+
+          echo "🚀 Deploying $SERVICE_NAME with image $IMAGE_URL using SA $SERVICE_ACCOUNT"
+          gcloud run deploy "$SERVICE_NAME" \
+            --image "$IMAGE_URL" \
+            --region "$GCP_REGION" \
+            --platform managed \
+            --service-account "$SERVICE_ACCOUNT" \
+            --project "$GCP_PROJECT_ID" \
+            --quiet
+
+# Opcional: evita que builds/deploys do mesmo branch se acumulem
 concurrency:
-  group: build-workers-${{ github.ref }}
+  group: deploy-workers-${{ github.ref }}
   cancel-in-progress: true
