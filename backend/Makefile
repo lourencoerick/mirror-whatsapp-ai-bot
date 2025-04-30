@@ -49,13 +49,17 @@ worker-ai: ## Run Response sender
 	PYTHONPATH=$(APP_DIR) arq app.workers.ai_replier.WorkerSettings
 
 worker-arq: ## Run Response sender
-	PYTHONPATH=$(APP_DIR) arq app.workers.batch_contacts.contact_creator.WorkerSettings
+	PYTHONPATH=$(APP_DIR) arq app.workers.batch.contacts.contact_creator.WorkerSettings
 
 worker-researcher: ## Run Response sender
 	PYTHONPATH=$(APP_DIR) arq app.workers.researcher.WorkerSettings
 
 worker-ingester: ## Run Knowledge Ingester
 	PYTHONPATH=$(APP_DIR) arq app.workers.knowledge_ingester.WorkerSettings
+
+worker-batch: ## Run Knowledge Ingester
+	PYTHONPATH=$(APP_DIR) arq app.workers.batch.worker_settings.WorkerSettings
+
 
 
 run-app: ## Run Fast API app
