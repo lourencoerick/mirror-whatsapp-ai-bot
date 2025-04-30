@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     RESPONSE_SENDER_QUEUE_NAME: str = "response_queue"
     AI_REPLY_QUEUE_NAME: str = "ai_reply_queue"
     MESSAGE_QUEUE_NAME: str = "message_queue"
+    BATCH_ARQ_QUEUE_NAME: str = "batch_queue"
     # DATABASE_URL_PSYCOPG: str:
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
