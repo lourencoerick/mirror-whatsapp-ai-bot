@@ -2,7 +2,7 @@
 // src/app/dashboard/simulation/page.tsx
 "use client";
 import { useLayoutContext } from "@/contexts/layout-context";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"; // Import useMutation, useQueryClient
+import { useMutation, useQuery } from "@tanstack/react-query"; // Import useMutation, useQueryClient
 import { AlertCircle, Info, Loader2, RotateCcw } from "lucide-react"; // Import RotateCcw icon
 import { useEffect, useState } from "react";
 // --- UI Components ---
@@ -40,7 +40,6 @@ export default function SimulationPage() {
     );
   }, [setPageTitle]);
   const fetcher = useAuthenticatedFetch();
-  const queryClient = useQueryClient();
   // --- Query to fetch simulation details ---
   const {
     data: simulationDetails,

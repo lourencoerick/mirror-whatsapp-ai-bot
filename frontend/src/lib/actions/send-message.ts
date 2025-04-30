@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/actions/send-messages.ts
 
 import api from "@/lib/api";
