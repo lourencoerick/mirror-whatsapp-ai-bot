@@ -6,6 +6,7 @@ from loguru import logger
 # --- Helper Function (Synchronous) ---
 def normalize_phone_number(
     phone_number: str,
+    *,
     account_country_code: Optional[str] = "BR",
     is_simulation: Optional[bool] = False,
 ) -> Optional[str]:
