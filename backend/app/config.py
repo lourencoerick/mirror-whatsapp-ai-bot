@@ -47,6 +47,15 @@ class Settings(BaseSettings):
 
     FRONTEND_ALLOWED_ORIGINS: Optional[str] = None
 
+    # -- AI Replier --
+    OPENAI_MODEL_NAME: str = "gpt-4o-mini"
+    OPENAI_TEMPERATURE: int = 0
+
+    # -- Worker queues --
+    RESPONSE_SENDER_QUEUE_NAME: str = "response_queue"
+    AI_REPLY_QUEUE_NAME: str = "ai_reply_queue"
+    MESSAGE_QUEUE_NAME: str = "message_queue"
+    # DATABASE_URL_PSYCOPG: str:
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True
