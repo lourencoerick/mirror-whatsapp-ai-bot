@@ -50,9 +50,9 @@ from app.api.schemas.knowledge_document import (
     PaginatedKnowledgeDocumentRead,
 )
 
-from app.config import get_seetings, Settings
+from app.config import get_settings, Settings
 
-settings: Settings = get_seetings()
+settings: Settings = get_settings()
 
 
 KNOWLEDGE_TASK_NAME = "process_knowledge_source"
