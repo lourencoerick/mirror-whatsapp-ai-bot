@@ -99,9 +99,9 @@ export function DocumentTable({
             <TableCell
               className="font-medium truncate max-w-xs"
               title={
-                doc.source_type === "file"
+                (doc.source_type === "file"
                   ? doc.original_filename
-                  : doc.source_uri
+                  : doc.source_uri) ?? undefined
               }
             >
               {/* Display filename for files, URI for others */}
@@ -165,7 +165,7 @@ export function DocumentTable({
                       Essa ação não pode ser desfeita. Isso excluirá
                       permanentemente a fonte do documento{" "}
                       <span className="font-medium break-all">
-                        "{doc.original_filename || doc.source_uri}"
+                        &quot;{doc.original_filename || doc.source_uri}&quot;
                       </span>{" "}
                       e todos os seus chunks de conhecimento associados do banco
                       de dados.

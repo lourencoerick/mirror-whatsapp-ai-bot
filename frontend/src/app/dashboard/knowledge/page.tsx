@@ -1,8 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/dashboard/knowledge/page.tsx
 "use client";
 
 import { useLayoutContext } from "@/contexts/layout-context";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   AlertCircle,
   Files,
@@ -89,7 +95,7 @@ const KnowledgeBasePage = () => {
     },
     enabled: !!fetcher, // Only run the query if the fetcher is available
     staleTime: 1 * 60 * 1000, // Data is considered fresh for 1 minute
-    keepPreviousData: true, // Keep displaying old data while fetching new page
+    placeholderData: keepPreviousData, // Keep displaying old data while fetching new page
     refetchInterval: (query) => {
       // Check if any document in the current view is pending or processing
       const data = query.state.data as
@@ -192,7 +198,8 @@ const KnowledgeBasePage = () => {
         {isFetching && !isLoadingDocuments && (
           <Loader2
             className="h-5 w-5 animate-spin text-muted-foreground"
-            title="Atualizando..."
+            aria-label="Atualizando…"
+            role="status"
           />
         )}
       </div>

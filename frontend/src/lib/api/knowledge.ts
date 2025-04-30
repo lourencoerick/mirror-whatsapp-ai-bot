@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/lib/api/knowledge.ts
 
 import { FetchFunction } from "@/hooks/use-authenticated-fetch";
@@ -97,7 +98,6 @@ export const addKnowledgeText = async (
   const payload: AddTextRequest = {
     title,
     content: textContent,
-    description,
   };
   const response = await fetcher(`${KNOWLEDGE_API_PREFIX}/add-text`, {
     method: "POST",

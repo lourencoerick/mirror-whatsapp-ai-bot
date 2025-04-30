@@ -143,6 +143,7 @@ export function ConversationChatView({
     } catch (err: unknown) {
       console.error("Error sending message:", err);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, conversationId, sendMessage, userDirection]); // Added scrollToBottom dependency later
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) =>
