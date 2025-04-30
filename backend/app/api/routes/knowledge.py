@@ -50,12 +50,15 @@ from app.api.schemas.knowledge_document import (
     PaginatedKnowledgeDocumentRead,
 )
 
+from app.config import get_seetings, Settings
 
-router = APIRouter()
+settings: Settings = get_seetings()
 
 
 KNOWLEDGE_TASK_NAME = "process_knowledge_source"
 BATCH_ARQ_QUEUE_NAME = settings.BATCH_ARQ_QUEUE_NAME
+
+router = APIRouter()
 
 
 # --- Endpoint: Upload File ---
