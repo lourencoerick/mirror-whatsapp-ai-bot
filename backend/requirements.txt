@@ -57,3 +57,4 @@ tavily_python==0.6.0
 pgvector==0.4.1
 pypdf==5.4.0
 lxml==5.4.0
+langgraph_checkpoint_postgres==2.0.21
