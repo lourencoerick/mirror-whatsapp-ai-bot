@@ -2,14 +2,17 @@
 from loguru import logger
 from uuid import UUID, uuid4
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any
 
+from sqlalchemy import delete, text
 
 from app.database import get_db
 from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.models.account import Account
+from app.models.message import Message
+
 from app.models.user import User
 from app.services.repository import conversation as conversation_repo
 
@@ -23,9 +26,37 @@ from app.api.schemas.simulation import (
     SimulationMessageEnqueueResponse,
 )
 
-# from app.api.schemas.message import MessageCreate, MessageResponse
+try:
+    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-MESSAGE_QUEUE_NAME = "message_queue"
+    CHECKPOINTER_AVAILABLE = True
+except ImportError:
+    CHECKPOINTER_AVAILABLE = False
+    logger.error("AsyncPostgresSaver not available for checkpoint deletion.")
+
+    # Dummy class para evitar erros de importação, mas a funcionalidade falhará
+    class AsyncPostgresSaver:
+        @classmethod
+        def from_conn_string(cls, *args, **kwargs):
+            class DummyCheckpointer:
+                async def __aenter__(self):
+                    return self
+
+                async def __aexit__(self, exc_type, exc, tb):
+                    pass
+
+                async def delete(self, config):
+                    logger.error("Dummy checkpointer cannot delete.")
+                    raise NotImplementedError
+
+            return DummyCheckpointer()
+
+
+from app.config import get_settings
+
+settings = get_settings()
+MESSAGE_QUEUE_NAME = settings.MESSAGE_QUEUE_NAME
+
 
 router = APIRouter()
 
@@ -190,4 +221,85 @@ async def enqueue_simulation_message(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Falha ao enfileirar a mensagem de simulação para processamento.",
+        ) from e
+
+
+@router.delete(
+    "/simulation/conversations/{conversation_id}/checkpoint",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Reset Simulation State (Delete Checkpoint & Messages)",  # Nome mais claro
+    description="Deletes the persisted LangGraph state (checkpoint) AND associated messages "
+    "for the specified simulation conversation.",
+)
+async def reset_simulation_state(  # Nome mais claro
+    conversation_id: UUID,
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Deletes checkpoint data and messages for the given simulation conversation ID.
+    Uses direct SQL DELETE commands as checkpointer.adelete might not be available.
+    """
+    account_id = auth_context.account.id
+    user_id = auth_context.user.id
+    thread_id_str = str(conversation_id)  # Checkpoint usa string
+    log_prefix = (
+        f"[ResetSimState|Conv:{conversation_id}|Acc:{account_id}|User:{user_id}]"
+    )
+    logger.info(f"{log_prefix} Received request to reset simulation state.")
+
+    # --- 1. Verificar se a conversa existe, pertence à conta e é de simulação ---
+    conversation = await conversation_repo.find_conversation_by_id(
+        db, conversation_id=conversation_id, account_id=account_id
+    )
+    if not conversation:
+        logger.warning(f"{log_prefix} Conversation not found or not authorized.")
+        raise HTTPException(status_code=404, detail="Conversa não encontrada.")
+    if not conversation.is_simulation:
+        logger.warning(f"{log_prefix} Attempted reset on non-simulation conversation.")
+        raise HTTPException(
+            status_code=400, detail="Operação permitida apenas em simulações."
+        )
+
+    # --- 2. Executar Comandos DELETE SQL ---
+    # Nomes das tabelas e colunas baseados no código fonte do AsyncPostgresSaver
+    # ATENÇÃO: Se o LangGraph mudar esses nomes, este código quebrará.
+    checkpoint_tables = ["checkpoint_writes", "checkpoint_blobs", "checkpoints"]
+    # A tabela checkpoint_migrations geralmente não deve ser limpa por thread.
+
+    try:
+        logger.info(f"{log_prefix} Deleting messages...")
+        # Usando SQLAlchemy Core API (mais seguro contra SQL Injection que f-string)
+        delete_msgs_stmt = delete(Message).where(
+            Message.conversation_id == conversation_id
+        )
+        await db.execute(delete_msgs_stmt)
+        logger.info(f"{log_prefix} Messages deleted (if any existed).")
+
+        logger.info(
+            f"{log_prefix} Deleting checkpoint data for thread_id: {thread_id_str}..."
+        )
+        for table in checkpoint_tables:
+            # Usar parâmetros vinculados (:thread_id) é crucial para segurança!
+            logger.debug(f"{log_prefix} Deleting from {table}...")
+            # Usamos checkpoint_ns = '' como padrão, ajuste se você usar namespaces
+            stmt = text(
+                f"DELETE FROM {table} WHERE thread_id = :thread_id AND checkpoint_ns = :checkpoint_ns"
+            )
+            await db.execute(stmt, {"thread_id": thread_id_str, "checkpoint_ns": ""})
+            logger.debug(f"{log_prefix} Deleted rows from {table} (if any existed).")
+
+        # --- 3. Commit da Transação ---
+        await db.commit()
+        logger.success(
+            f"{log_prefix} Simulation state (messages and checkpoint) reset successfully."
+        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    except Exception as e:
+        logger.exception(f"{log_prefix} Error during simulation state reset: {e}")
+        await db.rollback()  # Garante rollback em caso de erro
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Falha ao reiniciar o estado da simulação.",
         ) from e
