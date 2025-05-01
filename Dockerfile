@@ -1,5 +1,9 @@
 # DevContainer Base with Python 3.11
-FROM mcr.microsoft.com/vscode/devcontainers/python:0-3.11-bullseye
+# FROM mcr.microsoft.com/vscode/devcontainers/python:0-3.11-bullseye
+FROM python:3.11-slim-bullseye
+
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
 
 # Set the working directory
 WORKDIR /workspace
