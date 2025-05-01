@@ -396,9 +396,16 @@ async def handle_ai_reply_request(
 
                 # --- Invoke Graph ---
 
-                if last_db_message.content.lower() == settings.RESET_MESSAGE_TRIGGER:
+                if (
+                    last_db_message.content.lower().strip()
+                    == settings.RESET_MESSAGE_TRIGGER
+                ):
+                    logger.info(
+                        f"{log_prefix}  Trigger de reset conversation process..."
+                    )
                     graph_error = None
                     ai_response_text = settings.RESET_MESSAGE_TRIGGER
+                    final_state = {}
                 else:
                     logger.info(
                         f"{log_prefix} Invoking reply graph with checkpointer..."
@@ -448,10 +455,10 @@ async def handle_ai_reply_request(
                     content_attributes={
                         "source": "ai-reply-graph",
                         "final_sales_stage": final_state.get(
-                            "current_sales_stage"
+                            "current_sales_stage", ""
                         ),  # Get final stage from state
                         "intent_classified": final_state.get(
-                            "intent"
+                            "intent", ""
                         ),  # Get final intent from state
                         "bot_agent_id": (
                             str(agent_config_db.id) if agent_config_db else None
