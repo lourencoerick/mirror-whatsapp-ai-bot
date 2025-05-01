@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 from uuid import UUID
 from datetime import datetime, timezone
+import pytz
 
 # Import State and Constants
 from .graph_state import (
@@ -536,7 +537,8 @@ async def generate_response_node(
 
     # --- Build Prompt ---
     try:
-        current_time_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+        brasilia_tz = pytz.timezone("America/Sao_Paulo")
+        current_time_str = datetime.now(brasilia_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
         # Pass current stage if available, prompt builder might use it
         current_stage = state.get("current_sales_stage")
         logger.debug(
