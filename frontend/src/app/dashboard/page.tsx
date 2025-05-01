@@ -109,9 +109,9 @@ export default function DashboardPage() {
       title: "4. Configurar IA",
       description:
         "Configure seu vendedor IA para lidar com conversas automaticamente com base em seus objetivos.",
-      link: "#", // Link pode ser '#' ou vazio, já que estará desabilitado
-      linkLabel: "Em breve", // Texto alterado
-      disabled: true, // Botão desabilitado
+      link: "/dashboard/settings",
+      linkLabel: "Ativar Vendedor IA",
+      disabled: false,
     },
   ];
 
