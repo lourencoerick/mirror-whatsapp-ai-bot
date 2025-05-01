@@ -104,6 +104,7 @@ except ImportError:
 
 from app.api.schemas.company_profile import CompanyProfileSchema
 
+from app.services.ai_reply.prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
 
 # --- End Generate Response Imports ---
 
@@ -639,6 +640,8 @@ Sua tarefa é apresentar como o produto/serviço da **{company_name}** atende a 
 Use o CONTEXTO ADICIONAL (se disponível) sobre o produto/serviço. Mantenha o tom {sales_tone}.
 Seja claro e conecte diretamente a solução à necessidade do cliente. Termine com uma pergunta aberta ou um próximo passo suave (avanço).
 
+{formatting_instructions}
+
 PERFIL DA EMPRESA: {company_name}, {business_description}
 Ofertas Relevantes (Contexto): {offering_summary}
 
@@ -680,6 +683,7 @@ Instrução: Apresente a capacidade da solução focando no benefício para a ne
                     else "Nenhuma informação adicional específica recuperada."
                 ),
                 "chat_history": formatted_history if formatted_history else "N/A",
+                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
             }
         )
         generated_presentation = generated_presentation.strip()
@@ -707,3 +711,117 @@ Instrução: Apresente a capacidade da solução focando no benefício para a ne
             "messages": [ai_message],
             "error": f"Presentation generation failed: {e}",
         }
+
+
+async def transition_after_answer_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Generates a transition question AND combines it with the previous agent response
+    to form the final 'generation' for this turn.
+
+    Args:
+        state: Current state. Requires 'messages', 'generation' (from previous node).
+        config: Requires 'llm_fast'.
+
+    Returns:
+        Dictionary with updated 'generation' and 'messages'.
+    """
+    node_name = "transition_after_answer_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    current_stage = state.get("current_sales_stage")
+    # --- Pega a RESPOSTA RAG gerada pelo nó ANTERIOR ---
+    previous_generation = state.get("generation", "")
+    # Pega a pergunta original do cliente
+    last_human_message = (
+        messages[-2].content
+        if len(messages) >= 2 and isinstance(messages[-2], HumanMessage)
+        else ""
+    )
+
+    llm_fast_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+
+    if not llm_fast_instance:
+        return {"error": "Transition failed: LLM unavailable."}
+    # Se não houve resposta anterior para adicionar gancho, talvez só termine?
+    if not previous_generation:
+        logger.warning(
+            f"[{node_name}] No previous generation found in state. Ending turn."
+        )
+        return {}  # Retorna dict vazio, não sobrescreve 'generation'
+
+    logger.debug(
+        f"[{node_name}] Generating transition hook after response: '{previous_generation[:50]}...'"
+    )
+
+    # --- Prompt para gerar APENAS a pergunta de transição ---
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um assistente de vendas que acabou de responder à pergunta do cliente.
+                Sua tarefa agora é fazer uma **transição suave** para retomar o controle e continuar a investigação (Estágio Atual: {current_stage}).
+
+                **Contexto:**
+                Pergunta do Cliente: {last_human_message}
+                Sua Resposta Anterior (Resumo): {last_agent_response}
+
+                **Instruções:**
+                1.  **Reconheça (Opcional):** Comece com uma frase curta confirmando se a resposta anterior foi útil (ex: "Isso ajudou a esclarecer?", "Fez sentido?").
+                2.  **Conecte e Pergunte:** Faça UMA pergunta relevante que:
+                    *   Se conecte à **resposta que você deu** (ex: "Qual dessas funcionalidades mais te interessou?") OU
+                    *   Se conecte à **pergunta original do cliente** (ex: "Além disso que perguntei, qual era o principal desafio que você tinha em mente?") OU
+                    *   Seja uma pergunta de **Problema ou Implicação SPIN** apropriada para o estágio de Investigação.
+                3.  **Seja Natural e Conciso:** Evite perguntas genéricas demais. Tente fazer a conversa fluir.
+                4.  **Formatação:** Use formatação WhatsApp sutilmente, se necessário (ex: *negrito* para um termo chave na pergunta).
+
+                Gere APENAS a frase de reconhecimento (opcional) + a pergunta de transição.""",
+            ),
+        ]
+    )
+
+    parser = StrOutputParser()
+    chain = prompt_template | llm_fast_instance | parser
+
+    try:
+        transition_question = await chain.ainvoke(
+            {
+                "current_stage": current_stage or SALES_STAGE_INVESTIGATION,
+                "last_human_message": last_human_message or "N/A",
+                "last_agent_response": previous_generation,  # Passa a resposta anterior
+            }
+        )
+        transition_question = transition_question.strip()
+
+        if not transition_question or not transition_question.endswith("?"):
+            logger.warning(
+                f"[{node_name}] LLM generated invalid transition: '{transition_question}'. Skipping transition."
+            )
+            # Se não gerar pergunta, a 'generation' final será apenas a resposta RAG
+            return {}  # Não modifica o estado
+
+        logger.info(
+            f"[{node_name}] Generated transition question: '{transition_question}'"
+        )
+
+        # --- COMBINA a resposta anterior com a nova pergunta ---
+        final_response_text = f"{previous_generation}\n\n{transition_question}"
+        # --- FIM COMBINAÇÃO ---
+
+        ai_message = AIMessage(content=final_response_text)  # Mensagem única combinada
+
+        # Atualiza 'generation' com o texto combinado e 'messages' com a msg combinada
+        return {
+            "generation": final_response_text,  # <-- Sobrescreve com texto combinado
+            "messages": [ai_message],  # <-- Adiciona a mensagem combinada
+            "error": None,
+        }
+
+    except Exception as e:
+        logger.exception(f"[{node_name}] Error generating transition question: {e}")
+        # Se falhar, a 'generation' do nó anterior (resposta RAG) permanece
+        return {"error": f"Transition generation failed: {e}"}

@@ -39,6 +39,7 @@ try:
         retrieve_knowledge_node,
         generate_response_node,
         present_capability_node,  # Import the presentation node
+        transition_after_answer_node,
     )
 
     CORE_NODES_AVAILABLE = True
@@ -234,36 +235,78 @@ def route_after_classification(
     "invoke_spin_subgraph",
     "invoke_straight_line_subgraph",
     "present_capability",
-    "retrieve_knowledge",
+    "retrieve_knowledge",  # Rota RAG padrão
     "generate_rapport",
     "__end__",
 ]:
+    """
+    Determines the next node after initial classification.
+    Prioritizes RAG for direct questions before entering specific sales flows.
+    """
     intent = state.get("intent")
     stage = state.get("current_sales_stage")
     error = state.get("error")
+    input_msg = state.get(
+        "input_message", ""
+    ).lower()  # Pega a última mensagem para análise simples
     log_prefix = "[Router: After Classification]"
     logger.debug(f"{log_prefix} Intent='{intent}', Stage='{stage}', Error='{error}'")
 
     if error and "Classification failed" in error:
+        logger.error(f"{log_prefix} Classification failed. Ending.")
         return END
 
+    # 1. Respostas Simples Primeiro
     if intent == "Greeting":
-        logger.debug(f"{log_prefix} Routing to: generate_rapport")
+        logger.debug(f"{log_prefix} Intent is Greeting. Routing to: generate_rapport")
         return "generate_rapport"
-    elif stage == SALES_STAGE_INVESTIGATION:
-        logger.debug(f"{log_prefix} Routing to: invoke_spin_subgraph")
+
+    # 2. Perguntas Diretas -> Tentar RAG Primeiro
+    # Se a intenção foi classificada como Pergunta OU contém palavras interrogativas comuns
+    # E NÃO estamos explicitamente em um estágio avançado como Closing/Objection (ainda não implementado)
+    is_direct_question = intent == "Question"  # or any(
+    # kw in input_msg for kw in ["como", "qual", "onde", "quando", "quanto", "?"]
+    # )
+    is_early_stage = stage in [
+        None,
+        SALES_STAGE_OPENING,
+        SALES_STAGE_INVESTIGATION,
+        SALES_STAGE_UNKNOWN,
+    ]  # Adicione outros estágios onde RAG é preferível
+
+    if is_direct_question and is_early_stage:
+        logger.debug(
+            f"{log_prefix} Intent is Question in early stage. Routing to: retrieve_knowledge (RAG)"
+        )
+        # Define o estágio como Investigation se ainda não estiver, pois estamos respondendo perguntas
+        state["current_sales_stage"] = SALES_STAGE_INVESTIGATION
+        return "retrieve_knowledge"  # Tenta responder com RAG
+
+    # 3. Lógica de Estágio Específico (SPIN, Straight Line, etc.)
+    # Só entra aqui se NÃO for uma saudação ou pergunta direta inicial
+    if stage == SALES_STAGE_INVESTIGATION:
+        # Se já estamos em Investigação e NÃO foi uma pergunta direta respondível por RAG,
+        # então provavelmente queremos fazer uma pergunta SPIN.
+        logger.debug(
+            f"{log_prefix} Stage is Investigation (not direct question). Routing to: invoke_spin_subgraph"
+        )
         return "invoke_spin_subgraph"
     elif stage == SALES_STAGE_PRESENTATION:
-        # Após SPIN identificar necessidade, classificador pode colocar aqui.
-        # Antes de apresentar, vamos checar/construir certeza.
         logger.debug(
-            f"{log_prefix} Stage is Presentation, routing to: invoke_straight_line_subgraph"
+            f"{log_prefix} Stage is Presentation. Routing to: invoke_straight_line_subgraph"
         )
         return "invoke_straight_line_subgraph"
-    # Adicionar outras condições (Objection, Closing) depois
-    else:
-        logger.debug(f"{log_prefix} Routing to fallback: retrieve_knowledge")
-        return "retrieve_knowledge"
+    # Adicionar condições para outros estágios aqui...
+
+    # 4. Fallback Final
+    # Se nenhuma das condições acima for atendida, usa RAG como último recurso.
+    logger.debug(
+        f"{log_prefix} No specific route matched. Routing to fallback: retrieve_knowledge"
+    )
+    # Garante que o estágio seja definido para algo razoável se ainda for None/Opening
+    if stage in [None, SALES_STAGE_OPENING]:
+        state["current_sales_stage"] = SALES_STAGE_INVESTIGATION
+    return "retrieve_knowledge"
 
 
 # --- Conditional Routing Function AFTER SPIN Subgraph ---
@@ -386,6 +429,7 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     workflow.add_node("retrieve_knowledge", retrieve_knowledge_node)
     workflow.add_node("generate_response", generate_response_node)
     workflow.add_node("present_capability", present_capability_node)
+    workflow.add_node("transition_after_answer", transition_after_answer_node)
 
     # Subgraphs as Nodes
     workflow.add_node("invoke_spin_subgraph", spin_subgraph)
@@ -403,7 +447,8 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     # Static Edges
     workflow.add_edge("generate_rapport", END)
     workflow.add_edge("retrieve_knowledge", "generate_response")
-    workflow.add_edge("generate_response", END)
+    workflow.add_edge("generate_response", "transition_after_answer")
+    workflow.add_edge("transition_after_answer", END)
     workflow.add_edge(
         "present_capability", END
     )  # Para onde ir depois de apresentar? Talvez checar objeção/fechamento? Por enquanto, END.
