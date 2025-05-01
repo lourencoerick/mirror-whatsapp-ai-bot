@@ -177,10 +177,8 @@ async def setup_simulation_environment(
         contact_data = ContactCreate(
             name=SIMULATION_CONTACT_NAME,
             phone_number=SIMULATION_CONTACT_PHONE_NUMBER,  # Add phone if needed/required
-            # Add other fields from ContactCreate if necessary
+            is_simulation=True,
         )
-
-        contact_data.is_simulation = True
 
         sim_contact = await contact_repo.create_contact(
             db=session,
@@ -223,7 +221,7 @@ async def setup_simulation_environment(
             account_id=account.id,
             inbox_id=sim_inbox.id,
             contact_inbox_id=contact_inbox.id,
-            status=ConversationStatusEnum.OPEN,
+            status=ConversationStatusEnum.BOT,
         )
         if not sim_conversation or not sim_conversation.id:
             raise RuntimeError(

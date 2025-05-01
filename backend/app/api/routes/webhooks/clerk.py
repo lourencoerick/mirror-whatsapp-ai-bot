@@ -8,6 +8,7 @@ from fastapi import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from svix.webhooks import Webhook
 from loguru import logger
 
@@ -61,8 +62,10 @@ async def process_user_created(data: dict, db: AsyncSession):
     )
 
     try:
-        stmt_select = select(User).where(
-            User.provider == "clerk", User.uid == clerk_user_id
+        stmt_select = (
+            select(User)
+            .options(selectinload(User.account_users).selectinload(AccountUser.account))
+            .where(User.provider == "clerk", User.uid == clerk_user_id)
         )
         result = await db.execute(stmt_select)
         existing_user = result.scalars().first()
@@ -109,42 +112,51 @@ async def process_user_created(data: dict, db: AsyncSession):
                 f"Linking User {new_user.id} to Account {new_account.id} with role '{default_role}'"
             )
 
-            # -- Creating Simulation environment --
-            try:
-                logger.info(
-                    f"Attempting to set up simulation environment for Account {new_account.id}..."
-                )
-
-                sim_inbox, sim_contact, sim_convo = await setup_simulation_environment(
-                    session=db, account=new_account, user=new_user
-                )
-                logger.info(
-                    f"Simulation environment setup successful for Account {new_account.id}. "
-                    f"Inbox: {sim_inbox.id}, Contact: {sim_contact.id}, Conversation: {sim_convo.id}"
-                )
-            except Exception as sim_error:
-                logger.error(
-                    f"Failed to set up simulation environment for Account {new_account.id} "
-                    f"(User: {new_user.id}). Account/User creation will proceed. Error: {sim_error}",
-                    exc_info=True,  # Include stack trace
-                )
-                # Raise exception to trigger rollback
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"User/Account created, but simulation setup failed: {sim_error}",
-                ) from sim_error
-
-            await db.commit()
-
-            logger.info(
-                f"Successfully created and linked User {new_user.id} and Account {new_account.id} for Clerk ID {clerk_user_id}."
-            )
-
         else:
 
             logger.warning(
                 f"User with provider 'clerk' and uid {clerk_user_id} already exists (User ID: {existing_user.id}). Skipping creation."
             )
+
+        # -- Creating Simulation environment --
+        if existing_user:
+            simulation_setup_user = existing_user
+            simulation_setup_account = existing_user.account_users[0].account
+        else:
+            simulation_setup_user = new_user
+            simulation_setup_account = new_account
+
+        try:
+            logger.info(
+                f"Attempting to set up simulation environment for Account {simulation_setup_account.id}..."
+            )
+
+            sim_inbox, sim_contact, sim_convo = await setup_simulation_environment(
+                session=db,
+                account=simulation_setup_account,
+                user=simulation_setup_user,
+            )
+            logger.info(
+                f"Simulation environment setup successful for Account {simulation_setup_account.id}. "
+                f"Inbox: {sim_inbox.id}, Contact: {sim_contact.id}, Conversation: {sim_convo.id}"
+            )
+        except Exception as sim_error:
+            logger.error(
+                f"Failed to set up simulation environment for Account {simulation_setup_account.id} "
+                f"(User: {simulation_setup_user.id}). Account/User creation will proceed. Error: {sim_error}",
+                exc_info=True,  # Include stack trace
+            )
+            # Raise exception to trigger rollback
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"User/Account created, but simulation setup failed: {sim_error}",
+            ) from sim_error
+
+        await db.commit()
+
+        logger.info(
+            f"Successfully created and linked User {simulation_setup_user.id} and Account {simulation_setup_account.id} for Clerk ID {clerk_user_id}."
+        )
 
     except Exception as e:
         logger.exception(

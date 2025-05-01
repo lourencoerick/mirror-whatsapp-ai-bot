@@ -1,3 +1,4 @@
+# .github/workflows/deploy-backend.yml
 name: Build and Push Backend Docker Image
 
 on:
@@ -11,7 +12,6 @@ on:
       - "docker-compose.dev.yml"
       - ".github/workflows/deploy-backend.yml"
 
-  # Optional: Also trigger manually
   workflow_dispatch:
 
 jobs:
@@ -25,56 +25,50 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- GCP Authentication via WIF ---
-      - id: "auth"
-        uses: "google-github-actions/auth@v2"
+      - name: Authenticate GCP via WIF
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
           service_account: ${{ vars.GCP_SA_EMAIL }}
-          audience: "https://github.com/${{ github.github_org || github.repository_owner }}"
+          audience: https://github.com/${{ github.repository_owner }}
 
-      # --- Configure Docker and Authenticate with Artifact Registry ---
-      - name: Set up Docker Buildx
+      - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev # Use the GitHub environment variable/secret for the region
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
 
-      # --- Build and Push Image ---
-      - name: Build and Push Docker Image
+      - name: Build and Push Docker Image with Cache
         env:
-          # Use GitHub environment variables/secrets for these values
           GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID: ${{ vars.AR_REPO_ID }} # Ex: app-images-dev
+          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
           IMAGE_NAME: fastapi-backend
         run: |
-          IMAGE_TAG=${{ github.sha }} # Uses the commit SHA as tag
-          IMAGE_URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
+          TAG=${{ github.sha }}
+          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
 
-          echo "Building image: ${IMAGE_URL}:${IMAGE_TAG}"
-          docker build -t "${IMAGE_URL}:${IMAGE_TAG}" -t "${IMAGE_URL}:latest" -f ./Dockerfile . # Assuming Dockerfile is at the root
+          docker buildx build \
+            --push \
+            --cache-from type=gha \
+            --cache-to   type=gha,mode=max \
+            --tag         "$URL:$TAG" \
+            --tag         "$URL:latest" \
+            --file        ./Dockerfile \
+            .
 
-          echo "Pushing image: ${IMAGE_URL}:${IMAGE_TAG}"
-          docker push "${IMAGE_URL}:${IMAGE_TAG}"
-
-          echo "Pushing image: ${IMAGE_URL}:latest"
-          docker push "${IMAGE_URL}:latest"
-
-      # --- Optional: Deploy on Cloud Run ---
       - name: Deploy to Cloud Run
         env:
-          # Use GitHub environment variables/secrets for these values
           GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID: ${{ vars.AR_REPO_ID }} # Ex: app-images-dev
+          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
           IMAGE_NAME: fastapi-backend
         run: |
           IMAGE_URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}:latest"
           gcloud run deploy fastapi-backend-dev \
-            --image "$IMAGE_URL" \
-            --region "$GCP_REGION" \
-            --platform managed \
+            --image           "$IMAGE_URL" \
+            --region          "$GCP_REGION" \
+            --platform        managed \
             --service-account "${{ secrets.BACKEND_API_SA_EMAIL }}" \
-            --project "$GCP_PROJECT_ID" \
+            --project         "$GCP_PROJECT_ID" \
             --quiet

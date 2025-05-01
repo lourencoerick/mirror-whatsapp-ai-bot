@@ -41,3 +41,5 @@ RUN chmod +x /start.sh
 
 # Set the default user command
 CMD ["/start.sh"]
+
+
