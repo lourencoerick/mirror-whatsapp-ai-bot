@@ -17,7 +17,7 @@ from langchain_core.messages import (
 )
 
 from loguru import logger
-
+from app.services.ai_reply.prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
 
 SYSTEM_MESSAGE_TEMPLATE = """
 You are an AI Sales Assistant for '{company_name}'.
@@ -46,6 +46,8 @@ Delivery/Pickup Options:
 
 Communication Guidelines:
 {communication_guidelines}
+
+{formatting_instructions}
 --- End Company Profile Information ---
 
 **Instructions:**
@@ -166,6 +168,7 @@ def build_llm_prompt_messages(
                 else "If you cannot answer the query, politely state that you cannot help with that specific request."
             ),
             "retrieved_knowledge": knowledge_text,
+            "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
         }
 
         all_input_vars = {
