@@ -8,6 +8,13 @@ from app.services.queue.redis_queue import RedisQueue
 from app.services.sender.evolution import send_message as evolution_send_message
 from app.services.repository import message as message_repo
 
+from app.services.repository.message import (
+    delete_messages_by_conversation,
+)
+from app.config import get_settings, Settings
+
+settings: Settings = get_settings()
+
 
 class ResponseSender:
     """
@@ -139,8 +146,18 @@ class ResponseSender:
 
                 return
 
+            message_content = message.content
+            phone_number = message.contact.phone_number
+
+            if message_content == settings.RESET_MESSAGE_TRIGGER:
+                message_content = (
+                    message_content + " Ativado! Deleção do histórico feito!"
+                )
+
             response = await evolution_send_message(
-                message=message, inbox=message.inbox
+                message_content=message_content,
+                phone_number=phone_number,
+                inbox=message.inbox,
             )
 
             external_id = response.get("key", {}).get("id")
@@ -158,6 +175,14 @@ class ResponseSender:
             logger.info(
                 f"[sender] Message {message.id} status updated to '{status_from_provider}' based on provider response."
             )
+
+            if message_content == settings.RESET_MESSAGE_TRIGGER:
+                await delete_messages_by_conversation(
+                    db=db, conversation_id=message.conversation_id
+                )
+                logger.info(
+                    "[sender] Deleting messages for testing bot agent from no history."
+                )
 
         except httpx.HTTPError as e:
             message.status = "failed"

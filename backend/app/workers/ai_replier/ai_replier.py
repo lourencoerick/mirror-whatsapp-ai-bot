@@ -395,28 +395,35 @@ async def handle_ai_reply_request(
                 )
 
                 # --- Invoke Graph ---
-                logger.info(f"{log_prefix} Invoking reply graph with checkpointer...")
-                final_state = await compiled_reply_graph.ainvoke(
-                    current_input, config={**graph_config, "recursion_limit": 50}
-                )
 
-                logger.info(f"{log_prefix} Reply graph execution finished.")
-                logger.trace(
-                    f"{log_prefix} Final graph state from checkpointer: {final_state}"
-                )
+                if last_db_message.content.lower() == settings.RESET_MESSAGE_TRIGGER:
+                    graph_error = None
+                    ai_response_text = settings.RESET_MESSAGE_TRIGGER
+                else:
+                    logger.info(
+                        f"{log_prefix} Invoking reply graph with checkpointer..."
+                    )
+                    final_state = await compiled_reply_graph.ainvoke(
+                        current_input, config={**graph_config, "recursion_limit": 50}
+                    )
 
-                # --- Process Graph Output ---
-                graph_error = final_state.get("error")
-                ai_response_text = final_state.get("generation")
+                    logger.info(f"{log_prefix} Reply graph execution finished.")
+                    logger.trace(
+                        f"{log_prefix} Final graph state from checkpointer: {final_state}"
+                    )
 
-                if graph_error:
-                    raise RuntimeError(f"Graph failed: {graph_error}")
-                if not ai_response_text:
-                    raise ValueError("Graph generated no response.")
+                    # --- Process Graph Output ---
+                    graph_error = final_state.get("error")
+                    ai_response_text = final_state.get("generation")
 
-                logger.success(
-                    f"{log_prefix} Graph generated response: '{ai_response_text[:100]}...'"
-                )
+                    if graph_error:
+                        raise RuntimeError(f"Graph failed: {graph_error}")
+                    if not ai_response_text:
+                        raise ValueError("Graph generated no response.")
+
+                    logger.success(
+                        f"{log_prefix} Graph generated response: '{ai_response_text[:100]}...'"
+                    )
 
                 # --- Create Outgoing Message ---
                 logger.debug(f"{log_prefix} Creating outgoing message record...")

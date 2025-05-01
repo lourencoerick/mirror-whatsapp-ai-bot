@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     OPENAI_TEMPERATURE: int = 0
 
     # -- Worker queues --
+    RESET_MESSAGE_TRIGGER: str = "Bot@123"
     RESPONSE_SENDER_QUEUE_NAME: str = "response_queue"
     AI_REPLY_QUEUE_NAME: str = "ai_reply_queue"
     MESSAGE_QUEUE_NAME: str = "message_queue"
