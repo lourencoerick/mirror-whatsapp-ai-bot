@@ -181,7 +181,7 @@ AI_DELAY_BASE_SECONDS = float(os.getenv("AI_DELAY_BASE_SECONDS", "0.5"))
 AI_DELAY_PER_CHAR_SECONDS = float(os.getenv("AI_DELAY_PER_CHAR_SECONDS", "0.025"))
 AI_DELAY_RANDOM_SECONDS = float(os.getenv("AI_DELAY_RANDOM_SECONDS", "1.5"))
 AI_DELAY_MIN_SECONDS = float(os.getenv("AI_DELAY_MIN_SECONDS", "0.5"))
-AI_DELAY_MAX_SECONDS = float(os.getenv("AI_DELAY_MAX_SECONDS", "5.0"))
+AI_DELAY_MAX_SECONDS = float(os.getenv("AI_DELAY_MAX_SECONDS", "0.5"))
 CONVERSATION_HISTORY_LIMIT = 20
 
 # ==============================================================================
