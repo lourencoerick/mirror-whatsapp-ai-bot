@@ -94,8 +94,8 @@ except ImportError:
     AsyncSession = None
     async_sessionmaker = None
 
+from app.services.ai_reply.prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
 from trustcall import create_extractor
-
 
 # --- Pydantic Schema for Certainty Assessment Output ---
 from pydantic import BaseModel, Field, conint
@@ -409,46 +409,51 @@ async def generate_certainty_statement_node(
 
     messages = state.get("messages", [])
     profile_dict = state.get("company_profile")
-    focus = state.get("certainty_focus")
-    context = state.get("retrieved_context")
+    focus = state.get("certainty_focus")  # "product", "agent", or "company"
+    context = state.get("retrieved_context")  # RAG context specific to the focus
     llm_primary_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
         "llm_primary_instance"
     )
 
-    # --- Validations ---
+    # --- Validações ---
     if not llm_primary_instance:
         return {"error": "Certainty generation failed: LLM unavailable."}
     if not focus:
-        return {
-            "error": "Certainty generation failed: Focus not set."
-        }  # Should be caught by router
-    if not profile_dict or not isinstance(profile_dict, dict):
+        return {"error": "Certainty generation failed: Focus not set."}
+    if not profile_dict:
         return {"error": "Certainty generation failed: Missing profile dict."}
 
     logger.debug(
         f"[{node_name}] Generating statement for focus: {focus}. Context available: {bool(context)}"
     )
 
-    # --- Prompt for Certainty Statement ---
     prompt_template = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                """Você é um assistente de vendas de alta performance, mestre na técnica Linha Reta. Seu objetivo é construir CERTEZA na mente do cliente.
+                """Você é um assistente de vendas de alta performance, mestre na técnica Linha Reta. Seu objetivo é construir CERTEZA na mente do cliente de forma CONVERSACIONAL e NATURAL.
 O foco atual é aumentar a certeza sobre: **{focus}**.
-Use o CONTEXTO ADICIONAL (se disponível) e o HISTÓRICO para gerar uma declaração CURTA, CONFIANTE e PERSUASIVA que reforce a certeza nesta área específica. Use um tom {sales_tone}.
-Incorpore padrões de linguagem que transmitam autoridade e confiança, mas sem ser arrogante.
-NÃO faça perguntas agora, apenas faça a declaração para construir certeza.
+
+Instruções:
+1.  **Conecte-se à Última Mensagem:** Comece com uma frase curta que mostre que você ouviu a última mensagem do cliente. Exemplos: "Entendo sua preocupação sobre X...", "Faz sentido o que você disse sobre Y...", "Com base no seu interesse em Z...".
+2.  **Gere a Declaração de Certeza:** Crie uma declaração **específica** para o foco '{focus}'.
+    *   Se foco='product': Destaque um benefício chave, um resultado comprovado ou um diferencial relevante (use o CONTEXTO ADICIONAL se disponível). Ex: "...e é exatamente por isso que [Nome do Produto] foi projetado para [resolver benefício], muitos clientes veem [resultado X]."
+    *   Se foco='agent': Transmita expertise e confiança. Ex: "...e pode ficar tranquilo, nossa equipe tem vasta experiência em [área relevante] e já ajudou empresas como a sua a..." ou "Com certeza, posso te guiar nesse processo, já implementamos isso com sucesso para..." (Use o CONTEXTO ADICIONAL se tiver depoimentos/casos).
+    *   Se foco='company': Reforce a credibilidade e reputação. Ex: "...e a [Nome da Empresa] já está há X anos no mercado, sendo reconhecida por [ponto forte]..." (Use o CONTEXTO ADICIONAL se tiver informações da empresa).
+3.  **Seja Conciso e Confiante:** Use linguagem clara, direta e que transmita segurança, mas evite jargões ou exageros. Mantenha o tom {sales_tone}.
+4.  **NÃO FAÇA PERGUNTAS:** O objetivo é fazer uma afirmação para construir certeza. Termine a declaração.
+
+{formatting_instructions} 
 
 PERFIL DA EMPRESA: {company_name}
 
 CONTEXTO ADICIONAL (Use se relevante para o foco '{focus}'):
 {additional_context}
 
-HISTÓRICO RECENTE:
+HISTÓRICO RECENTE (Últimas mensagens):
 {chat_history}
 
-Instrução: Gere a declaração de certeza focada em '{focus}'.""",
+Instrução Final: Gere a resposta conectada e a declaração de certeza focada em '{focus}'.""",
             ),
         ]
     )
@@ -463,6 +468,16 @@ Instrução: Gere a declaração de certeza focada em '{focus}'.""",
     chain = prompt_template | llm_primary_instance | parser
 
     try:
+        profile = CompanyProfileSchema.model_validate(
+            profile_dict
+        )  # Revalida para acesso fácil
+    except Exception:
+        profile = None  # Lida com erro se a validação falhar
+
+    if not profile:  # Checagem adicional
+        return {"error": "Certainty generation failed: Invalid profile data."}
+
+    try:
         generated_statement = await chain.ainvoke(
             {
                 "focus": focus,
@@ -472,8 +487,9 @@ Instrução: Gere a declaração de certeza focada em '{focus}'.""",
                     else "Nenhuma informação adicional específica recuperada."
                 ),
                 "chat_history": formatted_history if formatted_history else "N/A",
-                "company_name": profile_dict.get("company_name", "N/A"),
-                "sales_tone": profile_dict.get("sales_tone", "confiante e prestativo"),
+                "company_name": profile.company_name or "N/A",
+                "sales_tone": profile.sales_tone or "profissional e confiante",
+                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
             }
         )
         generated_statement = generated_statement.strip()
@@ -485,7 +501,6 @@ Instrução: Gere a declaração de certeza focada em '{focus}'.""",
             f"[{node_name}] Generated certainty statement: '{generated_statement[:100]}...'"
         )
         ai_message = AIMessage(content=generated_statement)
-        # Update messages list and potentially clear context used for this statement
         return {
             "generation": generated_statement,
             "messages": [ai_message],
@@ -495,8 +510,9 @@ Instrução: Gere a declaração de certeza focada em '{focus}'.""",
         }
 
     except Exception as e:
+        # ... (Fallback como antes) ...
         logger.exception(f"[{node_name}] Error generating certainty statement: {e}")
-        fallback = f"Entendo sua perspectiva. Sobre {focus}, posso afirmar que [afirmação genérica positiva]."
+        fallback = f"Entendo. Sobre {focus}, posso dizer que temos ótimos resultados."
         ai_message = AIMessage(content=fallback)
         return {
             "generation": fallback,
