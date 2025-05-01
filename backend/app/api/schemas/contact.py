@@ -29,6 +29,9 @@ class ContactBase(BaseModel):
     profile_picture_url: Optional[str] = Field(
         None, max_length=255, description="URL of the contact's profile picture"
     )
+    is_simulation: Optional[bool] = Field(
+        False, description="Flag indicating if the contact is set for simulation"
+    )
     additional_attributes: Optional[Dict[str, Any]] = Field(
         None, description="Additional custom key-value attributes"
     )

@@ -177,10 +177,8 @@ async def setup_simulation_environment(
         contact_data = ContactCreate(
             name=SIMULATION_CONTACT_NAME,
             phone_number=SIMULATION_CONTACT_PHONE_NUMBER,  # Add phone if needed/required
-            # Add other fields from ContactCreate if necessary
+            is_simulation=True,
         )
-
-        contact_data.is_simulation = True
 
         sim_contact = await contact_repo.create_contact(
             db=session,
