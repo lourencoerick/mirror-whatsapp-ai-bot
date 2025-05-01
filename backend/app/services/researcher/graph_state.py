@@ -39,7 +39,7 @@ class ResearchState(TypedDict):
     combined_context: Optional[str]
     profile_draft: Optional[CompanyProfileSchema]
     missing_info_summary: Optional[str]
-    visited_urls: Annotated[Set[str], operator.add]
+    visited_urls: Annotated[Set[str], operator.or_]
     newly_found_links: List[LinkInfo]
     intial_url_found_links: List[LinkInfo]
     max_iterations: int
