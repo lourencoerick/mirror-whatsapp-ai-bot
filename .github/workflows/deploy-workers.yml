@@ -1,110 +1,163 @@
-name: Build and Push Worker Docker Images
+# .github/workflows/deploy-workers.yml
+name: Build, Push and Deploy Worker Images
 
 on:
   push:
-    branches:
-      - master
-    # dispara se mudar qualquer coisa de workers, Dockerfile ou o próprio workflow
+    branches: [master, refact/workers]
     paths:
-      - 'backend/app/workers/**'
-      - 'backend/app/workers/Dockerfile'
-      - '.github/workflows/deploy-workers.yml'
+      - "backend/app/workers/**"
+      - "backend/app/services/researcher/**"
+      - "backend/app/services/knowledge/**"
+      - "backend/app/services/ai_reply/**"
+      - "backend/app/workers/Dockerfile"
+      - ".github/workflows/deploy-workers.yml"
   workflow_dispatch:
 
+env:
+  DOCKERFILE_PATH: ./backend/app/workers/Dockerfile
+
 jobs:
-  # 1) Detecta alterações
+  # ─────────────────────────────────────────────────────────────
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      consumer:   ${{ steps.filter.outputs.consumer }}
-      response:   ${{ steps.filter.outputs.response_sender }}
-      batch:      ${{ steps.filter.outputs.batch_contacts }}
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+      needs_job: ${{ steps.build-matrix.outputs.needs_job }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Filtrar paths
-        uses: dorny/paths-filter@v2
+      - name: Filter paths
         id: filter
+        uses: dorny/paths-filter@v2
         with:
           filters: |
             consumer:
               - 'backend/app/workers/consumer/**'
             response_sender:
               - 'backend/app/workers/response_sender/**'
-            batch_contacts:
+            batch:
               - 'backend/app/workers/batch_contacts/**'
+              - 'backend/app/workers/researcher/**'
+              - 'backend/app/workers/knowledge_ingester/**'
+              - 'backend/app/services/researcher/**'
+              - 'backend/app/services/knowledge/**'
+            ai_replier:
+              - 'backend/app/workers/ai_replier/**'
+              - 'backend/app/services/ai_reply/**'
 
-  # 2) Build & Push (um único job, mas cada step só roda se o filtro pedir)
+      # Constrói JSON da matriz + flag needs_job
+      - name: Build matrix JSON
+        id: build-matrix
+        run: |
+          # mapas lógicos → nomes reais
+          declare -A IMG=(      [consumer]=worker-consumer
+                                [response_sender]=worker-response-sender
+                                [batch]=batch-arq-worker
+                                [ai_replier]=ai-replier-worker )
+
+          declare -A SA=(       [consumer]="${{ vars.WORKER_CONSUMER_SA_EMAIL }}"
+                                [response_sender]="${{ vars.WORKER_RESPONSE_SENDER_SA_EMAIL }}"
+                                [batch]="${{ vars.WORKER_BATCH_SA_EMAIL }}"
+                                [ai_replier]="${{ vars.WORKER_AI_REPLIER_SA_EMAIL }}" )
+
+          declare -A SRV=(      [consumer]="${{ vars.WORKER_CONSUMER_SERVICE_NAME }}"
+                                [response_sender]="${{ vars.WORKER_RESPONSE_SENDER_SERVICE_NAME }}"
+                                [batch]="${{ vars.WORKER_BATCH_SERVICE_NAME }}"
+                                [ai_replier]="${{ vars.WORKER_AI_REPLIER_SERVICE_NAME }}" )
+
+          json='{"include":['
+          first=true
+          needs_job=false
+
+          add_entry () {
+            [[ $first == false ]] && json+=','
+            json+='{"img":"'"${IMG[$1]}"'","sa":"'"${SA[$1]}"'","service":"'"${SRV[$1]}"'"}'
+            first=false
+            needs_job=true
+          }
+
+          [[ "${{ steps.filter.outputs.consumer }}"        == 'true' ]] && add_entry consumer
+          [[ "${{ steps.filter.outputs.response_sender }}" == 'true' ]] && add_entry response_sender
+          [[ "${{ steps.filter.outputs.batch }}"           == 'true' ]] && add_entry batch
+          [[ "${{ steps.filter.outputs.ai_replier }}"      == 'true' ]] && add_entry ai_replier
+
+          json+=']}'
+          echo "matrix=$json"      >> "$GITHUB_OUTPUT"
+          echo "needs_job=$needs_job" >> "$GITHUB_OUTPUT"
+
+  # ─────────────────────────────────────────────────────────────
   build-and-push:
     needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.needs_job == 'true' }}
     runs-on: ubuntu-latest
-    if: >
-      needs.detect-changes.outputs.consumer == 'true' ||
-      needs.detect-changes.outputs.response == 'true' ||
-      needs.detect-changes.outputs.batch == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     permissions:
       id-token: write
       contents: read
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # --- GCP Auth ---
-      - id: auth
-        uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
-          service_account:          ${{ vars.GCP_SA_EMAIL }}
-          audience:                 https://github.com/${{ github.github_org || github.repository_owner }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          audience: https://github.com/${{ github.repository_owner }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev
+      - name: Configure Docker → Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
 
-      # --- Consumer Worker ---
-      - name: Build & Push Consumer
-        if: ${{ needs.detect-changes.outputs.consumer == 'true' }}
+      - name: Build & Push ${{ matrix.img }}
         env:
-          GCP_REGION:    ${{ vars.GCP_REGION }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID:     ${{ vars.AR_REPO_ID }}
-          IMAGE_NAME:     worker-consumer
+          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
         run: |
           TAG=${{ github.sha }}
-          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
-          docker push "${URL}:${TAG}"
-          docker push "${URL}:latest"
+          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${{ matrix.img }}"
+          docker buildx build -t "$URL:$TAG" -t "$URL:latest" \
+            -f "$DOCKERFILE_PATH" . \
+            --push \
+            --cache-to   type=gha,mode=max \
+            --cache-from type=gha
 
-      # --- Response Sender Worker ---
-      - name: Build & Push Response Sender
-        if: ${{ needs.detect-changes.outputs.response == 'true' }}
-        env:
-          GCP_REGION:    ${{ vars.GCP_REGION }}
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID:     ${{ vars.AR_REPO_ID }}
-          IMAGE_NAME:     worker-response-sender
-        run: |
-          TAG=${{ github.sha }}
-          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
-          docker push "${URL}:${TAG}"
-          docker push "${URL}:latest"
+  # ─────────────────────────────────────────────────────────────
+  deploy-workers:
+    needs: [detect-changes, build-and-push]
+    if: ${{ needs.detect-changes.outputs.needs_job == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
+          service_account: ${{ vars.GCP_SA_EMAIL }}
+          audience: https://github.com/${{ github.repository_owner }}
 
-      # --- ARQ / Batch Contacts Worker ---
-      - name: Build & Push Batch Contacts
-        if: ${{ needs.detect-changes.outputs.batch == 'true' }}
+      - name: Deploy ${{ matrix.service }}
         env:
-          GCP_REGION:    ${{ vars.GCP_REGION }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
           GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          AR_REPO_ID:     ${{ vars.AR_REPO_ID }}
-          IMAGE_NAME:     worker-arq
+          AR_REPO_ID: ${{ vars.AR_REPO_ID }}
         run: |
-          TAG=${{ github.sha }}
-          URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${IMAGE_NAME}"
-          docker build -t "${URL}:${TAG}" -t "${URL}:latest" -f ./backend/app/workers/Dockerfile .
-          docker push "${URL}:${TAG}"
-          docker push "${URL}:latest"
+          IMAGE_URL="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO_ID}/${{ matrix.img }}:latest"
+          gcloud run deploy "${{ matrix.service }}" \
+            --image "$IMAGE_URL" \
+            --region "$GCP_REGION" \
+            --platform managed \
+            --service-account "${{ matrix.sa }}" \
+            --project "$GCP_PROJECT_ID" \
+            --quiet
+
+# Evita builds/deploys simultâneos do mesmo branch
+concurrency:
+  group: deploy-workers-${{ github.ref }}
+  cancel-in-progress: true

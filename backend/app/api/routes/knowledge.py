@@ -50,12 +50,15 @@ from app.api.schemas.knowledge_document import (
     PaginatedKnowledgeDocumentRead,
 )
 
+from app.config import get_settings, Settings
 
-router = APIRouter()
+settings: Settings = get_settings()
 
 
 KNOWLEDGE_TASK_NAME = "process_knowledge_source"
-KNOWLEDGE_QUEUE_NAME = "knowledge_ingestion_queue"
+BATCH_ARQ_QUEUE_NAME = settings.BATCH_ARQ_QUEUE_NAME
+
+router = APIRouter()
 
 
 # --- Endpoint: Upload File ---
@@ -189,7 +192,7 @@ async def upload_knowledge_file(
             source_uri=gcs_uri,
             source_identifier=original_filename,
             document_id=document_id,
-            _queue_name=KNOWLEDGE_QUEUE_NAME,
+            _queue_name=BATCH_ARQ_QUEUE_NAME,
         )
         if not job:
             raise RuntimeError("arq_pool.enqueue_job returned None.")
@@ -308,7 +311,7 @@ async def add_knowledge_url(
             source_uri=url_to_ingest,
             source_identifier=source_identifier,
             document_id=document_id,
-            _queue_name=KNOWLEDGE_QUEUE_NAME,
+            _queue_name=BATCH_ARQ_QUEUE_NAME,
         )
         if not job:
             raise RuntimeError("arq_pool.enqueue_job returned None.")
@@ -426,7 +429,7 @@ async def add_knowledge_text(
             source_uri=text_content,
             source_identifier=source_identifier,
             document_id=document_id,
-            _queue_name=KNOWLEDGE_QUEUE_NAME,
+            _queue_name=BATCH_ARQ_QUEUE_NAME,
         )
         if not job:
             raise RuntimeError("arq_pool.enqueue_job returned None.")

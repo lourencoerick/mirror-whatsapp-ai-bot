@@ -23,7 +23,7 @@ from app.services.helper.evolution_instance import (
     fetch_evolution_connection_state,
 )
 
-from app.workers.batch_contacts.tasks.evolution_whatsapp_sync import (
+from app.workers.batch.contacts.tasks.evolution_whatsapp_sync import (
     ARQ_TASK_NAME as SYNC_WAPP_CONTACT_ARQ_TASK_NAME,
 )
 from app.core.arq_manager import get_arq_pool
@@ -33,6 +33,7 @@ from app.services.helper.websocket import publish_to_instance_ws
 from app.config import Settings, get_settings
 
 settings: Settings = get_settings()
+BATCH_ARQ_QUEUE_NAME = settings.BATCH_ARQ_QUEUE_NAME
 router = APIRouter()
 
 
@@ -420,6 +421,7 @@ async def trigger_whatsapp_contact_sync(
             SYNC_WAPP_CONTACT_ARQ_TASK_NAME,
             instance_id=instance_id,
             account_id=account_id,
+            _queue_name=BATCH_ARQ_QUEUE_NAME,
         )
         if not arq_task:
             # This might happen if the connection is temporarily lost or queue full

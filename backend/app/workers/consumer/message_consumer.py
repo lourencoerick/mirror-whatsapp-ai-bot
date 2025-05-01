@@ -47,11 +47,15 @@ from app.services.helper.websocket import (
     publish_to_account_conversations_ws,
 )
 
+from app.config import get_settings, Settings
+
+settings: Settings = get_settings()
+
 
 # --- Configuration ---
-MESSAGE_QUEUE_NAME = "message_queue"
 AI_REPLY_TASK_NAME = "handle_ai_reply_request"
-AI_REPLY_QUEUE_NAME = "ai_reply_queue"
+AI_REPLY_QUEUE_NAME = settings.AI_REPLY_QUEUE_NAME
+MESSAGE_QUEUE_NAME = settings.MESSAGE_QUEUE_NAME
 
 
 class MessageConsumer:
@@ -170,7 +174,7 @@ class MessageConsumer:
                 logger.exception(
                     f"[consumer] Unexpected failure processing message loop: {type(e).__name__} - {e}"
                 )
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.1)
 
         # logger.info("[consumer] Shutting down...")
         # await close_arq_pool()

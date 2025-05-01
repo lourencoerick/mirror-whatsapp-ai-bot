@@ -24,8 +24,12 @@ from app.api.schemas.research import (
 router = APIRouter()
 
 # Define the name of the Arq task function as defined in the worker
+from app.config import get_settings, Settings
+
+settings: Settings = get_settings()
+
 RESEARCH_TASK_NAME = "run_profile_research"
-RESEARCH_QUEUE_NAME = "researcher_queue"
+BATCH_ARQ_QUEUE_NAME = settings.BATCH_ARQ_QUEUE_NAME
 
 
 @router.post(
@@ -63,7 +67,7 @@ async def start_research_task(
             RESEARCH_TASK_NAME,
             url=url_to_research,
             account_id=account_id,
-            _queue_name=RESEARCH_QUEUE_NAME,
+            _queue_name=BATCH_ARQ_QUEUE_NAME,
         )
 
         if job:

@@ -13,8 +13,8 @@ redis_settings = RedisSettings(
 )
 
 # --- Task Definitions ---
-from app.workers.batch_contacts.tasks.contact_importer import process_contact_csv_task
-from app.workers.batch_contacts.tasks.evolution_whatsapp_sync import (
+from app.workers.batch.contacts.tasks.contact_importer import process_contact_csv_task
+from app.workers.batch.contacts.tasks.evolution_whatsapp_sync import (
     sync_evolution_whatsapp_contacts_task,
 )
 

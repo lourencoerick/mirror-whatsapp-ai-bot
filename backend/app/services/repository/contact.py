@@ -186,8 +186,9 @@ async def create_contact(
     """
     # Verify if the is_simulation was passed to the contact_data
     is_simulation = getattr(contact_data, "is_simulation", False)
-
-    normalized_phone = normalize_phone_number(contact_data.phone_number, is_simulation)
+    normalized_phone = normalize_phone_number(
+        phone_number=contact_data.phone_number, is_simulation=is_simulation
+    )
     if not normalized_phone:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -268,7 +269,10 @@ async def update_contact(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Phone number cannot be empty.",
             )
-        new_normalized_phone = normalize_phone_number(new_phone_number)
+        is_simulation = getattr(update_dict, "is_simulation", False)
+        new_normalized_phone = normalize_phone_number(
+            phone_number=new_phone_number, is_simulation=is_simulation
+        )
         if not new_normalized_phone:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

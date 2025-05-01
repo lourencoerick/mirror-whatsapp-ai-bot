@@ -21,7 +21,7 @@ settings = get_settings()
     retry=retry_if_exception_type(httpx.RequestError),
     reraise=True,
 )
-async def send_message(message: Message, inbox: Inbox) -> dict:
+async def send_message(message_content: str, phone_number: str, inbox: Inbox) -> dict:
     """
     Sends a text message using the Evolution API via HTTPX.
     Retries up to 3 times in case of connection-level failures.
@@ -40,8 +40,8 @@ async def send_message(message: Message, inbox: Inbox) -> dict:
         )
 
         payload = {
-            "number": message.contact.phone_number,
-            "text": message.content,
+            "number": phone_number,
+            "text": message_content,
         }
         headers = {
             "apikey": api_key,
