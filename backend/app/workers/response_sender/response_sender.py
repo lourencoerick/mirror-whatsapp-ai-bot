@@ -177,10 +177,7 @@ class ResponseSender:
                 f"[sender] Message {message.id} status updated to '{status_from_provider}' based on provider response."
             )
 
-            if (
-                message_content.content.lower().strip()
-                == settings.RESET_MESSAGE_TRIGGER
-            ):
+            if message.content.lower().strip() == settings.RESET_MESSAGE_TRIGGER:
                 thread_id_str = str(message.conversation_id)
                 await delete_messages_by_conversation(
                     db=db, conversation_id=message.conversation_id
