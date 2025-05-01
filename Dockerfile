@@ -1,37 +1,45 @@
 # DevContainer Base with Python 3.11
 # FROM mcr.microsoft.com/vscode/devcontainers/python:0-3.11-bullseye
-
-# syntax=docker/dockerfile:1.4
 FROM python:3.11-slim-bullseye
 
-# Evita buffers e interações no apt
 ENV PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive \
-    PIP_NO_CACHE_DIR=1
+    DEBIAN_FRONTEND=noninteractive
 
+# Set the working directory
 WORKDIR /workspace
 
-# 1) Instala deps de SO em uma camada só
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    build-essential cmake libsqlite3-dev \
-    openssh-client sqlite3 postgresql-client redis-tools \
-    && rm -rf /var/lib/apt/lists/*
+# Update system packages and install essential dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-client \
+    build-essential \
+    sqlite3 \
+    libsqlite3-dev \
+    cmake \
+    postgresql-client \
+    redis-tools && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2) Copia só o requirements e instala Python deps
-COPY backend/requirements.txt .
+# --- Python Dependencies Installation ---
+COPY ./backend/requirements.txt .
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip \
-    && pip install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 3) Copia todo o código depois (maximiza cache acima)
-COPY . .
 
-# 4) Entrypoint
-COPY backend/start.sh /start.sh
-RUN chmod +x /start.sh
+ENV PYTHONPATH /workspace/backend
 
+# --- Final Setup ---
+# Specify the port that the container will expose
 EXPOSE 8000
 
+# Copy the project files into the container
+COPY . .
+
+# --- Entrypoint Setup ---
+COPY ./backend/start.sh /start.sh
+RUN chmod +x /start.sh
+
+# Set the default user command
 CMD ["/start.sh"]
+
+
