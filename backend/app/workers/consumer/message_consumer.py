@@ -174,7 +174,7 @@ class MessageConsumer:
                 logger.exception(
                     f"[consumer] Unexpected failure processing message loop: {type(e).__name__} - {e}"
                 )
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.1)
 
         # logger.info("[consumer] Shutting down...")
         # await close_arq_pool()
