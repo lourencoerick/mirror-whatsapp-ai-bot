@@ -117,10 +117,11 @@ async def process_user_created(data: dict, db: AsyncSession):
 
         # -- Creating Simulation environment --
         simulation_setup_user = existing_user if existing_user else new_user
+        user_account = simulation_setup_user.account_users[0].account
 
         try:
             logger.info(
-                f"Attempting to set up simulation environment for Account {new_account.id}..."
+                f"Attempting to set up simulation environment for Account {user_account.id}..."
             )
 
             sim_inbox, sim_contact, sim_convo = await setup_simulation_environment(
@@ -129,13 +130,13 @@ async def process_user_created(data: dict, db: AsyncSession):
                 user=simulation_setup_user,
             )
             logger.info(
-                f"Simulation environment setup successful for Account {new_account.id}. "
+                f"Simulation environment setup successful for Account {user_account.id}. "
                 f"Inbox: {sim_inbox.id}, Contact: {sim_contact.id}, Conversation: {sim_convo.id}"
             )
         except Exception as sim_error:
             logger.error(
-                f"Failed to set up simulation environment for Account {new_account.id} "
-                f"(User: {new_user.id}). Account/User creation will proceed. Error: {sim_error}",
+                f"Failed to set up simulation environment for Account {user_account.id} "
+                f"(User: {simulation_setup_user.id}). Account/User creation will proceed. Error: {sim_error}",
                 exc_info=True,  # Include stack trace
             )
             # Raise exception to trigger rollback
@@ -147,7 +148,7 @@ async def process_user_created(data: dict, db: AsyncSession):
         await db.commit()
 
         logger.info(
-            f"Successfully created and linked User {new_user.id} and Account {new_account.id} for Clerk ID {clerk_user_id}."
+            f"Successfully created and linked User {simulation_setup_user.id} and Account {user_account.id} for Clerk ID {clerk_user_id}."
         )
 
     except Exception as e:
