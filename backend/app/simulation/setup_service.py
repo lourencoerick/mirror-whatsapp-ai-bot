@@ -221,7 +221,7 @@ async def setup_simulation_environment(
             account_id=account.id,
             inbox_id=sim_inbox.id,
             contact_inbox_id=contact_inbox.id,
-            status=ConversationStatusEnum.OPEN,
+            status=ConversationStatusEnum.BOT,
         )
         if not sim_conversation or not sim_conversation.id:
             raise RuntimeError(
