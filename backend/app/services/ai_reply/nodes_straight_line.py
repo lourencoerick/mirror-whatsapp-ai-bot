@@ -9,6 +9,7 @@ from .graph_state import (
     ConversationState,
     CompanyProfileSchema,
     BotAgentRead,
+    CERTAINTY_STATUS_STATEMENT_MADE,
 )
 
 # Import LLM and related components
@@ -489,6 +490,7 @@ Instrução: Gere a declaração de certeza focada em '{focus}'.""",
             "generation": generated_statement,
             "messages": [ai_message],
             "retrieved_context": None,
+            "certainty_status": CERTAINTY_STATUS_STATEMENT_MADE,
             "error": None,
         }
 
@@ -500,54 +502,6 @@ Instrução: Gere a declaração de certeza focada em '{focus}'.""",
             "generation": fallback,
             "messages": [ai_message],
             "retrieved_context": None,
+            "certainty_status": None,
             "error": f"Certainty generation failed: {e}",
         }
-
-
-# --- Conditional Routing Function (for within Straight Line subgraph) ---
-def check_straight_line_completion(
-    state: ConversationState,
-) -> Literal["continue_building_certainty", "proceed_to_next_phase"]:
-    """
-    Checks if certainty levels meet threshold to proceed or loop back.
-
-    Args:
-        state: Requires 'certainty_level'.
-
-    Returns:
-        Edge name: "continue_building_certainty" or "proceed_to_next_phase".
-    """
-    node_name = "check_straight_line_completion"
-    logger.info(f"--- Checking Node: {node_name} (Straight Line Subgraph) ---")
-    certainty_level = state.get("certainty_level")
-
-    if not certainty_level or not isinstance(certainty_level, dict):
-        logger.warning(
-            f"[{node_name}] Certainty levels invalid or missing. Proceeding."
-        )
-        return "proceed_to_next_phase"
-
-    # Check if *all* areas meet the threshold
-    all_met = all(
-        score >= CERTAINTY_THRESHOLD
-        for score in certainty_level.values()
-        if isinstance(score, int)
-    )
-    if all_met:
-        logger.info(
-            f"[{node_name}] All certainty levels meet threshold ({certainty_level}). Proceeding."
-        )
-        return "proceed_to_next_phase"
-    else:
-        logger.info(
-            f"[{node_name}] Certainty levels not fully met ({certainty_level}). Looping back."
-        )
-        # Before looping, check loop count to prevent infinite loops
-        loop_count = state.get("loop_count", 0)
-        if loop_count >= 2:  # Limit to e.g., 2 loops through certainty building
-            logger.warning(
-                f"[{node_name}] Certainty loop limit reached ({loop_count}). Proceeding despite low certainty."
-            )
-            return "proceed_to_next_phase"
-        else:
-            return "continue_building_certainty"

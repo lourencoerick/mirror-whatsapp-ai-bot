@@ -60,6 +60,12 @@ SPIN_TYPE_IMPLICATION = "Implication"
 SPIN_TYPE_NEED_PAYOFF = "NeedPayoff"
 
 
+CERTAINTY_STATUS_OK = "OK"  # Indicates certainty threshold met
+CERTAINTY_STATUS_STATEMENT_MADE = (
+    "StatementMade"  # Indicates a statement was made, awaiting response
+)
+
+
 class ConversationState(TypedDict):
     """
     Represents the evolving state during the AI reply generation process,
@@ -102,6 +108,7 @@ class ConversationState(TypedDict):
     certainty_level: Optional[Dict[str, int]]
     certainty_focus: Optional[str]
     proposed_solution_details: Optional[Dict[str, Any]]
+    certainty_status: Optional[str]
 
     # === Control & Metadata ===
     intent: Optional[str]

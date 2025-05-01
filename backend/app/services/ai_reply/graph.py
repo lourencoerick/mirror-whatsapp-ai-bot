@@ -13,6 +13,8 @@ try:
         SALES_STAGE_PRESENTATION,
         SALES_STAGE_OPENING,
         SALES_STAGE_UNKNOWN,
+        CERTAINTY_STATUS_OK,
+        CERTAINTY_STATUS_STATEMENT_MADE,
     )
 
     STATE_AVAILABLE = True
@@ -91,7 +93,6 @@ try:
         select_certainty_focus_node,
         retrieve_knowledge_for_certainty_node,
         generate_certainty_statement_node,
-        check_straight_line_completion,
     )
 
     STRAIGHT_LINE_NODES_AVAILABLE = True
@@ -113,14 +114,20 @@ except ImportError as e:
     async def generate_certainty_statement_node(state, config):
         return {}
 
-    def check_straight_line_completion(state):
-        return "proceed_to_next_phase"
-
 
 # --- Function to Create Straight Line Subgraph ---
 def create_straight_line_subgraph(checkpointer: Checkpointer) -> StateGraph:
     """
-    Builds the StateGraph for the Straight Line certainty building process.
+    Builds the StateGraph for a SINGLE PASS of the Straight Line certainty
+    building process. It assesses certainty, selects a focus (if needed),
+    retrieves knowledge, generates a statement, and then ENDS, indicating
+    its outcome via 'certainty_status' in the state.
+
+    Args:
+        checkpointer: The checkpointer instance for persistence.
+
+    Returns:
+        The compiled Straight Line subgraph.
     """
     if not STATE_AVAILABLE or not STRAIGHT_LINE_NODES_AVAILABLE:
         raise RuntimeError(
@@ -130,6 +137,7 @@ def create_straight_line_subgraph(checkpointer: Checkpointer) -> StateGraph:
     sl_workflow = StateGraph(ConversationState)
     logger.debug("Adding nodes to the Straight Line subgraph...")
 
+    # Nós do subgraph (como antes)
     sl_workflow.add_node("assess_certainty", assess_certainty_node)
     sl_workflow.add_node("select_focus", select_certainty_focus_node)
     sl_workflow.add_node(
@@ -137,38 +145,55 @@ def create_straight_line_subgraph(checkpointer: Checkpointer) -> StateGraph:
     )
     sl_workflow.add_node("generate_statement", generate_certainty_statement_node)
 
-    # --- Define Straight Line subgraph flow ---
+    # --- Define NOVO Fluxo Linear (sem loop interno) ---
     sl_workflow.set_entry_point("assess_certainty")
     sl_workflow.add_edge("assess_certainty", "select_focus")
+
+    # Função lambda para rotear após select_focus OU para atualizar status se OK
+    def route_or_set_status_after_focus(
+        state: ConversationState,
+    ) -> Literal["retrieve_certainty_knowledge", "__end__"]:
+        if state.get("certainty_focus") is None:
+            # Certeza OK, definir status e terminar subgraph
+            state["certainty_status"] = (
+                CERTAINTY_STATUS_OK  # Define o status diretamente (alternativa: nó dedicado)
+            )
+            logger.debug(
+                "[SL Subgraph Router] Certainty OK. Setting status and ending subgraph."
+            )
+            return END
+        else:
+            # Certeza precisa de reforço, continuar fluxo
+            logger.debug(
+                "[SL Subgraph Router] Certainty focus selected. Proceeding to retrieve knowledge."
+            )
+            # Limpa o status anterior, se houver
+            state["certainty_status"] = None
+            return "retrieve_certainty_knowledge"
 
     # Conditional Edge 1: After selecting focus
     sl_workflow.add_conditional_edges(
         "select_focus",
-        # Simple lambda to check if focus is None (certainty met) or set
-        lambda state: (
-            END
-            if state.get("certainty_focus") is None
-            else "retrieve_certainty_knowledge"
-        ),
+        route_or_set_status_after_focus,  # Usa a nova função lambda/lógica
         {
             "retrieve_certainty_knowledge": "retrieve_certainty_knowledge",
-            END: END,  # End subgraph if no focus needed
+            END: END,
         },
     )
 
     sl_workflow.add_edge("retrieve_certainty_knowledge", "generate_statement")
 
-    # Conditional Edge 2: After generating statement (Loop or End)
-    sl_workflow.add_conditional_edges(
-        "generate_statement",
-        check_straight_line_completion,  # Use the checking function
-        {
-            "continue_building_certainty": "assess_certainty",  # Loop back to assess again
-            "proceed_to_next_phase": END,  # End subgraph if certainty met or loop limit reached
-        },
-    )
+    # --- Nó generate_statement AGORA vai para END ---
+    # Precisamos garantir que ele atualize o certainty_status
+    # Vamos modificar o nó generate_statement para fazer isso
 
-    logger.info("Compiling the Straight Line subgraph with checkpointer...")
+    # Aresta final: Após gerar a declaração, o subgraph termina.
+    sl_workflow.add_edge("generate_statement", END)
+    # --- FIM NOVO Fluxo Linear ---
+
+    logger.info(
+        "Compiling the Straight Line subgraph (no internal loop) with checkpointer..."
+    )
     compiled_sl_graph = sl_workflow.compile(checkpointer=checkpointer)
     logger.info("Straight Line subgraph compiled successfully.")
     return compiled_sl_graph
@@ -254,6 +279,9 @@ def route_after_spin(
     explicit_need_identified = state.get("explicit_need_identified", False)
     spin_error = state.get("error")  # Check for errors within SPIN subgraph
 
+    if explicit_need_identified:
+        state["explicit_need_identified"] = False
+
     logger.debug(
         f"{log_prefix} Explicit Need Identified='{explicit_need_identified}', Error='{spin_error}'"
     )
@@ -265,14 +293,50 @@ def route_after_spin(
         return END
     elif explicit_need_identified:
         logger.debug(
-            f"{log_prefix} Explicit need identified. Routing to: present_capability"
+            f"{log_prefix} Explicit need identified. Routing to: invoke_straight_line_subgraph"
         )
-        return "present_capability"
+        return "invoke_straight_line_subgraph"
     else:
         # If no explicit need identified, it means a SPIN question was asked (or fallback occurred).
         # The graph turn ends here, waiting for the user's response.
         logger.debug(
             f"{log_prefix} SPIN question asked or fallback occurred. Ending current turn."
+        )
+        return END
+
+
+def route_after_straight_line(
+    state: ConversationState,
+) -> Literal["present_capability", "__end__"]:
+    """Roteia após o subgraph Straight Line, baseado no seu resultado ('certainty_status')."""
+    log_prefix = "[Router: After Straight Line]"
+    certainty_status = state.get("certainty_status")
+    sl_error = state.get("error")  # Verifica erros do SL
+
+    logger.debug(
+        f"{log_prefix} Certainty Status='{certainty_status}', Error='{sl_error}'"
+    )
+
+    # Limpa o status para a próxima execução (importante!)
+    state["certainty_status"] = None
+
+    if sl_error and "Certainty" in sl_error:
+        logger.error(
+            f"{log_prefix} Error during Straight Line: {sl_error}. Ending turn."
+        )
+        return END
+    elif certainty_status == CERTAINTY_STATUS_OK:
+        # Certeza atingiu o limiar ou já estava OK
+        logger.debug(f"{log_prefix} Certainty OK. Routing to Present Capability.")
+        return "present_capability"
+    elif certainty_status == CERTAINTY_STATUS_STATEMENT_MADE:
+        # Uma declaração foi feita, precisamos esperar a resposta do cliente
+        logger.debug(f"{log_prefix} Certainty statement made. Ending turn.")
+        return END
+    else:
+        # Caso inesperado (subgraph terminou sem definir status?)
+        logger.warning(
+            f"{log_prefix} Unknown state after Straight Line (Status: {certainty_status}). Ending turn."
         )
         return END
 
@@ -340,7 +404,9 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     workflow.add_edge("generate_rapport", END)
     workflow.add_edge("retrieve_knowledge", "generate_response")
     workflow.add_edge("generate_response", END)
-    # workflow.add_edge("present_capability", END) # Para onde ir depois de apresentar? Talvez checar objeção/fechamento? Por enquanto, END.
+    workflow.add_edge(
+        "present_capability", END
+    )  # Para onde ir depois de apresentar? Talvez checar objeção/fechamento? Por enquanto, END.
 
     # Conditional Edge 1: After Classification
     workflow.add_conditional_edges(
@@ -363,7 +429,7 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
         route_after_spin,  # Função inalterada por enquanto
         {
             # Se necessidade explícita foi identificada, vamos construir certeza antes de apresentar
-            "present_capability": "invoke_straight_line_subgraph",
+            "invoke_straight_line_subgraph": "invoke_straight_line_subgraph",
             END: END,  # Se fez pergunta, termina o turno
         },
     )
@@ -371,11 +437,14 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
 
     # Edge 3: After Straight Line Subgraph
     # Depois de construir certeza, apresentamos a capacidade
-    workflow.add_edge("invoke_straight_line_subgraph", "present_capability")
-    logger.debug(
-        "Added edge from 'invoke_straight_line_subgraph' to 'present_capability'."
+    workflow.add_conditional_edges(
+        "invoke_straight_line_subgraph",  # Nó de origem
+        route_after_straight_line,  # Nova função de roteamento
+        {
+            "present_capability": "present_capability",  # Vai apresentar se certeza OK
+            END: END,  # Termina o turno se fez declaração ou erro
+        },
     )
-
     # Edge 4: After Present Capability
     # O que fazer depois de apresentar? Por enquanto, termina. No futuro, checar objeções/fechamento.
     workflow.add_edge("present_capability", END)
