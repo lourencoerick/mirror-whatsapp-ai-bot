@@ -180,8 +180,8 @@ RESPONSE_SENDER_QUEUE_NAME = settings.RESPONSE_SENDER_QUEUE_NAME
 AI_DELAY_BASE_SECONDS = float(os.getenv("AI_DELAY_BASE_SECONDS", "0.5"))
 AI_DELAY_PER_CHAR_SECONDS = float(os.getenv("AI_DELAY_PER_CHAR_SECONDS", "0.025"))
 AI_DELAY_RANDOM_SECONDS = float(os.getenv("AI_DELAY_RANDOM_SECONDS", "1.5"))
-AI_DELAY_MIN_SECONDS = float(os.getenv("AI_DELAY_MIN_SECONDS", "0.5"))
-AI_DELAY_MAX_SECONDS = float(os.getenv("AI_DELAY_MAX_SECONDS", "0.5"))
+AI_DELAY_MIN_SECONDS = float(os.getenv("AI_DELAY_MIN_SECONDS", "0.02"))
+AI_DELAY_MAX_SECONDS = float(os.getenv("AI_DELAY_MAX_SECONDS", "0.03"))
 CONVERSATION_HISTORY_LIMIT = 20
 
 # ==============================================================================
@@ -223,6 +223,100 @@ def _format_db_history_to_lc(db_messages: List[Message]) -> List[BaseMessage]:
 # ==============================================================================
 # Arq Task Definition: handle_ai_reply_request
 # ==============================================================================
+
+
+async def _process_one_message(
+    db: AsyncSession,
+    account_id: UUID,
+    trigger_message_id: str,
+    task_id: str,
+    agent_config_db: Dict[str, Any],
+    final_state: Dict[str, Any],
+    conversation: Conversation,
+    ai_response_text: str,
+):
+    log_prefix = f"[AIReplyTask:{task_id}|Conv:{conversation.id}|Acc:{account_id}]"
+    # --- Create Outgoing Message ---
+    logger.debug(f"{log_prefix} Creating outgoing message record...")
+    internal_source_id = f"ai-reply-graph-{task_id}-{uuid4().hex[:8]}"
+    contact_id = (
+        conversation.contact_inbox.contact_id if conversation.contact_inbox else None
+    )
+
+    message_data = MessageCreate(
+        account_id=account_id,
+        inbox_id=conversation.inbox_id,
+        conversation_id=conversation.id,
+        contact_id=contact_id,
+        source_id=internal_source_id,
+        direction="out",
+        status="processing",  # Will be sent or delivered later
+        message_timestamp=datetime.now(timezone.utc),
+        content=ai_response_text,
+        content_type="text",
+        content_attributes={
+            "source": "ai-reply-graph",
+            "final_sales_stage": final_state.get(
+                "current_sales_stage", ""
+            ),  # Get final stage from state
+            "intent_classified": final_state.get(
+                "intent", ""
+            ),  # Get final intent from state
+            "bot_agent_id": (str(agent_config_db.id) if agent_config_db else None),
+        },
+        triggering_message_id=trigger_message_id,
+        is_simulation=conversation.is_simulation,
+    )
+    ai_message = await message_repo.create_message(db=db, message_data=message_data)
+    await db.flush()
+    await db.refresh(ai_message)
+    logger.info(
+        f"{log_prefix} Created outgoing AI message record (ID: {ai_message.id})."
+    )
+
+    # --- Handle Simulation vs Real ---
+    if conversation.is_simulation:
+        logger.info(
+            f"{log_prefix} Publishing simulation message {ai_message.id} via WebSocket."
+        )
+        try:
+            message_payload_ws = jsonable_encoder(ai_message)  # Use jsonable_encoder
+            await publish_to_conversation_ws(
+                conversation_id=conversation.id,
+                data={"type": "new_message", "payload": message_payload_ws},
+            )
+            # Update status in DB for simulation after successful WS publish
+            ai_message.status = "delivered"
+            db.add(ai_message)
+            await db.flush([ai_message])
+            logger.info(
+                f"{log_prefix} Published simulation message {ai_message.id} to WS and marked delivered."
+            )
+        except Exception as ws_err:
+            logger.error(
+                f"{log_prefix} Failed to publish simulation message {ai_message.id} to WS: {ws_err}"
+            )
+            # Keep status as 'processing' or potentially move to 'failed'
+    else:
+        # Apply delay and enqueue for real sending
+        final_delay = _compute_delay(ai_response_text)
+        logger.info(
+            f"{log_prefix} Applying delay of {final_delay:.2f}s before queueing message {ai_message.id}."
+        )
+        if final_delay > 0:
+            await asyncio.sleep(final_delay)
+
+        sender_payload = {"message_id": str(ai_message.id)}
+        output_queue = RedisQueue(queue_name=RESPONSE_SENDER_QUEUE_NAME)
+        await output_queue.enqueue(sender_payload)
+        logger.info(
+            f"{log_prefix} Enqueued message {ai_message.id} to '{RESPONSE_SENDER_QUEUE_NAME}'."
+        )
+        # Status remains 'processing' until the sender confirms delivery
+
+    # --- Commit Transaction ---
+    await db.commit()
+    logger.info(f"{log_prefix} Database transaction committed successfully.")
 
 
 async def handle_ai_reply_request(
@@ -312,6 +406,9 @@ async def handle_ai_reply_request(
                     if agent_data:
                         agent_config_db = BotAgentRead.model_validate(agent_data)
 
+                logger.info(
+                    "{log_prefix} Initial history has {initial_lc_history_len} Messages"
+                )
                 # --- Validate Data ---
                 if not profile_db:
                     raise ValueError(f"CompanyProfile not found: {account_id}")
@@ -336,7 +433,7 @@ async def handle_ai_reply_request(
                 # --- Prepare Graph State Input ---
                 # Checkpointer handles loading persisted state. We provide current context.
                 logger.debug(f"{log_prefix} Preparing initial input for LangGraph...")
-                formatted_history = _format_db_history_to_lc(history_db)
+                formatted_history = _format_db_history_to_lc([last_db_message])
 
                 profile_dict = CompanyProfileSchema.model_validate(
                     profile_db
@@ -394,6 +491,20 @@ async def handle_ai_reply_request(
                     f"{log_prefix} Graph config prepared with thread_id: {conversation_id}"
                 )
 
+                snapshot = await compiled_reply_graph.aget_state(graph_config)
+                previous_messages_state = snapshot.values.get("messages", [])
+                previous_checkpoint_message_ids = set()
+                if isinstance(previous_messages_state, list):
+                    previous_checkpoint_message_ids = {
+                        str(msg.id)
+                        for msg in previous_messages_state
+                        if isinstance(msg, AIMessage) and hasattr(msg, "id")
+                    }
+
+                logger.debug(
+                    f"{log_prefix} Snapshot of the messages of the Current Graph: {previous_checkpoint_message_ids}"
+                )
+
                 # --- Invoke Graph ---
 
                 if (
@@ -421,108 +532,62 @@ async def handle_ai_reply_request(
 
                     # --- Process Graph Output ---
                     graph_error = final_state.get("error")
-                    ai_response_text = final_state.get("generation")
+                    final_messages_lc = final_state.get("messages", [])
+
+                    new_ai_messages_lc: List[AIMessage] = []
+                    for msg in final_messages_lc:
+                        if (
+                            isinstance(msg, AIMessage)
+                            and hasattr(msg, "id")
+                            and str(msg.id) not in previous_checkpoint_message_ids
+                        ):
+                            new_ai_messages_lc.append(msg)
+                            logger.debug(
+                                f"{log_prefix} Identified new AI message ID: {msg.id}"
+                            )
+
+                    logger.debug(
+                        f"{log_prefix} final messages: {final_messages_lc}, final ai messages: {new_ai_messages_lc}"
+                    )
 
                     if graph_error:
-                        raise RuntimeError(f"Graph failed: {graph_error}")
-                    if not ai_response_text:
-                        raise ValueError("Graph generated no response.")
-
-                    logger.success(
-                        f"{log_prefix} Graph generated response: '{ai_response_text[:100]}...'"
-                    )
-
-                # --- Create Outgoing Message ---
-                logger.debug(f"{log_prefix} Creating outgoing message record...")
-                internal_source_id = f"ai-reply-graph-{task_id}-{uuid4().hex[:8]}"
-                contact_id = (
-                    conversation.contact_inbox.contact_id
-                    if conversation.contact_inbox
-                    else None
-                )
-
-                message_data = MessageCreate(
-                    account_id=account_id,
-                    inbox_id=conversation.inbox_id,
-                    conversation_id=conversation.id,
-                    contact_id=contact_id,
-                    source_id=internal_source_id,
-                    direction="out",
-                    status="processing",  # Will be sent or delivered later
-                    message_timestamp=datetime.now(timezone.utc),
-                    content=ai_response_text,
-                    content_type="text",
-                    content_attributes={
-                        "source": "ai-reply-graph",
-                        "final_sales_stage": final_state.get(
-                            "current_sales_stage", ""
-                        ),  # Get final stage from state
-                        "intent_classified": final_state.get(
-                            "intent", ""
-                        ),  # Get final intent from state
-                        "bot_agent_id": (
-                            str(agent_config_db.id) if agent_config_db else None
-                        ),
-                    },
-                    triggering_message_id=trigger_message_id,
-                    is_simulation=conversation.is_simulation,
-                )
-                ai_message = await message_repo.create_message(
-                    db=db, message_data=message_data
-                )
-                await db.flush()
-                await db.refresh(ai_message)
-                logger.info(
-                    f"{log_prefix} Created outgoing AI message record (ID: {ai_message.id})."
-                )
-
-                # --- Handle Simulation vs Real ---
-                if conversation.is_simulation:
-                    logger.info(
-                        f"{log_prefix} Publishing simulation message {ai_message.id} via WebSocket."
-                    )
-                    try:
-                        message_payload_ws = jsonable_encoder(
-                            ai_message
-                        )  # Use jsonable_encoder
-                        await publish_to_conversation_ws(
-                            conversation_id=conversation.id,
-                            data={"type": "new_message", "payload": message_payload_ws},
-                        )
-                        # Update status in DB for simulation after successful WS publish
-                        ai_message.status = "delivered"
-                        db.add(ai_message)
-                        await db.flush([ai_message])
-                        logger.info(
-                            f"{log_prefix} Published simulation message {ai_message.id} to WS and marked delivered."
-                        )
-                    except Exception as ws_err:
                         logger.error(
-                            f"{log_prefix} Failed to publish simulation message {ai_message.id} to WS: {ws_err}"
+                            f"{log_prefix} Graph execution finished with error: {graph_error}"
                         )
-                        # Keep status as 'processing' or potentially move to 'failed'
-                else:
-                    # Apply delay and enqueue for real sending
-                    final_delay = _compute_delay(ai_response_text)
-                    logger.info(
-                        f"{log_prefix} Applying delay of {final_delay:.2f}s before queueing message {ai_message.id}."
-                    )
-                    if final_delay > 0:
-                        await asyncio.sleep(final_delay)
 
-                    sender_payload = {"message_id": str(ai_message.id)}
-                    output_queue = RedisQueue(queue_name=RESPONSE_SENDER_QUEUE_NAME)
-                    await output_queue.enqueue(sender_payload)
-                    logger.info(
-                        f"{log_prefix} Enqueued message {ai_message.id} to '{RESPONSE_SENDER_QUEUE_NAME}'."
-                    )
-                    # Status remains 'processing' until the sender confirms delivery
+                    if not new_ai_messages_lc and not graph_error:
+                        logger.warning(
+                            f"{log_prefix} Graph finished but no new AI messages were added."
+                        )
 
-                # --- Commit Transaction ---
-                await db.commit()
-                logger.info(
-                    f"{log_prefix} Database transaction committed successfully."
-                )
+                    elif not new_ai_messages_lc and graph_error:
+                        logger.error(
+                            f"{log_prefix} Graph failed and no fallback message generated."
+                        )
+                        raise RuntimeError(f"Graph failed: {graph_error}")
+                    else:
+                        logger.success(
+                            f"{log_prefix} Graph generated {len(new_ai_messages_lc)} new AI message(s)."
+                        )
+
+                USE_GENERATION_RESPONSE = True
+                if USE_GENERATION_RESPONSE:
+                    new_ai_messages_lc = [
+                        AIMessage(content=final_state.get("generation", ""))
+                    ]
+                for _, ai_msg_lc in enumerate(new_ai_messages_lc):
+                    if isinstance(ai_msg_lc, AIMessage) and ai_msg_lc.content:
+                        ai_response_text = ai_msg_lc.content
+                        await _process_one_message(
+                            db=db,
+                            account_id=account_id,
+                            trigger_message_id=trigger_message_id,
+                            task_id=task_id,
+                            conversation=conversation,
+                            agent_config_db=agent_config_db,
+                            final_state=final_state,
+                            ai_response_text=ai_response_text,
+                        )
 
     except Exception as e:
         logger.exception(
@@ -577,8 +642,8 @@ async def startup(ctx: dict):
             ctx["llm_primary"] = llm_primary_client
             logger.info(f"Primary LLM client initialized: {settings.OPENAI_MODEL_NAME}")
 
-            fast_model_name = getattr(settings, "FAST_LLM_MODEL_NAME", "gpt-4o-mini")
-            fast_temperature = float(getattr(settings, "FAST_LLM_TEMPERATURE", 0.1))
+            fast_model_name = getattr(settings, "FAST_LLM_MODEL_NAME", "gpt-4o")
+            fast_temperature = float(getattr(settings, "FAST_LLM_TEMPERATURE", 0.0))
             llm_fast_client = ChatOpenAI(
                 model=fast_model_name, temperature=fast_temperature
             )
