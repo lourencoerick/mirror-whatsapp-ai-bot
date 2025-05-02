@@ -182,7 +182,7 @@ class ResponseSender:
                 await delete_messages_by_conversation(
                     db=db, conversation_id=message.conversation_id
                 )
-                reset_checkpoint(db=db, thread_id=thread_id_str)
+                await reset_checkpoint(db=db, thread_id=thread_id_str)
 
                 logger.info(
                     "[sender] Deleting messages for testing bot agent from no history."

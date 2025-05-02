@@ -15,7 +15,7 @@ from app.models.message import Message
 
 from app.models.user import User
 from app.services.repository import conversation as conversation_repo
-
+from app.services.helper.checkpoint import reset_checkpoint
 
 from app.services.queue.iqueue import IQueue
 from app.services.queue.redis_queue import RedisQueue
@@ -264,9 +264,7 @@ async def reset_simulation_state(  # Nome mais claro
     # --- 2. Executar Comandos DELETE SQL ---
     # Nomes das tabelas e colunas baseados no código fonte do AsyncPostgresSaver
     # ATENÇÃO: Se o LangGraph mudar esses nomes, este código quebrará.
-    checkpoint_tables = ["checkpoint_writes", "checkpoint_blobs", "checkpoints"]
     # A tabela checkpoint_migrations geralmente não deve ser limpa por thread.
-
     try:
         logger.info(f"{log_prefix} Deleting messages...")
         # Usando SQLAlchemy Core API (mais seguro contra SQL Injection que f-string)
@@ -279,13 +277,7 @@ async def reset_simulation_state(  # Nome mais claro
         logger.info(
             f"{log_prefix} Deleting checkpoint data for thread_id: {thread_id_str}..."
         )
-        for table in checkpoint_tables:
-            # Usar parâmetros vinculados (:thread_id) é crucial para segurança!
-            logger.debug(f"{log_prefix} Deleting from {table}...")
-            # Usamos checkpoint_ns = '' como padrão, ajuste se você usar namespaces AND checkpoint_ns = :checkpoint_ns , "checkpoint_ns": ""
-            stmt = text(f"DELETE FROM {table} WHERE thread_id = :thread_id ")
-            await db.execute(stmt, {"thread_id": thread_id_str})
-            logger.debug(f"{log_prefix} Deleted rows from {table} (if any existed).")
+        await reset_checkpoint(db=db, thread_id=thread_id_str)
 
         # --- 3. Commit da Transação ---
         await db.commit()
