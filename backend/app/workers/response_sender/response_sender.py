@@ -192,12 +192,8 @@ class ResponseSender:
                 )
                 for table in checkpoint_tables:
                     logger.debug(f"[response_sender] Deleting from {table}...")
-                    stmt = text(
-                        f"DELETE FROM {table} WHERE thread_id = :thread_id AND checkpoint_ns = :checkpoint_ns"
-                    )
-                    await db.execute(
-                        stmt, {"thread_id": thread_id_str, "checkpoint_ns": ""}
-                    )
+                    stmt = text(f"DELETE FROM {table} WHERE thread_id = :thread_id")
+                    await db.execute(stmt, {"thread_id": thread_id_str})
                     logger.debug(
                         f"[response_sender] Deleted rows from {table} (if any existed)."
                     )

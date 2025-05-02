@@ -282,11 +282,9 @@ async def reset_simulation_state(  # Nome mais claro
         for table in checkpoint_tables:
             # Usar parâmetros vinculados (:thread_id) é crucial para segurança!
             logger.debug(f"{log_prefix} Deleting from {table}...")
-            # Usamos checkpoint_ns = '' como padrão, ajuste se você usar namespaces
-            stmt = text(
-                f"DELETE FROM {table} WHERE thread_id = :thread_id AND checkpoint_ns = :checkpoint_ns"
-            )
-            await db.execute(stmt, {"thread_id": thread_id_str, "checkpoint_ns": ""})
+            # Usamos checkpoint_ns = '' como padrão, ajuste se você usar namespaces AND checkpoint_ns = :checkpoint_ns , "checkpoint_ns": ""
+            stmt = text(f"DELETE FROM {table} WHERE thread_id = :thread_id ")
+            await db.execute(stmt, {"thread_id": thread_id_str})
             logger.debug(f"{log_prefix} Deleted rows from {table} (if any existed).")
 
         # --- 3. Commit da Transação ---
