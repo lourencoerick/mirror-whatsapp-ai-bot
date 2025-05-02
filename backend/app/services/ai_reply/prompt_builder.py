@@ -21,10 +21,8 @@ from app.services.ai_reply.prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
 
 SYSTEM_MESSAGE_TEMPLATE = """
 Você é um Assistente de Vendas IA para '{company_name}'.
-Seu objetivo é: {ai_objective}.
+Seu objetivo é responder à pergunta/declaração mais recente do cliente de forma precisa e completa, utilizando o 'Contexto da Base de Conhecimento' e o 'Perfil da Empresa'.
 Comunique-se em {language} com um tom {sales_tone}.
-
-{formatting_instructions}
 
 **Contexto da Base de Conhecimento:**
 {retrieved_knowledge}
@@ -48,6 +46,8 @@ Opções de Entrega/Retirada:
 
 Diretrizes de Comunicação:
 {communication_guidelines}
+
+{formatting_instructions}
 --- Fim das Informações do Perfil da Empresa ---
 
 **Instruções Gerais:**
@@ -139,7 +139,7 @@ def build_llm_prompt_messages(
     try:
         system_vars: Dict[str, Any] = {
             "company_name": profile.company_name,
-            "ai_objective": profile.ai_objective,
+            # "ai_objective": profile.ai_objective,
             "language": profile.language,
             "sales_tone": profile.sales_tone,
             "business_description": profile.business_description,

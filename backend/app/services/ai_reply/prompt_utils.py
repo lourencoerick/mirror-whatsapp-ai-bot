@@ -1,18 +1,43 @@
 # backend/app/services/ai_reply/prompt_utils.py
 
 WHATSAPP_MARKDOWN_INSTRUCTIONS = """
-**Instruções de Formatação (Estilo WhatsApp - SEJA PRECISO):**
-*   Para **Negrito**: Use *UM asterisco* de cada lado do texto. Exemplo: *texto em negrito*. **NÃO USE DOIS ASTERISCOS (`**texto**`)**.
-*   Para *Itálico*: Use _UM sublinhado_ de cada lado do texto. Exemplo: _texto em itálico_. **NÃO USE UM ASTERISCO (`*texto*`)**.
-*   Para ~Tachado~: Use ~UM til~ de cada lado do texto. Exemplo: ~texto tachado~.
-*   Para `Monoespaçado`: Use `UMA crase` de cada lado do texto. Exemplo: `código ou termo técnico`.
-*   Para Listas com Marcadores: Comece a linha com `- ` (hífen seguido de espaço) OU `* ` (asterisco seguido de espaço).
-    - Exemplo de item
-    * Outro exemplo de item
-*   Para Listas Numeradas: Comece a linha com o número, um ponto e um espaço.
-    1. Primeiro item
-    2. Segundo item
-*   Para Citação: Comece a linha com `> ` (sinal maior que seguido de espaço).
-    > Texto citado aqui.
-*   **IMPORTANTE:** Aplique a formatação *exatamente* como mostrado nos exemplos. Use negrito (*palavra*) para nomes de produtos, termos chave ou para dar ênfase importante. Use listas para clareza. Evite formatação excessiva.
+**Instruções de Formatação no Estilo WhatsApp — SIGA COM PRECISÃO:**
+
+Aplique os estilos conforme os exemplos abaixo. *Não use variações*. A consistência é obrigatória.
+
+- **Negrito**: Use *um* asterisco de cada lado.  
+  ✅ Exemplo correto: *texto em negrito*  
+  ❌ NUNCA use dois asteriscos: **texto**
+
+- *Itálico*: Use _um_ sublinhado de cada lado.  
+  ✅ Exemplo correto: _texto em itálico_  
+  ❌ NUNCA use asteriscos: *texto*
+
+- ~Tachado~: Use ~um~ til de cada lado.  
+  ✅ Exemplo correto: ~texto tachado~
+
+- `Monoespaçado`: Use `uma crase` de cada lado.  
+  ✅ Exemplo correto: `comando`, `termo técnico`
+
+- **Listas com Marcadores**:  
+  Inicie com `- ` (hífen + espaço) ou `* ` (asterisco + espaço).  
+  ✅ Exemplo:  
+  - Item com hífen  
+  * Item com asterisco
+
+- **Listas Numeradas**:  
+  Inicie com número, ponto e espaço.  
+  ✅ Exemplo:  
+  1. Primeiro item  
+  2. Segundo item
+
+- **Citação**:  
+  Inicie a linha com `> ` (maior que + espaço).  
+  ✅ Exemplo:  
+  > Texto citado aqui.
+
+⚠️ **IMPORTANTE**:  
+- Use *negrito* para nomes de produtos, termos-chave e ênfases.  
+- Utilize listas para tornar o conteúdo mais claro.  
+- **Evite formatação excessiva**. Siga os exemplos *à risca*.
 """
