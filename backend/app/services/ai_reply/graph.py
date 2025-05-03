@@ -11,7 +11,9 @@ try:
         ConversationState,
         SALES_STAGE_INVESTIGATION,
         SALES_STAGE_PRESENTATION,
+        SALES_STAGE_OBJECTION_HANDLING,
         SALES_STAGE_OPENING,
+        SALES_STAGE_CLOSING,
         SALES_STAGE_UNKNOWN,
         CERTAINTY_STATUS_OK,
         CERTAINTY_STATUS_STATEMENT_MADE,
@@ -28,8 +30,10 @@ except ImportError as e:
 
     SALES_STAGE_INVESTIGATION = "Investigation"
     SALES_STAGE_PRESENTATION = "Presentation"
+    SALES_STAGE_OBJECTION_HANDLING = "ObjectionHandling"
     SALES_STAGE_OPENING = "Opening"
     SALES_STAGE_UNKNOWN = "Unknown"
+    SALES_STAGE_CLOSING = "Closing"
 
 # Import Core Nodes
 try:
@@ -114,6 +118,140 @@ except ImportError as e:
 
     async def generate_certainty_statement_node(state, config):
         return {}
+
+
+# Import Objection Nodes
+try:
+    from .nodes_objection import (
+        acknowledge_and_clarify_node,
+        retrieve_knowledge_for_objection_node,
+        generate_rebuttal_node,
+        check_objection_resolved_node,
+    )
+    from .nodes_objection import ObjectionStatus
+
+    OBJECTION_NODES_AVAILABLE = True
+    logger.info("Successfully imported Objection subgraph creator.")
+except ImportError as e:
+    logger.error(f"Failed to import Objection subgraph creator: {e}")
+    OBJECTION_NODES_AVAILABLE = False
+
+
+try:
+    from .nodes_closing import initiate_close_node  # Importa o nó inicial por enquanto
+
+    # from .nodes_closing import create_closing_subgraph # Importaremos quando estiver pronto
+    CLOSING_NODES_AVAILABLE = True
+    logger.info("Successfully imported Closing nodes.")
+except ImportError as e:
+    logger.error(f"Failed to import Closing nodes: {e}")
+    CLOSING_NODES_AVAILABLE = False
+
+    # Dummy node
+    async def initiate_close_node(state, config):
+        return {}
+
+
+def create_closing_subgraph(checkpointer: BaseCheckpointSaver) -> StateGraph:
+    """
+    Builds the StateGraph for the closing process.
+    (Currently only contains the initial node).
+    """
+    if not STATE_AVAILABLE or not CLOSING_NODES_AVAILABLE:
+        raise RuntimeError("Cannot create Closing subgraph: State or nodes missing.")
+
+    closing_workflow = StateGraph(ConversationState)
+    logger.debug("Adding nodes to the Closing subgraph...")
+
+    closing_workflow.add_node("initiate_close", initiate_close_node)
+
+    # --- Define Closing Flow (Inicial) ---
+    closing_workflow.set_entry_point("initiate_close")
+
+    # POR FAZER: Adicionar nós (handle_final_objections, confirm_details, process_order)
+    # POR FAZER: Adicionar arestas condicionais baseadas na resposta do cliente
+
+    # Por enquanto, termina após a tentativa inicial
+    closing_workflow.add_edge("initiate_close", END)
+
+    logger.info("Compiling the Closing subgraph (INCOMPLETE)...")
+    compiled_closing_graph = closing_workflow.compile(checkpointer=checkpointer)
+    logger.info("Closing subgraph compiled (INCOMPLETE).")
+    return compiled_closing_graph
+
+
+def create_objection_subgraph(checkpointer: Checkpointer) -> StateGraph:
+    """
+    Builds the StateGraph for handling customer objections. It first checks
+    the resolution status of a previous rebuttal (if any) and then either
+    exits or proceeds to handle the current/new objection.
+    """
+    if not STATE_AVAILABLE or not OBJECTION_NODES_AVAILABLE:
+        raise RuntimeError("Cannot create Objection subgraph: State or nodes missing.")
+
+    objection_workflow = StateGraph(ConversationState)
+    logger.debug("Adding nodes to the Objection Handling subgraph...")
+
+    # Adiciona todos os nós do ciclo de objeção
+    objection_workflow.add_node("check_resolution", check_objection_resolved_node)
+    objection_workflow.add_node("acknowledge_and_clarify", acknowledge_and_clarify_node)
+    objection_workflow.add_node(
+        "retrieve_for_objection", retrieve_knowledge_for_objection_node
+    )
+    objection_workflow.add_node("generate_rebuttal", generate_rebuttal_node)
+
+    # --- Define Objection Handling Flow ---
+    objection_workflow.set_entry_point("check_resolution")  # Sempre checa primeiro
+
+    # Roteamento APÓS a checagem de resolução
+    def route_after_objection_check_inside(
+        state: ConversationState,
+    ) -> Literal[
+        "acknowledge_and_clarify",  # Tratar objeção (persistente ou nova)
+        "__end__",  # Sair do subgraph (resolvida, limite, erro)
+    ]:
+        resolution_status = state.get("objection_resolution_status")
+        # Limpa o status para a próxima vez que o check rodar
+        state["objection_resolution_status"] = None
+        logger.debug(
+            f"[Objection Subgraph Router] Resolution Status: {resolution_status}"
+        )
+
+        if resolution_status == "PERSISTS" or resolution_status == "NEW_OBJECTION":
+            # Se a objeção persiste OU uma nova foi detectada pelo check_resolution,
+            # vamos (re)iniciar o ciclo de tratamento a partir do acknowledge.
+            # O acknowledge vai pegar a 'current_objection' atualizada (se for nova) ou a antiga.
+            logger.debug(
+                f"[Objection Subgraph Router] Status is '{resolution_status}'. Routing to acknowledge."
+            )
+            return "acknowledge_and_clarify"
+        else:
+            # Se RESOLVED, LOOP_LIMIT_EXIT, PERSISTS_ERROR ou None/Outro, termina o subgraph.
+            logger.debug(
+                f"[Objection Subgraph Router] Status is '{resolution_status}'. Exiting subgraph."
+            )
+            return END
+
+    # Aresta Condicional após a checagem
+    objection_workflow.add_conditional_edges(
+        "check_resolution",
+        route_after_objection_check_inside,  # Usa a função de roteamento interna
+        {
+            "acknowledge_and_clarify": "acknowledge_and_clarify",  # Vai para o início do tratamento
+            END: END,  # Sai do subgraph
+        },
+    )
+
+    # Fluxo linear de tratamento
+    objection_workflow.add_edge("acknowledge_and_clarify", "retrieve_for_objection")
+    objection_workflow.add_edge("retrieve_for_objection", "generate_rebuttal")
+    # Termina após gerar o rebuttal (espera resposta do cliente)
+    objection_workflow.add_edge("generate_rebuttal", END)
+
+    logger.info("Compiling the Objection Handling subgraph (v3)...")
+    compiled_objection_graph = objection_workflow.compile(checkpointer=checkpointer)
+    logger.info("Objection Handling subgraph compiled (v3).")
+    return compiled_objection_graph
 
 
 # --- Function to Create Straight Line Subgraph ---
@@ -232,78 +370,108 @@ def create_spin_subgraph(checkpointer: Checkpointer) -> StateGraph:
 def route_after_classification(
     state: ConversationState,
 ) -> Literal[
-    "invoke_spin_subgraph",
-    "invoke_straight_line_subgraph",
-    "present_capability",
-    "retrieve_knowledge",  # Rota RAG padrão
-    "generate_rapport",
-    "__end__",
+    "invoke_spin_subgraph",  # Para investigação ativa
+    "invoke_straight_line_subgraph",  # Para construir/verificar certeza antes de apresentar
+    "invoke_objection_subgraph",  # Para lidar com objeções detectadas
+    "invoke_closing_subgraph",  # <-- Adiciona como destino possível
+    "present_capability",  # Para apresentar diretamente (menos comum agora)
+    "retrieve_knowledge",  # Para responder perguntas diretas com RAG (fallback)
+    "generate_rapport",  # Para saudações/abertura
+    "__end__",  # Para erros na classificação
 ]:
     """
-    Determines the next node after initial classification.
-    Prioritizes RAG for direct questions before entering specific sales flows.
+    Determines the next node after initial classification based on intent and stage.
+    Prioritizes specific flows (Objection, SPIN, SL) over generic RAG for relevant stages.
     """
+    # Pega o estado ATUALIZADO pelo nó classificador NESTA execução
     intent = state.get("intent")
-    stage = state.get("current_sales_stage")
+    stage = state.get("current_sales_stage")  # O que o classificador ACABOU de definir
     error = state.get("error")
-    input_msg = state.get(
-        "input_message", ""
-    ).lower()  # Pega a última mensagem para análise simples
+    # input_msg = state.get("input_message", "").lower() # Usado para checar perguntas diretas
     log_prefix = "[Router: After Classification]"
-    logger.debug(f"{log_prefix} Intent='{intent}', Stage='{stage}', Error='{error}'")
+    logger.debug(
+        f"{log_prefix} Intent='{intent}', Classified Stage='{stage}', Error='{error}'"
+    )
 
+    # 1. Tratamento de Erro da Classificação
     if error and "Classification failed" in error:
-        logger.error(f"{log_prefix} Classification failed. Ending.")
+        logger.error(
+            f"{log_prefix} Classification failed. Ending graph execution: {error}"
+        )
         return END
 
-    # 1. Respostas Simples Primeiro
+    # 2. Saudação -> Rapport
     if intent == "Greeting":
         logger.debug(f"{log_prefix} Intent is Greeting. Routing to: generate_rapport")
         return "generate_rapport"
 
-    # 2. Perguntas Diretas -> Tentar RAG Primeiro
-    # Se a intenção foi classificada como Pergunta OU contém palavras interrogativas comuns
-    # E NÃO estamos explicitamente em um estágio avançado como Closing/Objection (ainda não implementado)
-    is_direct_question = intent == "Question"  # or any(
-    # kw in input_msg for kw in ["como", "qual", "onde", "quando", "quanto", "?"]
-    # )
-    is_early_stage = stage in [
-        None,
+    # 3. Objeção Detectada -> Tratar Objeção
+    # Se o classificador definiu o estágio como ObjectionHandling, essa é a prioridade.
+    if stage == SALES_STAGE_OBJECTION_HANDLING:
+        logger.debug(
+            f"{log_prefix} Classified stage is ObjectionHandling. Routing to: invoke_objection_subgraph"
+        )
+        return "invoke_objection_subgraph"
+
+    # 4. Pergunta Direta -> Tentar RAG (Prioridade sobre SPIN em estágios iniciais)
+    # Verifica se é uma pergunta e se estamos em um estágio onde responder diretamente faz sentido
+    is_direct_question = intent == "Question"
+    # Permitir RAG em Opening e Investigation. Em Presentation, talvez seja melhor ir para SL/Objection?
+    # Vamos permitir RAG em Investigation por enquanto.
+    if is_direct_question and stage in [
         SALES_STAGE_OPENING,
         SALES_STAGE_INVESTIGATION,
         SALES_STAGE_UNKNOWN,
-    ]  # Adicione outros estágios onde RAG é preferível
-
-    if is_direct_question and is_early_stage:
+        None,
+    ]:
         logger.debug(
-            f"{log_prefix} Intent is Question in early stage. Routing to: retrieve_knowledge (RAG)"
+            f"{log_prefix} Intent is Question in early/investigation stage. Routing to: retrieve_knowledge (RAG)"
         )
-        # Define o estágio como Investigation se ainda não estiver, pois estamos respondendo perguntas
+        # Garante que o estágio seja Investigation ao responder perguntas
         state["current_sales_stage"] = SALES_STAGE_INVESTIGATION
-        return "retrieve_knowledge"  # Tenta responder com RAG
+        return "retrieve_knowledge"
 
-    # 3. Lógica de Estágio Específico (SPIN, Straight Line, etc.)
-    # Só entra aqui se NÃO for uma saudação ou pergunta direta inicial
+    # 5. Estágio de Investigação (e NÃO foi pergunta direta) -> Continuar SPIN
     if stage == SALES_STAGE_INVESTIGATION:
-        # Se já estamos em Investigação e NÃO foi uma pergunta direta respondível por RAG,
-        # então provavelmente queremos fazer uma pergunta SPIN.
         logger.debug(
             f"{log_prefix} Stage is Investigation (not direct question). Routing to: invoke_spin_subgraph"
         )
         return "invoke_spin_subgraph"
-    elif stage == SALES_STAGE_PRESENTATION:
+
+    # 6. Estágio de Apresentação -> Verificar/Construir Certeza (Straight Line)
+    if stage == SALES_STAGE_PRESENTATION:
+        # Entra aqui se o SPIN identificou necessidade explícita na rodada anterior
+        # OU se o classificador pulou direto para cá (menos provável com prompts ajustados)
         logger.debug(
-            f"{log_prefix} Stage is Presentation. Routing to: invoke_straight_line_subgraph"
+            f"{log_prefix} Stage is Presentation. Routing to check/build certainty: invoke_straight_line_subgraph"
         )
         return "invoke_straight_line_subgraph"
-    # Adicionar condições para outros estágios aqui...
 
-    # 4. Fallback Final
-    # Se nenhuma das condições acima for atendida, usa RAG como último recurso.
+    # 7. Estágio de Fechamento (Futuro)
+    # if stage == SALES_STAGE_CLOSING:
+    #     logger.debug(f"{log_prefix} Stage is Closing. Routing to: invoke_closing_subgraph")
+    #     return "invoke_closing_subgraph"
+
+    # 8. Rota Direta para Apresentação (Caso Especial)
+    # Se, por algum motivo, o classificador decidir ir direto para apresentação
+    # sem passar por SL (talvez intenção muito forte?), podemos ter essa rota.
+    # No entanto, com a lógica atual, Presentation sempre vai para SL primeiro.
+    # Mantendo por segurança, mas pode ser removido se a lógica for estrita.
+    if (
+        stage == SALES_STAGE_PRESENTATION and intent != "Objection"
+    ):  # Exemplo de condição mais específica
+        # Esta condição provavelmente nunca será atingida com a lógica atual
+        logger.debug(
+            f"{log_prefix} Classified stage is Presentation, intent is not Objection. Routing directly to: present_capability (Unlikely path)"
+        )
+        return "present_capability"  # Comentado pois SL é o caminho preferido
+
+    # 9. Fallback Final -> RAG
+    # Se nenhuma das condições específicas acima for atendida
     logger.debug(
-        f"{log_prefix} No specific route matched. Routing to fallback: retrieve_knowledge"
+        f"{log_prefix} No specific route matched for Stage '{stage}' and Intent '{intent}'. Routing to fallback: retrieve_knowledge"
     )
-    # Garante que o estágio seja definido para algo razoável se ainda for None/Opening
+    # Define um estágio padrão se ainda não tiver um
     if stage in [None, SALES_STAGE_OPENING]:
         state["current_sales_stage"] = SALES_STAGE_INVESTIGATION
     return "retrieve_knowledge"
@@ -370,8 +538,11 @@ def route_after_straight_line(
         return END
     elif certainty_status == CERTAINTY_STATUS_OK:
         # Certeza atingiu o limiar ou já estava OK
-        logger.debug(f"{log_prefix} Certainty OK. Routing to Present Capability.")
-        return "present_capability"
+        # logger.debug(f"{log_prefix} Certainty OK. Routing to Present Capability.")
+        # return "present_capability"
+
+        logger.debug(f"{log_prefix} Certainty OK. Routing to: invoke_closing_subgraph")
+        return "invoke_closing_subgraph"
     elif certainty_status == CERTAINTY_STATUS_STATEMENT_MADE:
         # Uma declaração foi feita, precisamos esperar a resposta do cliente
         logger.debug(f"{log_prefix} Certainty statement made. Ending turn.")
@@ -396,6 +567,8 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
             CORE_NODES_AVAILABLE,
             SPIN_NODES_AVAILABLE,
             STRAIGHT_LINE_NODES_AVAILABLE,
+            OBJECTION_NODES_AVAILABLE,
+            CLOSING_NODES_AVAILABLE,
         ]
     ):
         missing = [
@@ -405,6 +578,8 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
                 ("Core Nodes", CORE_NODES_AVAILABLE),
                 ("SPIN Nodes", SPIN_NODES_AVAILABLE),
                 ("Straight Line Nodes", STRAIGHT_LINE_NODES_AVAILABLE),
+                ("Objection Nodes", OBJECTION_NODES_AVAILABLE),
+                ("Closing Nodes", CLOSING_NODES_AVAILABLE),  # <-- Adiciona validação
             ]
             if not available
         ]
@@ -414,9 +589,12 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
 
     # --- Instantiate Subgraphs ---
     spin_subgraph = create_spin_subgraph(checkpointer=checkpointer)
-    straight_line_subgraph = create_straight_line_subgraph(
+    straight_line_subgraph = create_straight_line_subgraph(checkpointer=checkpointer)
+    objection_subgraph = create_objection_subgraph(checkpointer=checkpointer)
+    closing_subgraph = create_closing_subgraph(
         checkpointer=checkpointer
-    )  # <-- INSTANCIA NOVO SUBGRAPH
+    )  # <-- Instancia subgrafo de closing
+
     logger.info("SPIN and Straight Line subgraphs instantiated.")
 
     # --- Define Main Workflow ---
@@ -461,12 +639,19 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
             "generate_rapport": "generate_rapport",
             "invoke_spin_subgraph": "invoke_spin_subgraph",
             "invoke_straight_line_subgraph": "invoke_straight_line_subgraph",
+            "invoke_objection_subgraph": "invoke_objection_subgraph",
+            "invoke_closing_subgraph": "invoke_closing_subgraph",  # <-- Adiciona rota
             "present_capability": "present_capability",
             "retrieve_knowledge": "retrieve_knowledge",
             END: END,
         },
     )
     logger.debug("Added conditional edges after 'classify_intent_and_stage'.")
+
+    workflow.add_edge("invoke_objection_subgraph", "classify_intent_and_stage")
+    logger.debug(
+        "Added edge from 'invoke_objection_subgraph' back to 'classify_intent_and_stage'."
+    )
 
     # Conditional Edge 2: After SPIN Subgraph
     workflow.add_conditional_edges(
@@ -490,6 +675,12 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
             END: END,  # Termina o turno se fez declaração ou erro
         },
     )
+
+    workflow.add_edge("invoke_closing_subgraph", "classify_intent_and_stage")
+    logger.debug(
+        "Added edge from 'invoke_closing_subgraph' back to 'classify_intent_and_stage'."
+    )
+
     # Edge 4: After Present Capability
     # O que fazer depois de apresentar? Por enquanto, termina. No futuro, checar objeções/fechamento.
     workflow.add_edge("present_capability", END)
