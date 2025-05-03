@@ -69,6 +69,7 @@ class SearchService:
         search_depth: str = "basic",  # Or "advanced"
         max_results: int = 5,
         include_raw_content: bool = False,  # Raw content can be large
+        include_domains: List[str] = [],
     ) -> List[SearchResult]:
         """
         Performs a search using the Tavily API.
@@ -93,6 +94,7 @@ class SearchService:
                 search_depth=search_depth,
                 max_results=max_results,
                 include_raw_content=include_raw_content,
+                include_domains=include_domains,
                 # include_answer=False, # Optionally exclude Tavily's generated answer
             )
             # Extract results in a consistent format

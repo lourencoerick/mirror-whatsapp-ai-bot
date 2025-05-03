@@ -6,6 +6,10 @@ from typing import List, Optional, Dict, Any
 import json
 
 
+from typing import List, Optional
+from pydantic import BaseModel, Field, HttpUrl
+
+
 class OfferingInfo(BaseModel):
     """Brief information about a key product or service offering."""
 
@@ -21,9 +25,16 @@ class OfferingInfo(BaseModel):
         None,
         description="Brief pricing information (e.g., 'Starts at $X', 'Contact for quote').",
     )
-
     link: Optional[HttpUrl] = Field(
         None, description="Direct link to the product/service page, if available."
+    )
+
+    bonus_items: List[str] = Field(
+        default_factory=list,
+        description=(
+            "List of additional bonus items or services included for free "
+            "when purchasing the main offering. These may include templates, e-books, consultations, etc."
+        ),
     )
 
 
@@ -142,6 +153,7 @@ class CompanyProfileSchema(BaseModel):
                         "key_features": ["Serve até 10 pessoas"],
                         "price_info": "R$ 30,00",
                         "link": None,  # Example where link might not be available
+                        "bonus_items": ["dois pães francês"],
                     },
                 ],
                 "delivery_options": ["Retirada na loja", "Delivery no bairro Central"],

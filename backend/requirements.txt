@@ -60,3 +60,4 @@ lxml==5.4.0
 langgraph_checkpoint_postgres==2.0.21
 
 pytz==2025.2
+tldextract==5.3.0

@@ -1,11 +1,11 @@
 # backend/app/services/researcher/graph_nodes.py
-
+import tldextract
 import asyncio
 from typing import Dict, Any, List, Optional, Set, Type
 from loguru import logger
 from uuid import UUID
 from pydantic import BaseModel
-
+from urllib.parse import urlparse
 
 # Import state and schemas
 from .graph_state import (
@@ -271,6 +271,12 @@ async def perform_search(state: ResearchState) -> Dict[str, Any]:
     """
     search_attempted_flag = state.get("search_attempted", False)
 
+    initial_url = state.get("initial_url", False)
+    ext = tldextract.extract(initial_url)
+    registrable = f"{ext.domain}.{ext.suffix}"
+    include_domains = [registrable, f"*.{registrable}"]
+
+    registrable = f"{ext.domain}.{ext.suffix}"
     if not SEARCH_AVAILABLE:
         summary = "Search failed: Service unavailable."
         logger.error(summary)
@@ -296,7 +302,10 @@ async def perform_search(state: ResearchState) -> Dict[str, Any]:
         }
 
     logger.info(f"Starting search for {len(queries)} queries: {queries}")
-    search_tasks = [perform_tavily_search(query=q, max_results=3) for q in queries]
+    search_tasks = [
+        perform_tavily_search(query=q, max_results=3, include_domains=include_domains)
+        for q in queries
+    ]
     results_list = await asyncio.gather(*search_tasks, return_exceptions=True)
 
     successful_searches = 0
@@ -715,7 +724,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
         initial_url_links_summary = f"Potential URLs found in the last scraping cycle (limit 30):\n{links_list_str}"
         if len(intial_url_found_links) > 30:
             initial_url_links_summary += "\n..."
-
+    logger.debug(f"{initial_url_links_summary}")
     if unvisited_candidate_links:
         links_list_str = "\n".join(
             [

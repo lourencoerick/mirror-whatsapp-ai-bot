@@ -89,6 +89,7 @@ def create_research_graph() -> StateGraph:
             # Mapping: Output of router function -> Destination node name
             "scrape_website": "scrape_website",
             "perform_search": "perform_search",
+            "analyze_completeness": "analyze_completeness",
             "finish_research": "finish_research",
         },
     )
