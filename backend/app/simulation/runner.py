@@ -13,9 +13,11 @@ from app.models.simulation.simulation import (
 )
 from app.models.simulation.simulation_message import SimulationMessageRoleEnum
 from app.models.simulation.simulation_event import SimulationEventTypeEnum
-from app.simulation.schemas.persona_definition import PersonaDefinition
+from app.simulation.schemas.persona import PersonaRead
 from app.simulation.schemas.persona_state import PersonaState
 from app.services.repository import company_profile as profile_repo
+from app.services.repository import contact as contact_repo
+
 from app.simulation.repositories import (
     simulation as simulation_repo,
     simulation_message as simulation_message_repo,
@@ -31,17 +33,25 @@ from app.simulation.config import (
 from app.simulation.utils import webhook as webhook_utils
 from app.simulation.utils.cleanup import reset_simulation_conversation
 
+from app.api.routes.simulation import _enqueue_simulation_message
+from app.api.schemas.simulation import (
+    SimulationMessageCreate,
+    SimulationMessageEnqueueResponse,
+)
 
-async def run_single_simulation(persona_id: str, reset_conversation: bool = False):
+
+async def run_single_simulation(
+    account: UUID, persona_id_str: str, reset_conversation: bool = False
+):
     """
     Orchestrates and runs a single simulation instance.
     Optionally resets the conversation history before starting.
     """
-    account_id = SIMULATION_ACCOUNT_ID
-    inbox_id = SIMULATION_INBOX_ID
+    account_id = account.id
+    inbox_id = account.simulation_inbox_id
 
     logger.info(
-        f"--- Starting simulation: account={account_id}, persona={persona_id} ---"
+        f"--- Starting simulation: account={account_id}, persona={persona_id_str} ---"
     )
     start_time = time.time()
     simulation: Optional[Simulation] = None
@@ -60,10 +70,25 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 raise ValueError(f"Company profile not found for account {account_id}")
 
             # Load persona definition
-            persona = await persona_loader.load_persona(persona_id)
+            logger.debug(f"Loading persona '{persona_id_str}' using new DB loader...")
+            persona = await persona_loader.load_persona_from_db(db, persona_id_str)
             if not persona:
-                raise ValueError(f"Persona '{persona_id}' not found or invalid")
+                raise ValueError(f"Persona '{persona_id_str}' not found or invalid")
 
+            # contact = contact_repo.find_contact_by_id(
+            #     db=db, contact_ud=persona.contact_id, account_id=account_id
+            # )
+
+            contact_inbox = await contact_repo.find_contact_inbox_by_contact_and_inbox(
+                db=db,
+                account_id=account_id,
+                contact_id=persona.contact_id,
+                inbox_id=inbox_id,
+            )
+            logger.info(
+                f"Contact Inbox {contact_inbox} has a conversation {contact_inbox.conversation}"
+            )
+            conversation_id = contact_inbox.conversation.id
             # Optionally reset conversation
             if reset_conversation:
                 await reset_simulation_conversation(
@@ -77,7 +102,7 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
 
             # Create initial simulation record
             simulation = await simulation_repo.create_simulation(
-                db, profile_id=profile.id, persona_def=persona
+                db, profile_id=profile.id, persona_id=persona.id
             )
             event_type = SimulationEventTypeEnum.SIMULATION_START
             await simulation_event_repo.create_event(
@@ -96,25 +121,19 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
             events_occurred.append(event_type)
 
             # Send initial message
-            initial_payload = webhook_utils.create_message_payload(
-                message_text=persona.initial_message,
-                identifier=persona.simulation_contact_identifier,
+            message_payload = SimulationMessageCreate(content=persona.initial_message)
+
+            simulation_enqueue_response: SimulationMessageEnqueueResponse = (
+                await _enqueue_simulation_message(
+                    db=db,
+                    account_id=account_id,
+                    conversation_id=conversation_id,
+                    message_payload=message_payload,
+                )
             )
+            logger.info(f"Simulation Message Enqueued: {simulation_enqueue_response}")
 
             last_message_time = datetime.now(timezone.utc)
-
-            webhook_response = await webhook_utils.send_message_to_webhook(
-                initial_payload
-            )
-
-            if webhook_response is None:
-                raise Exception("Failed to send initial message to webhook.")
-
-            conversation_id_str = webhook_response.get("conversation_id")
-            if not conversation_id_str:
-                raise Exception("No conversation_id in webhook response.")
-            conversation_id = UUID(conversation_id_str)
-            logger.info(f"Obtained conversation_id: {conversation_id}")
 
             await simulation_message_repo.create_message(
                 db,
@@ -262,6 +281,7 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 events_occurred.append(event_type)
 
                 # Send persona response
+
                 await simulation_message_repo.create_message(
                     db,
                     simulation_id=simulation.id,
@@ -279,15 +299,18 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 )
                 events_occurred.append(event_type)
 
-                next_payload = webhook_utils.create_message_payload(
-                    message_text=next_persona_message,
-                    identifier=persona.simulation_contact_identifier,
-                    conversation_id=conversation_id,
+                message_payload = SimulationMessageCreate(content=next_persona_message)
+
+                simulation_enqueue_response: SimulationMessageEnqueueResponse = (
+                    await _enqueue_simulation_message(
+                        db=db,
+                        account_id=account_id,
+                        conversation_id=conversation_id,
+                        message_payload=message_payload,
+                    )
                 )
-                webhook_response = await webhook_utils.send_message_to_webhook(
-                    next_payload
-                )
-                if webhook_response is None:
+
+                if simulation_enqueue_response is None:
                     final_outcome = SimulationOutcomeEnum.SIMULATION_ERROR
                     error_msg = "Webhook send failed during conversation."
                     event_type = SimulationEventTypeEnum.SIMULATION_ENGINE_ERROR
@@ -380,5 +403,5 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 logger.error("Simulation failed before record creation.")
 
     logger.info(
-        f"--- Simulation finished: account={account_id}, persona={persona_id} ---"
+        f"--- Simulation finished: account={account_id}, persona={persona.id}, conversation_id {conversation_id} ---"
     )

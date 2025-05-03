@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 from uuid import UUID
 from datetime import datetime, timezone
+import pytz
 
 # Import State and Constants
 from .graph_state import (
@@ -104,6 +105,7 @@ except ImportError:
 
 from app.api.schemas.company_profile import CompanyProfileSchema
 
+from app.services.ai_reply.prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
 
 # --- End Generate Response Imports ---
 
@@ -176,6 +178,7 @@ async def classify_intent_and_stage_node(
         "llm_fast_instance"
     )
     previous_stage = state.get("current_sales_stage")
+    explicit_need_identified = state.get("explicit_need_identified", False)
 
     # --- Validações ---
     if not llm_fast_instance:
@@ -220,24 +223,23 @@ async def classify_intent_and_stage_node(
             (
                 "system",
                 """Você é um especialista em análise de conversas de vendas. Analise a ÚLTIMA MENSAGEM do cliente no contexto do HISTÓRICO DA CONVERSA e do ESTÁGIO ANTERIOR da venda.
-Sua tarefa é classificar a INTENÇÃO do cliente na última mensagem e determinar qual deve ser o PRÓXIMO ESTÁGIO da venda.
+Sua tarefa é classificar a INTENÇÃO do cliente e determinar o PRÓXIMO ESTÁGIO da venda.
+
+Estágios de Venda Possíveis: {valid_stages}
+Intenções Possíveis: {valid_intents}
 
 Considere o seguinte:
-- Estágios válidos: {valid_stages}
-- Intenções válidas: {valid_intents}
-- Se for o início da conversa ou apenas saudações, o estágio é 'Opening'.
-- Se o cliente faz perguntas sobre o produto/serviço ou descreve problemas após a abertura, o estágio deve ser 'Investigation'.
-- Se o agente já apresentou soluções e o cliente expressa dúvidas sobre preço, tempo, ou valor, é 'ObjectionHandling'.
+- Se for o início ou saudações, estágio é 'Opening'.
+- Se o cliente faz perguntas gerais/específicas ou descreve problemas/situação após a abertura, o estágio deve ser 'Investigation'. **Mantenha 'Investigation' mesmo que o cliente mencione um problema ou interesse inicial.**
+- Mude para 'Presentation' SOMENTE se o cliente, após uma pergunta focada em benefícios (Need-Payoff), **confirmar explicitamente o valor** ou pedir para ver a solução (ex: "Sim, isso seria ótimo!", "Como funciona na prática?", "Me mostre como fazer X"). Uma simples menção a um problema ou funcionalidade NÃO é suficiente para ir para 'Presentation'.
+- Se o cliente expressa dúvidas claras sobre preço, tempo, valor, etc., é 'ObjectionHandling'.
 - Se o cliente demonstra claro interesse em comprar ou pergunta como proceder, é 'Closing'.
-- Se a conversa parece ter se desviado ou a intenção não é clara, use 'Unknown' para intenção e mantenha o estágio anterior ou use 'Unknown'.
+- Se a conversa parece desviada ou a intenção não é clara, use 'Unknown' ou mantenha o estágio anterior.
 
-HISTÓRICO DA CONVERSA (Mais recentes primeiro):
-{chat_history}
-
+HISTÓRICO DA CONVERSA: {chat_history}
 ESTÁGIO ANTERIOR: {previous_stage}
-
-ÚLTIMA MENSAGEM DO CLIENTE:
-{last_message}
+FLAG NECESSIDADE EXPLÍCITA IDENTIFICADA (do ciclo SPIN anterior): {explicit_need_identified}
+ÚLTIMA MENSAGEM DO CLIENTE: {last_message}
 
 Classifique a intenção e o próximo estágio.""",
             ),
@@ -251,7 +253,7 @@ Classifique a intenção e o próximo estágio.""",
             for m in reversed(history_for_classification[:-1])
         ]
     )
-
+    logger.debug("[{node_name}]Conversation History: {formatted_history} ")
     # --- Cria LLM Estruturado ---
     structured_llm = llm_fast_instance.with_structured_output(
         IntentStageClassificationOutput
@@ -259,16 +261,18 @@ Classifique a intenção e o próximo estágio.""",
 
     try:
         logger.debug(f"[{node_name}] Invoking structured classification chain...")
+
+        prompt_filled = classification_prompt_template.format_messages(
+            valid_stages=", ".join(VALID_SALES_STAGES),
+            valid_intents=", ".join(VALID_INTENTS),
+            chat_history=formatted_history or "N/A",
+            previous_stage=previous_stage or "None",
+            last_message=last_message_content,
+            explicit_need_identified=str(explicit_need_identified).upper(),
+        )
+        logger.info(f"[{node_name}] Prompt used: {prompt_filled} ")
         classification_result: IntentStageClassificationOutput = (
-            await structured_llm.ainvoke(
-                classification_prompt_template.format_messages(
-                    valid_stages=", ".join(VALID_SALES_STAGES),
-                    valid_intents=", ".join(VALID_INTENTS),
-                    chat_history=formatted_history if formatted_history else "N/A",
-                    previous_stage=previous_stage or "None",
-                    last_message=last_message_content,
-                )
-            )
+            await structured_llm.ainvoke(prompt_filled)
         )
         logger.info(
             f"[{node_name}] Structured classification result: {classification_result}"
@@ -352,7 +356,8 @@ async def generate_rapport_node(
         return {"generation": default_greeting.content, "messages": [default_greeting]}
 
     company_name = profile_dict.get("company_name", "a empresa")
-    ai_objective = profile_dict.get("ai_objective", "ajudar com suas dúvidas")
+    # ai_objective = profile_dict.get("ai_objective", "ajudar com suas dúvidas")
+    ai_objective = "Responder à saudação/comentário inicial do cliente de forma breve, educada e convidativa."
 
     rapport_prompt_template = ChatPromptTemplate.from_messages(
         [
@@ -535,7 +540,8 @@ async def generate_response_node(
 
     # --- Build Prompt ---
     try:
-        current_time_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+        brasilia_tz = pytz.timezone("America/Sao_Paulo")
+        current_time_str = datetime.now(brasilia_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
         # Pass current stage if available, prompt builder might use it
         current_stage = state.get("current_sales_stage")
         logger.debug(
@@ -639,6 +645,8 @@ Sua tarefa é apresentar como o produto/serviço da **{company_name}** atende a 
 Use o CONTEXTO ADICIONAL (se disponível) sobre o produto/serviço. Mantenha o tom {sales_tone}.
 Seja claro e conecte diretamente a solução à necessidade do cliente. Termine com uma pergunta aberta ou um próximo passo suave (avanço).
 
+{formatting_instructions}
+
 PERFIL DA EMPRESA: {company_name}, {business_description}
 Ofertas Relevantes (Contexto): {offering_summary}
 
@@ -680,6 +688,7 @@ Instrução: Apresente a capacidade da solução focando no benefício para a ne
                     else "Nenhuma informação adicional específica recuperada."
                 ),
                 "chat_history": formatted_history if formatted_history else "N/A",
+                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
             }
         )
         generated_presentation = generated_presentation.strip()
@@ -707,3 +716,134 @@ Instrução: Apresente a capacidade da solução focando no benefício para a ne
             "messages": [ai_message],
             "error": f"Presentation generation failed: {e}",
         }
+
+
+async def transition_after_answer_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Generates ONLY the transition question/hook after the agent has answered
+    a direct question via generate_response_node.
+
+    Args:
+        state: Current state. Requires 'messages', 'current_sales_stage'.
+        config: Requires 'llm_fast'.
+
+    Returns:
+        Dictionary with 'generation' (the transition question) and 'messages'
+        (the transition question as an AIMessage).
+    """
+    node_name = "transition_after_answer_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    current_stage = state.get("current_sales_stage")
+    previous_generation = state.get("generation", "")
+
+    # Pega a pergunta original do cliente para contexto
+    last_human_message = (
+        messages[-2].content
+        if len(messages) >= 2 and isinstance(messages[-2], HumanMessage)
+        else ""
+    )
+    # Pega a resposta que o agente deu (última mensagem no estado atual)
+    last_agent_response = (
+        messages[-1].content if messages and isinstance(messages[-1], AIMessage) else ""
+    )
+
+    llm_fast_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+
+    if not llm_fast_instance:
+        return {"error": "Transition failed: LLM unavailable."}
+    elif not previous_generation:
+        logger.warning(
+            f"[{node_name}] No previous generation found in state. Ending turn."
+        )
+        return {}
+    if len(messages) < 2:
+        logger.warning(
+            f"[{node_name}] Not enough context to generate transition. Skipping."
+        )
+        return {}  # Retorna vazio para não adicionar nada
+
+    logger.debug(
+        f"[{node_name}] Generating transition hook after agent response: '{last_agent_response[:50]}...'"
+    )
+
+    # --- Prompt para gerar APENAS a pergunta de transição ---
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um assistente de vendas que acabou de responder à pergunta do cliente.
+                Sua tarefa agora é fazer uma **transição suave** para retomar o controle e continuar a investigação (Estágio Atual: {current_stage}).
+
+                **Contexto:**
+                Pergunta do Cliente: {last_human_message}
+                Sua Resposta Anterior (Resumo): {last_agent_response_summary}
+
+                **Instruções:**
+                1.  **Reconheça (Opcional):** Comece com uma frase curta confirmando se a resposta anterior foi útil (ex: "Isso ajudou a esclarecer?", "Fez sentido?").
+                2.  **Conecte e Pergunte:** Faça UMA pergunta relevante que:
+                    *   Se conecte à **resposta que você deu** (ex: "Qual dessas funcionalidades mais te interessou?") OU
+                    *   Se conecte à **pergunta original do cliente** (ex: "Além disso que perguntei, qual era o principal desafio que você tinha em mente?") OU
+                    *   Seja uma pergunta de **Problema ou Implicação SPIN** apropriada para o estágio de Investigação.
+                3.  **Seja Natural e Conciso:** Evite perguntas genéricas demais. Tente fazer a conversa fluir.
+                4.  **Formatação:** Use formatação WhatsApp sutilmente, se necessário (ex: *negrito* para um termo chave na pergunta).
+
+                Gere APENAS a frase de reconhecimento (opcional) + a pergunta de transição.""",
+            ),
+        ]
+    )
+
+    parser = StrOutputParser()
+    chain = prompt_template | llm_fast_instance | parser
+
+    try:
+        response_summary = (
+            last_agent_response[:150] + "..."
+            if len(last_agent_response) > 150
+            else last_agent_response
+        )
+
+        transition_question = await chain.ainvoke(
+            {
+                "current_stage": current_stage or SALES_STAGE_INVESTIGATION,
+                "last_human_message": last_human_message or "N/A",
+                "last_agent_response_summary": response_summary,
+            }
+        )
+        transition_question = transition_question.strip()
+
+        if not transition_question or not transition_question.endswith("?"):
+            logger.warning(
+                f"[{node_name}] LLM generated invalid transition: '{transition_question}'. Skipping transition."
+            )
+            return {}  # Não retorna erro, apenas não faz a transição
+
+        logger.info(
+            f"[{node_name}] Generated transition question: '{transition_question}'"
+        )
+
+        # --- COMBINA a resposta anterior com a nova pergunta ---
+        final_response_text = f"{previous_generation}\n\n{transition_question}"
+        # --- FIM COMBINAÇÃO ---
+
+        ai_message = AIMessage(
+            content=transition_question
+        )  # Mensagem SÓ com a pergunta
+
+        # Atualiza 'generation' com a pergunta e 'messages' com a AIMessage dela
+        return {
+            "generation": final_response_text,  # <-- Generation é SÓ a pergunta
+            "messages": [
+                ai_message
+            ],  # <-- Adiciona SÓ a pergunta ao histórico do grafo
+            "error": None,
+        }
+
+    except Exception as e:
+        logger.exception(f"[{node_name}] Error generating transition question: {e}")
+        return {"error": f"Transition generation failed: {e}"}

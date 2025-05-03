@@ -14,13 +14,13 @@ from app.models.simulation.simulation import (
     SimulationStatusEnum,
     SimulationOutcomeEnum,
 )
-from app.simulation.schemas.persona_definition import (
-    PersonaDefinition,
+from app.simulation.schemas.persona import (
+    PersonaRead,
 )
 
 
 async def create_simulation(
-    db: AsyncSession, *, profile_id: UUID, persona_def: PersonaDefinition
+    db: AsyncSession, *, profile_id: UUID, persona_id: UUID
 ) -> Simulation:
     """
     Creates a new simulation record in the database.
@@ -28,20 +28,16 @@ async def create_simulation(
     Args:
         db: The SQLAlchemy async session.
         profile_id: The UUID of the company profile being used.
-        persona_def: The Pydantic schema of the persona definition.
+        persona_id: The UUID of the persona being used.
 
     Returns:
         The newly created Simulation object.
     """
-    logger.info(
-        f"Creating new simulation record for persona '{persona_def.persona_id}'"
-    )
-
-    persona_data_to_save = persona_def.model_dump(exclude={"embeddings"})
+    logger.info(f"Creating new simulation record for persona '{persona_id}'")
 
     db_simulation = Simulation(
         company_profile_id=profile_id,
-        persona_definition=persona_data_to_save,
+        persona_id=persona_id,
         status=SimulationStatusEnum.RUNNING,
     )
     try:

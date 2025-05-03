@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
 from loguru import logger
 from sqlalchemy import select, func, or_, update
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException, status
 
@@ -360,6 +361,42 @@ async def delete_contact(db: AsyncSession, *, contact: Contact) -> None:
                 detail="Failed to soft delete the contact.",
             )
     # Do not commit here.
+
+
+async def find_contact_inbox_by_contact_and_inbox(
+    db: AsyncSession,
+    account_id: UUID,
+    contact_id: UUID,
+    inbox_id: UUID,
+) -> ContactInbox:
+
+    contact = await find_contact_by_id(
+        db=db, account_id=account_id, contact_id=contact_id
+    )
+    if not contact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cannot associate with a non-existent or deleted contact.",
+        )
+
+    result = await db.execute(
+        select(ContactInbox)
+        .options(joinedload(ContactInbox.conversation))
+        .filter_by(contact_id=contact_id, inbox_id=inbox_id)
+    )
+
+    contact_inbox = result.scalar_one_or_none()
+
+    if not contact_inbox:
+        logger.info(
+            f"[contact_inbox] Creating contact_inbox for contact_id={contact_id} and inbox_id={inbox_id}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Cannot found a associate contact_inbox given the contact {contact_id} and the inbox {inbox_id}.",
+        )
+
+    return contact_inbox
 
 
 async def get_or_create_contact_inbox(

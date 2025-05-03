@@ -2,13 +2,12 @@ import asyncio
 import httpx
 from uuid import UUID
 from loguru import logger
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.services.queue.redis_queue import RedisQueue
 from app.services.sender.evolution import send_message as evolution_send_message
 from app.services.repository import message as message_repo
-
+from app.services.helper.checkpoint import reset_checkpoint
 from app.services.repository.message import (
     delete_messages_by_conversation,
 )
@@ -179,28 +178,11 @@ class ResponseSender:
 
             if message.content.lower().strip() == settings.RESET_MESSAGE_TRIGGER:
                 thread_id_str = str(message.conversation_id)
+
                 await delete_messages_by_conversation(
                     db=db, conversation_id=message.conversation_id
                 )
-                checkpoint_tables = [
-                    "checkpoint_writes",
-                    "checkpoint_blobs",
-                    "checkpoints",
-                ]
-                logger.info(
-                    f"[response_sender] Deleting checkpoint data for thread_id: {thread_id_str}..."
-                )
-                for table in checkpoint_tables:
-                    logger.debug(f"[response_sender] Deleting from {table}...")
-                    stmt = text(
-                        f"DELETE FROM {table} WHERE thread_id = :thread_id AND checkpoint_ns = :checkpoint_ns"
-                    )
-                    await db.execute(
-                        stmt, {"thread_id": thread_id_str, "checkpoint_ns": ""}
-                    )
-                    logger.debug(
-                        f"[response_sender] Deleted rows from {table} (if any existed)."
-                    )
+                await reset_checkpoint(db=db, thread_id=thread_id_str)
 
                 logger.info(
                     "[sender] Deleting messages for testing bot agent from no history."
