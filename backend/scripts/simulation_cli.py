@@ -1,9 +1,9 @@
 import asyncio
 import typer
 
-import os  # No longer needed for persona file paths
+import os
 import sys
-import json  # Keep for potentially printing output?
+import json
 from uuid import UUID
 from typing import Annotated, Optional
 from loguru import logger
@@ -11,8 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 # --- Setup sys.path ---
-# Assuming the script is in a 'scripts' or 'cli' directory level with 'app'
-# Adjust relative path if needed, e.g., os.path.join(os.path.dirname(__file__), "..", "..")
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
@@ -23,11 +21,11 @@ from app.simulation.runner import run_single_simulation
 from app.simulation.personas import generator as persona_generator
 from app.simulation.personas import importer as persona_importer
 
-# from app.simulation.personas import loader as persona_loader # Runner uses loader internally
+
 from app.services.repository import (
     company_profile as profile_repo,
 )
-from app.models.account import Account  # Import Account model
+from app.models.account import Account
 from app.database import AsyncSessionLocal
 from app.api.schemas.company_profile import CompanyProfileSchema
 
@@ -35,7 +33,7 @@ from pathlib import Path
 
 # --- Typer App ---
 app = typer.Typer(
-    help="CLI tool for running AI Seller simulations and managing database personas."  # Updated help
+    help="CLI tool for running AI Seller simulations and managing database personas."
 )
 
 SIMULATION_ACCOUNT_ID = UUID("0c59ccfa-dc09-4a68-a1fa-d49726b2d519")
@@ -63,13 +61,13 @@ async def _get_simulation_account(db: AsyncSession, account_id_to_get: UUID) -> 
 @app.command(name="import-persona")
 def import_persona_cli(
     json_file: Annotated[
-        Path,  # Use Path for better path handling and validation
+        Path,
         typer.Argument(
-            exists=True,  # Ensure file exists
-            file_okay=True,  # Ensure it's a file
-            dir_okay=False,  # Ensure it's not a directory
-            readable=True,  # Ensure it's readable
-            resolve_path=True,  # Get the absolute path
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            resolve_path=True,
             help="Path to the JSON file containing the persona definition.",
         ),
     ],
@@ -89,9 +87,7 @@ def import_persona_cli(
     on 'simulation_contact_identifier' in the file, and saves the Persona record.
     """
     target_account_id = account_id_param or SIMULATION_ACCOUNT_ID
-    json_file_path_str = str(
-        json_file
-    )  # Convert Path back to string if needed by importer
+    json_file_path_str = str(json_file)
 
     logger.info(
         f"Executing 'import-persona' command for file: {json_file_path_str}, Account: {target_account_id}"
@@ -100,17 +96,13 @@ def import_persona_cli(
     async def _import_wrapper():
         """Async wrapper to manage DB session and call importer."""
         async with AsyncSessionLocal() as db:
-            # Fetch Account
             try:
-                account = await _get_simulation_account(
-                    db, target_account_id
-                )  # Use helper, pass ID
+                account = await _get_simulation_account(db, target_account_id)
                 logger.info(f"Using account: {account.id} for import.")
             except ValueError as e:
                 logger.error(f"Setup error: {e}")
-                raise  # Re-raise to be caught by outer try/except
+                raise
 
-            # Call the importer function
             imported_persona = await persona_importer.import_persona_from_json(
                 db=db,
                 account=account,
@@ -118,10 +110,9 @@ def import_persona_cli(
             )
 
             if not imported_persona:
-                # Specific errors logged within the importer function
+
                 raise ValueError(f"Failed to import persona from {json_file_path_str}.")
 
-            # Log success and print info
             logger.success(
                 f"Persona '{imported_persona.persona_id}' imported successfully from {json_file_path_str}."
             )
@@ -146,7 +137,7 @@ def import_persona_cli(
 # --- Comandos ---
 @app.command()
 def run(
-    persona_id_str: Annotated[  # Renamed variable
+    persona_id_str: Annotated[
         str,
         typer.Argument(
             help="The unique persona_id (string identifier) of the persona in the database."
@@ -230,12 +221,11 @@ def generate_persona_cli(
     async def _generate_and_save_db():
         """Async wrapper to manage DB session and call generator."""
         async with AsyncSessionLocal() as db:
-            # Fetch Account
+
             account = await db.get(Account, target_account_id)
             if not account:
                 raise ValueError(f"Account {target_account_id} not found.")
 
-            # Fetch Profile
             company_profile_model = await profile_repo.get_profile_by_account_id(
                 db=db, account_id=target_account_id
             )
@@ -245,22 +235,20 @@ def generate_persona_cli(
                 )
             profile_schema = CompanyProfileSchema.model_validate(company_profile_model)
 
-            # Call the new generator function that saves to DB
             generated_persona_read = await persona_generator.generate_and_save_persona(
                 db=db,
                 account=account,
                 profile=profile_schema,
                 persona_type_description=persona_type,
-                contact_identifier=contact_identifier,  # Pass optional identifier
+                contact_identifier=contact_identifier,
             )
 
             if not generated_persona_read:
-                # Specific errors should be logged within the generator function
+
                 raise ValueError(
                     "Failed to generate and save persona definition to database."
                 )
 
-            # Log success and print info
             logger.success(
                 f"Persona '{generated_persona_read.persona_id}' generated and saved successfully to database."
             )
@@ -271,7 +259,7 @@ def generate_persona_cli(
             print(
                 f"Contact Identifier: {generated_persona_read.simulation_contact_identifier}"
             )
-            # Optionally print the full JSON
+
             print(generated_persona_read.model_dump_json(indent=2))
 
     try:
@@ -285,7 +273,7 @@ def generate_persona_cli(
 
 
 if __name__ == "__main__":
-    logger.remove()  # Remove default handler
+    logger.remove()
 
     logger.add(sys.stderr, level="DEBUG" if "--debug" in sys.argv else "INFO")
     app()
