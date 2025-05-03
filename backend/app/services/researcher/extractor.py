@@ -62,7 +62,7 @@ except ImportError:
 
 # --- Constants ---
 MAX_TEXT_CHARS_FOR_PROMPT = 140000
-DEFAULT_EXTRACTION_MODEL = "gpt-4.1-mini"
+DEFAULT_EXTRACTION_MODEL = "gpt-4o"
 
 # --- Helper Functions ---
 
@@ -103,32 +103,37 @@ def _build_extraction_prompt(website_text: str, schema_description: str) -> str:
         )
 
     return f"""
-        You are a meticulous AI assistant acting as a Business Analyst.
-        Your primary task is to analyze the provided 'Website Text' and extract information to populate a structured company profile.
+You are a meticulous AI assistant acting as a Business Analyst.
+Your task is to analyze the provided 'Website Text' and extract information to populate a structured company profile.
 
-        **Core Instructions:**
-        1.  **Source Limitation:** Extract information *exclusively* from the 'Website Text' below. Do not infer, assume, add external knowledge, or invent details.
-        2.  **Missing Information:** If specific information for a field is not found in the text: Use `null` for optional fields, `[]` for list fields.
-        3.  **Language Preservation:** Extracted values MUST match the original language in the 'Website Text'. **DO NOT TRANSLATE**.
-        4.  **Semantic Appropriateness:** Ensure extracted values make logical sense for their field.
-        5.  **Output Format:** Generate a single, valid JSON object conforming strictly to the 'Target Information Fields' structure. Respond ONLY with this JSON object.
+**Core Instructions**
+1. **Source Limitation:** Extract information *exclusively* from the 'Website Text' below. Do not infer, assume, add external knowledge, or invent details.
+2. **Missing Information:** If specific information for a field is not found, use `null` for optionals and `[]` for lists.
+3. **Language Preservation:** Extracted values MUST remain in the language used in the Website Text. **DO NOT TRANSLATE**.
+4. **Semantic Appropriateness:** Ensure values make sense for their field.
+5. **Output Format:** Return a single, valid JSON object conforming to the 'Target Information Fields'. Respond **only** with that JSON.
 
-        **Specific Guidance for 'offering_overview':**
-        *   This field should list the **actual products, services, subscriptions, or plans** the company sells or provides to customers.
-        *   **DO NOT** include items that are merely features, payment methods (like 'PIX Payment', 'Credit Card'), delivery methods, general categories (like 'documentaries' if specific documentary titles are listed elsewhere), or company sections (like 'Support Department') in the 'offering_overview' list.
-        *   Focus on items a customer would typically choose or purchase.
-        *   For each valid offering found, extract its name, description, key features, price info (if available), and a direct link (if available).
+**Guidance for `offering_overview`**
+* List only the actual products, services, subscriptions, or plans customers buy.
+* Do **NOT** list payment methods, delivery methods, categories, or internal sections.
+* For each offering extract: `name`, `short_description`, `key_features`, `price_info` (if available), `link` (if available), and `bonus_items`.
 
-        **Target Information Fields (CompanyProfileSchema):**
-        {schema_description}
+*** Bundles (one offering that includes several bonuses) ***
+• If one total price covers several items, treat it as ONE offering.
+• Content after “What you’ll get”, “Bonuses”, “Includes” etc. → put in `bonus_items`.
+• Put headline benefits in `key_features`.
+• Create multiple offerings only if each item has a separate price.
 
-        **Website Text to Analyze:**
-        --- START TEXT ---
-        {truncated_text}
-        --- END TEXT ---
+**Target Information Fields (CompanyProfileSchema):**
+{schema_description}
 
-        Now, perform the extraction according to all instructions, paying close attention to the guidance for 'offering_overview', and provide the JSON object.
-    """
+**Website Text to Analyze**
+--- START TEXT ---
+{truncated_text}
+--- END TEXT ---
+
+Now extract the data according to all instructions and return the JSON object.
+"""
 
 
 # --- Core Extraction Function ---
@@ -177,6 +182,7 @@ async def extract_profile_from_text(
 
     # Build the detailed prompt
     prompt = _build_extraction_prompt(website_text, schema_description)
+    logger.debug(f"Prompt: {prompt}")
 
     logger.info(
         f"Attempting profile extraction using LLM: {llm.__class__.__name__}. Text length: {len(website_text)}"

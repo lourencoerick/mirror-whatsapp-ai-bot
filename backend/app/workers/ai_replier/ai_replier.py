@@ -457,6 +457,8 @@ async def handle_ai_reply_request(
                     "generation": None,
                     "loop_count": 0,  # Reset loop count? Or let checkpoint manage? Let checkpoint manage.
                     "error": None,
+                    "current_objection": None,
+                    "objection_loop_count": 0,
                     # Fields managed entirely by checkpoint (don't need to initialize here unless setting default)
                     # "current_sales_stage": None,
                     # "customer_needs": [],

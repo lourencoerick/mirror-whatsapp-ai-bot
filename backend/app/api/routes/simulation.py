@@ -238,12 +238,14 @@ async def enqueue_simulation_message(
         f"Received simulation message to enqueue for conversation {conversation_id} from user {user_id}"
     )
 
-    await _enqueue_simulation_message(
+    simulation_message_enqueue_response = await _enqueue_simulation_message(
         db=db,
         account_id=account_id,
         conversation_id=conversation_id,
         message_payload=message_payload,
     )
+
+    return simulation_message_enqueue_response
 
 
 @router.delete(

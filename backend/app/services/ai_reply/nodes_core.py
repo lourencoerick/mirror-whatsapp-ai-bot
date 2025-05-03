@@ -142,13 +142,39 @@ from pydantic import BaseModel, Field
 class IntentStageClassificationOutput(BaseModel):
     """Structured output for intent and sales stage classification."""
 
-    intent: str = Field(
-        ...,
-        description=f"The primary intent of the customer's last message. Valid intents: {VALID_INTENTS}",
-    )
+    intent: str = Field(..., description=f"Primary intent. Valid: {VALID_INTENTS}")
     next_sales_stage: str = Field(
+        ..., description=f"Recommended next stage. Valid: {VALID_SALES_STAGES}"
+    )
+    is_problem_statement: bool = Field(
         ...,
-        description=f"The recommended next sales stage based on the conversation. Valid stages: {VALID_SALES_STAGES}",
+        description="True ONLY if the customer is describing a problem/pain point in response to an investigation question, NOT raising an objection to the sale itself.",
+    )  # <-- NOVO CAMPO
+
+
+class ProposedSolutionDetails(BaseModel):
+    """Structured output defining the specific solution proposed to the customer."""
+
+    product_name: str = Field(
+        ..., description="The name of the main product/service being proposed."
+    )
+    quantity: Optional[int] = Field(
+        ..., description="The quantity being proposed (default to 1 if not specified)."
+    )
+    price: Optional[float] = Field(
+        None,
+        description="The total price for the proposed quantity, if known or inferable.",
+    )
+    price_info: Optional[str] = Field(
+        None,
+        description="Additional context about the price (e.g., 'per month', 'one-time fee').",
+    )
+    key_benefit_addressed: Optional[str] = Field(
+        None,
+        description="The main customer need or pain point this specific proposal addresses.",
+    )
+    delivery_info: Optional[str] = Field(
+        None, description="Relevant delivery or setup information, if applicable."
     )
 
 
@@ -161,14 +187,16 @@ async def classify_intent_and_stage_node(
     state: ConversationState, config: dict
 ) -> Dict[str, Any]:
     """
-    Uses an LLM with structured output to classify intent and determine the next sales stage.
+    Uses an LLM with structured output to classify intent, determine the next
+    sales stage, and identify if the user is stating a problem vs. objecting.
 
     Args:
         state: The current conversation state. Requires 'messages'.
         config: The graph configuration. Requires 'llm_fast_instance'.
 
     Returns:
-        A dictionary containing 'intent', 'current_sales_stage', and optionally 'error'.
+        A dictionary containing 'intent', 'current_sales_stage', 'classification_details',
+        and optionally 'error'.
     """
     node_name = "classify_intent_and_stage_node"
     logger.info(f"--- Starting Node: {node_name} ---")
@@ -185,27 +213,29 @@ async def classify_intent_and_stage_node(
         logger.error(f"[{node_name}] LLM instance not found.")
         return {"error": "Classification failed: LLM unavailable."}
     if not messages:
-        logger.warning(
-            f"[{node_name}] No messages in state. Defaulting stage to Opening."
-        )
+        logger.warning(f"[{node_name}] No messages. Defaulting stage to Opening.")
         return {
             "intent": "Unknown",
             "current_sales_stage": SALES_STAGE_OPENING,
             "error": None,
         }
 
-    history_for_classification = messages[-10:]
+    history_for_classification = messages[-10:]  # Analisa últimas 10 mensagens
     last_message = history_for_classification[-1]
+    # Pega a penúltima mensagem (provável pergunta do agente) para contexto
+    previous_agent_message_content = (
+        getattr(history_for_classification[-2], "content", "")
+        if len(history_for_classification) >= 2
+        else ""
+    )
+
     last_message_content = (
         getattr(last_message, "content", "")
         if isinstance(getattr(last_message, "content", ""), str)
         else ""
     )
-
     if not last_message_content:
-        logger.warning(
-            f"[{node_name}] Last message has no text content. Cannot classify."
-        )
+        logger.warning(f"[{node_name}] Last message has no text content.")
         return {
             "intent": "Unknown",
             "current_sales_stage": previous_stage or SALES_STAGE_OPENING,
@@ -215,33 +245,45 @@ async def classify_intent_and_stage_node(
     logger.debug(
         f"[{node_name}] Classifying message: '{last_message_content[:100]}...'"
     )
-    logger.debug(f"[{node_name}] Previous stage was: {previous_stage}")
+    logger.debug(f"[{node_name}] Previous stage: {previous_stage}")
+    logger.debug(
+        f"[{node_name}] Previous agent msg: '{previous_agent_message_content[:100]}...'"
+    )
 
-    # --- Prompt de Classificação  ---
+    # --- Prompt de Classificação (REFINADO) ---
     classification_prompt_template = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                """Você é um especialista em análise de conversas de vendas. Analise a ÚLTIMA MENSAGEM do cliente no contexto do HISTÓRICO DA CONVERSA e do ESTÁGIO ANTERIOR da venda.
-Sua tarefa é classificar a INTENÇÃO do cliente e determinar o PRÓXIMO ESTÁGIO da venda.
+                """Você é um especialista em análise de conversas de vendas (SPIN, etc.). Analise a ÚLTIMA MENSAGEM do cliente no contexto do HISTÓRICO e da ÚLTIMA PERGUNTA DO AGENTE.
+Sua tarefa é classificar a INTENÇÃO, determinar o PRÓXIMO ESTÁGIO da venda e identificar se é uma DECLARAÇÃO DE PROBLEMA.
 
-Estágios de Venda Possíveis: {valid_stages}
-Intenções Possíveis: {valid_intents}
+Estágios Válidos: {valid_stages}
+Intenções Válidas: {valid_intents}
 
-Considere o seguinte:
-- Se for o início ou saudações, estágio é 'Opening'.
-- Se o cliente faz perguntas gerais/específicas ou descreve problemas/situação após a abertura, o estágio deve ser 'Investigation'. **Mantenha 'Investigation' mesmo que o cliente mencione um problema ou interesse inicial.**
-- Mude para 'Presentation' SOMENTE se o cliente, após uma pergunta focada em benefícios (Need-Payoff), **confirmar explicitamente o valor** ou pedir para ver a solução (ex: "Sim, isso seria ótimo!", "Como funciona na prática?", "Me mostre como fazer X"). Uma simples menção a um problema ou funcionalidade NÃO é suficiente para ir para 'Presentation'.
-- Se o cliente expressa dúvidas claras sobre preço, tempo, valor, etc., é 'ObjectionHandling'.
-- Se o cliente demonstra claro interesse em comprar ou pergunta como proceder, é 'Closing'.
-- Se a conversa parece desviada ou a intenção não é clara, use 'Unknown' ou mantenha o estágio anterior.
+**Regras de Classificação:**
+- **Greeting:** Saudações. -> Próximo Estágio: 'Opening'. `is_problem_statement`: false.
+- **Question:** Pergunta direta sobre produto, preço, processo. -> Próximo Estágio: 'Investigation' (ou manter avançado). `is_problem_statement`: false.
+- **Statement:** Afirmação, resposta neutra, descrição de situação. -> Próximo Estágio: Geralmente 'Investigation', *MAS* se `explicit_need_identified` for TRUE, então 'Presentation'. `is_problem_statement`: false.
+- **Objection:** Cliente expressa barreira CLARA à COMPRA ou ao AVANÇO (preço da *solução*, tempo para *implementar*, valor da *solução*, concorrente, "preciso pensar *sobre a compra*"). -> Próximo Estágio: 'ObjectionHandling'. `is_problem_statement`: false.
+- **ClosingAttempt:** Cliente demonstra interesse claro em comprar/prosseguir. -> Próximo Estágio: 'Closing'. `is_problem_statement`: false.
+- **Complaint:** Reclamação. -> Próximo Estágio: 'ObjectionHandling'. `is_problem_statement`: false.
+- **Other/Unknown:** Não se encaixa. -> Próximo Estágio: Manter ou 'Unknown'. `is_problem_statement`: false.
+
+**IMPORTANTE - Declaração de Problema:**
+- Se a 'ÚLTIMA PERGUNTA DO AGENTE' foi uma pergunta de Situação ou Problema (ex: "Quais desafios você enfrenta?", "Como você faz X hoje?"), E a 'ÚLTIMA MENSAGEM DO CLIENTE' descreve uma dificuldade, dor, ou insatisfação (ex: "gasto muito tempo", "é difícil fazer Y", "não consigo Z"), então:
+    - `intent` deve ser 'Statement'.
+    - `next_sales_stage` deve ser 'Investigation' (para continuar investigando com Implicação/Need-Payoff).
+    - `is_problem_statement` deve ser **true**.
+- **NÃO confunda uma declaração de problema com uma objeção.** Objeção é resistência à *venda*, declaração de problema é descrição da *situação atual* do cliente.
 
 HISTÓRICO DA CONVERSA: {chat_history}
 ESTÁGIO ANTERIOR: {previous_stage}
-FLAG NECESSIDADE EXPLÍCITA IDENTIFICADA (do ciclo SPIN anterior): {explicit_need_identified}
+FLAG NECESSIDADE EXPLÍCITA IDENTIFICADA: {explicit_need_identified}
+ÚLTIMA PERGUNTA DO AGENTE (Aproximada): {previous_agent_message}
 ÚLTIMA MENSAGEM DO CLIENTE: {last_message}
 
-Classifique a intenção e o próximo estágio.""",
+Responda APENAS com um objeto JSON contendo "intent", "next_sales_stage", e "is_problem_statement".""",
             ),
         ]
     )
@@ -250,27 +292,31 @@ Classifique a intenção e o próximo estágio.""",
     formatted_history = "\n".join(
         [
             f"{'Cliente' if isinstance(m, HumanMessage) else 'Agente'}: {m.content}"
-            for m in reversed(history_for_classification[:-1])
+            for m in reversed(
+                history_for_classification[:-1]
+            )  # Exclui a última msg do cliente daqui
         ]
     )
-    logger.debug("[{node_name}]Conversation History: {formatted_history} ")
+
     # --- Cria LLM Estruturado ---
+    # Usando with_structured_output para consistência (assumindo llm_fast_instance suporta)
     structured_llm = llm_fast_instance.with_structured_output(
         IntentStageClassificationOutput
     )
 
     try:
         logger.debug(f"[{node_name}] Invoking structured classification chain...")
-
+        # Preenche o prompt
         prompt_filled = classification_prompt_template.format_messages(
             valid_stages=", ".join(VALID_SALES_STAGES),
             valid_intents=", ".join(VALID_INTENTS),
             chat_history=formatted_history or "N/A",
             previous_stage=previous_stage or "None",
+            previous_agent_message=previous_agent_message_content or "N/A",
             last_message=last_message_content,
             explicit_need_identified=str(explicit_need_identified).upper(),
         )
-        logger.info(f"[{node_name}] Prompt used: {prompt_filled} ")
+        # Invoca o LLM
         classification_result: IntentStageClassificationOutput = (
             await structured_llm.ainvoke(prompt_filled)
         )
@@ -278,25 +324,29 @@ Classifique a intenção e o próximo estágio.""",
             f"[{node_name}] Structured classification result: {classification_result}"
         )
 
-        # --- Validação (Opcional - Pydantic já validou tipos/campos obrigatórios) ---
+        # --- Validação Pós-LLM (Opcional, mas útil) ---
         intent = classification_result.intent
         next_stage = classification_result.next_sales_stage
+        is_problem_stmt = classification_result.is_problem_statement
 
-        if intent not in VALID_INTENTS:
-            logger.warning(
-                f"[{node_name}] LLM returned intent '{intent}' not in VALID_INTENTS. Defaulting to Unknown."
+        # Correção: Se for uma declaração de problema, garantir que vá para Investigation
+        if is_problem_stmt:
+            intent = "Statement"  # Garante que a intenção seja Statement
+            next_stage = SALES_STAGE_INVESTIGATION  # Força a continuar investigando
+            logger.info(
+                f"[{node_name}] Identified as Problem Statement. Forcing Stage to Investigation."
             )
+
+        # Validar se os valores estão na lista permitida (redundante com Pydantic, mas seguro)
+        if intent not in VALID_INTENTS:
             intent = "Unknown"
         if next_stage not in VALID_SALES_STAGES:
-            logger.warning(
-                f"[{node_name}] LLM returned stage '{next_stage}' not in VALID_SALES_STAGES. Defaulting."
-            )
             next_stage = previous_stage or SALES_STAGE_UNKNOWN
 
         return {
             "intent": intent,
             "current_sales_stage": next_stage,
-            "classification_details": classification_result.model_dump(),
+            "classification_details": classification_result.model_dump(),  # Guarda detalhes completos
             "error": None,
         }
 
@@ -595,6 +645,137 @@ async def generate_response_node(
             "generation": fallback_text,
             "messages": [fallback_response],
             "error": f"LLM invocation failed: {e}",
+        }
+
+
+async def define_proposal_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Analyzes the conversation and company offerings to define the specific
+    solution details (product, price, quantity) being proposed before closing.
+
+    Args:
+        state: Requires 'messages', 'company_profile', 'customer_needs', 'customer_pain_points'.
+        config: Requires 'llm_primary_instance'.
+
+    Returns:
+        Dictionary containing 'proposed_solution_details'.
+    """
+    node_name = "define_proposal_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    profile = CompanyProfileSchema.model_validate(
+        state.get("company_profile")
+    )  # Validar para acesso
+    needs = state.get("customer_needs", [])
+    pains = state.get("customer_pain_points", [])
+    llm_primary: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_primary_instance"
+    )
+
+    # --- Validações ---
+    if not llm_primary:
+        return {"error": "Proposal definition failed: LLM unavailable."}
+    if not profile:
+        return {"error": "Proposal definition failed: Missing profile."}
+    if not messages:
+        return {"error": "Proposal definition failed: Empty message history."}
+    if not needs and not pains:
+        logger.warning(
+            f"[{node_name}] No specific needs or pains identified, proposal might be generic."
+        )
+
+    # --- Preparar Contexto para o LLM ---
+    formatted_history = "\n".join(
+        [
+            f"{'Cliente' if isinstance(m, HumanMessage) else 'Agente'}: {m.content}"
+            for m in reversed(messages[-8:])
+        ]
+    )
+    needs_summary = "; ".join(needs) if needs else "N/A"
+    pains_summary = "; ".join(pains) if pains else "N/A"
+    # Formatar ofertas para o prompt
+    offerings_text = (
+        "\n".join(
+            [
+                f"- {o.name}: {o.short_description} (Preço: {o.price_info or 'N/A'})"
+                for o in profile.offering_overview
+            ]
+        )
+        if profile.offering_overview
+        else "Nenhuma oferta específica listada."
+    )
+
+    logger.debug(
+        f"[{node_name}] Defining proposal based on Needs: '{needs_summary}', Pains: '{pains_summary}'"
+    )
+
+    # --- Prompt para Definir a Proposta ---
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um especialista em vendas que precisa definir a proposta final para o cliente com base na conversa.
+Analise as necessidades/dores do cliente e as ofertas da empresa para determinar a melhor solução a ser proposta.
+
+**Contexto:**
+Necessidades do Cliente: {customer_needs}
+Dores/Problemas do Cliente: {customer_pains}
+Ofertas da Empresa:
+{company_offerings}
+
+Histórico Recente da Conversa:
+{chat_history}
+
+**Sua Tarefa:**
+1.  **Identifique o Produto Principal:** Qual produto/serviço da lista de 'Ofertas da Empresa' melhor atende às necessidades/dores identificadas?
+2.  **Determine Detalhes:**
+    *   `product_name`: Nome exato do produto/serviço principal identificado.
+    *   `quantity`: Quantidade (geralmente 1, a menos que a conversa indique outra).
+    *   `price`: Preço total para a quantidade (se disponível nas ofertas ou inferível). Deixe null se não souber.
+    *   `price_info`: Informação adicional do preço (ex: "por mês", "taxa única").
+    *   `key_benefit_addressed`: A principal necessidade/dor que esta proposta resolve.
+    *   `delivery_info`: Informação relevante de entrega/setup, se houver.
+3.  **Output:** Responda APENAS com um objeto JSON seguindo o schema ProposedSolutionDetails.
+
+Instrução Final: Defina a proposta mais adequada em formato JSON.""",
+            ),
+        ]
+    )
+
+    # --- Cadeia com LLM Estruturado ---
+    # Usar um LLM capaz de extrair JSON (o primário deve ser)
+    structured_llm = llm_primary.with_structured_output(ProposedSolutionDetails)
+    chain = prompt_template | structured_llm
+
+    try:
+        proposal_details: ProposedSolutionDetails = await chain.ainvoke(
+            {
+                "customer_needs": needs_summary,
+                "customer_pains": pains_summary,
+                "company_offerings": offerings_text,
+                "chat_history": formatted_history,
+            }
+        )
+
+        logger.info(f"[{node_name}] Defined proposal details: {proposal_details}")
+
+        # Retorna o dicionário para ser adicionado ao estado
+        return {
+            "proposed_solution_details": proposal_details.model_dump(
+                exclude_none=True
+            ),  # Converte para dict
+            "error": None,
+        }
+
+    except Exception as e:
+        logger.exception(f"[{node_name}] Error defining proposal details: {e}")
+        # Retorna vazio ou um erro, impedindo o fechamento sem detalhes
+        return {
+            "proposed_solution_details": None,
+            "error": f"Proposal definition failed: {e}",
         }
 
 

@@ -37,6 +37,7 @@ export function OfferingForm({
       name: initialData?.name || "",
       short_description: initialData?.short_description || "",
       key_features: initialData?.key_features || [],
+      bonus_items: initialData?.bonus_items || [],
       price_info: initialData?.price_info || "",
       link: initialData?.link || "",
     },
@@ -55,7 +56,7 @@ export function OfferingForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <div>
         <Label htmlFor="offering-name" className="mb-1.5 block">
-          Offering Name
+          Nome da Oferta
         </Label>
         <Input id="offering-name" {...register("name")} disabled={disabled} />
         {errors.name && (
@@ -64,7 +65,7 @@ export function OfferingForm({
       </div>
       <div>
         <Label htmlFor="offering-desc" className="mb-1.5 block">
-          Short Description
+          Descrição Simples
         </Label>
         <Textarea
           id="offering-desc"
@@ -80,12 +81,12 @@ export function OfferingForm({
       </div>
       <div>
         <Label htmlFor="offering-price" className="mb-1.5 block">
-          Price Info
+          Informação de Preço
         </Label>
         <Textarea
           id="offering-price"
           rows={2}
-          placeholder="e.g., Starts at $XX, Contact us"
+          placeholder="ex: A partir de R$XX, entre em contato"
           {...register("price_info")}
           disabled={disabled}
         />
@@ -97,7 +98,7 @@ export function OfferingForm({
       </div>
       <div>
         <Label htmlFor="offering-link" className="mb-1.5 block">
-          Link (Optional)
+          Link (Opcional)
         </Label>
         <Input
           id="offering-link"
@@ -118,9 +119,25 @@ export function OfferingForm({
           render={({ field, fieldState: { error } }) => (
             <StringListInput
               field={field}
-              label="Key Features"
+              label="Principais Características"
               id="offering-features"
-              placeholder="Add a feature..."
+              placeholder="Adicione um recurso..."
+              error={error}
+            />
+          )}
+        />
+      </div>
+
+      <div>
+        <Controller
+          name="bonus_items"
+          control={control}
+          render={({ field, fieldState: { error } }) => (
+            <StringListInput
+              field={field}
+              label="Itens Bônus"
+              id="offering-bonus"
+              placeholder="Adicione um item bônus..."
               error={error}
             />
           )}
@@ -134,11 +151,11 @@ export function OfferingForm({
           onClick={onCancel}
           disabled={disabled}
         >
-          Cancel
+          Cancelar
         </Button>
         <Button type="submit" disabled={disabled}>
           {disabled && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {initialData ? "Save Changes" : "Add Offering"}
+          {initialData ? "Salvar Alterações" : "Adicionar Oferta"}
         </Button>
       </div>
     </form>

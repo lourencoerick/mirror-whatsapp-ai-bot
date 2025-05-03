@@ -118,6 +118,19 @@ class CertaintyAssessmentOutput(BaseModel):
     )
 
 
+class CertaintyGenerationOutput(BaseModel):
+    """Structured output for generating certainty statements."""
+
+    connection_phrase: Optional[str] = Field(
+        None,
+        description="An optional short phrase connecting to the customer's last message, showing understanding. Null or empty if no specific connection is needed.",
+    )
+    certainty_statement: str = Field(
+        ...,
+        description="The specific, confident statement focused on building certainty about the product, agent, or company (based on the focus). Should NOT end with a question.",
+    )
+
+
 # Constants
 CERTAINTY_THRESHOLD = 7  # Target certainty level (0-10)
 RAG_CHUNK_LIMIT = 3  # Limit for certainty RAG
@@ -394,23 +407,23 @@ async def generate_certainty_statement_node(
     state: ConversationState, config: dict
 ) -> Dict[str, Any]:
     """
-    Generates a persuasive statement to build certainty in the focused area,
-    using retrieved knowledge and Straight Line principles.
+    Generates a persuasive statement to build certainty using structured output,
+    ensuring the connection phrase accurately reflects the customer's sentiment.
 
     Args:
         state: Requires 'messages', 'company_profile', 'certainty_focus', 'retrieved_context'.
-        config: Requires 'llm_primary'.
+        config: Requires 'llm_primary_instance'.
 
     Returns:
-        Dictionary with 'generation' and updated 'messages'.
+        Dictionary with 'generation', 'messages', and updated 'certainty_status'.
     """
     node_name = "generate_certainty_statement_node"
     logger.info(f"--- Starting Node: {node_name} (Straight Line Subgraph) ---")
 
     messages = state.get("messages", [])
     profile_dict = state.get("company_profile")
-    focus = state.get("certainty_focus")  # "product", "agent", or "company"
-    context = state.get("retrieved_context")  # RAG context specific to the focus
+    focus = state.get("certainty_focus")
+    context = state.get("retrieved_context")
     llm_primary_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
         "llm_primary_instance"
     )
@@ -422,38 +435,60 @@ async def generate_certainty_statement_node(
         return {"error": "Certainty generation failed: Focus not set."}
     if not profile_dict:
         return {"error": "Certainty generation failed: Missing profile dict."}
+    if not messages:
+        return {"error": "Certainty generation failed: Empty message history."}
+
+    last_human_message_obj = (
+        messages[-1] if messages and isinstance(messages[-1], HumanMessage) else None
+    )
+    last_human_message_content = getattr(last_human_message_obj, "content", "")
 
     logger.debug(
         f"[{node_name}] Generating statement for focus: {focus}. Context available: {bool(context)}"
     )
+    logger.debug(
+        f"[{node_name}] Last human message for context: '{last_human_message_content[:100]}...'"
+    )
 
+    # --- Prompt SUPER REFINADO para Saída Estruturada ---
     prompt_template = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                """Você é um assistente de vendas de alta performance, mestre na técnica Linha Reta. Seu objetivo é construir CERTEZA na mente do cliente de forma CONVERSACIONAL e NATURAL.
+                """Você é um assistente de vendas IA de alta performance, mestre na técnica Linha Reta e em comunicação empática. Seu objetivo é construir CERTEZA no cliente de forma CONVERSACIONAL, separando a conexão da declaração principal.
 O foco atual é aumentar a certeza sobre: **{focus}**.
 
-Instruções:
-1.  **Conecte-se à Última Mensagem:** Comece com uma frase curta que mostre que você ouviu a última mensagem do cliente. Exemplos: "Entendo sua preocupação sobre X...", "Faz sentido o que você disse sobre Y...", "Com base no seu interesse em Z...".
-2.  **Gere a Declaração de Certeza:** Crie uma declaração **específica** para o foco '{focus}'.
-    *   Se foco='product': Destaque um benefício chave, um resultado comprovado ou um diferencial relevante (use o CONTEXTO ADICIONAL se disponível). Ex: "...e é exatamente por isso que [Nome do Produto] foi projetado para [resolver benefício], muitos clientes veem [resultado X]."
-    *   Se foco='agent': Transmita expertise e confiança. Ex: "...e pode ficar tranquilo, nossa equipe tem vasta experiência em [área relevante] e já ajudou empresas como a sua a..." ou "Com certeza, posso te guiar nesse processo, já implementamos isso com sucesso para..." (Use o CONTEXTO ADICIONAL se tiver depoimentos/casos).
-    *   Se foco='company': Reforce a credibilidade e reputação. Ex: "...e a [Nome da Empresa] já está há X anos no mercado, sendo reconhecida por [ponto forte]..." (Use o CONTEXTO ADICIONAL se tiver informações da empresa).
-3.  **Seja Conciso e Confiante:** Use linguagem clara, direta e que transmita segurança, mas evite jargões ou exageros. Mantenha o tom {sales_tone}.
-4.  **NÃO FAÇA PERGUNTAS:** O objetivo é fazer uma afirmação para construir certeza. Termine a declaração.
+**Contexto:**
+Última Mensagem do Cliente: {last_customer_message}
+Foco da Certeza: {focus}
 
-{formatting_instructions} 
+**Instruções:**
+1.  **Gere a `connection_phrase` (Opcional, mas importante):**
+    *   **Analise o SENTIMENTO e CONTEÚDO** da 'Última Mensagem do Cliente'. É uma preocupação? Uma dúvida? Um interesse? Um **benefício desejado**? Um **objetivo**?
+    *   Crie uma frase curta que **REFLITA ACURADAMENTE** esse sentimento/conteúdo e mostre entendimento.
+        *   Se for Preocupação/Dúvida: "Entendo sua questão sobre X..." ou "Faz sentido você pensar sobre Y..."
+        *   Se for Interesse: "Ótimo ponto sobre Z!" ou "Interessante você mencionar A..."
+        *   **Se for Benefício Desejado/Objetivo:** "Exatamente! Conseguir [benefício desejado] é fundamental." ou "Você tocou num ponto crucial: poder [objetivo do cliente]." ou "Concordo, focar em [objetivo do cliente] faz toda a diferença."
+    *   **Seja Específico:** Evite conexões genéricas como "Entendido.". Use palavras da mensagem do cliente se ajudar.
+    *   Se a última mensagem foi muito simples (ex: "ok"), deixe nula/vazia.
+2.  **Gere a `certainty_statement` (Obrigatório):**
+    *   Crie uma declaração **específica, confiante e positiva** para o foco '{focus}'.
+    *   **CONECTE a declaração ao ponto levantado pelo cliente (na `connection_phrase`)**. Mostre COMO o produto/agente/empresa ajuda a resolver a preocupação OU a alcançar o benefício/objetivo mencionado.
+    *   Use o CONTEXTO ADICIONAL se relevante.
+    *   **Exemplos por Foco (Conectados ao Benefício/Objetivo):**
+        *   'product' (Cliente quer focar no core): "...e o [Produto] permite exatamente isso ao automatizar [processo X], liberando sua equipe para focar nas atividades estratégicas."
+        *   'agent' (Cliente quer focar no core): "...e nossa equipe pode te ajudar justamente nisso, pois temos experiência em configurar a automação para que sua operação se concentre no que mais importa."
+        *   'company' (Cliente quer focar no core): "...e como empresa, nosso foco é fornecer ferramentas como [Produto] que impulsionam a eficiência e permitem que nossos clientes cresçam focados no seu core business."
+    *   Mantenha o tom {sales_tone}. Seja claro e direto.
+    *   **NÃO FAÇA PERGUNTAS** nesta declaração.
+3.  **Formatação:** Use formatação WhatsApp sutil. {formatting_instructions}
+4.  **Output:** Responda APENAS com um objeto JSON contendo "connection_phrase" (string opcional ou null) e "certainty_statement" (string obrigatória).
 
 PERFIL DA EMPRESA: {company_name}
+CONTEXTO ADICIONAL (Use se relevante para o foco '{focus}'): {additional_context}
+HISTÓRICO RECENTE (Opcional): {chat_history}
 
-CONTEXTO ADICIONAL (Use se relevante para o foco '{focus}'):
-{additional_context}
-
-HISTÓRICO RECENTE (Últimas mensagens):
-{chat_history}
-
-Instrução Final: Gere a resposta conectada e a declaração de certeza focada em '{focus}'.""",
+Instrução Final: Gere o JSON com "connection_phrase" e "certainty_statement" focada em '{focus}', garantindo que a conexão reflita o sentimento real do cliente.""",
             ),
         ]
     )
@@ -461,26 +496,30 @@ Instrução Final: Gere a resposta conectada e a declaração de certeza focada 
     formatted_history = "\n".join(
         [
             f"{'Cliente' if isinstance(m, HumanMessage) else 'Agente'}: {m.content}"
-            for m in reversed(messages[-4:])
+            for m in reversed(messages[-4:-1])
         ]
     )
-    parser = StrOutputParser()
-    chain = prompt_template | llm_primary_instance | parser
+
+    # --- Cadeia com LLM Estruturado ---
+    structured_llm = llm_primary_instance.with_structured_output(
+        CertaintyGenerationOutput
+    )
+    chain = prompt_template | structured_llm
 
     try:
-        profile = CompanyProfileSchema.model_validate(
-            profile_dict
-        )  # Revalida para acesso fácil
+        profile = CompanyProfileSchema.model_validate(profile_dict)
     except Exception:
-        profile = None  # Lida com erro se a validação falhar
-
-    if not profile:  # Checagem adicional
+        profile = None
+    if not profile:
         return {"error": "Certainty generation failed: Invalid profile data."}
 
     try:
-        generated_statement = await chain.ainvoke(
+        structured_result: CertaintyGenerationOutput = await chain.ainvoke(
             {
                 "focus": focus,
+                "last_customer_message": (
+                    last_human_message_content if last_human_message_content else "N/A"
+                ),
                 "additional_context": (
                     context
                     if context
@@ -492,17 +531,33 @@ Instrução Final: Gere a resposta conectada e a declaração de certeza focada 
                 "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
             }
         )
-        generated_statement = generated_statement.strip()
-
-        if not generated_statement:
-            raise ValueError("LLM returned empty statement.")
 
         logger.info(
-            f"[{node_name}] Generated certainty statement: '{generated_statement[:100]}...'"
+            f"[{node_name}] Structured certainty generation result: {structured_result}"
         )
-        ai_message = AIMessage(content=generated_statement)
+
+        # --- Combina as partes ---
+        connection = structured_result.connection_phrase
+        statement = structured_result.certainty_statement
+
+        if not statement:
+            raise ValueError("LLM returned empty certainty_statement.")
+        if statement.endswith("?"):
+            raise ValueError("LLM included question in certainty_statement.")
+
+        if connection and connection.strip():
+            connection_formatted = connection.strip()
+            generated_response = f"{connection_formatted} {statement}"
+        else:
+            generated_response = statement
+
+        logger.info(
+            f"[{node_name}] Combined certainty response: '{generated_response}'"
+        )
+        ai_message = AIMessage(content=generated_response)
+
         return {
-            "generation": generated_statement,
+            "generation": generated_response,
             "messages": [ai_message],
             "retrieved_context": None,
             "certainty_status": CERTAINTY_STATUS_STATEMENT_MADE,
@@ -511,8 +566,10 @@ Instrução Final: Gere a resposta conectada e a declaração de certeza focada 
 
     except Exception as e:
         # ... (Fallback como antes) ...
-        logger.exception(f"[{node_name}] Error generating certainty statement: {e}")
-        fallback = f"Entendo. Sobre {focus}, posso dizer que temos ótimos resultados."
+        logger.exception(
+            f"[{node_name}] Error generating structured certainty statement: {e}"
+        )
+        fallback = f"Entendo. Sobre {focus}, posso afirmar que temos excelentes resultados e confiabilidade."
         ai_message = AIMessage(content=fallback)
         return {
             "generation": fallback,
