@@ -56,9 +56,14 @@ class Simulation(BaseModel):
         doc="FK to the CompanyProfile used in this simulation.",
     )
 
-    persona_definition = Column(
-        JSON, nullable=False, doc="JSON representation of the PersonaDefinition used."
+    persona_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("personas.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        doc="FK to the Persona used in this simulation.",
     )
+
     status = Column(
         SAEnum(SimulationStatusEnum),
         nullable=False,
@@ -115,6 +120,7 @@ class Simulation(BaseModel):
     )
 
     company_profile = relationship("CompanyProfile")
+    persona = relationship("Persona")
 
     def __repr__(self):
         return f"<Simulation(id={self.id}, status='{self.status}', outcome='{self.outcome}')>"
