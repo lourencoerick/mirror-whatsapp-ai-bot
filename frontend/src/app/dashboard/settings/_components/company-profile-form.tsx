@@ -217,6 +217,7 @@ export function CompanyProfileForm({
     const dataToSave = {
       ...data,
       key_features: data.key_features || [],
+      bonus_items: data.bonus_items || [],
     };
 
     if (editingOfferingIndex !== null) {

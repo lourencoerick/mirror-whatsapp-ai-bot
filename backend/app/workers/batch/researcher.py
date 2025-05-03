@@ -125,7 +125,7 @@ async def run_profile_research(ctx: dict, url: str, account_id: UUID):
     initial_input = ResearchState(
         account_id=account_id,
         initial_url=url,
-        max_iterations=7,
+        max_iterations=3,
         urls_to_scrape=[],
         search_queries=[],
         scraped_data={},

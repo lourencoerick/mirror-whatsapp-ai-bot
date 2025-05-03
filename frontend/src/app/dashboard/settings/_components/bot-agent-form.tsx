@@ -311,7 +311,7 @@ export function BotAgentForm({
               // Show message if no inboxes are available
               <p className="text-sm text-muted-foreground italic">
                 Nenhuma caixa de entrada encontrada para esta conta.{" "}
-                <Link href="/dashboard/inboxes/new" className="underline">
+                <Link href="/dashboard/inboxes/create" className="underline">
                   Criar uma?
                 </Link>
               </p>

@@ -405,6 +405,154 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/simulation/conversations/{conversation_id}/checkpoint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Reset Simulation State (Delete Checkpoint & Messages)
+         * @description Deletes the persisted LangGraph state (checkpoint) AND associated messages for the specified simulation conversation.
+         */
+        delete: operations["reset_simulation_state_api_v1_simulation_conversations__conversation_id__checkpoint_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/simulation/personas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Personas
+         * @description Retrieve a list of personas with pagination.
+         */
+        get: operations["read_personas_api_v1_simulation_personas_get"];
+        put?: never;
+        /**
+         * Create Persona
+         * @description Create a new Persona linked to an existing Contact.
+         */
+        post: operations["create_new_persona_api_v1_simulation_personas_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/simlation/personas/{persona_db_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Persona by DB ID
+         * @description Get a specific persona by its database UUID.
+         */
+        get: operations["read_persona_by_id_api_v1_simlation_personas__persona_db_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/by_persona_id/{persona_id_str}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Persona by Persona ID
+         * @description Get a specific persona by its unique string identifier (persona_id).
+         */
+        get: operations["read_persona_by_persona_id_str_api_v1_by_persona_id__persona_id_str__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/simulation/personas/by_contact_id/{contact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Persona by Contact ID
+         * @description Get the persona associated with a specific Contact UUID.
+         */
+        get: operations["read_persona_by_contact_id_uuid_api_v1_simulation_personas_by_contact_id__contact_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/simulation/personas/by_identifier/{identifier}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Persona by Simulation Identifier
+         * @description Get a persona by its simulation contact identifier (e.g., phone number).
+         */
+        get: operations["read_persona_by_identifier_str_api_v1_simulation_personas_by_identifier__identifier__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/simulation/personas/{persona_db_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Persona
+         * @description Update an existing persona's details. Cannot change persona_id or linked contact.
+         */
+        put: operations["update_existing_persona_api_v1_simulation_personas__persona_db_id__put"];
+        post?: never;
+        /**
+         * Delete Persona
+         * @description Delete a persona by its database UUID.
+         */
+        delete: operations["delete_existing_persona_api_v1_simulation_personas__persona_db_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/profile": {
         parameters: {
             query?: never;
@@ -1093,6 +1241,9 @@ export interface components {
          *           "short_description": "Crocante por fora, macio por dentro."
          *         },
          *         {
+         *           "bonus_items": [
+         *             "dois pães francês"
+         *           ],
          *           "key_features": [
          *             "Serve até 10 pessoas"
          *           ],
@@ -1229,6 +1380,9 @@ export interface components {
          *           "short_description": "Crocante por fora, macio por dentro."
          *         },
          *         {
+         *           "bonus_items": [
+         *             "dois pães francês"
+         *           ],
          *           "key_features": [
          *             "Serve até 10 pessoas"
          *           ],
@@ -1374,6 +1528,12 @@ export interface components {
              */
             profile_picture_url?: string | null;
             /**
+             * Is Simulation
+             * @description Flag indicating if the contact is set for simulation
+             * @default false
+             */
+            is_simulation: boolean | null;
+            /**
              * Additional Attributes
              * @description Additional custom key-value attributes
              */
@@ -1416,6 +1576,12 @@ export interface components {
              * @description URL of the contact's profile picture
              */
             profile_picture_url?: string | null;
+            /**
+             * Is Simulation
+             * @description Flag indicating if the contact is set for simulation
+             * @default false
+             */
+            is_simulation: boolean | null;
             /**
              * Additional Attributes
              * @description Additional custom key-value attributes
@@ -1568,6 +1734,12 @@ export interface components {
              * @description URL of the contact's profile picture
              */
             profile_picture_url?: string | null;
+            /**
+             * Is Simulation
+             * @description Flag indicating if the contact is set for simulation
+             * @default false
+             */
+            is_simulation: boolean | null;
             /**
              * Additional Attributes
              * @description Additional custom key-value attributes
@@ -2203,6 +2375,11 @@ export interface components {
              * @description Direct link to the product/service page, if available.
              */
             link?: string | null;
+            /**
+             * Bonus Items
+             * @description List of additional bonus items or services included for free when purchasing the main offering. These may include templates, e-books, consultations, etc.
+             */
+            bonus_items?: string[];
         };
         /**
          * PaginatedContactRead
@@ -2248,6 +2425,237 @@ export interface components {
              * @description List of documents for the current page.
              */
             items: components["schemas"]["KnowledgeDocumentRead"][];
+        };
+        /**
+         * PersonaBase
+         * @description Base Pydantic schema for Persona data.
+         */
+        PersonaBase: {
+            /**
+             * Persona Id
+             * @description Unique, human-readable snake_case identifier for the persona.
+             */
+            persona_id: string;
+            /**
+             * Description
+             * @description Concise description of the persona and their goal.
+             */
+            description: string;
+            /**
+             * Initial Message
+             * @description The first message the persona sends.
+             */
+            initial_message: string;
+            /**
+             * Objective
+             * @description The specific goal the persona wants to achieve.
+             */
+            objective: string;
+            /**
+             * Information Needed
+             * @description List of facts needed [{'entity': 'X', 'attribute': 'Y'},...]. Entity should match offerings or common topics.
+             */
+            information_needed: {
+                [key: string]: string;
+            }[];
+            /**
+             * Info Attribute To Question Template
+             * @description Mapping of UNIQUE attributes from information_needed to question templates {'attr': 'template {entity}?'}.
+             */
+            info_attribute_to_question_template: {
+                [key: string]: string;
+            };
+            /**
+             * Success Criteria
+             * @description List of criteria defining simulation success.
+             * @default [
+             *       "state:all_info_extracted"
+             *     ]
+             */
+            success_criteria: string[];
+            /**
+             * Failure Criteria
+             * @description List of criteria defining simulation failure.
+             * @default [
+             *       "event:ai_fallback_detected",
+             *       "turn_count > 8"
+             *     ]
+             */
+            failure_criteria: string[];
+        };
+        /**
+         * PersonaCreate
+         * @description Schema for creating a new Persona. Requires the ID of an existing Contact.
+         *     The 'simulation_contact_identifier' will be automatically set based on the
+         *     linked Contact's identifier.
+         * @example {
+         *       "contact_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+         *       "description": "Cliente decidido a comprar o produto Y se o preço for bom.",
+         *       "failure_criteria": [
+         *         "turn_count > 5"
+         *       ],
+         *       "info_attribute_to_question_template": {
+         *         "price": "Qual é o preço do {entity}?"
+         *       },
+         *       "information_needed": [
+         *         {
+         *           "attribute": "price",
+         *           "entity": "Produto Y"
+         *         }
+         *       ],
+         *       "initial_message": "Quanto custa o produto Y?",
+         *       "objective": "Confirmar o preço do produto Y e efetuar a compra.",
+         *       "persona_id": "comprador_produto_y",
+         *       "success_criteria": [
+         *         "state:all_info_extracted",
+         *         "event:purchase_intent_confirmed"
+         *       ]
+         *     }
+         */
+        PersonaCreate: {
+            /**
+             * Persona Id
+             * @description Unique, human-readable snake_case identifier for the persona.
+             */
+            persona_id: string;
+            /**
+             * Description
+             * @description Concise description of the persona and their goal.
+             */
+            description: string;
+            /**
+             * Initial Message
+             * @description The first message the persona sends.
+             */
+            initial_message: string;
+            /**
+             * Objective
+             * @description The specific goal the persona wants to achieve.
+             */
+            objective: string;
+            /**
+             * Information Needed
+             * @description List of facts needed [{'entity': 'X', 'attribute': 'Y'},...]. Entity should match offerings or common topics.
+             */
+            information_needed: {
+                [key: string]: string;
+            }[];
+            /**
+             * Info Attribute To Question Template
+             * @description Mapping of UNIQUE attributes from information_needed to question templates {'attr': 'template {entity}?'}.
+             */
+            info_attribute_to_question_template: {
+                [key: string]: string;
+            };
+            /**
+             * Success Criteria
+             * @description List of criteria defining simulation success.
+             * @default [
+             *       "state:all_info_extracted"
+             *     ]
+             */
+            success_criteria: string[];
+            /**
+             * Failure Criteria
+             * @description List of criteria defining simulation failure.
+             * @default [
+             *       "event:ai_fallback_detected",
+             *       "turn_count > 8"
+             *     ]
+             */
+            failure_criteria: string[];
+            /**
+             * Contact Id
+             * Format: uuid
+             * @description The UUID of the existing Contact record to link this Persona to.
+             */
+            contact_id: string;
+        };
+        /**
+         * PersonaRead
+         * @description Schema for reading Persona data, including database ID and timestamps.
+         */
+        PersonaRead: {
+            /**
+             * Persona Id
+             * @description Unique, human-readable snake_case identifier for the persona.
+             */
+            persona_id: string;
+            /**
+             * Description
+             * @description Concise description of the persona and their goal.
+             */
+            description: string;
+            /**
+             * Initial Message
+             * @description The first message the persona sends.
+             */
+            initial_message: string;
+            /**
+             * Objective
+             * @description The specific goal the persona wants to achieve.
+             */
+            objective: string;
+            /**
+             * Information Needed
+             * @description List of facts needed [{'entity': 'X', 'attribute': 'Y'},...]. Entity should match offerings or common topics.
+             */
+            information_needed: {
+                [key: string]: string;
+            }[];
+            /**
+             * Info Attribute To Question Template
+             * @description Mapping of UNIQUE attributes from information_needed to question templates {'attr': 'template {entity}?'}.
+             */
+            info_attribute_to_question_template: {
+                [key: string]: string;
+            };
+            /**
+             * Success Criteria
+             * @description List of criteria defining simulation success.
+             * @default [
+             *       "state:all_info_extracted"
+             *     ]
+             */
+            success_criteria: string[];
+            /**
+             * Failure Criteria
+             * @description List of criteria defining simulation failure.
+             * @default [
+             *       "event:ai_fallback_detected",
+             *       "turn_count > 8"
+             *     ]
+             */
+            failure_criteria: string[];
+            /**
+             * Id
+             * Format: uuid
+             * @description Unique identifier for the Persona record.
+             */
+            id: string;
+            /**
+             * Contact Id
+             * Format: uuid
+             * @description The UUID of the associated Contact record.
+             */
+            contact_id: string;
+            /**
+             * Simulation Contact Identifier
+             * @description Contact identifier used in simulation (e.g., phone number).
+             */
+            simulation_contact_identifier: string;
+            /**
+             * Created At
+             * Format: date-time
+             * @description Timestamp of creation.
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description Timestamp of last update.
+             */
+            updated_at: string;
         };
         /**
          * ResearchJobStatusEnum
@@ -2311,25 +2719,26 @@ export interface components {
         };
         /**
          * SimulationDetailsResponse
-         * @description Schema for returning simulation entity IDs.
+         * @description Schema for returning the UUIDs of the primary simulation entities
+         *     associated with a user's account.
          */
         SimulationDetailsResponse: {
             /**
              * Inbox Id
              * Format: uuid
-             * @description The UUID of the simulation inbox.
+             * @description The UUID of the primary simulation inbox.
              */
             inbox_id: string;
             /**
              * Contact Id
              * Format: uuid
-             * @description The UUID of the simulation contact.
+             * @description The UUID of the primary simulation contact ('Simulador').
              */
             contact_id: string;
             /**
              * Conversation Id
              * Format: uuid
-             * @description The UUID of the simulation conversation.
+             * @description The UUID of the primary simulation conversation between the inbox and the contact.
              */
             conversation_id: string;
         };
@@ -3114,6 +3523,288 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SimulationMessageEnqueueResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_simulation_state_api_v1_simulation_conversations__conversation_id__checkpoint_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_personas_api_v1_simulation_personas_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_new_persona_api_v1_simulation_personas_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_persona_by_id_api_v1_simlation_personas__persona_db_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                persona_db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_persona_by_persona_id_str_api_v1_by_persona_id__persona_id_str__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                persona_id_str: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_persona_by_contact_id_uuid_api_v1_simulation_personas_by_contact_id__contact_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_persona_by_identifier_str_api_v1_simulation_personas_by_identifier__identifier__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                identifier: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_existing_persona_api_v1_simulation_personas__persona_db_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                persona_db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonaBase"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonaRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_existing_persona_api_v1_simulation_personas__persona_db_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                persona_db_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
