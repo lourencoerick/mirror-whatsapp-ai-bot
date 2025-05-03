@@ -110,6 +110,15 @@ class ConversationState(TypedDict):
     proposed_solution_details: Optional[Dict[str, Any]]
     certainty_status: Optional[str]
 
+    # === Objection Handling State ===
+    current_objection: Optional[str]
+    objection_loop_count: int
+    objection_resolution_status: Optional[str]
+
+    # === Closing Subgraph State (Inicial) ===
+    closing_attempt_count: int
+    closing_status: Optional[str]
+
     # === Control & Metadata ===
     intent: Optional[str]
     is_simulation: bool
