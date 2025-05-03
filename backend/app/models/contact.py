@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Optional  # Added TYPE_CHECKING, Optional
+
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import (
@@ -15,6 +17,10 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 from sqlalchemy.sql import expression
+
+
+if TYPE_CHECKING:
+    from app.models.simulation.persona import Persona
 
 
 class Contact(BaseModel):
@@ -48,6 +54,13 @@ class Contact(BaseModel):
     )
     messages = relationship(
         "Message", back_populates="contact", cascade="all, delete-orphan"
+    )
+
+    persona = relationship(
+        "Persona",
+        back_populates="contact",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -100,3 +113,11 @@ class Contact(BaseModel):
             postgresql_ops={"name": "gin_trgm_ops"},
         ),
     )
+
+    def __repr__(self):
+        is_persona_str = (
+            f", persona_id={self.persona.persona_id}" if self.persona else ""
+        )
+        return (
+            f"<Contact(id={self.id}, identifier='{self.identifier}'{is_persona_str})>"
+        )
