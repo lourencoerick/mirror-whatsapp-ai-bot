@@ -3,7 +3,7 @@ name: Build, Push and Deploy Worker Images
 
 on:
   push:
-    branches: [master, refact/workers]
+    branches: [master, feat/simulation_refactoring]
     paths:
       - "backend/app/workers/**"
       - "backend/app/services/researcher/**"

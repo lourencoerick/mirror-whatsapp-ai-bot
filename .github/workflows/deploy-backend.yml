@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - master
-      - refact/workers
+      - feat/simulation_refactoring
     paths:
       - "backend/**"
       - "Dockerfile"
