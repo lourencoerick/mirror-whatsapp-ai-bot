@@ -27,4 +27,6 @@ class ContactInbox(BaseModel):
 
     contact = relationship("Contact", back_populates="contact_inboxes")
     inbox = relationship("Inbox", back_populates="contact_inboxes")
-    conversation = relationship("Conversation", back_populates="contact_inbox")
+    conversation = relationship(
+        "Conversation", back_populates="contact_inbox", uselist=False
+    )
