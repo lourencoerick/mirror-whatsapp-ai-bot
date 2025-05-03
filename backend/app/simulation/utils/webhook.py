@@ -29,7 +29,7 @@ from app.simulation.config import (
     MAX_POLL_ATTEMPTS,
     WEBHOOK_URL,
 )
-from app.simulation.schemas.persona_definition import PersonaDefinition
+from app.simulation.schemas.persona import PersonaRead
 from app.models.simulation.simulation import SimulationOutcomeEnum
 from app.models.simulation.simulation_event import SimulationEventTypeEnum
 
@@ -171,7 +171,7 @@ async def poll_for_ai_response(
 
 
 def check_explicit_failure_criteria(
-    persona: PersonaDefinition,
+    persona: PersonaRead,
     turn: int,
     events_occurred: List[SimulationEventTypeEnum],
 ) -> Optional[SimulationOutcomeEnum]:
@@ -179,7 +179,7 @@ def check_explicit_failure_criteria(
     Checks explicit failure criteria defined in the persona.
 
     Args:
-        persona: The PersonaDefinition object.
+        persona: The PersonaRead object.
         turn: The current turn number.
         events_occurred: A list of event types that occurred in this run.
 

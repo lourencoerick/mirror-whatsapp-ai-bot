@@ -7,6 +7,7 @@ from app.services.repository import inbox as inbox_repo
 from app.services.repository import contact as contact_repo
 from app.services.repository import conversation as conversation_repo
 from app.services.repository import message as message_repo
+from app.services.helper.checkpoint import reset_checkpoint
 
 
 async def reset_simulation_conversation(
@@ -82,5 +83,14 @@ async def reset_simulation_conversation(
     except Exception as e:
         logger.error(
             f"Failed to reset conversation for contact '{contact.id}' in inbox '{inbox.id}': {e}"
+        )
+        raise
+
+    # Reset the checkpoint
+    try:
+        await reset_checkpoint(db=db, thread_id=str(conversation.id))
+    except Exception as e:
+        logger.error(
+            f"Failed to reset the checkpoint of a thread_id {conversation.id} for contact '{contact.id}' in inbox '{inbox.id} and ': {e}"
         )
         raise

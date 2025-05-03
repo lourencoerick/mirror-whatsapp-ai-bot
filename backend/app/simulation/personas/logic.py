@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from langchain_openai import ChatOpenAI
 from trustcall import create_extractor
 
-from app.simulation.schemas.persona_definition import PersonaDefinition, InfoRequest
+from app.simulation.schemas.persona import PersonaRead
 from app.simulation.schemas.persona_state import PersonaState, ExtractedFact
 from app.models.simulation.simulation import SimulationOutcomeEnum
 
@@ -28,23 +28,30 @@ except Exception as e:
 
 
 async def get_next_persona_action(
-    persona: PersonaDefinition, ai_response_text: str, current_state: PersonaState
+    persona: PersonaRead, ai_response_text: str, current_state: PersonaState
 ) -> Tuple[Optional[str], PersonaState, bool, Optional[SimulationOutcomeEnum]]:
     """
-    Determines the persona's next action by using trustcall to extract facts
-    from the AI response and update the persona's knowledge state.
+    Determines the persona's next action based on AI response and required info.
+
+    Uses trustcall to extract facts from the AI response and updates the
+    persona's knowledge state accordingly. Determines the next message based
+    on remaining information needed or terminates if criteria met.
 
     Args:
-        persona: The definition of the current persona.
-        ai_response_text: The last response from the AI Seller.
-        current_state: The current PersonaState object.
+        persona: The PersonaRead object containing the persona's definition
+                 and goals loaded from the database.
+        ai_response_text: The last response received from the AI Seller.
+        current_state: The current PersonaState object tracking extracted facts.
 
     Returns:
         A tuple containing:
-            - next_persona_message (str or None if terminating)
-            - updated_state (PersonaState object)
-            - terminate_simulation (bool)
-            - termination_outcome (Optional[SimulationOutcomeEnum])
+            - next_persona_message (Optional[str]): The message the persona should
+              send next, or None if terminating or error.
+            - updated_state (PersonaState): The updated state reflecting any newly
+              extracted facts.
+            - terminate_simulation (bool): Flag indicating if the simulation should end.
+            - termination_outcome (Optional[SimulationOutcomeEnum]): The reason for
+              termination, if applicable.
     """
     logger.debug(
         f"Persona '{persona.persona_id}' current facts: {current_state.extracted_facts}"
@@ -61,14 +68,16 @@ async def get_next_persona_action(
     next_persona_message = None
 
     if ai_response_text:
-        # 1. Prepare prompt to extract facts
-        needed_info_str = ", ".join(
-            [
-                f"'{req.attribute}' for '{req.entity}'"
-                for req in persona.information_needed
-                if not updated_state.has_fact(req.entity, req.attribute)
-            ]
-        )
+
+        needed_info_str_list = []
+        for req in persona.information_needed:
+            if not updated_state.has_fact(req["entity"], req["attribute"]):
+                needed_info_str_list.append(
+                    f"'{req['attribute']}' for '{req['entity']}'"
+                )
+
+        needed_info_str = ", ".join(needed_info_str_list)
+
         prompt = f"""
         Analyze the AI Seller's response below. The customer still needs: [{needed_info_str}].
         Extract each distinct fact as an 'ExtractedFact' JSON object with keys 'entity', 'attribute', and 'value'.
@@ -112,10 +121,10 @@ async def get_next_persona_action(
             logger.error("Proceeding with previous state due to extractor error.")
 
     # 3. Check which information is still needed
-    still_needed: List[InfoRequest] = []
+    still_needed: List[Dict[str, str]] = []
     for req in persona.information_needed:
-        if not updated_state.has_fact(req.entity, req.attribute):
-            still_needed.append(req)
+        if not updated_state.has_fact(req["entity"], req["attribute"]):
+            still_needed.append(req)  # Append the dictionary itself
 
     # 4. Check success criteria
     if not still_needed and "state:all_info_extracted" in persona.success_criteria:
@@ -125,19 +134,22 @@ async def get_next_persona_action(
 
     # 5. Determine next question if not terminating
     elif not terminate and still_needed:
-        missing = still_needed[0]
-        template = persona.info_attribute_to_question_template.get(missing.attribute)
+        missing_item = still_needed[0]  # Get the first missing item (dictionary)
+        missing_attribute = missing_item["attribute"]
+        missing_entity = missing_item["entity"]
+
+        template = persona.info_attribute_to_question_template.get(missing_attribute)
         if template:
             try:
-                next_persona_message = template.format(entity=missing.entity)
+                next_persona_message = template.format(entity=missing_entity)
             except KeyError:
                 logger.error(
-                    f"Template missing '{{entity}}' for '{missing.attribute}'."
+                    f"Template missing '{{entity}}' for '{missing_attribute}'."
                 )
-                next_persona_message = f"Can you tell me about '{missing.attribute}' for '{missing.entity}'?"
+                next_persona_message = f"Can you tell me about '{missing_attribute}' for '{missing_entity}'?"
         else:
             next_persona_message = (
-                f"Can you tell me about '{missing.attribute}' for '{missing.entity}'?"
+                f"Can you tell me about '{missing_attribute}' for '{missing_entity}'?"
             )
         logger.debug(f"Next persona message: '{next_persona_message}'")
 
