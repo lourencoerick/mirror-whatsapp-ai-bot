@@ -13,7 +13,7 @@ from app.models.simulation.simulation import (
 )
 from app.models.simulation.simulation_message import SimulationMessageRoleEnum
 from app.models.simulation.simulation_event import SimulationEventTypeEnum
-from app.simulation.schemas.persona_definition import PersonaDefinition
+from app.simulation.schemas.persona import PersonaRead
 from app.simulation.schemas.persona_state import PersonaState
 from app.services.repository import company_profile as profile_repo
 from app.simulation.repositories import (
@@ -31,17 +31,24 @@ from app.simulation.config import (
 from app.simulation.utils import webhook as webhook_utils
 from app.simulation.utils.cleanup import reset_simulation_conversation
 
+from app.api.routes.simulation import enqueue_simulation_message
+from app.api.schemas.simulation import (
+    SimulationMessageCreate,
+)
 
-async def run_single_simulation(persona_id: str, reset_conversation: bool = False):
+
+async def run_single_simulation(
+    account: UUID, persona_id_str: str, reset_conversation: bool = False
+):
     """
     Orchestrates and runs a single simulation instance.
     Optionally resets the conversation history before starting.
     """
-    account_id = SIMULATION_ACCOUNT_ID
-    inbox_id = SIMULATION_INBOX_ID
+    account_id = account.id
+    inbox_id = account.simulation_inbox_id
 
     logger.info(
-        f"--- Starting simulation: account={account_id}, persona={persona_id} ---"
+        f"--- Starting simulation: account={account_id}, persona={persona_id_str} ---"
     )
     start_time = time.time()
     simulation: Optional[Simulation] = None
@@ -60,9 +67,10 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 raise ValueError(f"Company profile not found for account {account_id}")
 
             # Load persona definition
-            persona = await persona_loader.load_persona(persona_id)
+            logger.debug(f"Loading persona '{persona_id_str}' using new DB loader...")
+            persona = await persona_loader.load_persona_from_db(db, persona_id_str)
             if not persona:
-                raise ValueError(f"Persona '{persona_id}' not found or invalid")
+                raise ValueError(f"Persona '{persona_id_str}' not found or invalid")
 
             # Optionally reset conversation
             if reset_conversation:
@@ -77,7 +85,7 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
 
             # Create initial simulation record
             simulation = await simulation_repo.create_simulation(
-                db, profile_id=profile.id, persona_def=persona
+                db, profile_id=profile.id, persona_id=persona.id
             )
             event_type = SimulationEventTypeEnum.SIMULATION_START
             await simulation_event_repo.create_event(
@@ -380,5 +388,5 @@ async def run_single_simulation(persona_id: str, reset_conversation: bool = Fals
                 logger.error("Simulation failed before record creation.")
 
     logger.info(
-        f"--- Simulation finished: account={account_id}, persona={persona_id} ---"
+        f"--- Simulation finished: account={account_id}, persona={persona.id} ---"
     )
