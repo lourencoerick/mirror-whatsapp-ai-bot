@@ -20,6 +20,7 @@ from .company_profile import CompanyProfile
 from .simulation.simulation import Simulation
 from .simulation.simulation_event import SimulationEvent
 from .simulation.simulation_message import SimulationMessage
+from .simulation.persona import Persona
 from .knowledge_chunk import KnowledgeChunk
 from .knowledge_document import KnowledgeDocument
 
@@ -48,4 +49,5 @@ __all__ = [
     "SimulationMessage",
     "KnowledgeChunk",
     "KnowledgeDocument",
+    "Persona",
 ]
