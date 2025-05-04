@@ -503,9 +503,9 @@ async def handle_ai_reply_request(
                         if isinstance(msg, AIMessage) and hasattr(msg, "id")
                     }
 
-                logger.debug(
-                    f"{log_prefix} Snapshot of the messages of the Current Graph: {previous_checkpoint_message_ids}"
-                )
+                # logger.debug(
+                #     f"{log_prefix} Snapshot of the messages of the Current Graph: {previous_checkpoint_message_ids}"
+                # )
 
                 # --- Invoke Graph ---
 
@@ -519,6 +519,9 @@ async def handle_ai_reply_request(
                     graph_error = None
                     ai_response_text = settings.RESET_MESSAGE_TRIGGER
                     final_state = {}
+                    new_ai_messages_lc: List[AIMessage] = [
+                        AIMessage(content=ai_response_text)
+                    ]
                 else:
                     logger.info(
                         f"{log_prefix} Invoking reply graph with checkpointer..."
@@ -572,14 +575,17 @@ async def handle_ai_reply_request(
                             f"{log_prefix} Graph generated {len(new_ai_messages_lc)} new AI message(s)."
                         )
 
-                USE_GENERATION_RESPONSE = True
-                if USE_GENERATION_RESPONSE:
-                    new_ai_messages_lc = [
-                        AIMessage(content=final_state.get("generation", ""))
-                    ]
+                    USE_GENERATION_RESPONSE = True
+                    if USE_GENERATION_RESPONSE:
+                        new_ai_messages_lc = [
+                            AIMessage(content=final_state.get("generation", ""))
+                        ]
+
                 for _, ai_msg_lc in enumerate(new_ai_messages_lc):
                     if isinstance(ai_msg_lc, AIMessage) and ai_msg_lc.content:
-                        ai_response_text = ai_msg_lc.content
+                        ai_response_text = ai_msg_lc.content.replace(
+                            "**", "*"
+                        )  # correct the bold style for whatsapp
                         await _process_one_message(
                             db=db,
                             account_id=account_id,

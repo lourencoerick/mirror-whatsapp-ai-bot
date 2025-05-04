@@ -10,8 +10,7 @@ import pytz
 # Import State and Constants
 from .graph_state import (
     ConversationState,
-    CompanyProfileSchema,
-    BotAgentRead,
+    PendingAgentQuestion,
     SALES_STAGE_OPENING,
     SALES_STAGE_QUALIFICATION,
     SALES_STAGE_INVESTIGATION,
@@ -133,9 +132,12 @@ VALID_INTENTS = [
     "Complaint",
     "Other",
     "Unknown",
+    "VagueStatement",
+    "Goodbye",
 ]
 
 from pydantic import BaseModel, Field
+from typing import Literal  # Para Literal
 
 
 # --- Pydantic Schema for Intent/Stage Classification Output ---
@@ -175,6 +177,30 @@ class ProposedSolutionDetails(BaseModel):
     )
     delivery_info: Optional[str] = Field(
         None, description="Relevant delivery or setup information, if applicable."
+    )
+
+
+class AnswerStatusOutput(BaseModel):
+    """Structured output analyzing if the user answered the agent's question."""
+
+    answered_status: Literal["YES", "NO", "PARTIAL"] = Field(
+        ...,
+        description="Did the user's last message adequately answer the agent's pending question? YES, NO, or PARTIAL.",
+    )
+
+
+class TransitionOutput(BaseModel):
+    """Structured output for the transition node."""
+
+    transition_text: str = Field(
+        ..., description="The full transition text (acknowledgement + question)."
+    )
+    question_asked: str = Field(
+        ..., description="The specific question asked in the transition."
+    )
+    question_type: str = Field(
+        ...,
+        description="The type of question asked (e.g., 'Resume_Pending', 'New_Investigation').",
     )
 
 
@@ -269,6 +295,8 @@ Intenções Válidas: {valid_intents}
 - **ClosingAttempt:** Cliente demonstra interesse claro em comprar/prosseguir. -> Próximo Estágio: 'Closing'. `is_problem_statement`: false.
 - **Complaint:** Reclamação. -> Próximo Estágio: 'ObjectionHandling'. `is_problem_statement`: false.
 - **Other/Unknown:** Não se encaixa. -> Próximo Estágio: Manter ou 'Unknown'. `is_problem_statement`: false.
+- **VagueStatement:** Cliente expressa dúvida, incerteza, ou necessidade de pensar **sem especificar o motivo ou o ponto de dúvida**. Exemplos: "preciso pensar melhor", "não sei...", "não entendi direito essa parte", "parece complicado". -> Próximo Estágio: Manter o estágio atual ou 'Investigation'. `is_problem_statement`: false.
+- **Goodbye:** Cliente indica explicitamente que quer encerrar a conversa, não tem mais interesse, ou se despede. Exemplos: "obrigado, por enquanto é só", "não tenho interesse", "tchau", "até logo". -> Próximo Estágio: Manter o atual ou 'Unknown'. 
 
 **IMPORTANTE - Declaração de Problema:**
 - Se a 'ÚLTIMA PERGUNTA DO AGENTE' foi uma pergunta de Situação ou Problema (ex: "Quais desafios você enfrenta?", "Como você faz X hoje?"), E a 'ÚLTIMA MENSAGEM DO CLIENTE' descreve uma dificuldade, dor, ou insatisfação (ex: "gasto muito tempo", "é difícil fazer Y", "não consigo Z"), então:
@@ -276,6 +304,7 @@ Intenções Válidas: {valid_intents}
     - `next_sales_stage` deve ser 'Investigation' (para continuar investigando com Implicação/Need-Payoff).
     - `is_problem_statement` deve ser **true**.
 - **NÃO confunda uma declaração de problema com uma objeção.** Objeção é resistência à *venda*, declaração de problema é descrição da *situação atual* do cliente.
+- **Diferenciação:** NÃO confunda `VagueStatement` com `Objection` (que tem uma barreira clara) ou `Question` (que pergunta algo específico)
 
 HISTÓRICO DA CONVERSA: {chat_history}
 ESTÁGIO ANTERIOR: {previous_stage}
@@ -359,6 +388,276 @@ Responda APENAS com um objeto JSON contendo "intent", "next_sales_stage", e "is_
             "current_sales_stage": previous_stage or SALES_STAGE_UNKNOWN,
             "classification_details": {"error": str(e)},
             "error": f"Classification failed: {e}",
+        }
+
+
+async def check_pending_answer_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Checks if the latest user message answers the agent's pending question.
+    Updates the status of 'pending_agent_question'. Does NOT generate a response.
+
+    Args:
+        state: Requires 'messages', 'pending_agent_question'.
+        config: Requires 'llm_fast_instance'.
+
+    Returns:
+        Dictionary with potentially updated 'pending_agent_question'.
+    """
+    node_name = "check_pending_answer_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    pending_question = state.get("pending_agent_question")
+    llm_fast: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+    max_attempts = 3  # Número máximo de tentativas antes de ignorar
+
+    # --- Validações e Condições de Saída ---
+    if not pending_question or not isinstance(pending_question, dict):
+        logger.debug(f"[{node_name}] No pending agent question found. Skipping.")
+        return {}  # Nada a fazer
+    if pending_question.get("status") != "pending":
+        logger.debug(
+            f"[{node_name}] Pending question status is not 'pending' ({pending_question.get('status')}). Skipping."
+        )
+        return {
+            "pending_agent_question": pending_question
+        }  # Retorna o estado inalterado
+    if not llm_fast:
+        logger.error(f"[{node_name}] LLM unavailable. Cannot check answer status.")
+        # Mantém pendente, mas loga erro? Ou ignora? Vamos manter pendente por ora.
+        return {
+            "pending_agent_question": pending_question,
+            "error": "Pending check failed: LLM unavailable.",
+        }
+    if not messages or not isinstance(messages[-1], HumanMessage):
+        logger.warning(
+            f"[{node_name}] Last message not from user. Cannot check answer status."
+        )
+        # Mantém pendente se não podemos analisar a resposta
+        return {"pending_agent_question": pending_question}
+
+    last_user_message = messages[-1].content
+    question_text = pending_question.get("text")
+    attempts = pending_question.get("attempts", 0)  # Pega tentativas atuais
+
+    logger.debug(f"[{node_name}] Checking if user response answers: '{question_text}'")
+    logger.debug(f"[{node_name}] User response: '{last_user_message[:100]}...'")
+    logger.debug(f"[{node_name}] Current attempts: {attempts}")
+
+    # --- Prompt para Análise da Resposta ---
+    analysis_prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um analista de conversas. O agente fez uma pergunta específica e o cliente respondeu.
+Avalie se a RESPOSTA DO CLIENTE responde adequadamente à PERGUNTA DO AGENTE.
+
+PERGUNTA DO AGENTE: {agent_question}
+RESPOSTA DO CLIENTE: {customer_response}
+
+Determine o status da resposta:
+- YES: A resposta do cliente aborda diretamente e fornece a informação solicitada pela pergunta do agente.
+- NO: A resposta do cliente ignora completamente a pergunta do agente ou muda de assunto.
+- PARTIAL: A resposta do cliente toca no assunto da pergunta, mas é incompleta, vaga, ou evasiva.
+
+Responda APENAS com um objeto JSON seguindo o schema AnswerStatusOutput.""",
+            ),
+        ]
+    )
+
+    # --- Cadeia com LLM Estruturado ---
+    structured_llm = llm_fast.with_structured_output(AnswerStatusOutput)
+    chain = analysis_prompt_template | structured_llm
+
+    try:
+        analysis_result: AnswerStatusOutput = await chain.ainvoke(
+            {
+                "agent_question": question_text,
+                "customer_response": last_user_message,
+            }
+        )
+        logger.info(
+            f"[{node_name}] Answer status analysis result: {analysis_result.answered_status}"
+        )
+
+        # --- Atualiza Status da Pergunta Pendente ---
+        new_pending_status = pending_question.copy()  # Cria cópia para modificar
+
+        if analysis_result.answered_status == "YES":
+            new_pending_status["status"] = "answered"
+            logger.info(f"[{node_name}] Pending question marked as 'answered'.")
+            # Retorna None para limpar a pergunta pendente do estado principal
+            return {"pending_agent_question": None}
+        else:  # NO ou PARTIAL
+            new_attempts = attempts + 1
+            new_pending_status["attempts"] = new_attempts
+            if new_attempts >= max_attempts:
+                new_pending_status["status"] = "ignored"
+                logger.warning(
+                    f"[{node_name}] Pending question reached max attempts ({max_attempts}). Marked as 'ignored'."
+                )
+                # Retorna None para limpar a pergunta pendente do estado principal
+                return {"pending_agent_question": None}
+            else:
+                # Mantém status 'pending' e incrementa tentativas
+                new_pending_status["status"] = "pending"
+                logger.info(
+                    f"[{node_name}] Pending question remains 'pending'. Attempts incremented to {new_attempts}."
+                )
+                return {"pending_agent_question": new_pending_status}
+
+    except Exception as e:
+        logger.exception(f"[{node_name}] Error during answer status analysis: {e}")
+        # Em caso de erro, mantém a pergunta como pendente sem incrementar tentativas?
+        # Ou incrementa para evitar loop? Vamos incrementar por segurança.
+        new_pending_status = pending_question.copy()
+        new_pending_status["attempts"] = attempts + 1
+        if new_pending_status["attempts"] >= max_attempts:
+            new_pending_status["status"] = "ignored"
+            logger.warning(
+                f"[{node_name}] Pending question reached max attempts due to error. Marked 'ignored'."
+            )
+            return {
+                "pending_agent_question": None,
+                "error": f"Pending check failed: {e}",
+            }
+        else:
+            logger.error(
+                f"[{node_name}] Analysis failed. Keeping question pending, attempts {new_pending_status['attempts']}."
+            )
+            return {
+                "pending_agent_question": new_pending_status,
+                "error": f"Pending check failed: {e}",
+            }
+
+
+async def clarify_vague_statement_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Asks a clarifying question when the user's previous statement was vague.
+
+    Args:
+        state: Requires 'messages'.
+        config: Requires 'llm_fast_instance'.
+
+    Returns:
+        Dictionary with 'generation', 'messages', and sets 'pending_agent_question'.
+    """
+    node_name = "clarify_vague_statement_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    llm_fast: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+
+    # --- Validações ---
+    if not llm_fast:
+        logger.error(f"[{node_name}] LLM unavailable. Cannot ask for clarification.")
+        # O que fazer? Talvez tratar como objeção genérica? Ou só terminar? Vamos terminar.
+        return {"error": "Clarification failed: LLM unavailable."}
+    if not messages or not isinstance(messages[-1], HumanMessage):
+        logger.error(f"[{node_name}] Last message not from user. Cannot clarify.")
+        return {"error": "Clarification failed: Invalid context."}
+
+    vague_statement = messages[-1].content
+    # Tenta pegar contexto da penúltima mensagem (o que o agente disse antes)
+    previous_agent_context = (
+        messages[-2].content
+        if len(messages) >= 2 and isinstance(messages[-2], AIMessage)
+        else ""
+    )
+
+    logger.debug(
+        f"[{node_name}] Clarifying vague statement: '{vague_statement[:100]}...'"
+    )
+
+    # --- Prompt para Gerar Pergunta Clarificadora ---
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um assistente de vendas IA empático. O cliente acabou de fazer uma declaração vaga ou expressar uma dúvida não específica.
+Sua tarefa é fazer **UMA única pergunta aberta** para entender melhor o que o cliente quis dizer ou qual é a sua preocupação/dúvida principal.
+
+**Contexto:**
+Sua Última Mensagem (Contexto): {previous_agent_message_summary}
+Declaração Vaga do Cliente: {vague_statement}
+
+**Instruções:**
+1.  **Seja Específico (Se Possível):** Se a sua última mensagem ou a declaração vaga mencionam um tópico (ex: "qualificação", "implementação"), tente focar sua pergunta nesse tópico.
+2.  **Seja Aberto:** Faça uma pergunta que incentive o cliente a elaborar.
+3.  **Exemplos de Perguntas:** "Para que eu possa te ajudar melhor, poderia me dizer um pouco mais sobre o que está pensando?", "O que especificamente sobre [tópico, se houver] te deixou com dúvidas?", "O que te faria sentir mais claro/seguro sobre isso?", "Pode elaborar um pouco mais sobre [ponto vago]?".
+4.  **Tom:** Mantenha um tom prestativo e compreensivo.
+5.  **Formatação:** Use formatação WhatsApp sutil. {formatting_instructions}
+
+Gere APENAS a pergunta clarificadora.""",
+            ),
+        ]
+    )
+
+    parser = StrOutputParser()
+    chain = prompt_template | llm_fast | parser
+
+    try:
+        prev_context_summary = (
+            previous_agent_context[:150] + "..."
+            if len(previous_agent_context) > 150
+            else previous_agent_context
+        )
+
+        clarifying_question = await chain.ainvoke(
+            {
+                "previous_agent_message_summary": prev_context_summary or "N/A",
+                "vague_statement": vague_statement,
+                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
+            }
+        )
+        clarifying_question = clarifying_question.strip()
+
+        if not clarifying_question or not clarifying_question.endswith("?"):
+            raise ValueError("LLM did not generate a valid clarifying question.")
+
+        logger.info(
+            f"[{node_name}] Generated clarifying question: '{clarifying_question}'"
+        )
+        ai_message = AIMessage(content=clarifying_question)
+
+        # Define esta pergunta como a nova pergunta pendente
+        new_pending: PendingAgentQuestion = {
+            "text": clarifying_question,
+            "type": "Clarification",  # Novo tipo
+            "status": "pending",
+            "attempts": 1,
+        }
+
+        return {
+            "generation": clarifying_question,
+            "messages": [ai_message],
+            "pending_agent_question": new_pending,  # Define a pergunta de clarificação como pendente
+            "error": None,
+        }
+
+    except Exception as e:
+        logger.exception(f"[{node_name}] Error generating clarifying question: {e}")
+        fallback = "Poderia me explicar um pouco melhor o que você quis dizer?"
+        ai_fallback_message = AIMessage(content=fallback)
+        fallback_pending: PendingAgentQuestion = {
+            "text": fallback,
+            "type": "Clarification_Fallback",
+            "status": "pending",
+            "attempts": 1,
+        }
+        return {
+            "generation": fallback,
+            "messages": [ai_fallback_message],
+            "pending_agent_question": fallback_pending,
+            "error": f"Clarification failed: {e}",
         }
 
 
@@ -899,132 +1198,292 @@ Instrução: Apresente a capacidade da solução focando no benefício para a ne
         }
 
 
-async def transition_after_answer_node(
+async def end_conversation_node(
     state: ConversationState, config: dict
 ) -> Dict[str, Any]:
     """
-    Generates ONLY the transition question/hook after the agent has answered
-    a direct question via generate_response_node.
+    Generates a final, polite closing message for the conversation.
 
     Args:
-        state: Current state. Requires 'messages', 'current_sales_stage'.
-        config: Requires 'llm_fast'.
+        state: Current conversation state. May use 'disengagement_reason' for context.
+        config: Requires 'llm_fast_instance'.
 
     Returns:
-        Dictionary with 'generation' (the transition question) and 'messages'
-        (the transition question as an AIMessage).
+        Dictionary with 'generation' and 'messages'. This node leads to END.
     """
-    node_name = "transition_after_answer_node"
+    node_name = "end_conversation_node"
     logger.info(f"--- Starting Node: {node_name} ---")
 
     messages = state.get("messages", [])
-    current_stage = state.get("current_sales_stage")
-    previous_generation = state.get("generation", "")
-
-    # Pega a pergunta original do cliente para contexto
-    last_human_message = (
-        messages[-2].content
-        if len(messages) >= 2 and isinstance(messages[-2], HumanMessage)
-        else ""
-    )
-    # Pega a resposta que o agente deu (última mensagem no estado atual)
-    last_agent_response = (
-        messages[-1].content if messages and isinstance(messages[-1], AIMessage) else ""
-    )
-
-    llm_fast_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
+    reason = state.get("disengagement_reason")  # Opcional: motivo do fim
+    profile_dict = state.get("company_profile")
+    llm_fast: Optional[BaseChatModel] = config.get("configurable", {}).get(
         "llm_fast_instance"
     )
 
-    if not llm_fast_instance:
-        return {"error": "Transition failed: LLM unavailable."}
-    elif not previous_generation:
-        logger.warning(
-            f"[{node_name}] No previous generation found in state. Ending turn."
-        )
-        return {}
-    if len(messages) < 2:
-        logger.warning(
-            f"[{node_name}] Not enough context to generate transition. Skipping."
-        )
-        return {}  # Retorna vazio para não adicionar nada
+    # --- Validações ---
+    if not llm_fast:
+        logger.error(f"[{node_name}] LLM unavailable. Using generic fallback.")
+        fallback = "Agradeço seu contato. Tenha um ótimo dia!"
+        return {"generation": fallback, "messages": [AIMessage(content=fallback)]}
+    if not profile_dict:
+        logger.warning(f"[{node_name}] Profile not found. Using generic fallback.")
+        fallback = "Agradeço seu contato. Tenha um ótimo dia!"
+        return {"generation": fallback, "messages": [AIMessage(content=fallback)]}
 
-    logger.debug(
-        f"[{node_name}] Generating transition hook after agent response: '{last_agent_response[:50]}...'"
-    )
+    logger.debug(f"[{node_name}] Ending conversation. Reason (if any): {reason}")
 
-    # --- Prompt para gerar APENAS a pergunta de transição ---
+    # --- Prompt para Mensagem Final ---
     prompt_template = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                """Você é um assistente de vendas que acabou de responder à pergunta do cliente.
-                Sua tarefa agora é fazer uma **transição suave** para retomar o controle e continuar a investigação (Estágio Atual: {current_stage}).
+                """Você é um assistente de vendas IA educado encerrando a conversa.
+O motivo do encerramento foi: {reason_context}.
 
-                **Contexto:**
-                Pergunta do Cliente: {last_human_message}
-                Sua Resposta Anterior (Resumo): {last_agent_response_summary}
+**Sua Tarefa:**
+1.  **Agradeça:** Agradeça ao cliente pelo tempo ou interesse.
+2.  **Reconheça (Opcional):** Se houver um motivo claro (ex: cliente disse não, limite atingido), reconheça brevemente de forma neutra (ex: "Entendido.").
+3.  **Despeça-se:** Deseje um bom dia/tarde/noite.
+4.  **Ofereça Ajuda Futura (Opcional Suave):** Se apropriado (especialmente se o motivo não foi rejeição forte), mencione que está à disposição caso ele mude de ideia ou precise de algo no futuro. Use com moderação.
+5.  **Tom:** Mantenha o tom {sales_tone}, mas adaptado para ser cordial e finalizador.
+6.  **Formatação:** Use formatação WhatsApp sutil. {formatting_instructions}
 
-                **Instruções:**
-                1.  **Reconheça (Opcional):** Comece com uma frase curta confirmando se a resposta anterior foi útil (ex: "Isso ajudou a esclarecer?", "Fez sentido?").
-                2.  **Conecte e Pergunte:** Faça UMA pergunta relevante que:
-                    *   Se conecte à **resposta que você deu** (ex: "Qual dessas funcionalidades mais te interessou?") OU
-                    *   Se conecte à **pergunta original do cliente** (ex: "Além disso que perguntei, qual era o principal desafio que você tinha em mente?") OU
-                    *   Seja uma pergunta de **Problema ou Implicação SPIN** apropriada para o estágio de Investigação.
-                3.  **Seja Natural e Conciso:** Evite perguntas genéricas demais. Tente fazer a conversa fluir.
-                4.  **Formatação:** Use formatação WhatsApp sutilmente, se necessário (ex: *negrito* para um termo chave na pergunta).
-
-                Gere APENAS a frase de reconhecimento (opcional) + a pergunta de transição.""",
+Gere APENAS a mensagem final de despedida.""",
             ),
         ]
     )
 
     parser = StrOutputParser()
-    chain = prompt_template | llm_fast_instance | parser
+    chain = prompt_template | llm_fast | parser
 
     try:
-        response_summary = (
-            last_agent_response[:150] + "..."
-            if len(last_agent_response) > 150
-            else last_agent_response
+        reason_context = (
+            reason if reason else "Fim da interação solicitada ou fluxo concluído."
         )
 
-        transition_question = await chain.ainvoke(
+        final_message = await chain.ainvoke(
             {
-                "current_stage": current_stage or SALES_STAGE_INVESTIGATION,
-                "last_human_message": last_human_message or "N/A",
-                "last_agent_response_summary": response_summary,
+                "reason_context": reason_context,
+                "sales_tone": profile_dict.get("sales_tone", "profissional"),
+                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
             }
         )
-        transition_question = transition_question.strip()
+        final_message = final_message.strip()
 
-        if not transition_question or not transition_question.endswith("?"):
-            logger.warning(
-                f"[{node_name}] LLM generated invalid transition: '{transition_question}'. Skipping transition."
-            )
-            return {}  # Não retorna erro, apenas não faz a transição
+        if not final_message:
+            raise ValueError("LLM returned empty final message.")
 
-        logger.info(
-            f"[{node_name}] Generated transition question: '{transition_question}'"
-        )
+        logger.info(f"[{node_name}] Generated final message: '{final_message}'")
+        ai_message = AIMessage(content=final_message)
 
-        # --- COMBINA a resposta anterior com a nova pergunta ---
-        final_response_text = f"{previous_generation}\n\n{transition_question}"
-        # --- FIM COMBINAÇÃO ---
+        # Limpa estado pendente ao finalizar? Opcional.
+        # state['pending_agent_question'] = None
 
-        ai_message = AIMessage(
-            content=transition_question
-        )  # Mensagem SÓ com a pergunta
-
-        # Atualiza 'generation' com a pergunta e 'messages' com a AIMessage dela
         return {
-            "generation": final_response_text,  # <-- Generation é SÓ a pergunta
-            "messages": [
-                ai_message
-            ],  # <-- Adiciona SÓ a pergunta ao histórico do grafo
+            "generation": final_message,
+            "messages": [ai_message],
             "error": None,
         }
 
     except Exception as e:
-        logger.exception(f"[{node_name}] Error generating transition question: {e}")
-        return {"error": f"Transition generation failed: {e}"}
+        logger.exception(f"[{node_name}] Error generating final message: {e}")
+        fallback = "Agradeço seu tempo e interesse. Tenha um ótimo dia!"
+        ai_fallback_message = AIMessage(content=fallback)
+        return {
+            "generation": fallback,
+            "messages": [ai_fallback_message],
+            "error": f"End conversation failed: {e}",
+        }
+
+
+async def transition_after_answer_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Generates a transition after answering a direct user question, attempting
+    to smoothly return to the agent's previous line of questioning if one
+    was pending. Otherwise, asks a new relevant question.
+
+    Args:
+        state: Requires 'messages', 'generation', 'pending_agent_question'.
+        config: Requires 'llm_fast_instance'.
+
+    Returns:
+        Dictionary with updated 'generation' (original answer + transition),
+        'messages' (only the transition part as AIMessage), and updated
+        'pending_agent_question'.
+    """
+    node_name = "transition_after_answer_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    # Resposta completa dada pelo generate_response_node à pergunta do usuário
+    agent_answer_to_user_question = state.get("generation", "")
+    # Verifica se há pergunta pendente do agente
+    pending_question = state.get("pending_agent_question")
+
+    llm_fast_instance: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+
+    # --- Validações ---
+    if not llm_fast_instance:
+        logger.error(f"[{node_name}] LLM unavailable. Skipping transition.")
+        return {
+            "generation": agent_answer_to_user_question,
+            "messages": [],
+            "pending_agent_question": pending_question,
+        }  # Retorna estado atual
+    if not agent_answer_to_user_question:
+        logger.warning(
+            f"[{node_name}] No previous generation found. Skipping transition."
+        )
+        return {
+            "generation": agent_answer_to_user_question,
+            "messages": [],
+            "pending_agent_question": pending_question,
+        }
+    if not messages or len(messages) < 2:
+        logger.warning(
+            f"[{node_name}] Not enough message history. Skipping transition."
+        )
+        return {
+            "generation": agent_answer_to_user_question,
+            "messages": [],
+            "pending_agent_question": pending_question,
+        }
+
+    # Determina se há uma pergunta a ser retomada
+    output_transition_text: Optional[str] = None
+    output_pending_question: Optional[PendingAgentQuestion] = None
+    output_error: Optional[str] = None
+
+    question_to_resume_text: Optional[str] = None
+    if (
+        pending_question
+        and isinstance(pending_question, dict)
+        and pending_question.get("status") == "pending"
+    ):
+        question_to_resume_text = pending_question.get("text")
+        logger.info(
+            f"[{node_name}] Pending question found to resume: '{question_to_resume_text}'"
+        )
+    else:
+        logger.info(
+            f"[{node_name}] No pending question to resume. Will generate a new question."
+        )
+
+    # --- Prompt para Gerar a Transição (Retomando ou Nova) ---
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um assistente de vendas IA. Você acabou de fornecer a seguinte resposta ({agent_answer_summary}) à pergunta/declaração do cliente.
+Sua tarefa é criar uma transição suave para continuar a conversa, adaptando-se à qualidade da sua resposta anterior.
+
+**Instruções IMPORTANTES:**
+1.  **Analise a Sua Resposta Anterior ({agent_answer_summary}):**
+    *   **Se a sua resposta indica que você NÃO PÔDE responder à pergunta principal do cliente** (ex: contém frases como "não tenho essa informação", "não sei dizer", "recomendo entrar em contato", "não consigo ajudar com isso especificamente", "no momento não tenho detalhes sobre"):
+        *   **NÃO** tente retomar uma pergunta anterior complexa ({previous_agent_question}).
+        *   **NÃO** inicie uma nova linha de investigação profunda (SPIN).
+        *   Gere uma transição **simples e aberta**, focando no que você *pode* fazer ou devolvendo o controle. Exemplos: "Posso te ajudar com mais alguma dúvida sobre as funcionalidades que mencionei?", "Há algo mais sobre o *Vendedor IA* em que posso te ajudar agora?", "Em que mais posso ser útil no momento?". Defina `question_type` como 'Open_Fallback'.
+    *   **Se a sua resposta respondeu satisfatoriamente à pergunta do cliente:** Siga as instruções normais abaixo.
+
+**Instruções Normais (Se você respondeu à pergunta):**
+2.  **Confirme Utilidade (Opcional):** Comece com "Espero que isso tenha ajudado a esclarecer." ou "Fez sentido?".
+3.  **Decida a Próxima Pergunta:**
+    *   **Se uma 'Pergunta Anterior a Retomar' ({previous_agent_question}) foi fornecida E ela ainda faz sentido no contexto:** Reintroduza essa pergunta de forma natural. Defina `question_type` como 'Resume_Pending'.
+    *   **Caso contrário (sem pergunta anterior ou ela não faz mais sentido):** Gere uma *nova pergunta aberta* relevante para continuar a investigação (Problema/Implicação). Defina `question_type` como 'New_Investigation'.
+4.  **Seja Conciso e Natural.**
+5.  **Formatação:** Use formatação WhatsApp sutil. {formatting_instructions}
+6.  **Output:** Responda APENAS com um objeto JSON seguindo o schema TransitionOutput (`transition_text`, `question_asked`, `question_type`).""",
+            ),
+            ("user", "Gere a transição apropriada."),
+        ]
+    )
+
+    # --- Cadeia com LLM Estruturado ---
+    structured_llm = llm_fast_instance.with_structured_output(TransitionOutput)
+    chain = prompt_template | structured_llm
+
+    try:
+        answer_summary = (
+            agent_answer_to_user_question[:150] + "..."
+            if len(agent_answer_to_user_question) > 150
+            else agent_answer_to_user_question
+        )
+
+        transition_result: TransitionOutput = await chain.ainvoke(
+            {
+                "agent_answer_summary": answer_summary,
+                "previous_agent_question": question_to_resume_text
+                or "N/A",  # Passa a pergunta a retomar ou N/A
+                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
+            }
+        )
+
+        logger.info(f"[{node_name}] Structured transition result: {transition_result}")
+
+        transition_text = transition_result.transition_text.strip()
+        question_asked_text = transition_result.question_asked.strip()
+        question_asked_type = (
+            transition_result.question_type
+        )  # 'Resume_Pending' ou 'New_Investigation'
+
+        if (
+            not transition_text
+            or not question_asked_text
+            or not question_asked_text.endswith("?")
+        ):
+            raise ValueError("Invalid transition data")
+
+        output_transition_text = transition_text
+
+        # --- Define o estado de pending_question para o retorno ---
+        if question_asked_type == "Resume_Pending" and pending_question:
+            # Se retomou, retorna o objeto PENDENTE EXISTENTE (com attempts já incrementado)
+            output_pending_question = pending_question
+            logger.debug(
+                f"[{node_name}] Resuming pending question. Returning existing state: {output_pending_question}"
+            )
+        else:  # Gerou nova pergunta
+            # Cria um NOVO objeto pending_question com attempts = 1
+            output_pending_question = {
+                "text": question_asked_text,
+                "type": question_asked_type,
+                "status": "pending",
+                "attempts": 1,
+            }
+            logger.debug(
+                f"[{node_name}] Generated new question. Setting new pending state: {output_pending_question}"
+            )
+
+        output_error = None
+
+    except Exception as e:
+        logger.exception(f"[{node_name}] Error generating transition: {e}")
+        output_error = f"Transition generation failed: {e}"
+        # Mantém o estado pendente original em caso de erro na geração da transição? Sim.
+        output_pending_question = pending_question
+
+    # --- Prepara o Estado de Retorno Final ---
+    final_response_text = agent_answer_to_user_question  # Resposta original
+    output_messages = []  # Mensagens a adicionar ao histórico do grafo
+
+    if output_transition_text:
+        final_response_text = (
+            f"{agent_answer_to_user_question}\n\n{output_transition_text}"
+        )
+        ai_transition_message = AIMessage(content=output_transition_text)
+        output_messages = [ai_transition_message]
+        logger.info(f"[{node_name}] Generated transition: '{output_transition_text}'")
+    else:
+        logger.warning(f"[{node_name}] No transition text generated.")
+
+    return {
+        "generation": final_response_text,  # Resposta completa (original + transição se houver)
+        "messages": output_messages,  # Apenas a transição (se houver)
+        "pending_agent_question": output_pending_question,  # <-- Retorna o objeto correto (novo ou existente)
+        "error": output_error,
+    }

@@ -59,7 +59,7 @@ Diretrizes de Comunicação:
 6.  **Hora Atual:** Use a data e hora atuais ({current_datetime}) para perguntas sensíveis ao tempo.
 7.  **Responda à Última Mensagem:** Concentre sua resposta na mensagem mais recente do cliente.
 8.  **Aplique a Formatação:** Use a formatação WhatsApp Markdown (instruída acima) de forma útil e clara para melhorar a legibilidade.
-9.  **Foco na Resposta:** Forneça a resposta direta e completa à pergunta ou declaração do cliente. **NÃO adicione frases genéricas de encerramento** como "Se precisar de mais ajuda...", "Estou à disposição" ou "Posso ajudar em algo mais?". O objetivo deste passo é apenas responder à consulta atual.
+9.  **Foco EXLUSIVO na Resposta:** Sua **ÚNICA tarefa** neste passo é fornecer a resposta direta e completa à última pergunta ou declaração do cliente, usando as informações disponíveis. **NÃO inclua NENHUMA pergunta de acompanhamento** (como 'Isso ajudou?', 'Posso ajudar em algo mais?', 'Gostaria de saber mais?') **nem frases de encerramento genéricas** ('Estou à disposição', etc.). Termine a resposta logo após fornecer a informação solicitada ou a declaração de que não a possui. A próxima etapa da conversa (fazer perguntas) será tratada por outro componente.
 
 {fallback_instructions}
 
@@ -170,7 +170,7 @@ def build_llm_prompt_messages(
                 profile.communication_guidelines
             ),
             "fallback_instructions": (
-                f"If you cannot answer the query, direct the user with: '{profile.fallback_contact_info}'"
+                f"If you cannot answer the query, politely state that you cannot help with that specific request and direct the user with: '{profile.fallback_contact_info}'"
                 if profile.fallback_contact_info
                 else "If you cannot answer the query, politely state that you cannot help with that specific request."
             ),
