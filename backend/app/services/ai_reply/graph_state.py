@@ -127,9 +127,11 @@ class ConversationState(TypedDict):
     # === Closing Subgraph State (Inicial) ===
     closing_attempt_count: int
     closing_status: Optional[str]
+    correction_details: Optional[str]
 
     # === Control & Metadata ===
     intent: Optional[str]
+    disengagement_reason: Optional[str]
     is_simulation: bool
     loop_count: int
 

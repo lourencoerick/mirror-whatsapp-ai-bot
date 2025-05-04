@@ -47,6 +47,7 @@ try:
         transition_after_answer_node,
         define_proposal_node,
         clarify_vague_statement_node,
+        end_conversation_node,
     )
 
     CORE_NODES_AVAILABLE = True
@@ -192,6 +193,7 @@ def create_closing_subgraph(checkpointer: Checkpointer) -> StateGraph:
     )
     closing_workflow.add_node("process_order", process_order_node)  # <-- Novo
     closing_workflow.add_node("handle_correction", handle_correction_node)  # <-- Novo
+    closing_workflow.add_node("end_conversation_closing", end_conversation_node)
 
     # --- Define Closing Flow ---
 
@@ -257,7 +259,9 @@ def create_closing_subgraph(checkpointer: Checkpointer) -> StateGraph:
     # Roteamento após analisar a resposta da confirmação final (ATUALIZADO)
     def route_after_final_confirmation(
         state: ConversationState,
-    ) -> Literal["process_order", "handle_correction", "__end__"]:  # <-- Rotas finais
+    ) -> Literal[
+        "process_order", "handle_correction", "end_conversation_closing", "__end__"
+    ]:  # <-- Rotas finais
         """Routes based on the analysis of the final confirmation response."""
         status = state.get("closing_status")
         log_prefix = "[Final Confirmation Router]"
@@ -275,9 +279,17 @@ def create_closing_subgraph(checkpointer: Checkpointer) -> StateGraph:
                 f"{log_prefix} Correction needed. Routing to handle_correction."
             )
             return "handle_correction"  # <-- Rota para corrigir
-        else:  # CONFIRMATION_REJECTED ou CONFIRMATION_FAILED
+        elif status == "CONFIRMATION_REJECTED":  # <-- Trata rejeição
             logger.warning(
-                f"{log_prefix} Final confirmation rejected or failed ({status}). Ending closing subgraph."
+                f"{log_prefix} Final confirmation rejected. Routing to end_conversation_closing."
+            )
+            state["disengagement_reason"] = (
+                "Final confirmation rejected by customer."  # Opcional
+            )
+            return "end_conversation_closing"  # <-- Rota para finalizar
+        else:  # CONFIRMATION_FAILED ou outro
+            logger.warning(
+                f"{log_prefix} Final confirmation failed or unknown status ({status}). Ending closing subgraph."
             )
             return END
 
@@ -287,6 +299,7 @@ def create_closing_subgraph(checkpointer: Checkpointer) -> StateGraph:
         {
             "process_order": "process_order",  # <-- Nova aresta
             "handle_correction": "handle_correction",  # <-- Nova aresta
+            "end_conversation_closing": "end_conversation_closing",
             END: END,
         },
     )
@@ -296,6 +309,7 @@ def create_closing_subgraph(checkpointer: Checkpointer) -> StateGraph:
     closing_workflow.add_edge(
         "handle_correction", END
     )  # O nó handle_correction agora muda o estado para sair do closing
+    closing_workflow.add_edge("end_conversation_closing", END)
 
     logger.info(
         "Compiling the Closing subgraph (with simplified process/correction)..."
@@ -329,7 +343,7 @@ def create_objection_subgraph(checkpointer: Checkpointer) -> StateGraph:
         "retrieve_for_objection", retrieve_knowledge_for_objection_node
     )
     objection_workflow.add_node("generate_rebuttal", generate_rebuttal_node)
-
+    objection_workflow.add_node("end_conversation_objection", end_conversation_node)
     # --- Define Objection Handling Flow ---
 
     # Função para determinar o ponto de entrada
@@ -367,6 +381,7 @@ def create_objection_subgraph(checkpointer: Checkpointer) -> StateGraph:
         state: ConversationState,
     ) -> Literal[
         "acknowledge_and_clarify",  # Tratar objeção (persistente)
+        "end_conversation_objection",
         "__end__",  # Sair do subgraph (resolvida, limite, erro, nova objeção - tratar no grafo principal)
     ]:
         """Routes based on the status determined by check_resolution."""
@@ -375,20 +390,22 @@ def create_objection_subgraph(checkpointer: Checkpointer) -> StateGraph:
         logger.debug(f"{log_prefix} Routing based on status: {resolution_status}")
         state["objection_resolution_status"] = None  # Limpa o status
 
-        # Se check_resolution indicou que a objeção persiste
-        if resolution_status == "PERSISTS" or resolution_status == "PERSISTS_ERROR":
-            # Se persiste (ou erro na análise), tenta tratar de novo via acknowledge
-            # acknowledge vai usar a 'current_objection' que check_resolution manteve.
+        if resolution_status == "LOOP_LIMIT_EXIT":  # <-- Trata limite de loop
+            logger.warning(
+                f"{log_prefix} Objection loop limit reached. Routing to end_conversation_objection."
+            )
+            state["disengagement_reason"] = (
+                "Objection handling loop limit reached."  # Opcional
+            )
+            return "end_conversation_objection"  # <-- Rota para finalizar
+        elif resolution_status in ["PERSISTS", "PERSISTS_ERROR"]:
             logger.debug(
                 f"{log_prefix} Status '{resolution_status}' requires re-handling. Routing to acknowledge."
             )
             return "acknowledge_and_clarify"
-        else:
-            # Se RESOLVED, LOOP_LIMIT_EXIT, NEW_OBJECTION (será tratada no grafo principal),
-            # ou outro status, termina o subgrafo.
-            # O estado (current_objection, loop_count) foi atualizado por check_resolution.
+        else:  # RESOLVED, NEW_OBJECTION (tratada no grafo principal), ou outro
             logger.debug(
-                f"{log_prefix} Status is '{resolution_status}'. Exiting subgraph."
+                f"{log_prefix} Status is '{resolution_status}'. Exiting objection subgraph."
             )
             return END
 
@@ -398,6 +415,7 @@ def create_objection_subgraph(checkpointer: Checkpointer) -> StateGraph:
         route_after_objection_check_inside,
         {
             "acknowledge_and_clarify": "acknowledge_and_clarify",  # Volta para acknowledge se persiste
+            "end_conversation_objection": "end_conversation_objection",
             END: END,  # Sai se resolvida, limite, nova, etc.
         },
     )
@@ -415,6 +433,8 @@ def create_objection_subgraph(checkpointer: Checkpointer) -> StateGraph:
     # Termina após gerar o rebuttal (espera resposta do cliente para a próxima rodada)
     objection_workflow.add_edge("generate_rebuttal", END)
     logger.debug("Added edge from 'generate_rebuttal' to END.")
+
+    objection_workflow.add_edge("end_conversation_objection", END)
 
     logger.info("Compiling the Objection Handling subgraph (with conditional entry)...")
     compiled_objection_graph = objection_workflow.compile(checkpointer=checkpointer)
@@ -545,6 +565,7 @@ def route_after_classification(
     "present_capability",
     "retrieve_knowledge",
     "generate_rapport",
+    "end_conversation",
     "__end__",
 ]:
     """
@@ -565,6 +586,13 @@ def route_after_classification(
     if error and "Classification failed" in error:
         logger.error(f"{log_prefix} Classification failed. Ending: {error}")
         return END
+
+    if intent == "Goodbye":
+        logger.debug(
+            f"{log_prefix} Goodbye intent detected. Routing to end_conversation."
+        )
+        state["disengagement_reason"] = "Customer expressed desire to end."  # Opcional
+        return "end_conversation"
 
     # 2. Saudação -> Rapport
     if intent == "Greeting":
@@ -776,6 +804,7 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     workflow.add_node("generate_response", generate_response_node)
     workflow.add_node("present_capability", present_capability_node)
     workflow.add_node("transition_after_answer", transition_after_answer_node)
+    workflow.add_node("end_conversation", end_conversation_node)
 
     # Subgraphs as Nodes
     workflow.add_node("invoke_spin_subgraph", spin_subgraph)
@@ -797,6 +826,7 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     logger.debug("Defining edges for the main reply graph...")
 
     # Static Edges
+    workflow.add_edge("end_conversation", END)
     workflow.add_edge("generate_rapport", END)
     workflow.add_edge("retrieve_knowledge", "generate_response")
     workflow.add_edge("generate_response", "transition_after_answer")
@@ -815,6 +845,7 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
             "retrieve_knowledge": "retrieve_knowledge",
             "define_proposal": "define_proposal",
             "present_capability": "present_capability",
+            "end_conversation": "end_conversation",
             "invoke_spin_subgraph": "invoke_spin_subgraph",
             "invoke_straight_line_subgraph": "invoke_straight_line_subgraph",
             "invoke_objection_subgraph": "invoke_objection_subgraph",

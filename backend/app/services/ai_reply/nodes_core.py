@@ -133,6 +133,7 @@ VALID_INTENTS = [
     "Other",
     "Unknown",
     "VagueStatement",
+    "Goodbye",
 ]
 
 from pydantic import BaseModel, Field
@@ -295,6 +296,7 @@ Intenções Válidas: {valid_intents}
 - **Complaint:** Reclamação. -> Próximo Estágio: 'ObjectionHandling'. `is_problem_statement`: false.
 - **Other/Unknown:** Não se encaixa. -> Próximo Estágio: Manter ou 'Unknown'. `is_problem_statement`: false.
 - **VagueStatement:** Cliente expressa dúvida, incerteza, ou necessidade de pensar **sem especificar o motivo ou o ponto de dúvida**. Exemplos: "preciso pensar melhor", "não sei...", "não entendi direito essa parte", "parece complicado". -> Próximo Estágio: Manter o estágio atual ou 'Investigation'. `is_problem_statement`: false.
+- **Goodbye:** Cliente indica explicitamente que quer encerrar a conversa, não tem mais interesse, ou se despede. Exemplos: "obrigado, por enquanto é só", "não tenho interesse", "tchau", "até logo". -> Próximo Estágio: Manter o atual ou 'Unknown'. 
 
 **IMPORTANTE - Declaração de Problema:**
 - Se a 'ÚLTIMA PERGUNTA DO AGENTE' foi uma pergunta de Situação ou Problema (ex: "Quais desafios você enfrenta?", "Como você faz X hoje?"), E a 'ÚLTIMA MENSAGEM DO CLIENTE' descreve uma dificuldade, dor, ou insatisfação (ex: "gasto muito tempo", "é difícil fazer Y", "não consigo Z"), então:
@@ -1193,6 +1195,105 @@ Instrução: Apresente a capacidade da solução focando no benefício para a ne
             "generation": fallback,
             "messages": [ai_message],
             "error": f"Presentation generation failed: {e}",
+        }
+
+
+async def end_conversation_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Generates a final, polite closing message for the conversation.
+
+    Args:
+        state: Current conversation state. May use 'disengagement_reason' for context.
+        config: Requires 'llm_fast_instance'.
+
+    Returns:
+        Dictionary with 'generation' and 'messages'. This node leads to END.
+    """
+    node_name = "end_conversation_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    reason = state.get("disengagement_reason")  # Opcional: motivo do fim
+    profile_dict = state.get("company_profile")
+    llm_fast: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+
+    # --- Validações ---
+    if not llm_fast:
+        logger.error(f"[{node_name}] LLM unavailable. Using generic fallback.")
+        fallback = "Agradeço seu contato. Tenha um ótimo dia!"
+        return {"generation": fallback, "messages": [AIMessage(content=fallback)]}
+    if not profile_dict:
+        logger.warning(f"[{node_name}] Profile not found. Using generic fallback.")
+        fallback = "Agradeço seu contato. Tenha um ótimo dia!"
+        return {"generation": fallback, "messages": [AIMessage(content=fallback)]}
+
+    logger.debug(f"[{node_name}] Ending conversation. Reason (if any): {reason}")
+
+    # --- Prompt para Mensagem Final ---
+    prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um assistente de vendas IA educado encerrando a conversa.
+O motivo do encerramento foi: {reason_context}.
+
+**Sua Tarefa:**
+1.  **Agradeça:** Agradeça ao cliente pelo tempo ou interesse.
+2.  **Reconheça (Opcional):** Se houver um motivo claro (ex: cliente disse não, limite atingido), reconheça brevemente de forma neutra (ex: "Entendido.").
+3.  **Despeça-se:** Deseje um bom dia/tarde/noite.
+4.  **Ofereça Ajuda Futura (Opcional Suave):** Se apropriado (especialmente se o motivo não foi rejeição forte), mencione que está à disposição caso ele mude de ideia ou precise de algo no futuro. Use com moderação.
+5.  **Tom:** Mantenha o tom {sales_tone}, mas adaptado para ser cordial e finalizador.
+6.  **Formatação:** Use formatação WhatsApp sutil. {formatting_instructions}
+
+Gere APENAS a mensagem final de despedida.""",
+            ),
+        ]
+    )
+
+    parser = StrOutputParser()
+    chain = prompt_template | llm_fast | parser
+
+    try:
+        reason_context = (
+            reason if reason else "Fim da interação solicitada ou fluxo concluído."
+        )
+
+        final_message = await chain.ainvoke(
+            {
+                "reason_context": reason_context,
+                "sales_tone": profile_dict.get("sales_tone", "profissional"),
+                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
+            }
+        )
+        final_message = final_message.strip()
+
+        if not final_message:
+            raise ValueError("LLM returned empty final message.")
+
+        logger.info(f"[{node_name}] Generated final message: '{final_message}'")
+        ai_message = AIMessage(content=final_message)
+
+        # Limpa estado pendente ao finalizar? Opcional.
+        # state['pending_agent_question'] = None
+
+        return {
+            "generation": final_message,
+            "messages": [ai_message],
+            "error": None,
+        }
+
+    except Exception as e:
+        logger.exception(f"[{node_name}] Error generating final message: {e}")
+        fallback = "Agradeço seu tempo e interesse. Tenha um ótimo dia!"
+        ai_fallback_message = AIMessage(content=fallback)
+        return {
+            "generation": fallback,
+            "messages": [ai_fallback_message],
+            "error": f"End conversation failed: {e}",
         }
 
 
