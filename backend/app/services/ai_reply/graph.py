@@ -39,12 +39,14 @@ except ImportError as e:
 try:
     from .nodes_core import (
         classify_intent_and_stage_node,
+        check_pending_answer_node,
         generate_rapport_node,
         retrieve_knowledge_node,
         generate_response_node,
         present_capability_node,  # Import the presentation node
         transition_after_answer_node,
         define_proposal_node,
+        clarify_vague_statement_node,
     )
 
     CORE_NODES_AVAILABLE = True
@@ -574,6 +576,12 @@ def route_after_classification(
         logger.debug(f"{log_prefix} Routing to: invoke_objection_subgraph")
         return "invoke_objection_subgraph"
 
+    if intent == "VagueStatement":
+        logger.debug(
+            f"{log_prefix} Vague statement detected. Routing to clarify_vague_statement."
+        )
+        return "clarify_vague_statement"
+
     # 4. Tentativa de Fechamento (Intenção ou Estágio) -> Verificar Proposta
     if intent == "ClosingAttempt" or stage == SALES_STAGE_CLOSING:
         if proposal_defined:
@@ -761,6 +769,8 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
 
     # Core Nodes
     workflow.add_node("classify_intent_and_stage", classify_intent_and_stage_node)
+    workflow.add_node("check_pending_answer", check_pending_answer_node)
+    workflow.add_node("clarify_vague_statement", clarify_vague_statement_node)
     workflow.add_node("generate_rapport", generate_rapport_node)
     workflow.add_node("retrieve_knowledge", retrieve_knowledge_node)
     workflow.add_node("generate_response", generate_response_node)
@@ -778,6 +788,11 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     workflow.set_entry_point("classify_intent_and_stage")
     logger.debug("Entry point set to 'classify_intent_and_stage'.")
 
+    workflow.add_edge("classify_intent_and_stage", "check_pending_answer")
+    logger.debug(
+        "Added edge from 'classify_intent_and_stage' to 'check_pending_answer'."
+    )
+
     # --- Define Edges ---
     logger.debug("Defining edges for the main reply graph...")
 
@@ -792,17 +807,18 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
 
     # Conditional Edge 1: After Classification
     workflow.add_conditional_edges(
-        "classify_intent_and_stage",
+        "check_pending_answer",
         route_after_classification,
         {
             "generate_rapport": "generate_rapport",
+            "clarify_vague_statement": "clarify_vague_statement",
+            "retrieve_knowledge": "retrieve_knowledge",
+            "define_proposal": "define_proposal",
+            "present_capability": "present_capability",
             "invoke_spin_subgraph": "invoke_spin_subgraph",
             "invoke_straight_line_subgraph": "invoke_straight_line_subgraph",
             "invoke_objection_subgraph": "invoke_objection_subgraph",
             "invoke_closing_subgraph": "invoke_closing_subgraph",  # <-- Adiciona rota
-            "present_capability": "present_capability",
-            "retrieve_knowledge": "retrieve_knowledge",
-            "define_proposal": "define_proposal",
             END: END,
         },
     )

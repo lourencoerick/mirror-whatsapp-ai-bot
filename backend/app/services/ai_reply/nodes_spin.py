@@ -8,7 +8,7 @@ from .prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
 # Import State and Constants
 from .graph_state import (
     ConversationState,
-    CompanyProfileSchema,
+    PendingAgentQuestion,
     SPIN_TYPE_SITUATION,
     SPIN_TYPE_PROBLEM,
     SPIN_TYPE_IMPLICATION,
@@ -340,6 +340,7 @@ async def generate_spin_question_node(
     node_name = "generate_spin_question_node"
     logger.info(f"--- Starting Node: {node_name} (SPIN Subgraph) ---")
 
+    pending_question = state.get("pending_agent_question")
     spin_type = state.get("spin_question_type")
     if spin_type is None:
         logger.info(f"[{node_name}] No SPIN question type selected. Passing through.")
@@ -368,139 +369,178 @@ async def generate_spin_question_node(
             "last_spin_question_type": state.get("last_spin_question_type"),
         }
 
-    last_human_message_obj = (
-        messages[-1] if messages and isinstance(messages[-1], HumanMessage) else None
-    )
-    last_human_message_content = getattr(last_human_message_obj, "content", "")
+    # --- Lógica para Re-perguntar ou Gerar Nova ---
+    output_generation: Optional[str] = None
+    output_pending_question: Optional[PendingAgentQuestion] = None
+    output_error: Optional[str] = None
 
-    logger.debug(f"[{node_name}] Generating SPIN question of type: {spin_type}")
-    logger.debug(
-        f"[{node_name}] Last human message for context: '{last_human_message_content[:100]}...'"
-    )
-
-    # --- Prompt ATUALIZADO para Saída Estruturada ---
-    spin_prompt_template = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """Você é um assistente de vendas IA conversacional, especialista em SPIN Selling, com um toque humano e empático.
-Sua tarefa é gerar a PRÓXIMA pergunta da conversa, do tipo '{spin_type}', separando a frase de conexão da pergunta principal.
-
-**Contexto:**
-Última Mensagem do Cliente: {last_customer_message}
-Tipo de Pergunta SPIN a ser Gerada: {spin_type}
-
-**Instruções:**
-1.  **Analise a Última Mensagem:** Identifique o tópico/sentimento central (interesse, problema, etc.).
-2.  **Gere a `connection_phrase` (Opcional, mas VALIOSA):**
-    *   **Objetivo:** Criar uma ponte natural e agregar valor, mostrando que você entendeu e contextualizou a fala do cliente.
-    *   **Como:** Se um tópico claro foi identificado, crie uma frase curta que valide E **adicione um breve insight, contexto ou reforço de valor**.
-        *   Exemplo (Interesse em 'Qualificação'): "Realmente, a *qualificação automática* é um desafio comum (ou 'é fundamental') quando se está crescendo."
-        *   Exemplo (Problema 'Tempo Gasto'): "Entendo, otimizar esse *tempo gasto* é crucial para liberar sua equipe para tarefas estratégicas."
-        *   Exemplo (Problema [Topico X]): "Entendo, o [Topico X] é crucial para [Coisas que o Topico X é crucial]."
-    *   **Adapte a Profundidade:** A riqueza da sua conexão deve espelhar a riqueza da mensagem do cliente. Se ele foi detalhado, sua conexão pode ser mais elaborada. Se ele foi muito breve (ex: "sim", "ok"), use uma conexão mínima ("Entendido.", "Ok.") ou deixe nula/vazia.
-    *   **Evite Redundância Óbvia:** Não repita exatamente o que o cliente disse nem faça afirmações genéricas demais.
-    *   **Seja Natural e Empático:** Evite frases robóticas.
-3.  **Gere a `spin_question` (Obrigatório):**
-    *   Formule UMA pergunta clara, aberta e específica do tipo '{spin_type}'.
-    *   Conecte-a diretamente ao tópico/sentimento identificado na última mensagem do cliente, se possível.
-4.  **Formatação:** Use formatação WhatsApp sutil dentro das frases, se aplicável. {formatting_instructions}
-5.  **Output:** Responda APENAS com um objeto JSON contendo os campos "connection_phrase" (string opcional ou null) e "spin_question" (string obrigatória).
-
-PERFIL DA EMPRESA (Contexto): Nome: {company_name}, Descrição: {business_description}, Ofertas: {offering_summary}
-HISTÓRICO (Recente - opcional): {chat_history}
-
-Instrução Final: Gere o JSON com "connection_phrase" e "spin_question" para o tipo '{spin_type}'.""",
-            ),
-        ]
-    )
-
-    formatted_history = "\n".join(
-        [
-            f"{'Cliente' if isinstance(m, HumanMessage) else 'Agente'}: {m.content}"
-            for m in reversed(messages[-6:-1])
-        ]
-    )
-
-    # --- Cadeia com LLM Estruturado ---
-    structured_llm = llm_instance.with_structured_output(SpinGenerationOutput)
-    chain = spin_prompt_template | structured_llm
-
-    try:
-        offerings = profile_dict.get("offering_overview", [])
-        offering_summary = (
-            ", ".join([o.get("name", "?") for o in offerings[:3]])
-            if offerings
-            else "N/A"
+    # Verifica se há pergunta pendente e se devemos tentar de novo
+    if (
+        pending_question
+        and isinstance(pending_question, dict)
+        and pending_question.get("status") == "pending"
+    ):
+        attempts = pending_question.get("attempts", 1)
+        original_question_text = pending_question.get("text")
+        original_question_type = pending_question.get("type")
+        logger.warning(
+            f"[{node_name}] Re-asking pending question (Type: {original_question_type}, Attempt: {attempts}): '{original_question_text}'"
         )
 
-        # Invoca a cadeia para obter o objeto estruturado
-        structured_result: SpinGenerationOutput = await chain.ainvoke(
-            {
-                "spin_type": spin_type,
-                "last_customer_message": (
-                    last_human_message_content if last_human_message_content else "N/A"
+        output_generation = f"Retomando o ponto anterior: {original_question_text}"  # Exemplo simples de re-perguntar
+
+        # >>> IMPORTANTE: Retorna o MESMO objeto pending_question (com attempts já incrementado) <<<
+        output_pending_question = pending_question
+        output_error = None
+
+    else:
+        last_human_message_obj = (
+            messages[-1]
+            if messages and isinstance(messages[-1], HumanMessage)
+            else None
+        )
+        last_human_message_content = getattr(last_human_message_obj, "content", "")
+
+        logger.debug(f"[{node_name}] Generating SPIN question of type: {spin_type}")
+        logger.debug(
+            f"[{node_name}] Last human message for context: '{last_human_message_content[:100]}...'"
+        )
+
+        # --- Prompt ATUALIZADO para Saída Estruturada ---
+        spin_prompt_template = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """Você é um assistente de vendas IA conversacional, especialista em SPIN Selling, com um toque humano e empático.
+    Sua tarefa é gerar a PRÓXIMA pergunta da conversa, do tipo '{spin_type}', separando a frase de conexão da pergunta principal.
+
+    **Contexto:**
+    Última Mensagem do Cliente: {last_customer_message}
+    Tipo de Pergunta SPIN a ser Gerada: {spin_type}
+
+    **Instruções:**
+    1.  **Analise a Última Mensagem:** Identifique o tópico/sentimento central (interesse, problema, etc.).
+    2.  **Gere a `connection_phrase` (Opcional, mas VALIOSA):**
+        *   **Objetivo:** Criar uma ponte natural e agregar valor, mostrando que você entendeu e contextualizou a fala do cliente.
+        *   **Como:** Se um tópico claro foi identificado, crie uma frase curta que valide E **adicione um breve insight, contexto ou reforço de valor**.
+            *   Exemplo (Interesse em 'Qualificação'): "Realmente, a *qualificação automática* é um desafio comum (ou 'é fundamental') quando se está crescendo."
+            *   Exemplo (Problema 'Tempo Gasto'): "Entendo, otimizar esse *tempo gasto* é crucial para liberar sua equipe para tarefas estratégicas."
+            *   Exemplo (Problema [Topico X]): "Entendo, o [Topico X] é crucial para [Coisas que o Topico X é crucial]."
+        *   **Adapte a Profundidade:** A riqueza da sua conexão deve espelhar a riqueza da mensagem do cliente. Se ele foi detalhado, sua conexão pode ser mais elaborada. Se ele foi muito breve (ex: "sim", "ok"), use uma conexão mínima ("Entendido.", "Ok.") ou deixe nula/vazia.
+        *   **Evite Redundância Óbvia:** Não repita exatamente o que o cliente disse nem faça afirmações genéricas demais.
+        *   **Seja Natural e Empático:** Evite frases robóticas.
+    3.  **Gere a `spin_question` (Obrigatório):**
+        *   Formule UMA pergunta clara, aberta e específica do tipo '{spin_type}'.
+        *   Conecte-a diretamente ao tópico/sentimento identificado na última mensagem do cliente, se possível.
+    4.  **Formatação:** Use formatação WhatsApp sutil dentro das frases, se aplicável. {formatting_instructions}
+    5.  **Output:** Responda APENAS com um objeto JSON contendo os campos "connection_phrase" (string opcional ou null) e "spin_question" (string obrigatória).
+
+    PERFIL DA EMPRESA (Contexto): Nome: {company_name}, Descrição: {business_description}, Ofertas: {offering_summary}
+    HISTÓRICO (Recente - opcional): {chat_history}
+
+    Instrução Final: Gere o JSON com "connection_phrase" e "spin_question" para o tipo '{spin_type}'.""",
                 ),
-                "company_name": profile_dict.get("company_name", "N/A"),
-                "business_description": profile_dict.get("business_description", "N/A"),
-                "offering_summary": offering_summary,
-                "chat_history": formatted_history if formatted_history else "N/A",
-                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
-            }
+            ]
         )
 
-        logger.info(
-            f"[{node_name}] Structured SPIN generation result: {structured_result}"
+        formatted_history = "\n".join(
+            [
+                f"{'Cliente' if isinstance(m, HumanMessage) else 'Agente'}: {m.content}"
+                for m in reversed(messages[-6:-1])
+            ]
         )
 
-        # --- Combina as partes ---
-        connection = structured_result.connection_phrase
-        question = structured_result.spin_question
+        # --- Cadeia com LLM Estruturado ---
+        structured_llm = llm_instance.with_structured_output(SpinGenerationOutput)
+        chain = spin_prompt_template | structured_llm
 
-        if not question or not question.endswith("?"):
-            logger.warning(
-                f"[{node_name}] LLM generated invalid spin_question: '{question}'. Using fallback."
+        try:
+            offerings = profile_dict.get("offering_overview", [])
+            offering_summary = (
+                ", ".join([o.get("name", "?") for o in offerings[:3]])
+                if offerings
+                else "N/A"
             )
-            raise ValueError("LLM generated invalid spin_question.")
 
-        # Combina, adicionando espaço se a conexão existir
-        if connection and connection.strip():
-            # Adiciona um ponto final à conexão se não tiver e um espaço
-            connection_formatted = connection.strip()
-            if connection_formatted[-1] not in [".", "!", "?"]:
-                connection_formatted += "."
-            generated_response = f"{connection_formatted} {question}"
-        else:
-            generated_response = question
+            # Invoca a cadeia para obter o objeto estruturado
+            structured_result: SpinGenerationOutput = await chain.ainvoke(
+                {
+                    "spin_type": spin_type,
+                    "last_customer_message": (
+                        last_human_message_content
+                        if last_human_message_content
+                        else "N/A"
+                    ),
+                    "company_name": profile_dict.get("company_name", "N/A"),
+                    "business_description": profile_dict.get(
+                        "business_description", "N/A"
+                    ),
+                    "offering_summary": offering_summary,
+                    "chat_history": formatted_history if formatted_history else "N/A",
+                    "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
+                }
+            )
 
-        logger.info(f"[{node_name}] Combined SPIN response: '{generated_response}'")
-        ai_message = AIMessage(content=generated_response)
+            logger.info(
+                f"[{node_name}] Structured SPIN generation result: {structured_result}"
+            )
 
+            # --- Combina as partes ---
+            connection = structured_result.connection_phrase
+            question = structured_result.spin_question
+
+            if not question or not question.endswith("?"):
+                raise ValueError("Invalid question")
+
+            if connection and connection.strip():
+                output_generation = f"{connection.strip()} {question}"
+            else:
+                output_generation = question
+
+            # >>> IMPORTANTE: Cria um NOVO objeto pending_question com attempts = 1 <<<
+            output_pending_question = {
+                "text": question,  # A pergunta efetivamente feita
+                "type": f"SPIN_{spin_type}",
+                "status": "pending",
+                "attempts": 1,  # Primeira tentativa desta nova pergunta
+            }
+            output_error = None
+
+        except Exception as e:
+            # ... (Fallback como antes, usando apenas a pergunta fallback) ...
+            logger.exception(
+                f"[{node_name}] Error generating structured SPIN question/response: {e}"
+            )
+            fallback_text = ""
+            if spin_type == SPIN_TYPE_PROBLEM:
+                fallback_text = "Quais desafios você tem encontrado?"
+            elif spin_type == SPIN_TYPE_IMPLICATION:
+                fallback_text = "E qual o impacto disso?"
+            elif spin_type == SPIN_TYPE_NEED_PAYOFF:
+                fallback_text = "Como resolver isso ajudaria?"
+            else:
+                fallback_text = "Pode me contar mais sobre sua situação?"
+
+            output_generation = fallback_text
+            if fallback_text.endswith("?"):
+                output_pending_question = {
+                    "text": fallback_text,
+                    "type": f"SPIN_{spin_type}_Fallback",
+                    "status": "pending",
+                    "attempts": 1,
+                }
+            output_error = f"SPIN generation failed: {e}"
+
+    if output_generation:
+        logger.info(f"[{node_name}] Final question/response: '{output_generation}'")
+        ai_message = AIMessage(content=output_generation)
         return {
-            "generation": generated_response,
+            "generation": output_generation,
             "messages": [ai_message],
-            "last_spin_question_type": spin_type,
-            "error": None,
+            "last_spin_question_type": spin_type,  # Mantém o tipo que *tentamos* gerar/re-perguntar
+            "pending_agent_question": output_pending_question,  # <-- Retorna o objeto correto (novo ou existente)
+            "error": output_error,
         }
-
-    except Exception as e:
-        # ... (Fallback como antes, usando apenas a pergunta fallback) ...
-        logger.exception(
-            f"[{node_name}] Error generating structured SPIN question/response: {e}"
-        )
-        fallback_text = ""
-        if spin_type == SPIN_TYPE_PROBLEM:
-            fallback_text = "Quais desafios você tem encontrado?"
-        elif spin_type == SPIN_TYPE_IMPLICATION:
-            fallback_text = "E qual o impacto disso?"
-        elif spin_type == SPIN_TYPE_NEED_PAYOFF:
-            fallback_text = "Como resolver isso ajudaria?"
-        else:
-            fallback_text = "Pode me contar mais sobre sua situação?"
-        fallback_response = AIMessage(content=fallback_text)
-        return {
-            "generation": fallback_text,
-            "messages": [fallback_response],
-            "last_spin_question_type": spin_type,
-            "error": f"SPIN generation failed: {e}",
-        }
+    else:
+        logger.error(f"[{node_name}] Failed to generate or re-ask question.")
+        return {"error": "Failed to determine question to ask."}
