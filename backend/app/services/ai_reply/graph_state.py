@@ -1,6 +1,6 @@
 # backend/app/services/ai_reply/graph_state.py
 
-from typing import TypedDict, List, Optional, Dict, Any
+from typing import TypedDict, List, Optional, Dict, Any, Literal
 from typing_extensions import Annotated
 from uuid import UUID
 
@@ -66,6 +66,13 @@ CERTAINTY_STATUS_STATEMENT_MADE = (
 )
 
 
+class PendingAgentQuestion(TypedDict):
+    text: str  # O texto da pergunta
+    type: str  # O tipo (ex: 'SPIN_Problem', 'SPIN_Implication', 'Closing_Initiate', 'Confirmation')
+    status: Literal["pending", "answered", "ignored"]  # Status atual
+    attempts: int  # Quantas vezes foi perguntada (direta ou indiretamente)
+
+
 class ConversationState(TypedDict):
     """
     Represents the evolving state during the AI reply generation process,
@@ -79,6 +86,8 @@ class ConversationState(TypedDict):
     bot_agent_id: UUID
     company_profile: CompanyProfileSchema
     agent_config: BotAgentRead
+
+    pending_agent_question: Optional[PendingAgentQuestion]
 
     # === Conversation History & Input ===
     messages: Annotated[List[BaseMessage], add_messages]
