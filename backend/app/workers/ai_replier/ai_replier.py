@@ -455,10 +455,10 @@ async def handle_ai_reply_request(
                     # Initialize fields that might be calculated anew each turn or have defaults
                     "retrieved_context": None,
                     "generation": None,
-                    "loop_count": 0,  # Reset loop count? Or let checkpoint manage? Let checkpoint manage.
                     "error": None,
-                    "current_objection": None,
-                    "objection_loop_count": 0,
+                    # "loop_count": 0,  # Reset loop count? Or let checkpoint manage? Let checkpoint manage.
+                    # "current_objection": None,
+                    # "objection_loop_count": 0,
                     # Fields managed entirely by checkpoint (don't need to initialize here unless setting default)
                     # "current_sales_stage": None,
                     # "customer_needs": [],
