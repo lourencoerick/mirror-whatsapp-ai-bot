@@ -1874,3 +1874,160 @@ Gere APENAS a mensagem que reconhece o impasse e apresenta as opções finais.""
             "messages": [ai_fallback_message],
             "error": f"Impasse handling failed: {e}",
         }
+
+
+async def analyze_agent_response_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Analyzes the agent's last generated response ('generation') against the
+    questions identified in the last user message ('current_questions').
+    Updates the status of the corresponding entries in 'customer_question_log'.
+
+    Args:
+        state: Requires 'generation', 'customer_question_log', 'current_questions'.
+        config: Requires 'llm_fast_instance'.
+
+    Returns:
+        Dictionary with the potentially updated 'customer_question_log'.
+    """
+    node_name = "analyze_agent_response_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    agent_generation = state.get("generation")
+    # Pega o log histórico para ATUALIZAR
+    log_to_update: List[CustomerQuestionEntry] = [
+        entry.copy() for entry in state.get("customer_question_log", [])
+    ]
+    # Pega as perguntas DO TURNO ATUAL que a 'generation' deveria responder
+    current_questions_list = state.get("current_questions")
+    llm_fast: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+
+    # --- Validações ---
+    if not llm_fast:
+        logger.error(f"[{node_name}] LLM unavailable. Cannot analyze agent response.")
+        return {"customer_question_log": log_to_update}  # Retorna log sem modificação
+    if not agent_generation:
+        logger.debug(f"[{node_name}] No agent generation found to analyze. Skipping.")
+        return {"customer_question_log": log_to_update}
+    if not current_questions_list:  # Se não havia perguntas no turno anterior
+        logger.debug(
+            f"[{node_name}] No 'current_questions' from previous node to analyze against. Skipping."
+        )
+        return {"customer_question_log": log_to_update}
+    if (
+        not log_to_update
+    ):  # Log histórico não pode estar vazio se current_questions não está
+        logger.error(
+            f"[{node_name}] Log is empty, but current_questions exist. Inconsistent state."
+        )
+        return {
+            "customer_question_log": log_to_update,
+            "error": "Inconsistent log state.",
+        }
+
+    logger.debug(
+        f"[{node_name}] Analyzing agent generation against {len(current_questions_list)} current question(s)."
+    )
+    logger.debug(f"[{node_name}] Agent generation: '{agent_generation[:100]}...'")
+
+    # --- Prompt e Cadeia (Reutilizável para cada pergunta) ---
+    answer_check_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um analista de conversas. Avalie se a 'Resposta do Agente' respondeu satisfatoriamente à 'Pergunta Específica do Cliente'.
+**Ignore frases introdutórias comuns** na 'Pergunta Específica do Cliente' e foque no núcleo da questão ao avaliar a resposta.
+
+Pergunta Específica do Cliente: {customer_question}
+Resposta Completa do Agente (que pode responder a múltiplas perguntas): {agent_response}
+
+Determine para ESTA pergunta específica:
+1. `did_answer`: A resposta do agente abordou diretamente o núcleo desta pergunta específica e forneceu a informação solicitada? (true/false)
+2. `used_fallback`: A resposta do agente indicou claramente que não podia responder a ESTA pergunta específica ou usou fallback? (true/false)
+
+Responda APENAS com um objeto JSON seguindo o schema AnswerCheckOutput.""",
+            ),
+        ]
+    )
+    structured_llm_ans = llm_fast.with_structured_output(AnswerCheckOutput)
+    chain_ans = answer_check_prompt | structured_llm_ans
+
+    # --- Itera sobre as perguntas do turno atual e atualiza o log ---
+    log_updated = False
+    for current_q_entry in current_questions_list:
+        # Encontra a entrada correspondente no log principal para atualizar
+        # Compara pelo texto extraído E pelo turno para garantir que é a entrada correta
+        log_entry_index: Optional[int] = None
+        for i in reversed(range(len(log_to_update))):
+            log_entry = log_to_update[i]
+            if log_entry.get("extracted_question_core") == current_q_entry.get(
+                "extracted_question_core"
+            ) and log_entry.get("turn_asked") == current_q_entry.get("turn_asked"):
+                log_entry_index = i
+                break
+
+        if log_entry_index is None:
+            logger.warning(
+                f"[{node_name}] Could not find matching log entry for current question: {current_q_entry}. Skipping update for this question."
+            )
+            continue
+
+        # Só atualiza o status se a pergunta estava esperando resposta
+        entry_to_update = log_to_update[log_entry_index]
+        if entry_to_update.get("status") not in ["asked", "repeated_unanswered"]:
+            logger.debug(
+                f"[{node_name}] Log entry {log_entry_index} status is '{entry_to_update.get('status')}'. No update needed based on agent response."
+            )
+            continue
+
+        logger.debug(
+            f"[{node_name}] Analyzing agent response against log entry {log_entry_index}: '{entry_to_update.get('extracted_question_core')[:50]}...'"
+        )
+
+        try:
+            answer_check_result: AnswerCheckOutput = await chain_ans.ainvoke(
+                {
+                    "customer_question": entry_to_update.get(
+                        "extracted_question_core"
+                    ),  # Usa o núcleo para análise
+                    "agent_response": agent_generation or " ",
+                }
+            )
+            logger.info(
+                f"[{node_name}] Agent answer check result for entry {log_entry_index}: {answer_check_result}"
+            )
+
+            if answer_check_result.did_answer and not answer_check_result.used_fallback:
+                entry_to_update["status"] = "answered"
+                logger.info(
+                    f"[{node_name}] Marked question log entry {log_entry_index} as 'answered'."
+                )
+                log_updated = True
+            else:  # Não respondeu ou usou fallback
+                entry_to_update["status"] = "unanswered_pending"
+                # O contador de tentativas ('attempts') NÃO é incrementado aqui.
+                # Ele foi definido/incrementado no nó 'update_question_log_node' ao detectar a pergunta/repetição.
+                logger.info(
+                    f"[{node_name}] Marked question log entry {log_entry_index} as 'unanswered_pending'. Attempts remain {entry_to_update.get('attempts')}."
+                )
+                log_updated = True
+
+        except Exception as e:
+            logger.exception(
+                f"[{node_name}] Error during agent answer check for entry {log_entry_index}: {e}"
+            )
+            # Mantém o status anterior em caso de erro? Sim.
+
+    # Retorna o log potencialmente atualizado
+    if log_updated:
+        logger.debug(f"[{node_name}] Returning updated customer question log.")
+        return {"customer_question_log": log_to_update, "error": None}
+    else:
+        logger.debug(f"[{node_name}] No log entries updated.")
+        return {
+            "customer_question_log": log_to_update,
+            "error": None,
+        }  # Retorna mesmo se não atualizou
