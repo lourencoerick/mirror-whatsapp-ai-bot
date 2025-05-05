@@ -1,5 +1,4 @@
 # backend/app/simulation/schemas/persona.py
-
 from pydantic import (
     BaseModel,
     Field,
@@ -11,7 +10,6 @@ from datetime import datetime
 import re
 
 
-# --- Schema para Objeções Potenciais (Mantido como antes) ---
 class PotentialObjection(BaseModel):
     """Defines a potential objection and its trigger."""
 
@@ -37,7 +35,6 @@ class PotentialObjection(BaseModel):
         }
 
 
-# --- Schema Base da Persona (ATUALIZADO) ---
 class PersonaBase(BaseModel):
     """Base Pydantic schema for Persona data, including dynamic behaviors."""
 
@@ -52,7 +49,7 @@ class PersonaBase(BaseModel):
         ..., description="The specific goal the persona wants to achieve."
     )
     information_needed: List[Dict[str, str]] = Field(
-        default_factory=list,  # Pode ser vazia se o objetivo não for coletar fatos
+        default_factory=list,
         description="List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].",
     )
 
@@ -70,22 +67,19 @@ class PersonaBase(BaseModel):
     )
 
     success_criteria: List[str] = Field(
-        # Default vazio, sucesso será avaliado de outra forma (manual/LLM final) ou por critérios específicos
         default_factory=list,
         description="List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.",
         examples=[["event:purchase_intent_confirmed"], []],
     )
     failure_criteria: List[str] = Field(
-        # Mantém defaults razoáveis
         default=[
             "event:ai_fallback_detected",
             "turn_count > 10",
-        ],  # Aumentado limite de turno padrão
+        ],
         description="List of criteria defining simulation failure.",
         examples=[["event:ai_fallback_detected", "turn_count > 10"]],
     )
 
-    # --- Validadores (Ajustados) ---
     @field_validator("persona_id")
     @classmethod
     def validate_persona_id_format(cls, v: str) -> str:
@@ -98,11 +92,10 @@ class PersonaBase(BaseModel):
     def validate_information_needed(
         cls, v: List[Dict[str, str]]
     ) -> List[Dict[str, str]]:
-        # Validação mantida, pois a estrutura ainda é útil como contexto
+
         if not isinstance(v, list):
             raise ValueError("information_needed must be a list.")
-        # Permite lista vazia agora
-        # if not v: raise ValueError("information_needed cannot be empty.")
+
         seen_pairs = set()
         for item in v:
             if (
@@ -120,7 +113,7 @@ class PersonaBase(BaseModel):
             pair = (item["entity"], item["attribute"])
             if pair in seen_pairs:
                 raise ValueError(f"Duplicate entity/attribute pair: {pair}")
-                # seen_pairs.add(pair)
+
         return v
 
     class Config:
@@ -130,11 +123,10 @@ class PersonaBase(BaseModel):
                 "description": "Cliente interessado no Vendedor IA, mas sensível a preço e um pouco impaciente.",
                 "initial_message": "Olá, esse Vendedor IA parece interessante. Como funciona?",
                 "objective": "Entender os benefícios principais do Vendedor IA, ter uma ideia de preço e decidir se vale a pena.",
-                "information_needed": [  # Ainda útil como contexto para o Persona LLM
+                "information_needed": [
                     {"entity": "Vendedor IA", "attribute": "pricing_model"},
                     {"entity": "Vendedor IA", "attribute": "main_benefit"},
                 ],
-                # info_attribute_to_question_template REMOVIDO
                 "potential_objections": [
                     {
                         "trigger_keyword": "preço",
@@ -150,7 +142,7 @@ class PersonaBase(BaseModel):
                     "Vocês oferecem algum outro serviço de automação?",
                 ],
                 "behavior_hints": ["price_sensitive", "impatient", "results_oriented"],
-                "success_criteria": [],  # Sucesso avaliado externamente ou manualmente por enquanto
+                "success_criteria": [],
                 "failure_criteria": ["event:ai_fallback_detected", "turn_count > 8"],
             }
         }
