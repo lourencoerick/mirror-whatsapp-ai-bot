@@ -1,56 +1,57 @@
 # === Banco de dados ===
+sqlalchemy==2.0.0
 alembic==1.13.0
 asyncpg==0.30.0
-psycopg2-binary==2.9.6
+psycopg2-binary>=2.9.6
 pgvector==0.4.1
-sqlalchemy==2.0.0
 
 # === Cache / Fila / Mensageria ===
-arq==0.26.3
 redis==5.0.1
+arq==0.26.3
 
-# === Framework Web e HTTP ===
-fastapi[all]==0.95.2
-httpx==0.25.2
-requests==2.31.0
-uvicorn==0.24.0
-
-# === Autenticação e Segurança ===
-authlib==1.2.1
-python-jose[cryptography]==3.3.0
-PyJWT==2.8.0
-svix==1.62.0
-
-# === Configuração de ambiente ===
-pydantic-settings==2.0.1
+# === Ambiente e Configuração ===
 python-dotenv==1.0.0
+pydantic-settings
 pytz==2025.2
 
+# === Framework Web e HTTP ===
+fastapi[all]
+uvicorn
+requests
+
+# === Autenticação e Segurança ===
+svix==1.62.0
+python-jose[cryptography]
+authlib
+PyJWT>=2.8.0
+
 # === Testes e Qualidade ===
+httpx==0.25.2
 pytest==8.3.4
 pytest-asyncio==0.23.8
-pytest-mock==3.14.0
 tenacity==9.0.0
+pytest-mock==3.14.0
 
-# === Utilitários gerais ===
+# === Utilitários Gerais ===
+pydantic>=2.5.0
+phonenumbers==9.0.2
 beautifulsoup4==4.13.4
 lxml==5.4.0
-phonenumbers==9.0.2
 pypdf==5.4.0
 tldextract==5.3.0
-trustcall==0.0.39
 
 # === IA / NLP / Vetorização ===
 langchain==0.3.24
 langchain-openai==0.3.14
-langchain-community==0.3.22
 langgraph==0.3.32
-langgraph-checkpoint-postgres==2.0.21
+langchain_community==0.3.22
 sentence-transformers==4.1.0
+trustcall==0.0.39
 tavily-python==0.6.0
+langgraph-checkpoint-postgres==2.0.21
 
-# === Google Cloud ===
-google-cloud-storage==2.12.0
+# === Google Cloud Storage ===
+google-cloud-storage
 
 # === Logging ===
-loguru==0.5.3
+loguru>=0.5.3
