@@ -9,9 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /workspace
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    postgresql-client \
-    redis-tools && \
+    build-essential && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # --- Instalação de Dependências Python ---
