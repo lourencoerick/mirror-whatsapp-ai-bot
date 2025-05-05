@@ -1,7 +1,7 @@
 # backend/app/simulation/personas/logic.py
 
 import json
-import random  # Adicionar para comportamentos aleatórios
+import random
 from typing import List, Optional, Tuple, Dict, Any
 from langchain_core.messages import (
     SystemMessage,
@@ -11,37 +11,29 @@ from pydantic import ValidationError
 
 from langchain_openai import ChatOpenAI
 
-# REMOVIDO: from trustcall import create_extractor
-# REMOVIDO: from app.simulation.schemas.persona_state import ExtractedFact
 
 from app.simulation.schemas.persona import (
     PersonaRead,
     PotentialObjection,
-)  # Importar PotentialObjection
+)
 from app.simulation.schemas.persona_state import PersonaState
 from app.models.simulation.simulation import SimulationOutcomeEnum
 
-# --- Configuração do Persona LLM ---
+
 try:
-    # Usar um modelo talvez mais rápido/barato para a persona
-    persona_llm = ChatOpenAI(
-        model="gpt-4o-mini", temperature=0.6
-    )  # Temp um pouco maior para variedade
+    persona_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.6)
     logger.info("Persona LLM (gpt-4o-mini) initialized successfully.")
 except Exception as e:
     logger.error(f"Failed to initialize Persona LLM: {e}")
     persona_llm = None
 
+
 # --- Main Logic ---
-
-
 async def get_next_persona_action(
     persona: PersonaRead,
     ai_response_text: str,
-    current_state: PersonaState,  # Mantido por enquanto, pode ser usado para turn_count ou outros estados futuros
-    conversation_history: List[
-        Dict[str, str]
-    ],  # <-- ADICIONADO: Passar histórico recente
+    current_state: PersonaState,
+    conversation_history: List[Dict[str, str]],
 ) -> Tuple[Optional[str], PersonaState, bool, Optional[SimulationOutcomeEnum]]:
     """
     Determines the persona's next action by prompting an LLM acting as the persona.
@@ -67,13 +59,11 @@ async def get_next_persona_action(
         logger.error(
             f"[{node_name}] Persona LLM unavailable. Cannot generate response."
         )
-        # Retorna erro para o runner tratar
+
         return None, current_state, True, SimulationOutcomeEnum.SIMULATION_ERROR
 
     updated_state = current_state.model_copy(deep=True)
-    updated_state.turn_count += 1  # Incrementa contador de turno interno (exemplo)
-
-    # --- Construir Prompt REFINADO para o Persona LLM ---
+    updated_state.turn_count += 1
 
     history_str = "\n".join(
         [f"{msg['role']}: {msg['content']}" for msg in conversation_history[-6:]]
@@ -87,7 +77,7 @@ async def get_next_persona_action(
         )
         or "Nenhuma específica"
     )
-    # Formatar objeções e interrupções para clareza no prompt
+
     objections_list_str = (
         "\n".join(
             [
@@ -103,7 +93,6 @@ async def get_next_persona_action(
     )
     hints_str = ", ".join(persona.behavior_hints) or "Neutro"
 
-    # --- NOVO PROMPT ---
     prompt = f"""
 Você está atuando como uma persona de cliente em uma simulação de vendas via WhatsApp. Aja de forma realista e consistente com seu perfil.
 
@@ -142,29 +131,23 @@ Qual a sua **próxima resposta natural e realista**? Siga estas diretrizes:
 
 Gere APENAS a sua próxima mensagem como cliente.
 """
-    # --- FIM NOVO PROMPT ---
 
-    # --- Chamar o Persona LLM ---
     try:
         logger.debug(f"[{node_name}] Calling Persona LLM with refined prompt...")
-        # Nota: O prompt agora é mais longo e complexo, pode exigir um modelo mais capaz
-        # ou mais tempo de resposta dependendo do modelo escolhido em persona_llm.
+
         response = await persona_llm.ainvoke(prompt)
         next_persona_message = response.content.strip()
 
         if not next_persona_message:
-            # Se o LLM não retornar nada, pode indicar que a persona "desistiu" ou não sabe o que dizer
             logger.warning(
                 f"[{node_name}] Persona LLM returned empty response. Ending turn."
             )
-            # Tratar como fim natural ou erro? Vamos tratar como fim natural por enquanto.
             return None, updated_state, True, SimulationOutcomeEnum.UNKNOWN
 
         logger.info(
             f"[{node_name}] Persona LLM generated response: '{next_persona_message[:100]}...'"
         )
 
-        # Lógica de término simplificada (mantida como antes, focada no runner)
         terminate = False
         outcome = None
 
