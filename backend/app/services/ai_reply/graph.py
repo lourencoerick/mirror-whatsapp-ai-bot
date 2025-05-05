@@ -105,6 +105,7 @@ try:
         select_certainty_focus_node,
         retrieve_knowledge_for_certainty_node,
         generate_certainty_statement_node,
+        CERTAINTY_THRESHOLD,
     )
 
     STRAIGHT_LINE_NODES_AVAILABLE = True
@@ -730,43 +731,51 @@ def route_after_spin(
 
 def route_after_straight_line(
     state: ConversationState,
-) -> Literal["define_proposal", "present_capability", "__end__"]:
-    """Roteia após o subgraph Straight Line, baseado no seu resultado ('certainty_status')."""
+) -> Literal["define_proposal", "present_capability", "__end__"]:  # Destinos possíveis
+    """
+    Routes after the Straight Line subgraph, checking the status set by it.
+    Cleans up the status AFTER routing decision.
+    """
     log_prefix = "[Router: After Straight Line]"
-    certainty_status = state.get("certainty_status")
-    sl_error = state.get("error")  # Verifica erros do SL
 
-    logger.debug(
-        f"{log_prefix} Certainty Status='{certainty_status}', Error='{sl_error}'"
+    certainty_status = state.get("certainty_status")
+    sl_error = state.get("error")
+    certainty_level = state.get("certainty_level", {})
+
+    certainty_ok = (
+        all(v >= CERTAINTY_THRESHOLD for v in certainty_level.values())
+        if certainty_level
+        else False
     )
 
-    # Limpa o status para a próxima execução (importante!)
-    state["certainty_status"] = None
+    logger.debug(
+        f"{log_prefix} Received Status='{certainty_status}', Error='{sl_error}', Certainty Levels OK='{certainty_ok}'"
+    )
+
+    next_node: Literal["define_proposal", "present_capability", "__end__"] = END
 
     if sl_error and "Certainty" in sl_error:
         logger.error(
             f"{log_prefix} Error during Straight Line: {sl_error}. Ending turn."
         )
-        return END
-    elif certainty_status == CERTAINTY_STATUS_OK:
-        # Certeza atingiu o limiar ou já estava OK
-        # logger.debug(f"{log_prefix} Certainty OK. Routing to Present Capability.")
-        # return "present_capability"
-        # logger.debug(f"{log_prefix} Certainty OK. Routing to: invoke_closing_subgraph")
-        # return "invoke_closing_subgraph"
+        next_node = END
+    elif certainty_status == CERTAINTY_STATUS_OK or certainty_ok:
         logger.debug(f"{log_prefix} Certainty OK. Routing to: define_proposal")
-        return "define_proposal"
-
+        next_node = "define_proposal"
     elif certainty_status == CERTAINTY_STATUS_STATEMENT_MADE:
-        # Uma declaração foi feita, precisamos esperar a resposta do cliente
         logger.debug(f"{log_prefix} Certainty statement made. Ending turn.")
-        return END
+        next_node = END
     else:
-        # Caso inesperado (subgraph terminou sem definir status?)
         logger.warning(
-            f"{log_prefix} Unknown state after Straight Line (Status: {certainty_status}). Ending turn."
+            f"{log_prefix} Unknown or non-OK state after SL (Status: {certainty_status}). Ending turn."
         )
-        return END
+        next_node = END
+
+    state["certainty_status"] = None
+    logger.debug(f"{log_prefix} Certainty status cleared for next cycle.")
+    # --- Fim Limpeza ---
+
+    return next_node
 
 
 def route_after_log_update(
