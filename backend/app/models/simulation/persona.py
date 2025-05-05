@@ -1,26 +1,30 @@
 # backend/app/models/simulation/persona.py
 import uuid
-from datetime import datetime  # Import datetime
+from datetime import datetime
 
 from sqlalchemy import (
     Column,
     String,
-    Text,
     ForeignKey,
-    DateTime,
-    JSON,
+    JSON,  # Manter JSON para compatibilidade ou mudar para JSONB
     UniqueConstraint,
-    Index,  # Added Index
+    Index,
+    ARRAY,  # Importar ARRAY
+    Text as DBText,  # Renomear Text para evitar conflito com typing.Text se usado
+    text,  # Importar text para server_default
 )
-from sqlalchemy.dialects.postgresql import UUID
+
+# Usar JSONB do dialeto PostgreSQL para melhor performance
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 # Assuming your BaseModel provides the declarative base
-from app.models.base import BaseModel  # Make sure this path is correct
+from app.models.base import BaseModel
 
 # Forward reference for relationship type hinting
-from typing import TYPE_CHECKING, List, Dict, Any  # Add List, Dict, Any
+from typing import TYPE_CHECKING, List, Dict, Any
 
 if TYPE_CHECKING:
     from app.models.contact import Contact
@@ -28,67 +32,96 @@ if TYPE_CHECKING:
 
 class Persona(BaseModel):
     """
-    SQLAlchemy model representing a simulated persona profile (Classic Style).
+    SQLAlchemy model representing a simulated persona profile.
 
-    Stores the definition and characteristics of a persona used in simulations,
-    linked one-to-one with a Contact record.
+    Stores the definition, characteristics, and dynamic behavior elements
+    of a persona used in simulations, linked one-to-one with a Contact record.
     """
 
     __tablename__ = "personas"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    # Keep the human-readable ID, ensure it's unique via constraint
-    persona_id = Column(String, nullable=False, index=True)
+    persona_id = Column(
+        String, nullable=False, index=True, unique=True
+    )  # Unique já definido abaixo, mas ok aqui também
 
-    # Use the contact identifier from the linked contact, ensure unique via constraint
-    simulation_contact_identifier = Column(String, nullable=False, index=True)
-    description = Column(Text, nullable=False)
-    initial_message = Column(Text, nullable=False)
-    objective = Column(Text, nullable=False)
+    # Identificador do contato associado (para referência e unicidade)
+    simulation_contact_identifier = Column(
+        String, nullable=False, index=True, unique=True
+    )  # Unique já definido abaixo
 
-    # Use JSON type for complex structures
+    description = Column(DBText, nullable=False)
+    initial_message = Column(DBText, nullable=False)
+    objective = Column(DBText, nullable=False)
+
+    # Mantido, mas agora usado como contexto para o Persona LLM
     information_needed = Column(
-        JSON,
+        JSONB,  # Usar JSONB é geralmente melhor no Postgres
         nullable=False,
-        comment="List of dicts: [{'entity': 'x', 'attribute': 'y'}]",
+        server_default=text("'[]'::jsonb"),  # Default como lista JSON vazia
+        comment="List of dicts: [{'entity': 'x', 'attribute': 'y'}] - Contextual info persona seeks.",
     )
-    info_attribute_to_question_template = Column(
-        JSON, nullable=False, comment="Dict: {'attribute': 'template {entity} ?'}"
+
+    # info_attribute_to_question_template = Column(JSON, nullable=False) # <-- REMOVIDO
+
+    # --- NOVOS CAMPOS ---
+    potential_objections = Column(
+        JSONB,  # Armazena a lista de objetos PotentialObjection
+        nullable=False,
+        server_default=text("'[]'::jsonb"),  # Default como lista JSON vazia
+        comment="List of potential objections [{'trigger_keyword': 'x', 'objection_text': 'y'},...]",
     )
+    off_topic_questions = Column(
+        ARRAY(DBText),  # Array de strings
+        nullable=False,
+        server_default=text("'{}'::text[]"),  # Default como array vazio de texto
+        comment="List of potential off-topic questions persona might ask.",
+    )
+    behavior_hints = Column(
+        ARRAY(DBText),  # Array de strings
+        nullable=False,
+        server_default=text("'{}'::text[]"),  # Default como array vazio de texto
+        comment="List of keywords describing persona behavior (e.g., 'impatient', 'detailed').",
+    )
+    # --- FIM NOVOS CAMPOS ---
+
+    # Critérios simplificados
     success_criteria = Column(
-        JSON,
+        JSONB,  # Usar JSONB
         nullable=False,
-        comment="List of strings, e.g. ['state:all_info_extracted']",
+        server_default=text("'[]'::jsonb"),  # Default como lista JSON vazia
+        comment="List of strings defining success (often empty now).",
     )
     failure_criteria = Column(
-        JSON,
+        JSONB,  # Usar JSONB
         nullable=False,
-        comment="List of strings, e.g. ['event:ai_fallback_detected']",
+        server_default=text(
+            '\'["event:ai_fallback_detected", "turn_count > 10"]\'::jsonb'
+        ),  # Default atualizado
+        comment="List of strings defining failure.",
     )
 
-    # Foreign Key to Contact - Ensure unique=True for 1:1
+    # Foreign Key e Relacionamento (Mantidos)
     contact_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("contacts.id"),
+        ForeignKey(
+            "contacts.id", ondelete="CASCADE"
+        ),  # Adicionado ondelete se fizer sentido
         unique=True,
         nullable=False,
         index=True,
     )
+    contact = relationship("Contact", back_populates="persona")
 
-    # Define the 1:1 relationship TO Contact
-    contact = relationship(
-        "Contact", back_populates="persona"  # Link to the attribute in Contact
-    )
-
-    # Add unique constraints explicitly
+    # Constraints (Mantidos)
     __table_args__ = (
+        UniqueConstraint("persona_id", name="uq_persona_persona_id"),
         UniqueConstraint(
             "simulation_contact_identifier", name="uq_persona_contact_identifier"
         ),
-        UniqueConstraint("persona_id", name="uq_persona_persona_id"),
-        # The unique=True on contact_id already creates a constraint/index,
-        # but you could define it here explicitly if preferred:
-        # UniqueConstraint('contact_id', name='uq_persona_contact_id'),
+        # UniqueConstraint('contact_id', name='uq_persona_contact_id'), # Já coberto por unique=True
+        Index("ix_personas_persona_id", "persona_id"),  # Index explícito (boa prática)
+        Index("ix_personas_contact_id", "contact_id"),  # Index explícito (boa prática)
     )
 
     def __repr__(self):
