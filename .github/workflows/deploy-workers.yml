@@ -34,17 +34,21 @@ jobs:
           filters: |
             consumer:
               - 'backend/app/workers/consumer/**'
+              - "backend/app/workers/Dockerfile"
             response_sender:
               - 'backend/app/workers/response_sender/**'
+              - "backend/app/workers/Dockerfile"
             batch:
               - 'backend/app/workers/batch_contacts/**'
               - 'backend/app/workers/researcher/**'
               - 'backend/app/workers/knowledge_ingester/**'
               - 'backend/app/services/researcher/**'
               - 'backend/app/services/knowledge/**'
+              - "backend/app/workers/Dockerfile"
             ai_replier:
               - 'backend/app/workers/ai_replier/**'
               - 'backend/app/services/ai_reply/**'
+              - "backend/app/workers/Dockerfile"
 
       # Constrói JSON da matriz + flag needs_job
       - name: Build matrix JSON

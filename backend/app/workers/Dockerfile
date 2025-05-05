@@ -32,6 +32,5 @@ COPY ./backend/app/workers/worker-entrypoint.sh /worker-entrypoint.sh
 RUN chmod +x /worker-entrypoint.sh
 
 
-
 # Define o script como o ENTRYPOINT do container
 ENTRYPOINT ["/worker-entrypoint.sh"]
