@@ -1,63 +1,58 @@
-# Database
+# === Banco de dados ===
 sqlalchemy==2.0.0
 alembic==1.13.0
 asyncpg==0.30.0
 psycopg2-binary>=2.9.6
+pgvector==0.4.1
+psycopg-binary==3.2.7
 
-# Redis
+# === Cache / Fila / Mensageria ===
 redis==5.0.1
 arq==0.26.3
 
-# Environment and Configuration
+# === Ambiente e Configuração ===
 python-dotenv==1.0.0
 pydantic-settings
+pytz==2025.2
 
-# FastAPI and Web Framework
+# === Framework Web e HTTP ===
 fastapi[all]
 uvicorn
 requests
 
-# Authentication and Security
+# === Autenticação e Segurança ===
 svix==1.62.0
 python-jose[cryptography]
 authlib
 PyJWT>=2.8.0
 
-# Testing
+# === Testes e Qualidade ===
 httpx==0.25.2
 pytest==8.3.4
 pytest-asyncio==0.23.8
 tenacity==9.0.0
-pytest_mock==3.14.0
+pytest-mock==3.14.0
 
-# Utility
+# === Utilitários Gerais ===
 pydantic>=2.5.0
 phonenumbers==9.0.2
+beautifulsoup4==4.13.4
+lxml==5.4.0
+pypdf==5.4.0
+tldextract==5.3.0
 
-# Logging
-loguru>=0.5.3
-
-# GCP storage
-google-cloud-storage
-
-
-# Langchain
+# === IA / NLP / Vetorização ===
 langchain==0.3.24
 langchain-openai==0.3.14
 langgraph==0.3.32
 langchain_community==0.3.22
-
-sentence_transformers==4.1.0
+sentence-transformers==4.1.0
 trustcall==0.0.39
+tavily-python==0.6.0
+langgraph-checkpoint-postgres==2.0.21
 
-beautifulsoup4==4.13.4
-tavily_python==0.6.0
+# === Google Cloud Storage ===
+google-cloud-storage
 
-
-pgvector==0.4.1
-pypdf==5.4.0
-lxml==5.4.0
-langgraph_checkpoint_postgres==2.0.21
-
-pytz==2025.2
-tldextract==5.3.0
+# === Logging ===
+loguru>=0.5.3

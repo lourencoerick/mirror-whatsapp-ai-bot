@@ -47,6 +47,9 @@ try:
         transition_after_answer_node,
         define_proposal_node,
         clarify_vague_statement_node,
+        update_question_log_node,
+        analyze_agent_response_node,
+        handle_impasse_node,
         end_conversation_node,
     )
 
@@ -102,6 +105,7 @@ try:
         select_certainty_focus_node,
         retrieve_knowledge_for_certainty_node,
         generate_certainty_statement_node,
+        CERTAINTY_THRESHOLD,
     )
 
     STRAIGHT_LINE_NODES_AVAILABLE = True
@@ -207,6 +211,16 @@ def create_closing_subgraph(checkpointer: Checkpointer) -> StateGraph:
             return "analyze_response"
         elif status == "AWAITING_FINAL_CONFIRMATION":
             return "analyze_confirmation"
+
+        elif status in [
+            "ORDER_PROCESSED",
+            "CONFIRMATION_REJECTED",
+        ]:  # Adicionar outros estados finais se houver
+            logger.debug(
+                f"{log_prefix} Status '{status}' indicates previous step completed or exited. Ending subgraph immediately."
+            )
+            # Não reseta o status aqui, deixa o estado final registrado
+            return END
         else:
             logger.debug(
                 f"{log_prefix} No pending analysis (Status: {status}). Routing to initiate close."
@@ -220,6 +234,7 @@ def create_closing_subgraph(checkpointer: Checkpointer) -> StateGraph:
             "initiate_close": "initiate_close",
             "analyze_response": "analyze_response",
             "analyze_confirmation": "analyze_confirmation",
+            END: END,
         },
     )
 
@@ -566,6 +581,7 @@ def route_after_classification(
     "retrieve_knowledge",
     "generate_rapport",
     "end_conversation",
+    "handle_impasse",
     "__end__",
 ]:
     """
@@ -577,6 +593,7 @@ def route_after_classification(
     error = state.get("error")
     # Verifica se a proposta já foi definida
     proposal_defined = bool(state.get("proposed_solution_details"))
+    customer_log = state.get("customer_question_log", [])
     log_prefix = "[Router: After Classification]"
     logger.debug(
         f"{log_prefix} Intent='{intent}', Classified Stage='{stage}', Proposal Defined='{proposal_defined}', Error='{error}'"
@@ -593,6 +610,10 @@ def route_after_classification(
         )
         state["disengagement_reason"] = "Customer expressed desire to end."  # Opcional
         return "end_conversation"
+
+    if customer_log and customer_log[-1].get("status") == "repeated_ignored":
+        logger.warning(f"{log_prefix} Impasse detected. Routing to handle_impasse.")
+        return "handle_impasse"
 
     # 2. Saudação -> Rapport
     if intent == "Greeting":
@@ -710,43 +731,71 @@ def route_after_spin(
 
 def route_after_straight_line(
     state: ConversationState,
-) -> Literal["define_proposal", "present_capability", "__end__"]:
-    """Roteia após o subgraph Straight Line, baseado no seu resultado ('certainty_status')."""
+) -> Literal["define_proposal", "present_capability", "__end__"]:  # Destinos possíveis
+    """
+    Routes after the Straight Line subgraph, checking the status set by it.
+    Cleans up the status AFTER routing decision.
+    """
     log_prefix = "[Router: After Straight Line]"
-    certainty_status = state.get("certainty_status")
-    sl_error = state.get("error")  # Verifica erros do SL
 
-    logger.debug(
-        f"{log_prefix} Certainty Status='{certainty_status}', Error='{sl_error}'"
+    certainty_status = state.get("certainty_status")
+    sl_error = state.get("error")
+    certainty_level = state.get("certainty_level", {})
+
+    certainty_ok = (
+        all(v >= CERTAINTY_THRESHOLD for v in certainty_level.values())
+        if certainty_level
+        else False
     )
 
-    # Limpa o status para a próxima execução (importante!)
-    state["certainty_status"] = None
+    logger.debug(
+        f"{log_prefix} Received Status='{certainty_status}', Error='{sl_error}', Certainty Levels OK='{certainty_ok}'"
+    )
+
+    next_node: Literal["define_proposal", "present_capability", "__end__"] = END
 
     if sl_error and "Certainty" in sl_error:
         logger.error(
             f"{log_prefix} Error during Straight Line: {sl_error}. Ending turn."
         )
-        return END
-    elif certainty_status == CERTAINTY_STATUS_OK:
-        # Certeza atingiu o limiar ou já estava OK
-        # logger.debug(f"{log_prefix} Certainty OK. Routing to Present Capability.")
-        # return "present_capability"
-        # logger.debug(f"{log_prefix} Certainty OK. Routing to: invoke_closing_subgraph")
-        # return "invoke_closing_subgraph"
+        next_node = END
+    elif certainty_status == CERTAINTY_STATUS_OK or certainty_ok:
         logger.debug(f"{log_prefix} Certainty OK. Routing to: define_proposal")
-        return "define_proposal"
-
+        next_node = "define_proposal"
     elif certainty_status == CERTAINTY_STATUS_STATEMENT_MADE:
-        # Uma declaração foi feita, precisamos esperar a resposta do cliente
         logger.debug(f"{log_prefix} Certainty statement made. Ending turn.")
-        return END
+        next_node = END
     else:
-        # Caso inesperado (subgraph terminou sem definir status?)
         logger.warning(
-            f"{log_prefix} Unknown state after Straight Line (Status: {certainty_status}). Ending turn."
+            f"{log_prefix} Unknown or non-OK state after SL (Status: {certainty_status}). Ending turn."
         )
-        return END
+        next_node = END
+
+    state["certainty_status"] = None
+    logger.debug(f"{log_prefix} Certainty status cleared for next cycle.")
+    # --- Fim Limpeza ---
+
+    return next_node
+
+
+def route_after_log_update(
+    state: ConversationState,
+) -> Literal["handle_impasse", "route_normally"]:
+    """Checks the status of the last logged question to detect impasse."""
+    log_prefix = "[Router: After Log Update]"
+    customer_log = state.get("customer_question_log", [])
+    if customer_log:
+        last_entry_status = customer_log[-1].get("status")
+        if last_entry_status == "repeated_ignored":
+            logger.warning(
+                f"{log_prefix} Last question marked as 'repeated_ignored'. Routing to handle_impasse."
+            )
+            return "handle_impasse"
+
+    logger.debug(
+        f"{log_prefix} No impasse detected. Proceeding to normal classification routing."
+    )
+    return "route_normally"  # Sinaliza para usar o roteador normal
 
 
 # --- Function to Create the Main Reply Graph (Atualizada) ---
@@ -805,6 +854,9 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     workflow.add_node("present_capability", present_capability_node)
     workflow.add_node("transition_after_answer", transition_after_answer_node)
     workflow.add_node("end_conversation", end_conversation_node)
+    workflow.add_node("update_question_log", update_question_log_node)
+    workflow.add_node("handle_impasse", handle_impasse_node)
+    workflow.add_node("analyze_agent_response", analyze_agent_response_node)
 
     # Subgraphs as Nodes
     workflow.add_node("invoke_spin_subgraph", spin_subgraph)
@@ -821,6 +873,7 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     logger.debug(
         "Added edge from 'classify_intent_and_stage' to 'check_pending_answer'."
     )
+    workflow.add_edge("check_pending_answer", "update_question_log")
 
     # --- Define Edges ---
     logger.debug("Defining edges for the main reply graph...")
@@ -829,7 +882,9 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
     workflow.add_edge("end_conversation", END)
     workflow.add_edge("generate_rapport", END)
     workflow.add_edge("retrieve_knowledge", "generate_response")
-    workflow.add_edge("generate_response", "transition_after_answer")
+    workflow.add_edge("generate_response", "analyze_agent_response")
+    workflow.add_edge("analyze_agent_response", "transition_after_answer")
+
     workflow.add_edge("transition_after_answer", END)
     workflow.add_edge(
         "present_capability", END
@@ -837,9 +892,10 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
 
     # Conditional Edge 1: After Classification
     workflow.add_conditional_edges(
-        "check_pending_answer",
+        "update_question_log",
         route_after_classification,
         {
+            "handle_impasse": "handle_impasse",
             "generate_rapport": "generate_rapport",
             "clarify_vague_statement": "clarify_vague_statement",
             "retrieve_knowledge": "retrieve_knowledge",
@@ -891,6 +947,7 @@ def create_reply_graph(checkpointer: Checkpointer) -> StateGraph:
         "Added edge from 'invoke_closing_subgraph' back to 'classify_intent_and_stage'."
     )
 
+    workflow.add_edge("handle_impasse", END)
     # Edge 4: After Present Capability
     # O que fazer depois de apresentar? Por enquanto, termina. No futuro, checar objeções/fechamento.
     # workflow.add_edge("present_capability", END)

@@ -48,9 +48,9 @@ class Settings(BaseSettings):
     FRONTEND_ALLOWED_ORIGINS: Optional[str] = None
 
     # -- AI Replier --
-    OPENAI_MODEL_NAME: str = "gpt-4o"
+    OPENAI_MODEL_NAME: str = "gpt-4o-mini"
     OPENAI_TEMPERATURE: int = 0
-    FAST_LLM_MODEL_NAME: str = "gpt-4o"
+    FAST_LLM_MODEL_NAME: str = "gpt-4o-mini"
     FAST_LLM_TEMPERATURE: int = 0
 
     # -- Worker queues --

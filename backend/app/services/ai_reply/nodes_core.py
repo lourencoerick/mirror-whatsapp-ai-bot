@@ -11,6 +11,7 @@ import pytz
 from .graph_state import (
     ConversationState,
     PendingAgentQuestion,
+    CustomerQuestionEntry,
     SALES_STAGE_OPENING,
     SALES_STAGE_QUALIFICATION,
     SALES_STAGE_INVESTIGATION,
@@ -204,6 +205,55 @@ class TransitionOutput(BaseModel):
     )
 
 
+class RepetitionCheckOutput(BaseModel):
+    """Structured output analyzing if the user is repeating an unanswered question."""
+
+    is_repeated: bool = Field(
+        ...,
+        description="Is the current user question semantically similar to a previous one in the history?",
+    )
+    was_unanswered: bool = Field(
+        ...,
+        description="If it is repeated, did the agent's response immediately following the *first* instance of that question indicate it couldn't answer (e.g., used fallback phrases)?",
+    )
+
+
+class ExtractedQuestionInfo(BaseModel):
+    """Holds info about a single extracted question and its similarity check."""
+
+    extracted_question: str = Field(
+        ..., description="The core question extracted, removing introductions."
+    )
+    is_similar: bool = Field(
+        ...,
+        description="Is this extracted question semantically similar to any previous unanswered/ignored question?",
+    )
+    most_similar_previous_question: Optional[str] = Field(
+        None,
+        description="If similar, the text of the most similar previous question found.",
+    )
+
+
+# --- Pydantic Schema for the Node's Output ---
+class MultiQuestionAnalysisOutput(BaseModel):
+    """Output containing a list of analyzed questions from the user's message."""
+
+    analyzed_questions: List[ExtractedQuestionInfo] = Field(default_factory=list)
+
+
+class AnswerCheckOutput(BaseModel):
+    """Checks if the agent's response answered the preceding user question."""
+
+    did_answer: bool = Field(
+        ...,
+        description="Did the agent's response directly and sufficiently answer the user's question?",
+    )
+    used_fallback: bool = Field(
+        ...,
+        description="Did the agent's response indicate inability to answer (e.g., 'I don't know', 'contact us')?",
+    )
+
+
 # ==============================================================================
 # Core Graph Nodes
 # ==============================================================================
@@ -297,6 +347,7 @@ Intenções Válidas: {valid_intents}
 - **Other/Unknown:** Não se encaixa. -> Próximo Estágio: Manter ou 'Unknown'. `is_problem_statement`: false.
 - **VagueStatement:** Cliente expressa dúvida, incerteza, ou necessidade de pensar **sem especificar o motivo ou o ponto de dúvida**. Exemplos: "preciso pensar melhor", "não sei...", "não entendi direito essa parte", "parece complicado". -> Próximo Estágio: Manter o estágio atual ou 'Investigation'. `is_problem_statement`: false.
 - **Goodbye:** Cliente indica explicitamente que quer encerrar a conversa, não tem mais interesse, ou se despede. Exemplos: "obrigado, por enquanto é só", "não tenho interesse", "tchau", "até logo". -> Próximo Estágio: Manter o atual ou 'Unknown'. 
+- **CASO ESPECIAL - Pós-Confirmação/Processamento:** Se o `current_closing_status` for 'ORDER_PROCESSED' ou 'FINAL_CONFIRMED' (indicando que o agente acabou de confirmar um pedido ou próximo passo), E a 'ÚLTIMA MENSAGEM DO CLIENTE' contiver principalmente agradecimentos, confirmação dessa ação, ou apenas reiterações de dúvidas/preocupações antigas (sem novas objeções fortes ou perguntas urgentes), então classifique o `intent` como **'Goodbye'**. O objetivo é reconhecer o fim natural da interação principal.
 
 **IMPORTANTE - Declaração de Problema:**
 - Se a 'ÚLTIMA PERGUNTA DO AGENTE' foi uma pergunta de Situação ou Problema (ex: "Quais desafios você enfrenta?", "Como você faz X hoje?"), E a 'ÚLTIMA MENSAGEM DO CLIENTE' descreve uma dificuldade, dor, ou insatisfação (ex: "gasto muito tempo", "é difícil fazer Y", "não consigo Z"), então:
@@ -533,6 +584,211 @@ Responda APENAS com um objeto JSON seguindo o schema AnswerStatusOutput.""",
                 "pending_agent_question": new_pending_status,
                 "error": f"Pending check failed: {e}",
             }
+
+
+async def update_question_log_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Extracts one or more questions from the last user message, checks each for
+    repetition against unanswered/ignored questions in the log, updates the main log,
+    and populates the 'current_questions' state field.
+
+    Args:
+        state: Requires 'messages', 'customer_question_log', 'loop_count', 'intent'.
+        config: Requires 'llm_fast_instance'.
+
+    Returns:
+        Dictionary with updated 'customer_question_log' and 'current_questions'.
+    """
+    node_name = "update_question_log_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    current_log: List[CustomerQuestionEntry] = [
+        entry.copy() for entry in state.get("customer_question_log", [])
+    ]
+    current_turn = state.get("loop_count", 0)
+    intent = state.get("intent")  # Usado para decidir se processa
+    llm_fast: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+    max_attempts = 3
+
+    # --- Validações ---
+    if not llm_fast:
+        logger.error(f"[{node_name}] LLM unavailable.")
+        # Retorna estado inalterado, mas sem current_questions
+        return {
+            "customer_question_log": state.get("customer_question_log", []),
+            "current_questions": None,
+        }
+    if not messages or not isinstance(messages[-1], HumanMessage):
+        logger.debug(f"[{node_name}] Last message not from user or no messages.")
+        return {"customer_question_log": current_log, "current_questions": None}
+
+    # Processa apenas se o intent sugere uma pergunta ou algo que possa conter uma
+    # (Question, VAGUE_STATEMENT, talvez Statement dependendo da complexidade desejada)
+    # Por simplicidade, vamos focar em 'Question' por enquanto.
+    if intent != "Question":
+        logger.debug(
+            f"[{node_name}] Intent is '{intent}'. Skipping question extraction."
+        )
+        return {"customer_question_log": current_log, "current_questions": None}
+
+    current_message_original_text = messages[-1].content
+    logger.debug(
+        f"[{node_name}] Processing current message for questions: '{current_message_original_text[:100]}...'"
+    )
+
+    # --- Extrair Perguntas e Verificar Similaridade ---
+    extracted_questions_info: List[ExtractedQuestionInfo] = []
+    previous_unanswered_or_ignored_cores: List[str] = [
+        entry.get("extracted_question_core", entry.get("original_question_text"))
+        for entry in current_log
+        if entry.get("status") in ["unanswered_pending", "unanswered_ignored"]
+    ]
+    previous_questions_text_for_llm = (
+        "\n".join([f"- {q}" for q in previous_unanswered_or_ignored_cores])
+        if previous_unanswered_or_ignored_cores
+        else "Nenhuma"
+    )
+
+    # --- Prompt para Extrair Múltiplas Perguntas e Checar Similaridade ---
+    multi_extract_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um especialista em análise semântica de conversas. Sua tarefa é:
+1. Ler a 'Mensagem Atual do Cliente'.
+2. Identificar **TODAS** as perguntas distintas feitas pelo cliente nesta mensagem.
+3. Para **CADA** pergunta identificada:
+    a. Extrair o núcleo da pergunta, removendo introduções/agradecimentos. Chame de `extracted_question`.
+    b. Comparar essa `extracted_question` com a lista de 'Perguntas Anteriores Não Respondidas'.
+    c. Determinar se ela é semanticamente similar a alguma anterior (`is_similar`: true/false).
+    d. Se for similar, identificar a pergunta anterior mais parecida em `most_similar_previous_question`.
+
+**Perguntas Anteriores Não Respondidas:**
+{previous_questions}
+
+**Mensagem Atual do Cliente:**
+{current_message}
+
+Responda APENAS com um objeto JSON seguindo o schema MultiQuestionAnalysisOutput, contendo uma lista `analyzed_questions`, onde cada item segue o schema ExtractedQuestionInfo (`extracted_question`, `is_similar`, `most_similar_previous_question`). Se nenhuma pergunta for encontrada na mensagem atual, retorne uma lista vazia.""",
+            ),
+        ]
+    )
+    structured_llm_multi = llm_fast.with_structured_output(MultiQuestionAnalysisOutput)
+    chain_multi = multi_extract_prompt | structured_llm_multi
+
+    try:
+        analysis_result: MultiQuestionAnalysisOutput = await chain_multi.ainvoke(
+            {
+                "previous_questions": previous_questions_text_for_llm,
+                "current_message": current_message_original_text,
+            }
+        )
+        extracted_questions_info = analysis_result.analyzed_questions
+        logger.info(
+            f"[{node_name}] Extracted {len(extracted_questions_info)} questions from current message."
+        )
+        logger.debug(f"[{node_name}] Analysis details: {extracted_questions_info}")
+
+    except Exception as e:
+        logger.exception(
+            f"[{node_name}] Error during multi-question extraction/similarity check: {e}"
+        )
+        # Se a extração falhar, não teremos perguntas atuais para processar
+        return {
+            "customer_question_log": current_log,
+            "current_questions": None,
+            "error": f"Question extraction failed: {e}",
+        }
+
+    # --- Processar Cada Pergunta Extraída e Atualizar Log ---
+    current_questions_list_for_state: List[CustomerQuestionEntry] = []
+
+    if not extracted_questions_info:
+        logger.debug(f"[{node_name}] No questions extracted from the message.")
+        return {"customer_question_log": current_log, "current_questions": None}
+
+    for extracted_info in extracted_questions_info:
+        extracted_core_question = extracted_info.extracted_question
+        is_similar = extracted_info.is_similar
+        most_similar_text = extracted_info.most_similar_previous_question
+
+        new_entry_status: Literal[
+            "asked", "repeated_unanswered", "repeated_ignored"
+        ] = "asked"
+        new_entry_attempts = 1
+        similar_entry_index: Optional[int] = None
+
+        if is_similar and most_similar_text:
+            # Encontra a entrada original no log (match flexível)
+            for i, entry in enumerate(current_log):
+                if (
+                    entry.get("extracted_question_core") == most_similar_text
+                    or entry.get("original_question_text") == most_similar_text
+                ) and entry.get("status") in [
+                    "unanswered_pending",
+                    "unanswered_ignored",
+                ]:
+                    similar_entry_index = i
+                    break
+
+        if similar_entry_index is not None:
+            original_entry = current_log[similar_entry_index]
+            similar_entry_status = original_entry.get("status")
+            current_attempts = original_entry.get("attempts", 0)
+            new_entry_attempts = current_attempts + 1
+
+            if similar_entry_status == "unanswered_pending":
+                if new_entry_attempts >= max_attempts:
+                    new_entry_status = "repeated_ignored"
+                    original_entry["status"] = "unanswered_ignored"
+                    original_entry["attempts"] = new_entry_attempts
+                    logger.warning(
+                        f"[{node_name}] Question core '{extracted_core_question[:50]}...' reached max attempts. Marked original and current as ignored."
+                    )
+                else:
+                    new_entry_status = "repeated_unanswered"
+                    original_entry["attempts"] = new_entry_attempts
+                    logger.info(
+                        f"[{node_name}] Question core '{extracted_core_question[:50]}...' marked as 'repeated_unanswered'. Original attempts: {new_entry_attempts}"
+                    )
+            elif similar_entry_status == "unanswered_ignored":
+                new_entry_status = "repeated_ignored"
+                new_entry_attempts = original_entry.get("attempts")  # Mantém tentativas
+                logger.info(
+                    f"[{node_name}] Question core '{extracted_core_question[:50]}...' marked as 'repeated_ignored'."
+                )
+        else:
+            # Se não é similar a uma não respondida/ignorada, é 'asked'
+            new_entry_status = "asked"
+            new_entry_attempts = 1
+
+        # Cria a entrada para a pergunta ATUAL
+        current_question_entry: CustomerQuestionEntry = {
+            "original_question_text": current_message_original_text,  # Guarda o texto completo da mensagem original
+            "extracted_question_core": extracted_core_question,  # Guarda o núcleo extraído
+            "status": new_entry_status,
+            "attempts": new_entry_attempts,
+            "turn_asked": current_turn,
+        }
+        # Adiciona à lista de perguntas *deste turno*
+        current_questions_list_for_state.append(current_question_entry)
+        # Adiciona também ao log histórico persistente
+        current_log.append(current_question_entry)
+        logger.debug(
+            f"[{node_name}] Added current question entry to log and current_questions: {current_question_entry}"
+        )
+
+    # Retorna o log histórico atualizado e a lista de perguntas do turno atual
+    return {
+        "customer_question_log": current_log,
+        "current_questions": current_questions_list_for_state,
+        "error": None,
+    }
 
 
 async def clarify_vague_statement_node(
@@ -866,6 +1122,10 @@ async def generate_response_node(
 
     # --- Get State and Config ---
     messages = state.get("messages", [])
+    current_questions: Optional[List[CustomerQuestionEntry]] = state.get(
+        "current_questions"
+    )
+
     profile = CompanyProfileSchema.model_validate(state.get("company_profile"))
     # agent_config = state.get("agent_config") # Agent config might be optional for basic response
     retrieved_context = state.get("retrieved_context")
@@ -887,6 +1147,11 @@ async def generate_response_node(
         logger.error(f"[{node_name}] Prompt builder unavailable.")
         return {"error": "Generation failed: Prompt builder unavailable."}
 
+    if not current_questions:
+        logger.debug(
+            f"[{node_name}] No current questions identified by previous node. Skipping specific response generation (prompt builder might handle)."
+        )
+
     # --- Build Prompt ---
     try:
         brasilia_tz = pytz.timezone("America/Sao_Paulo")
@@ -901,6 +1166,7 @@ async def generate_response_node(
             chat_history_lc=messages,
             current_datetime=current_time_str,
             retrieved_context=retrieved_context,
+            current_questions=current_questions,
             # Optional: Pass stage to prompt builder if it uses it
             # current_stage=current_stage
         )
@@ -1487,3 +1753,281 @@ Sua tarefa é criar uma transição suave para continuar a conversa, adaptando-s
         "pending_agent_question": output_pending_question,  # <-- Retorna o objeto correto (novo ou existente)
         "error": output_error,
     }
+
+
+async def handle_impasse_node(state: ConversationState, config: dict) -> Dict[str, Any]:
+    """
+    Generates a message acknowledging the impasse due to a repeated unanswered
+    question and offers clear final options.
+
+    Args:
+        state: Requires 'messages', 'customer_question_log', 'company_profile'.
+        config: Requires 'llm_fast_instance'.
+
+    Returns:
+        Dictionary with 'generation' and 'messages'. This node leads to END.
+    """
+    node_name = "handle_impasse_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    messages = state.get("messages", [])
+    customer_log: List[CustomerQuestionEntry] = state.get("customer_question_log", [])
+    profile_dict = state.get("company_profile")
+    llm_fast: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+
+    # --- Validações ---
+    if not llm_fast:
+        logger.error(f"[{node_name}] LLM unavailable. Using generic impasse fallback.")
+        fallback = "Percebo que não consegui responder completamente sua dúvida anterior. Podemos tentar outro assunto ou encerrar por agora?"
+        return {"generation": fallback, "messages": [AIMessage(content=fallback)]}
+    if not profile_dict:
+        logger.warning(f"[{node_name}] Profile not found. Using generic fallback.")
+        fallback = "Percebo que não consegui responder completamente sua dúvida anterior. Podemos tentar outro assunto ou encerrar por agora?"
+        return {"generation": fallback, "messages": [AIMessage(content=fallback)]}
+    if not customer_log:
+        logger.error(
+            f"[{node_name}] Customer log is empty. Cannot determine impasse context."
+        )
+        fallback = "Parece que chegamos a um ponto onde não consigo ajudar mais especificamente. Gostaria de tentar outro assunto?"
+        return {"generation": fallback, "messages": [AIMessage(content=fallback)]}
+
+    # Encontra a última pergunta marcada como ignorada para dar contexto
+    ignored_question_text = "uma questão anterior"
+    last_entry = customer_log[-1]
+    if last_entry.get("status") == "repeated_ignored":
+        # Tenta encontrar o texto original buscando para trás por uma entrada similar
+        # com status 'unanswered_ignored' (marcada pelo update_log)
+        original_text = last_entry.get(
+            "question_text"
+        )  # Usa o texto da última como fallback
+        for entry in reversed(customer_log[:-1]):
+            # Simplificação: assume que a última entrada ignorada no log é a relevante
+            if entry.get("status") == "unanswered_ignored":
+                original_text = entry.get("question_text", original_text)
+                break
+        ignored_question_text = original_text
+
+    logger.warning(
+        f"[{node_name}] Handling impasse regarding question: '{ignored_question_text[:100]}...'"
+    )
+
+    # --- Prompt Específico para Impasse ---
+    impasse_prompt_template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um assistente de vendas IA educado e direto. A conversa chegou a um impasse porque o cliente repetiu várias vezes uma pergunta ('{ignored_question}') que você indicou não poder responder. Sua estratégia de redirecionamento falhou.
+
+**Sua Tarefa AGORA:**
+1.  **Reconheça o Impasse:** Admita de forma clara e educada que você não pode fornecer a informação específica solicitada, apesar das tentativas. (Ex: "Percebo que a informação sobre '{ignored_question}' é realmente crucial para você e, como já mencionei, infelizmente não a tenho disponível neste momento para seguirmos *nesta* linha específica.").
+2.  **Ofereça uma Escolha Final Clara e Fechada:** Apresente 2 ou 3 opções concretas e limitadas para o cliente decidir o rumo. As opções devem ser ações que você *pode* realizar ou o encerramento.
+    *   **Exemplo de Opções:** "[Opção 1: Agendar uma demonstração], [Opção 2: Discutir o benefício X em detalhes] ou, se preferir, podemos encerrar nossa conversa por agora." (Adapte as opções ao contexto, se possível, mas mantenha-as concretas).
+    *   **Estrutura da Pergunta Final:** "Qual dessas opções faz mais sentido para você neste momento?" ou "Como você gostaria de prosseguir?".
+3.  **Tom:** Mantenha o tom {sales_tone}, mas firme e resolutivo, focado em obter uma decisão do cliente sobre os próximos passos possíveis.
+4.  **Formatação:** Use formatação WhatsApp sutil. {formatting_instructions}
+
+Gere APENAS a mensagem que reconhece o impasse e apresenta as opções finais.""",
+            ),
+        ]
+    )
+
+    parser = StrOutputParser()
+    chain = impasse_prompt_template | llm_fast | parser
+
+    try:
+        impasse_message = await chain.ainvoke(
+            {
+                "ignored_question": ignored_question_text,
+                "sales_tone": profile_dict.get("sales_tone", "profissional"),
+                "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
+                # Poderia passar mais contexto aqui se necessário (ex: últimas alternativas oferecidas)
+            }
+        )
+        impasse_message = impasse_message.strip()
+
+        if not impasse_message:
+            raise ValueError("LLM returned empty impasse message.")
+
+        logger.info(f"[{node_name}] Generated impasse message: '{impasse_message}'")
+        ai_message = AIMessage(content=impasse_message)
+
+        # Define um motivo de desengajamento opcional
+        state["disengagement_reason"] = (
+            f"Impasse reached on question: {ignored_question_text}"
+        )
+
+        return {
+            "generation": impasse_message,
+            "messages": [ai_message],
+            "error": None,
+            # Não precisa mexer no pending_agent_question aqui, pois estamos encerrando ou esperando a escolha final
+        }
+
+    except Exception as e:
+        logger.exception(f"[{node_name}] Error generating impasse message: {e}")
+        fallback = "Percebo que não consegui ajudar com sua última questão como esperado. Podemos tentar focar em outro aspecto ou prefere encerrar por agora?"
+        ai_fallback_message = AIMessage(content=fallback)
+        return {
+            "generation": fallback,
+            "messages": [ai_fallback_message],
+            "error": f"Impasse handling failed: {e}",
+        }
+
+
+async def analyze_agent_response_node(
+    state: ConversationState, config: dict
+) -> Dict[str, Any]:
+    """
+    Analyzes the agent's last generated response ('generation') against the
+    questions identified in the last user message ('current_questions').
+    Updates the status of the corresponding entries in 'customer_question_log'.
+
+    Args:
+        state: Requires 'generation', 'customer_question_log', 'current_questions'.
+        config: Requires 'llm_fast_instance'.
+
+    Returns:
+        Dictionary with the potentially updated 'customer_question_log'.
+    """
+    node_name = "analyze_agent_response_node"
+    logger.info(f"--- Starting Node: {node_name} ---")
+
+    agent_generation = state.get("generation")
+    # Pega o log histórico para ATUALIZAR
+    log_to_update: List[CustomerQuestionEntry] = [
+        entry.copy() for entry in state.get("customer_question_log", [])
+    ]
+    # Pega as perguntas DO TURNO ATUAL que a 'generation' deveria responder
+    current_questions_list = state.get("current_questions")
+    llm_fast: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_fast_instance"
+    )
+
+    # --- Validações ---
+    if not llm_fast:
+        logger.error(f"[{node_name}] LLM unavailable. Cannot analyze agent response.")
+        return {"customer_question_log": log_to_update}  # Retorna log sem modificação
+    if not agent_generation:
+        logger.debug(f"[{node_name}] No agent generation found to analyze. Skipping.")
+        return {"customer_question_log": log_to_update}
+    if not current_questions_list:  # Se não havia perguntas no turno anterior
+        logger.debug(
+            f"[{node_name}] No 'current_questions' from previous node to analyze against. Skipping."
+        )
+        return {"customer_question_log": log_to_update}
+    if (
+        not log_to_update
+    ):  # Log histórico não pode estar vazio se current_questions não está
+        logger.error(
+            f"[{node_name}] Log is empty, but current_questions exist. Inconsistent state."
+        )
+        return {
+            "customer_question_log": log_to_update,
+            "error": "Inconsistent log state.",
+        }
+
+    logger.debug(
+        f"[{node_name}] Analyzing agent generation against {len(current_questions_list)} current question(s)."
+    )
+    logger.debug(f"[{node_name}] Agent generation: '{agent_generation[:100]}...'")
+
+    # --- Prompt e Cadeia (Reutilizável para cada pergunta) ---
+    answer_check_prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """Você é um analista de conversas. Avalie se a 'Resposta do Agente' respondeu satisfatoriamente à 'Pergunta Específica do Cliente'.
+**Ignore frases introdutórias comuns** na 'Pergunta Específica do Cliente' e foque no núcleo da questão ao avaliar a resposta.
+
+Pergunta Específica do Cliente: {customer_question}
+Resposta Completa do Agente (que pode responder a múltiplas perguntas): {agent_response}
+
+Determine para ESTA pergunta específica:
+1. `did_answer`: A resposta do agente abordou diretamente o núcleo desta pergunta específica e forneceu a informação solicitada? (true/false)
+2. `used_fallback`: A resposta do agente indicou claramente que não podia responder a ESTA pergunta específica ou usou fallback? (true/false)
+
+Responda APENAS com um objeto JSON seguindo o schema AnswerCheckOutput.""",
+            ),
+        ]
+    )
+    structured_llm_ans = llm_fast.with_structured_output(AnswerCheckOutput)
+    chain_ans = answer_check_prompt | structured_llm_ans
+
+    # --- Itera sobre as perguntas do turno atual e atualiza o log ---
+    log_updated = False
+    for current_q_entry in current_questions_list:
+        # Encontra a entrada correspondente no log principal para atualizar
+        # Compara pelo texto extraído E pelo turno para garantir que é a entrada correta
+        log_entry_index: Optional[int] = None
+        for i in reversed(range(len(log_to_update))):
+            log_entry = log_to_update[i]
+            if log_entry.get("extracted_question_core") == current_q_entry.get(
+                "extracted_question_core"
+            ) and log_entry.get("turn_asked") == current_q_entry.get("turn_asked"):
+                log_entry_index = i
+                break
+
+        if log_entry_index is None:
+            logger.warning(
+                f"[{node_name}] Could not find matching log entry for current question: {current_q_entry}. Skipping update for this question."
+            )
+            continue
+
+        # Só atualiza o status se a pergunta estava esperando resposta
+        entry_to_update = log_to_update[log_entry_index]
+        if entry_to_update.get("status") not in ["asked", "repeated_unanswered"]:
+            logger.debug(
+                f"[{node_name}] Log entry {log_entry_index} status is '{entry_to_update.get('status')}'. No update needed based on agent response."
+            )
+            continue
+
+        logger.debug(
+            f"[{node_name}] Analyzing agent response against log entry {log_entry_index}: '{entry_to_update.get('extracted_question_core')[:50]}...'"
+        )
+
+        try:
+            answer_check_result: AnswerCheckOutput = await chain_ans.ainvoke(
+                {
+                    "customer_question": entry_to_update.get(
+                        "extracted_question_core"
+                    ),  # Usa o núcleo para análise
+                    "agent_response": agent_generation or " ",
+                }
+            )
+            logger.info(
+                f"[{node_name}] Agent answer check result for entry {log_entry_index}: {answer_check_result}"
+            )
+
+            if answer_check_result.did_answer and not answer_check_result.used_fallback:
+                entry_to_update["status"] = "answered"
+                logger.info(
+                    f"[{node_name}] Marked question log entry {log_entry_index} as 'answered'."
+                )
+                log_updated = True
+            else:  # Não respondeu ou usou fallback
+                entry_to_update["status"] = "unanswered_pending"
+                # O contador de tentativas ('attempts') NÃO é incrementado aqui.
+                # Ele foi definido/incrementado no nó 'update_question_log_node' ao detectar a pergunta/repetição.
+                logger.info(
+                    f"[{node_name}] Marked question log entry {log_entry_index} as 'unanswered_pending'. Attempts remain {entry_to_update.get('attempts')}."
+                )
+                log_updated = True
+
+        except Exception as e:
+            logger.exception(
+                f"[{node_name}] Error during agent answer check for entry {log_entry_index}: {e}"
+            )
+            # Mantém o status anterior em caso de erro? Sim.
+
+    # Retorna o log potencialmente atualizado
+    if log_updated:
+        logger.debug(f"[{node_name}] Returning updated customer question log.")
+        return {"customer_question_log": log_to_update, "error": None}
+    else:
+        logger.debug(f"[{node_name}] No log entries updated.")
+        return {
+            "customer_question_log": log_to_update,
+            "error": None,
+        }  # Retorna mesmo se não atualizou

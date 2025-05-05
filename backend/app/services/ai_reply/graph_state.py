@@ -60,17 +60,32 @@ SPIN_TYPE_IMPLICATION = "Implication"
 SPIN_TYPE_NEED_PAYOFF = "NeedPayoff"
 
 
-CERTAINTY_STATUS_OK = "OK"  # Indicates certainty threshold met
-CERTAINTY_STATUS_STATEMENT_MADE = (
-    "StatementMade"  # Indicates a statement was made, awaiting response
-)
+CERTAINTY_STATUS_OK = "OK"
+CERTAINTY_STATUS_STATEMENT_MADE = "StatementMade"
 
 
 class PendingAgentQuestion(TypedDict):
-    text: str  # O texto da pergunta
-    type: str  # O tipo (ex: 'SPIN_Problem', 'SPIN_Implication', 'Closing_Initiate', 'Confirmation')
-    status: Literal["pending", "answered", "ignored"]  # Status atual
-    attempts: int  # Quantas vezes foi perguntada (direta ou indiretamente)
+    text: str
+    type: str
+    status: Literal["pending", "answered", "ignored"]
+    attempts: int
+
+
+class CustomerQuestionEntry(TypedDict):
+    """Represents a question asked by the customer and its status."""
+
+    original_question_text: str
+    extracted_question_core: str
+    status: Literal[
+        "asked",  # Newly asked in the current turn
+        "answered",  # Agent provided a satisfactory answer previously
+        "unanswered_pending",  # Agent couldn't answer, awaiting customer reaction/repetition
+        "unanswered_ignored",  # Agent couldn't answer, limit reached, agent moving on
+        "repeated_unanswered",  # Detected as repetition of an unanswered_pending question
+        "repeated_ignored",  # Detected as repetition of an unanswered_ignored question
+    ]
+    attempts: int
+    turn_asked: int
 
 
 class ConversationState(TypedDict):
@@ -87,7 +102,12 @@ class ConversationState(TypedDict):
     company_profile: CompanyProfileSchema
     agent_config: BotAgentRead
 
+    # === Agent Question Tracking ===
     pending_agent_question: Optional[PendingAgentQuestion]
+
+    # === Customer Question Log ===
+    customer_question_log: List[CustomerQuestionEntry]
+    current_questions: Optional[List[CustomerQuestionEntry]]
 
     # === Conversation History & Input ===
     messages: Annotated[List[BaseMessage], add_messages]
@@ -124,7 +144,7 @@ class ConversationState(TypedDict):
     objection_loop_count: int
     objection_resolution_status: Optional[str]
 
-    # === Closing Subgraph State (Inicial) ===
+    # === Closing Subgraph State  ===
     closing_attempt_count: int
     closing_status: Optional[str]
     correction_details: Optional[str]
@@ -132,6 +152,8 @@ class ConversationState(TypedDict):
     # === Control & Metadata ===
     intent: Optional[str]
     disengagement_reason: Optional[str]
+    customer_question_log: List[CustomerQuestionEntry]
+
     is_simulation: bool
     loop_count: int
 

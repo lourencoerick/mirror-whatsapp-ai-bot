@@ -4,13 +4,14 @@ name: Build, Push and Deploy Worker Images
 
 on:
   push:
-    branches: [master, feat/http_endpoint_workers]
+    branches: [master, feat/simulation_refactoring]
     paths:
       - "backend/app/workers/**"
       - "backend/app/services/researcher/**"
       - "backend/app/services/knowledge/**"
       - "backend/app/services/ai_reply/**"
       - "backend/app/workers/Dockerfile"
+      - "backend/requirements.txt"
       - ".github/workflows/deploy-workers.yml"
   workflow_dispatch:
 
@@ -35,9 +36,11 @@ jobs:
             consumer:
               - 'backend/app/workers/consumer/**'
               - "backend/app/workers/Dockerfile"
+              - "backend/requirements.txt"
             response_sender:
               - 'backend/app/workers/response_sender/**'
               - "backend/app/workers/Dockerfile"
+              - "backend/requirements.txt"
             batch:
               - 'backend/app/workers/batch_contacts/**'
               - 'backend/app/workers/researcher/**'
@@ -45,10 +48,12 @@ jobs:
               - 'backend/app/services/researcher/**'
               - 'backend/app/services/knowledge/**'
               - "backend/app/workers/Dockerfile"
+              - "backend/requirements.txt"
             ai_replier:
               - 'backend/app/workers/ai_replier/**'
               - 'backend/app/services/ai_reply/**'
               - "backend/app/workers/Dockerfile"
+              - "backend/requirements.txt"
 
       # Constrói JSON da matriz + flag needs_job
       - name: Build matrix JSON

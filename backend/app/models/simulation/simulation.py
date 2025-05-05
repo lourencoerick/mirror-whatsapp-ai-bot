@@ -32,6 +32,8 @@ class SimulationOutcomeEnum(str, enum.Enum):
     AI_ERROR = "ai_error"
     SIMULATION_ERROR = "simulation_error"
     TIMEOUT = "timeout"
+    UNKNOWN = "unkown"
+    SETUP_ERROR = "setup_error"
 
 
 class Simulation(BaseModel):

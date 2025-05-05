@@ -30,22 +30,9 @@ class PersonaState(BaseModel):
     primarily through a list of extracted facts.
     """
 
-    extracted_facts: List[ExtractedFact] = Field(
-        default_factory=list,
-        description="List of facts the persona has learned during the conversation.",
-    )
+    turn_count: int = Field(
+        0, description="Internal turn count for the persona logic, if needed."
+    )  # Exemplo de estado futuro
 
     class Config:
-
         validate_assignment = True
-
-    def get_fact(self, entity: str, attribute: str) -> Optional[Any]:
-        """Helper method to find the value of a specific fact."""
-        for fact in self.extracted_facts:
-            if fact.entity == entity and fact.attribute == attribute:
-                return fact.value
-        return None
-
-    def has_fact(self, entity: str, attribute: str) -> bool:
-        """Helper method to check if a specific fact has been extracted."""
-        return self.get_fact(entity, attribute) is not None

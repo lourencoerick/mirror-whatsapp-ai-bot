@@ -240,7 +240,7 @@ def generate_persona_cli(
                 account=account,
                 profile=profile_schema,
                 persona_type_description=persona_type,
-                contact_identifier=contact_identifier,
+                # contact_identifier=contact_identifier,
             )
 
             if not generated_persona_read:
