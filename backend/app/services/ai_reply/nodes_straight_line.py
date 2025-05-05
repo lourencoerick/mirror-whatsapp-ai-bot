@@ -462,15 +462,10 @@ async def generate_certainty_statement_node(
         f"[{node_name}] Last human message for context: '{last_human_message_content[:100]}...'"
     )
 
-    # --- Formatando Contexto Adicional do Perfil ---
     business_desc = profile.business_description or "N/A"
-    offering_summary = _format_offerings(profile.offering_overview)  # Reutiliza helper
-    key_selling_points = _format_list_items(
-        profile.key_selling_points
-    )  # Reutiliza helper
-    # --- Fim Formatação ---
+    offering_summary = _format_offerings(profile.offering_overview)
+    key_selling_points = _format_list_items(profile.key_selling_points)
 
-    # --- Prompt ATUALIZADO com Mais Contexto ---
     prompt_template = ChatPromptTemplate.from_messages(
         [
             (
@@ -522,14 +517,13 @@ Instrução Final: Gere o JSON com "connection_phrase" e "certainty_statement" f
         ]
     )
 
-    # --- Cadeia com LLM Estruturado ---
     structured_llm = llm_primary_instance.with_structured_output(
         CertaintyGenerationOutput
     )
     chain = prompt_template | structured_llm
 
     try:
-        # Invoca a cadeia passando as novas variáveis de contexto
+
         structured_result: CertaintyGenerationOutput = await chain.ainvoke(
             {
                 "focus": focus,
@@ -537,14 +531,14 @@ Instrução Final: Gere o JSON com "connection_phrase" e "certainty_statement" f
                     last_human_message_content if last_human_message_content else "N/A"
                 ),
                 "company_name": profile.company_name or "N/A",
-                "business_description": business_desc,  # Passa formatado
-                "offering_summary": offering_summary,  # Passa formatado
-                "key_selling_points": key_selling_points,  # Passa formatado
+                "business_description": business_desc,
+                "offering_summary": offering_summary,
+                "key_selling_points": key_selling_points,
                 "additional_context": (
                     context
                     if context
                     else "Nenhuma informação adicional específica recuperada."
-                ),  # Contexto RAG
+                ),
                 "chat_history": formatted_history if formatted_history else "N/A",
                 "sales_tone": profile.sales_tone or "profissional e confiante",
                 "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
@@ -555,14 +549,13 @@ Instrução Final: Gere o JSON com "connection_phrase" e "certainty_statement" f
             f"[{node_name}] Structured certainty generation result: {structured_result}"
         )
 
-        # --- Combina as partes (como antes) ---
         connection = structured_result.connection_phrase
         statement = structured_result.certainty_statement
         if not statement:
             raise ValueError("LLM returned empty certainty_statement.")
         if statement.endswith("?"):
             raise ValueError("LLM included question in certainty_statement.")
-        # ... (lógica de combinar connection e statement) ...
+
         if connection and connection.strip():
             generated_response = f"{connection.strip()} {statement}"
         else:
@@ -582,7 +575,6 @@ Instrução Final: Gere o JSON com "connection_phrase" e "certainty_statement" f
         }
 
     except Exception as e:
-        # ... (Fallback como antes) ...
         logger.exception(
             f"[{node_name}] Error generating structured certainty statement: {e}"
         )
