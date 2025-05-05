@@ -1,15 +1,25 @@
 #!/bin/sh
-# worker-entrypoint.sh
+# backend/app/workers/worker-entrypoint.sh
 
 # Exit immediately if a command exits with non-zero status
 set -e
 
-# Start a simple HTTP server in the background on the port specified by Cloud Run ($PORT)
-# It only needs to listen; it doesn't need to serve anything meaningful.
-echo "Starting dummy HTTP server on port ${PORT:-8080} for Cloud Run health check..."
-python3 -m http.server ${PORT:-8080} --bind 0.0.0.0 &
+# Define the path to the HTTP server script relative to WORKDIR (/workspace)
+HTTP_SERVER_SCRIPT="/workspace/backend/app/workers/worker_http_server.py"
 
-# Now, execute the actual command passed to the container
-# (this will be the command specified in Cloud Run's 'command' and 'args')
+# Start the dedicated FastAPI HTTP server in the background
+echo "Starting worker HTTP server in background from ${HTTP_SERVER_SCRIPT}..."
+python3 ${HTTP_SERVER_SCRIPT} &
+
+# Store the PID of the background server (optional, for potential cleanup)
+HTTP_SERVER_PID=$!
+echo "HTTP Server running with PID ${HTTP_SERVER_PID}"
+
+# Now, execute the actual command passed to the container (e.g., arq ...)
+# This command comes from the 'args' defined in the Cloud Run service definition.
 echo "Executing main worker command: $@"
 exec "$@"
+
+# Optional: Cleanup background process on exit (might not always execute depending on how the main command exits)
+# trap "echo 'Stopping HTTP server...'; kill $HTTP_SERVER_PID" SIGINT SIGTERM
+# wait $HTTP_SERVER_PID
