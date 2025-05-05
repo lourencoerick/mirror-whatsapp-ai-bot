@@ -12,12 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_openai import ChatOpenAI
 from trustcall import create_extractor
 
-# Importar schemas atualizados
+
 from app.simulation.schemas import persona as persona_schemas
 from app.api.schemas.company_profile import CompanyProfileSchema
 from app.simulation.repositories import persona as persona_repo
 
-# Importar outros módulos necessários
+
 from app.api.schemas.contact import ContactCreate
 from app.services.repository import contact as contact_repo
 from app.services.repository import conversation as conversation_repo
@@ -26,7 +26,6 @@ from app.models.contact import Contact
 from app.models.account import Account
 
 
-# --- Prompt ATUALIZADO ---
 GENERATOR_SYSTEM_PROMPT_PT = """
 SYSTEM: Você é um especialista em marketing e vendas B2C, criando perfis de personas realistas para simular interações de vendas via WhatsApp. Seu objetivo é gerar UMA definição de persona em formato JSON.
 
@@ -56,26 +55,22 @@ INSTRUÇÃO FINAL: Gere APENAS o objeto JSON contendo os campos da persona confo
 """
 
 
-# --- Função generate_persona_data (Usando o schema PersonaBase correto) ---
 async def generate_persona_data(
     profile: CompanyProfileSchema,
     persona_type_description: str,
-) -> Optional[persona_schemas.PersonaBase]:  # Retorna o schema base atualizado
+) -> Optional[persona_schemas.PersonaBase]:
     """
     Generates persona base data using the LLM based on company profile.
     """
     logger.debug(f"Generating persona data for type: {persona_type_description}")
-    persona_generator_extractor: Optional[Any] = None  # Definir dentro do try
+    persona_generator_extractor: Optional[Any] = None
     try:
-        # Inicializa LLM e Extractor aqui para garantir uso do schema atualizado
-        llm_gen = ChatOpenAI(
-            model="gpt-4o", temperature=0.7
-        )  # Ou outro modelo configurado
+
+        llm_gen = ChatOpenAI(model="gpt-4o", temperature=0.7)
         persona_generator_extractor = create_extractor(
             llm_gen,
-            tools=[persona_schemas.PersonaBase],  # <<< USA O SCHEMA ATUALIZADO
+            tools=[persona_schemas.PersonaBase],
             tool_choice="PersonaBase",
-            # enable_inserts=True # Remover se não estiver usando inserts aqui
         )
         logger.info("Temporary extractor for PersonaBase generation initialized.")
     except Exception as e:
@@ -97,7 +92,6 @@ async def generate_persona_data(
             logger.error("Trustcall persona generator returned no valid response.")
             return None
 
-        # Pega o dicionário gerado (assumindo que é o primeiro da lista)
         llm_generated_data_dict = trustcall_result["responses"][0]
         if not isinstance(llm_generated_data_dict, dict):
             if isinstance(llm_generated_data_dict, persona_schemas.PersonaBase):
@@ -108,7 +102,6 @@ async def generate_persona_data(
                 )
                 return None
 
-        # Adiciona sufixo único ao persona_id gerado pelo LLM
         base_persona_id = llm_generated_data_dict.get("persona_id", "unknown_persona")
         base_persona_id = "".join(
             c if c.isalnum() or c == "_" else "_" for c in base_persona_id.lower()
@@ -116,10 +109,8 @@ async def generate_persona_data(
         unique_persona_id = f"{base_persona_id}_{uuid.uuid4().hex[:6]}"
         llm_generated_data_dict["persona_id"] = unique_persona_id
 
-        # Remove o campo que não existe mais no schema base, caso o LLM o inclua por engano
         llm_generated_data_dict.pop("info_attribute_to_question_template", None)
 
-        # Valida contra o schema PersonaBase ATUALIZADO
         persona_base_data = persona_schemas.PersonaBase.model_validate(
             llm_generated_data_dict
         )
@@ -137,17 +128,13 @@ async def generate_persona_data(
         return None
 
 
-# --- Funções _find_or_create_contact_for_persona, save_persona_from_data, generate_and_save_persona ---
 async def _find_or_create_contact_for_persona(
     db: AsyncSession,
     account_id: uuid.UUID,
     persona_id_to_link: str,
-    # requested_identifier: Optional[str] = None, # Removido - identificador será gerado
 ) -> Optional[Contact]:
     """Finds or creates a simulation contact."""
-    final_identifier = "5500" + "".join(
-        random.choices("0123456789", k=9)
-    )  # Gerar um ID de simulação
+    final_identifier = "5500" + "".join(random.choices("0123456789", k=9))
     logger.info(f"Using generated simulation identifier: {final_identifier}")
 
     try:
@@ -162,7 +149,7 @@ async def _find_or_create_contact_for_persona(
             logger.error(
                 f"Generated identifier {final_identifier} conflict: linked to persona {contact.persona.persona_id}."
             )
-            # Poderia tentar gerar outro ID aqui em um loop, mas por simplicidade, falha por enquanto.
+
             return None
         if not contact:
             contact_data = ContactCreate(
@@ -189,10 +176,9 @@ async def _find_or_create_contact_for_persona(
                 logger.warning(
                     f"Existing contact {contact.id} not marked as simulation. Updating."
                 )
-                # Idealmente, atualizaria o campo aqui se necessário
-                pass  # Por ora, apenas loga
 
-        # Cria conversation e contact_inbox
+                pass
+
         await create_conversation_from_contact(
             db=db, account_id=account_id, contact_id=contact.id
         )
@@ -206,7 +192,7 @@ async def _find_or_create_contact_for_persona(
 
 async def save_persona_from_data(
     db: AsyncSession,
-    persona_base_data: persona_schemas.PersonaBase,  # Recebe o schema atualizado
+    persona_base_data: persona_schemas.PersonaBase,
     contact_id: uuid.UUID,
 ) -> Optional[persona_schemas.PersonaRead]:
     """Saves the persona data to the database, linking it to the contact_id."""
@@ -222,7 +208,7 @@ async def save_persona_from_data(
             db=db, persona_in=persona_create_payload
         )
         if created_db_persona is None:
-            return None  # Erro já logado pelo repo
+            return None
         logger.success(
             f"Successfully saved persona: {created_db_persona.persona_id} (DB ID: {created_db_persona.id})"
         )
@@ -283,7 +269,6 @@ async def generate_and_save_persona(
         return None
 
 
-# Função create_conversation_from_contact permanece a mesma
 async def create_conversation_from_contact(
     db: AsyncSession, account_id: uuid.UUID, contact_id: uuid.UUID
 ) -> None:
@@ -312,7 +297,7 @@ async def create_conversation_from_contact(
             conversation.is_simulation = True
             db.add(conversation)
             await db.flush()
-            await db.refresh(conversation)  # Refresh para obter estado atualizado
+            await db.refresh(conversation)
             logger.info(f"Marked conversation {conversation.id} as simulation.")
         else:
             logger.debug(
@@ -323,5 +308,5 @@ async def create_conversation_from_contact(
         logger.exception(
             f"Error creating contact_inbox/conversation for contact {contact_id}: {e}"
         )
-        # Não relança a exceção aqui para permitir que o fluxo principal tente um rollback
-        raise  # Relança para que generate_and_save_persona possa fazer rollback
+
+        raise
