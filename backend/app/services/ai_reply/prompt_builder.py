@@ -18,11 +18,18 @@ from langchain_core.messages import (
 
 from loguru import logger
 from app.services.ai_reply.prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
+from .graph_state import CustomerQuestionEntry
 
 SYSTEM_MESSAGE_TEMPLATE = """
 Você é um Assistente de Vendas IA para '{company_name}'.
 Seu objetivo é responder à pergunta/declaração mais recente do cliente de forma precisa e completa, utilizando o 'Contexto da Base de Conhecimento' e o 'Perfil da Empresa'.
 Comunique-se em {language} com um tom {sales_tone}.
+
+
+**Pergunta(s) do Cliente na Última Mensagem (Analise CADA UMA):**
+{current_questions_formatted}
+--- Fim das Perguntas Atuais ---
+
 
 **Contexto da Base de Conhecimento:**
 {retrieved_knowledge}
@@ -61,6 +68,19 @@ Diretrizes de Comunicação:
 8.  **Aplique a Formatação:** Use a formatação WhatsApp Markdown (instruída acima) de forma útil e clara para melhorar a legibilidade.
 9.  **Foco EXLUSIVO na Resposta:** Sua **ÚNICA tarefa** neste passo é fornecer a resposta direta e completa à última pergunta ou declaração do cliente, usando as informações disponíveis. **NÃO inclua NENHUMA pergunta de acompanhamento** (como 'Isso ajudou?', 'Posso ajudar em algo mais?', 'Gostaria de saber mais?') **nem frases de encerramento genéricas** ('Estou à disposição', etc.). Termine a resposta logo após fornecer a informação solicitada ou a declaração de que não a possui. A próxima etapa da conversa (fazer perguntas) será tratada por outro componente.
 
+**Instrução ESPECIAL - Lidar com Status da Pergunta Atual:**
+- **Se `current_question_status` for 'asked':** Responda normalmente à pergunta usando as informações disponíveis (RAG/Perfil). Se não souber, use o fallback padrão.
+- **Se `current_question_status` for 'repeated_unanswered':**
+    - **NÃO** repita apenas a resposta padrão de "não sei / contate-nos".
+    - **Reconheça a Repetição:** Comece reconhecendo que a pergunta já foi feita e você não tinha a resposta (Ex: "Entendo que você já perguntou sobre [tópico] e ainda precisa dessa informação...").
+    - **Reitere a Indisponibilidade (Brevemente):** Mencione rapidamente que a informação específica ainda não está disponível.
+    - **Seja Proativo/Estratégico:** Ofereça uma **alternativa concreta** ou tente **redirecionar** a conversa para algo que você *pode* fazer ou um valor que *pode* demonstrar (Ex: agendar demo, focar em outra funcionalidade, etc. - como instruído anteriormente).
+- **Se `current_question_status` for 'repeated_ignored':**
+    - **Reconheça o Impasse:** Admita diretamente que vocês estão em um impasse sobre essa informação específica (Ex: "Percebo que a informação sobre [tópico] é realmente crucial para você e, infelizmente, como mencionei, não a tenho disponível neste momento e já tentamos alternativas.").
+    - **Declare a Limitação:** Afirme que não é possível prosseguir *naquela linha específica* agora.
+    - **Ofereça uma Escolha Final Clara (Opcional):** Apresente opções limitadas e concretas ou simplesmente encerre educadamente aquela linha de questionamento. (Ex: "Neste cenário, podemos focar em [outro assunto] ou, se preferir, podemos seguir para outro ponto?"). **Evite perguntas abertas como "Posso ajudar com algo mais?".**
+
+**Instrução de Fallback (Se não puder responder E NÃO for repetição não respondida):**
 {fallback_instructions}
 
 HISTÓRICO DA CONVERSA (Mais recentes primeiro):
@@ -96,6 +116,19 @@ def _format_list_items(items: List[str], prefix: str = "- ") -> str:
     return "\n".join([f"{prefix}{item}" for item in items])
 
 
+def _format_current_questions(questions: Optional[List[CustomerQuestionEntry]]) -> str:
+    if not questions:
+        return "Nenhuma pergunta específica identificada na última mensagem."
+    lines = []
+    for i, q in enumerate(questions):
+        lines.append(f"Pergunta {i+1}:")
+        lines.append(f"  - Texto Principal: {q.get('extracted_question_core', 'N/A')}")
+        lines.append(f"  - Status Atual: {q.get('status', 'N/A')}")
+        lines.append(f"  - Tentativas (se repetida): {q.get('attempts', 'N/A')}")
+        # lines.append(f"  - Texto Original: {q.get('original_question_text', 'N/A')}") # Opcional
+    return "\n".join(lines)
+
+
 def _format_history_lc_messages(history: List[BaseMessage]) -> List[BaseMessage]:
     """Passes through LangChain BaseMessages, potentially reversing if needed."""
     logger.debug(f"Using {len(history)} messages for chat history placeholder.")
@@ -107,6 +140,7 @@ def build_llm_prompt_messages(
     profile: CompanyProfileSchema,
     chat_history_lc: List[BaseMessage],
     current_datetime: str,
+    current_questions: Optional[List[CustomerQuestionEntry]] = None,
     retrieved_context: Optional[str] = None,
 ) -> List[BaseMessage]:
     """
@@ -135,6 +169,8 @@ def build_llm_prompt_messages(
     )
     if retrieved_context and retrieved_context.strip():
         knowledge_text = retrieved_context
+
+    current_questions_formatted = _format_current_questions(current_questions)
 
     try:
         system_vars: Dict[str, Any] = {
@@ -176,6 +212,7 @@ def build_llm_prompt_messages(
             ),
             "retrieved_knowledge": knowledge_text,
             "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
+            "current_questions_formatted": current_questions_formatted,
         }
 
         all_input_vars = {

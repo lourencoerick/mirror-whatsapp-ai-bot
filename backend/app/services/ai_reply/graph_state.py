@@ -73,6 +73,23 @@ class PendingAgentQuestion(TypedDict):
     attempts: int  # Quantas vezes foi perguntada (direta ou indiretamente)
 
 
+class CustomerQuestionEntry(TypedDict):
+    """Represents a question asked by the customer and its status."""
+
+    original_question_text: str  # The normalized/original text of the question
+    extracted_question_core: str
+    status: Literal[
+        "asked",  # Newly asked in the current turn
+        "answered",  # Agent provided a satisfactory answer previously
+        "unanswered_pending",  # Agent couldn't answer, awaiting customer reaction/repetition
+        "unanswered_ignored",  # Agent couldn't answer, limit reached, agent moving on
+        "repeated_unanswered",  # Detected as repetition of an unanswered_pending question
+        "repeated_ignored",  # Detected as repetition of an unanswered_ignored question
+    ]
+    attempts: int  # How many times this (or similar) question was asked consecutively without a satisfactory answer
+    turn_asked: int
+
+
 class ConversationState(TypedDict):
     """
     Represents the evolving state during the AI reply generation process,
@@ -87,7 +104,14 @@ class ConversationState(TypedDict):
     company_profile: CompanyProfileSchema
     agent_config: BotAgentRead
 
+    # === Agent Question Tracking (como antes) ===
     pending_agent_question: Optional[PendingAgentQuestion]
+
+    # === Customer Question Log (NOVA ESTRUTURA) ===
+    customer_question_log: List[CustomerQuestionEntry]
+    current_questions: Optional[List[CustomerQuestionEntry]]
+    # customer_question_history: List[str]  # Lista das perguntas anteriores do cliente
+    # is_repeated_unanswered_question: bool  # Flag definido pelo check_repetition_node
 
     # === Conversation History & Input ===
     messages: Annotated[List[BaseMessage], add_messages]
@@ -132,6 +156,8 @@ class ConversationState(TypedDict):
     # === Control & Metadata ===
     intent: Optional[str]
     disengagement_reason: Optional[str]
+    customer_question_log: List[CustomerQuestionEntry]
+
     is_simulation: bool
     loop_count: int
 
