@@ -46,7 +46,7 @@ worker-response: ## Run Response sender
 	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/response_sender/response_sender.py
 
 worker-ai: ## Run Response sender
-	PYTHONPATH=$(APP_DIR) arq app.workers.ai_replier.WorkerSettings
+	PYTHONPATH=$(APP_DIR) arq app.workers.ai_replier.ai_replier.WorkerSettings
 
 worker-arq: ## Run Response sender
 	PYTHONPATH=$(APP_DIR) arq app.workers.batch.contacts.contact_creator.WorkerSettings
