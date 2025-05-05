@@ -1,9 +1,10 @@
 # .github/workflows/deploy-workers.yml
+
 name: Build, Push and Deploy Worker Images
 
 on:
   push:
-    branches: [master, feat/simulation_refactoring]
+    branches: [master, feat/http_endpoint_workers]
     paths:
       - "backend/app/workers/**"
       - "backend/app/services/researcher/**"
