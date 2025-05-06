@@ -659,7 +659,7 @@ async def startup(ctx: dict):
                 f"Primary LLM client initialized: {settings.PRIMARY_LLM_MODEL_NAME}"
             )
 
-            fast_model_name = getattr(settings, "FAST_LLM_MODEL_NAME", "gpt4o")
+            fast_model_name = getattr(settings, "FAST_LLM_MODEL_NAME", "gpt-4o")
             fast_temperature = float(getattr(settings, "FAST_LLM_TEMPERATURE", 0.0))
 
             llm_fast_client = AzureChatOpenAI(
