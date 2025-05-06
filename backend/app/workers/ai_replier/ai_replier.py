@@ -103,8 +103,8 @@ except ImportError:
             "MESSAGE_QUEUE_NAME": "message_queue",
             "RESPONSE_SENDER_QUEUE_NAME": "response_queue",
             "AI_REPLY_QUEUE_NAME": "ai_reply_queue",
-            "OPENAI_MODEL_NAME": "gpt-4o-mini",
-            "OPENAI_TEMPERATURE": 0.7,
+            "PRIMARY_LLM_MODEL_NAME": "gpt-4o-mini",
+            "PRIMARY_LLM_TEMPERATURE": 0.7,
             "FAST_LLM_MODEL_NAME": "gpt-4o-mini",
             "FAST_LLM_TEMPERATURE": 0.1,
         },
@@ -644,8 +644,8 @@ async def startup(ctx: dict):
                 raise EnvironmentError("AZURE_OPENAI_API_KEY not set.")
 
             llm_primary_client = AzureChatOpenAI(
-                azure_deployment=settings.OPENAI_MODEL_NAME,
-                temperature=settings.OPENAI_TEMPERATURE,
+                azure_deployment=settings.PRIMARY_LLM_MODEL_NAME,
+                temperature=settings.PRIMARY_LLM_TEMPERATURE,
                 azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
                 api_key=settings.AZURE_OPENAI_API_KEY,
                 api_version="2025-01-01-preview",  # settings.OPENAI_API_VERSION,
@@ -655,7 +655,9 @@ async def startup(ctx: dict):
             logger.debug(f"Primary LLM client is working :{llm_response_test.content}")
 
             ctx["llm_primary"] = llm_primary_client
-            logger.info(f"Primary LLM client initialized: {settings.OPENAI_MODEL_NAME}")
+            logger.info(
+                f"Primary LLM client initialized: {settings.PRIMARY_LLM_MODEL_NAME}"
+            )
 
             fast_model_name = getattr(settings, "FAST_LLM_MODEL_NAME", "gpt4o")
             fast_temperature = float(getattr(settings, "FAST_LLM_TEMPERATURE", 0.0))
