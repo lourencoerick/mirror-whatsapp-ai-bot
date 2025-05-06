@@ -30,7 +30,7 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_NAME }}
           service_account: ${{ vars.GCP_SA_EMAIL }}
-          audience: https://github.com/${{ github.repository_owner }}
+          audience: https://github.com/${{ github.repository_org }}
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
