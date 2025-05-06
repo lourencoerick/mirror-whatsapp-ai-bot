@@ -217,7 +217,7 @@ async def startup(ctx: dict):
             # Consider loading model name from settings
             llm = AzureChatOpenAI(
                 model="gpt-4.1-mini",
-                temperature=0.0
+                temperature=0.0,
                 azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
                 api_key=settings.AZURE_OPENAI_API_KEY,
                 api_version="2025-01-01-preview",                
