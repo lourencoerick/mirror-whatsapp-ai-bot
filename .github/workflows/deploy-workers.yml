@@ -42,9 +42,7 @@ jobs:
               - "backend/app/workers/Dockerfile"
               - "backend/requirements.txt"
             batch:
-              - 'backend/app/workers/batch_contacts/**'
-              - 'backend/app/workers/researcher/**'
-              - 'backend/app/workers/knowledge_ingester/**'
+              - 'backend/app/workers/batch/**'
               - 'backend/app/services/researcher/**'
               - 'backend/app/services/knowledge/**'
               - "backend/app/workers/Dockerfile"
