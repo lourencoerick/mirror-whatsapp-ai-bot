@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # -- Azure Openai --
     OPENAI_API_VERSION: str = "2025-01-01-preview"
-    AZURE_OPENAI_API_KEY: str = Field(..., env="AZURE_OPENAI_API_KEY")
+    AZURE_OPENAI_API_KEY: str = "your-secret-key"
     AZURE_OPENAI_ENDPOINT: str = "https://eastus2.api.cognitive.microsoft.com/"
 
     # -- Worker queues --
