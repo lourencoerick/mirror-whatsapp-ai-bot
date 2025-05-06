@@ -9,7 +9,7 @@ from loguru import logger
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from trustcall import create_extractor
 
 
@@ -25,6 +25,9 @@ from app.models.conversation import ConversationStatusEnum
 from app.models.contact import Contact
 from app.models.account import Account
 
+from app.config import get_settings, Settings
+
+settings: Settings = get_settings()
 
 GENERATOR_SYSTEM_PROMPT_PT = """
 SYSTEM: Você é um especialista em marketing e vendas B2C, criando perfis de personas realistas para simular interações de vendas via WhatsApp. Seu objetivo é gerar UMA definição de persona em formato JSON.
@@ -66,7 +69,13 @@ async def generate_persona_data(
     persona_generator_extractor: Optional[Any] = None
     try:
 
-        llm_gen = ChatOpenAI(model="gpt-4o", temperature=0.7)
+        llm_gen = AzureChatOpenAI(
+            azure_deployment="gpt-4o",
+            temperature=0.7,
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            api_key=settings.AZURE_OPENAI_API_KEY,
+            api_version="2025-01-01-preview",
+        )
         persona_generator_extractor = create_extractor(
             llm_gen,
             tools=[persona_schemas.PersonaBase],

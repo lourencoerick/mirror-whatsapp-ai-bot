@@ -53,7 +53,7 @@ except ImportError:
 
 # --- LangChain Imports ---
 try:
-    from langchain_openai import ChatOpenAI
+    from langchain_openai import AzureChatOpenAI
     from langchain_core.language_models import BaseChatModel
     from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
     from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
@@ -639,22 +639,38 @@ async def startup(ctx: dict):
     if LANGCHAIN_AVAILABLE:
         logger.info("Initializing LLM clients...")
         try:
-            openai_api_key = os.getenv("OPENAI_API_KEY")
+            openai_api_key = os.getenv("AZURE_OPENAI_API_KEY")
             if not openai_api_key:
-                raise EnvironmentError("OPENAI_API_KEY not set.")
+                raise EnvironmentError("AZURE_OPENAI_API_KEY not set.")
 
-            llm_primary_client = ChatOpenAI(
-                model=settings.OPENAI_MODEL_NAME,
+            llm_primary_client = AzureChatOpenAI(
+                azure_deployment=settings.OPENAI_MODEL_NAME,
                 temperature=settings.OPENAI_TEMPERATURE,
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                api_key=settings.AZURE_OPENAI_API_KEY,
+                api_version="2025-01-01-preview",  # settings.OPENAI_API_VERSION,
             )
+
+            llm_response_test = llm_primary_client.invoke("Olá")
+            logger.debug(f"Primary LLM client is working :{llm_response_test.content}")
+
             ctx["llm_primary"] = llm_primary_client
             logger.info(f"Primary LLM client initialized: {settings.OPENAI_MODEL_NAME}")
 
-            fast_model_name = getattr(settings, "FAST_LLM_MODEL_NAME", "gpt-4o")
+            fast_model_name = getattr(settings, "FAST_LLM_MODEL_NAME", "gpt4o")
             fast_temperature = float(getattr(settings, "FAST_LLM_TEMPERATURE", 0.0))
-            llm_fast_client = ChatOpenAI(
-                model=fast_model_name, temperature=fast_temperature
+
+            llm_fast_client = AzureChatOpenAI(
+                azure_deployment=fast_model_name,
+                temperature=fast_temperature,
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                api_key=settings.AZURE_OPENAI_API_KEY,
+                api_version="2025-01-01-preview",
             )
+
+            llm_response_test = llm_fast_client.invoke("Olá")
+            logger.debug(f"Fast LLM client is working :{llm_response_test.content}")
+
             ctx["llm_fast"] = llm_fast_client
             logger.info(f"Fast LLM client initialized: {fast_model_name}")
 

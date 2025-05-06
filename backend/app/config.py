@@ -48,10 +48,20 @@ class Settings(BaseSettings):
     FRONTEND_ALLOWED_ORIGINS: Optional[str] = None
 
     # -- AI Replier --
-    OPENAI_MODEL_NAME: str = "gpt-4o-mini"
+    OPENAI_MODEL_NAME: str = "gpt-4o"
     OPENAI_TEMPERATURE: int = 0
     FAST_LLM_MODEL_NAME: str = "gpt-4o-mini"
     FAST_LLM_TEMPERATURE: int = 0
+
+    # -- Embbeding --
+    EMBEDDING_PROVIDER: str = "openai"
+    AZURE_OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    LOCAL_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
+
+    # -- Azure Openai --
+    OPENAI_API_VERSION: str = "2025-01-01-preview"
+    AZURE_OPENAI_API_KEY: str = Field(..., env="AZURE_OPENAI_API_KEY")
+    AZURE_OPENAI_ENDPOINT: str = "https://eastus2.api.cognitive.microsoft.com/"
 
     # -- Worker queues --
     RESET_MESSAGE_TRIGGER: str = "bot@123"
@@ -59,7 +69,7 @@ class Settings(BaseSettings):
     AI_REPLY_QUEUE_NAME: str = "ai_reply_queue"
     MESSAGE_QUEUE_NAME: str = "message_queue"
     BATCH_ARQ_QUEUE_NAME: str = "batch_queue"
-    # DATABASE_URL_PSYCOPG: str:
+
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True

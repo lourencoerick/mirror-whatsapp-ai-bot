@@ -3,15 +3,20 @@ import asyncio
 from typing import List, Optional, Union
 import numpy as np
 from loguru import logger
+from app.config import get_settings, Settings
 
+settings: Settings = get_settings()
 # --- Configuration ---
-EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "openai").lower()
-LOCAL_EMBEDDING_MODEL = os.getenv("LOCAL_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+OPENAI_API_VERSION = settings.OPENAI_API_VERSION
+AZURE_OPENAI_API_KEY = settings.AZURE_OPENAI_API_KEY
+AZURE_OPENAI_ENDPOINT = settings.AZURE_OPENAI_ENDPOINT
+AZURE_OPENAI_EMBEDDING_MODEL = settings.AZURE_OPENAI_EMBEDDING_MODEL
+EMBEDDING_PROVIDER = settings.EMBEDDING_PROVIDER.lower()
+LOCAL_EMBEDDING_MODEL = settings.LOCAL_EMBEDDING_MODEL.lower()
 
 # --- Initialize Models/Clients ---
 local_model: Optional["SentenceTransformer"] = None
-openai_async_client: Optional["AsyncOpenAI"] = None
+openai_async_client: Optional["AsyncAzureOpenAI"] = None
 
 if EMBEDDING_PROVIDER == "local":
     try:
@@ -33,20 +38,44 @@ if EMBEDDING_PROVIDER == "local":
 elif EMBEDDING_PROVIDER == "openai":
     try:
 
-        from openai import AsyncOpenAI, APIConnectionError, RateLimitError, APIError
+        from openai import (
+            APIConnectionError,
+            RateLimitError,
+            APIError,
+            AsyncAzureOpenAI,
+        )
 
-        logger.info("Initializing AsyncOpenAI client for embeddings...")
+        logger.info("Initializing AsyncAzureOpenAI client for embeddings...")
+        if not AZURE_OPENAI_API_KEY:
+            raise EnvironmentError(
+                "API key not found. Please set the 'AZURE_OPENAI_API_KEY' environment variable."
+            )
 
-        openai_async_client = AsyncOpenAI()
+        if not AZURE_OPENAI_ENDPOINT:
+            raise EnvironmentError(
+                "Azure Endpoint not found. Please set the 'AZURE_OPENAI_ENDPOINT' environment variable."
+            )
 
-        logger.info("AsyncOpenAI client initialized.")
-    except ImportError:
+        if not OPENAI_API_VERSION:
+            raise EnvironmentError(
+                "Openai api version not found. Please set the 'AZURE_OPENAI_ENDPOINT' environment variable."
+            )
+
+        # openai_async_client = AsyncAzureOpenAI()
+        openai_async_client = AsyncAzureOpenAI(
+            api_version=OPENAI_API_VERSION,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_key=AZURE_OPENAI_API_KEY,
+        )
+
+        logger.info("AsyncAzureOpenAI client initialized.")
+    except ImportError as import_error:
         logger.error(
-            "openai library not found or version < 1.0. pip install --upgrade openai"
+            "openai library not found or version < 1.0. pip install --upgrade openai, {e}"
         )
         openai_async_client = None
     except Exception as e:
-        logger.error(f"Failed to initialize AsyncOpenAI client: {e}")
+        logger.error(f"Failed to initialize AsyncAzureOpenAI client: {e}")
         openai_async_client = None
 else:
     logger.error(
@@ -93,7 +122,7 @@ async def get_embedding(text: str) -> Optional[np.ndarray]:
             try:
 
                 response = await openai_async_client.embeddings.create(
-                    input=[text], model=OPENAI_EMBEDDING_MODEL
+                    input=[text], model=AZURE_OPENAI_EMBEDDING_MODEL
                 )
                 return np.array(response.data[0].embedding)
             except (APIConnectionError, RateLimitError, APIError) as api_err:
@@ -103,7 +132,7 @@ async def get_embedding(text: str) -> Optional[np.ndarray]:
                 logger.exception(f"Unexpected error generating OpenAI embedding: {e}")
                 return None
         else:
-            logger.error("AsyncOpenAI client not available.")
+            logger.error("AsyncAzureOpenAI client not available.")
             return None
     else:
         logger.error("No valid embedding provider configured.")
@@ -153,7 +182,7 @@ async def get_embeddings_batch(texts: List[str]) -> Optional[List[np.ndarray]]:
             try:
 
                 response = await openai_async_client.embeddings.create(
-                    input=texts, model=OPENAI_EMBEDDING_MODEL
+                    input=texts, model=AZURE_OPENAI_EMBEDDING_MODEL
                 )
                 return [np.array(data.embedding) for data in response.data]
             except (APIConnectionError, RateLimitError, APIError) as api_err:
@@ -165,7 +194,7 @@ async def get_embeddings_batch(texts: List[str]) -> Optional[List[np.ndarray]]:
                 )
                 return None
         else:
-            logger.error("AsyncOpenAI client not available.")
+            logger.error("AsyncAzureOpenAI client not available.")
             return None
     else:
         logger.error("No valid embedding provider configured.")
