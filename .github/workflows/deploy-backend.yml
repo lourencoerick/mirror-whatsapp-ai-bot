@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - master
-      - feat/simulation_refactoring
+      - feat/azure_llm
     paths:
       - "backend/**"
       - "Dockerfile"
