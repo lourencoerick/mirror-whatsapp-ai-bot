@@ -4,14 +4,14 @@ name: Build, Push and Deploy Worker Images
 
 on:
   push:
-    branches: [master, feat/simulation_refactoring]
+    branches: [master, feat/azure_llm]
     paths:
       - "backend/app/workers/**"
       - "backend/app/services/researcher/**"
       - "backend/app/services/knowledge/**"
       - "backend/app/services/ai_reply/**"
-      - "backend/app/workers/Dockerfile"
       - "backend/requirements.txt"
+      - "backend/app/workers/Dockerfile"
       - ".github/workflows/deploy-workers.yml"
   workflow_dispatch:
 

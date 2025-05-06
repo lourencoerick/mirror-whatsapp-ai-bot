@@ -23,7 +23,7 @@ except ImportError as e:
 
 # LLM Client
 try:
-    from langchain_openai import ChatOpenAI
+    from langchain_openai import AzureChatOpenAI
     from langchain_core.language_models import BaseChatModel
 
     LANGCHAIN_AVAILABLE = True
@@ -34,7 +34,7 @@ except ImportError:
     class BaseChatModel:
         pass
 
-    class ChatOpenAI(BaseChatModel):
+    class AzureChatOpenAI(BaseChatModel):
         pass  # Dummy
 
 
@@ -215,8 +215,12 @@ async def startup(ctx: dict):
         try:
             # Ensure OPENAI_API_KEY is set in environment
             # Consider loading model name from settings
-            llm = ChatOpenAI(
-                model="gpt-4.1-mini", temperature=0.0
+            llm = AzureChatOpenAI(
+                model="gpt-4.1-mini",
+                temperature=0.0
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                api_key=settings.AZURE_OPENAI_API_KEY,
+                api_version="2025-01-01-preview",                
             )  # Model for extraction/planning
             ctx["llm"] = llm
             logger.info(f"LLM client ({llm.__class__.__name__}) initialized.")

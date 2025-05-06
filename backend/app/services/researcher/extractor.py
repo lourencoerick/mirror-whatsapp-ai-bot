@@ -26,12 +26,12 @@ except ImportError:
 # --- LangChain Core Imports ---
 try:
     from langchain_core.language_models import BaseChatModel
-    from langchain_openai import ChatOpenAI
+    from langchain_openai import AzureChatOpenAI
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     logger.error(
-        "LangChain core components (BaseChatModel, ChatOpenAI) not found. "
+        "LangChain core components (BaseChatModel, AzureChatOpenAI) not found. "
         "Please install langchain-core and langchain-openai: "
         "pip install langchain-core langchain-openai"
     )
@@ -40,7 +40,7 @@ except ImportError:
     class BaseChatModel:
         pass
 
-    class ChatOpenAI(BaseChatModel):
+    class AzureChatOpenAI(BaseChatModel):
         pass
 
 
@@ -150,7 +150,7 @@ async def extract_profile_from_text(
 
     Args:
         website_text: The text content extracted from the company's website.
-        llm: An instance of a LangChain BaseChatModel (e.g., ChatOpenAI).
+        llm: An instance of a LangChain BaseChatModel (e.g., AzureChatOpenAI).
         target_schema: The Pydantic schema to extract data into.
 
     Returns:
@@ -238,12 +238,18 @@ async def main_test():
 
     # --- LLM Setup (Replace with your actual setup) ---
     try:
-        llm = ChatOpenAI(model=DEFAULT_EXTRACTION_MODEL, temperature=0.0)
+        llm = AzureChatOpenAI(
+            azure_deployment=DEFAULT_EXTRACTION_MODEL,
+            temperature=0.0,
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            api_key=settings.AZURE_OPENAI_API_KEY,
+            api_version="2025-01-01-preview",
+        )
         await llm.ainvoke("test")  # Basic check
-        logger.info(f"Using actual ChatOpenAI model: {DEFAULT_EXTRACTION_MODEL}")
+        logger.info(f"Using actual AzureChatOpenAI model: {DEFAULT_EXTRACTION_MODEL}")
     except Exception as llm_exc:
         logger.error(
-            f"Failed to initialize or test ChatOpenAI. Ensure API key is set and valid. Error: {llm_exc}"
+            f"Failed to initialize or test AzureChatOpenAI. Ensure API key is set and valid. Error: {llm_exc}"
         )
         logger.warning("Skipping extraction test.")
         return
@@ -278,7 +284,7 @@ if __name__ == "__main__":
 
     if "OPENAI_API_KEY" not in os.environ:
         logger.warning(
-            "OPENAI_API_KEY environment variable not set. The test might fail if using ChatOpenAI."
+            "OPENAI_API_KEY environment variable not set. The test might fail if using AzureChatOpenAI."
         )
 
     try:

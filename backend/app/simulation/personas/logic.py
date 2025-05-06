@@ -9,7 +9,7 @@ from langchain_core.messages import (
 from loguru import logger
 from pydantic import ValidationError
 
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 
 
 from app.simulation.schemas.persona import (
@@ -18,10 +18,18 @@ from app.simulation.schemas.persona import (
 )
 from app.simulation.schemas.persona_state import PersonaState
 from app.models.simulation.simulation import SimulationOutcomeEnum
+from app.config import get_settings, Settings
 
+settings: Settings = get_settings()
 
 try:
-    persona_llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.6)
+    persona_llm = AzureChatOpenAI(
+        azure_deployment="gpt-4o-mini",
+        temperature=0.6,
+        azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+        api_key=settings.AZURE_OPENAI_API_KEY,
+        api_version="2025-01-01-preview",
+    )
     logger.info("Persona LLM (gpt-4o-mini) initialized successfully.")
 except Exception as e:
     logger.error(f"Failed to initialize Persona LLM: {e}")

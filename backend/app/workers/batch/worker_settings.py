@@ -63,7 +63,7 @@ except ImportError:
 
 # --- LLM / LangChain Imports (for Researcher, Knowledge Ingester) ---
 try:
-    from langchain_openai import ChatOpenAI
+    from langchain_openai import AzureChatOpenAI
     from langchain_core.language_models import BaseChatModel
 
     LANGCHAIN_AVAILABLE = True
@@ -72,7 +72,7 @@ except ImportError:
     LANGCHAIN_AVAILABLE = False
     logger.warning("LangChain components unavailable. Researcher/Ingester limited.")
     BaseChatModel = type("obj", (object,), {})  # type: ignore
-    ChatOpenAI = type("obj", (object,), {})  # type: ignore
+    AzureChatOpenAI = type("obj", (object,), {})  # type: ignore
 
 
 # --- Search Client Imports (for Researcher) ---
@@ -198,7 +198,7 @@ async def on_startup(ctx: Dict[str, Any]) -> None:
         ctx["db_session_factory"] = None
 
     # --- LLM Clients (General LLM & Embeddings for Researcher/Ingester) ---
-    if LANGCHAIN_AVAILABLE and ChatOpenAI:
+    if LANGCHAIN_AVAILABLE and AzureChatOpenAI:
         logger.info("Initializing LLM clients for Batch tasks...")
         try:
             openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -207,8 +207,12 @@ async def on_startup(ctx: Dict[str, Any]) -> None:
 
             # General LLM (used by Researcher, potentially Ingester)
             general_model = os.getenv("ARQ_GENERAL_LLM_MODEL", "gpt-4o-mini")
-            llm_general = ChatOpenAI(
-                model=general_model, temperature=0.0, api_key=openai_api_key
+            llm_general = AzureChatOpenAI(
+                model=general_model,
+                temperature=0.0,
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                api_key=settings.AZURE_OPENAI_API_KEY,
+                api_version="2025-01-01-preview",
             )
             ctx["llm"] = llm_general
             logger.info(f"General LLM client initialized: {general_model}")
