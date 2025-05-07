@@ -398,22 +398,32 @@ async def test_generator_selects_correct_prompt_for_ack_transition(
     """Testa se o prompt ACKNOWLEDGE_AND_TRANSITION correto é selecionado."""
     state = base_state_for_generator
     action: AgentActionType = "ACKNOWLEDGE_AND_TRANSITION"
-    params: AgentActionDetails = {}  # Parâmetros vazios, contexto vem do goal
+    off_topic_text = "Falando nisso, viu o jogo?"
+    previous_topic = "desafios atuais"
+
+    # --- FIX: Populate action_parameters like the Planner would ---
+    params: AgentActionDetails = {
+        "off_topic_text": off_topic_text,
+        "previous_goal_topic": previous_topic,
+    }
     state["next_agent_action_command"] = action
-    state["action_parameters"] = params
-    # Simular o goal atual e o anterior
+    state["action_parameters"] = params  # Set the parameters
+    # --- END FIX ---
+
+    # Setting current_agent_goal is less critical now for this specific test,
+    # but good for context if _prepare_common_prompt_context used it.
     previous_goal = AgentGoal(
         goal_type="INVESTIGATING_NEEDS",
-        goal_details={"topic": "desafios atuais"},
+        goal_details={"topic": previous_topic},  # Keep for consistency
         previous_goal_if_interrupted=None,
     )
     state["current_agent_goal"] = AgentGoal(
-        goal_type="ACKNOWLEDGE_AND_TRANSITION",  # Ou o goal temporário definido pelo planner
-        goal_details={"text": "Falando nisso, viu o jogo?"},  # Texto off-topic
+        goal_type="ACKNOWLEDGE_AND_TRANSITION",  # The goal set by Planner
+        goal_details={"text": off_topic_text, "reason": "Handling off-topic"},
         previous_goal_if_interrupted=previous_goal,
     )
 
-    common_context_mock = {"company_name": "Test"}
+    common_context_mock = {"company_name": "Test"}  # Example common context
     mock_prepare_context.return_value = common_context_mock
     expected_llm_response = "Entendido. Voltando aos desafios atuais que mencionou..."
     mock_call_llm.return_value = expected_llm_response
@@ -428,11 +438,12 @@ async def test_generator_selects_correct_prompt_for_ack_transition(
 
     assert call_kwargs["prompt"] == PROMPT_ACKNOWLEDGE_AND_TRANSITION
 
+    # This assertion should now pass as the generator reads from action_parameters
     expected_prompt_values = {
         **common_context_mock,
         **{
-            "off_topic_text": "Falando nisso, viu o jogo?",
-            "previous_goal_topic": "desafios atuais",  # Extraído do previous_goal
+            "off_topic_text": off_topic_text,
+            "previous_goal_topic": previous_topic,
         },
     }
     assert call_kwargs["prompt_values"] == expected_prompt_values

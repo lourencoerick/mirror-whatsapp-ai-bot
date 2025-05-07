@@ -96,44 +96,6 @@ class PendingAgentActionResponseAnalysis(BaseModel):
         extra = "forbid"
 
 
-class UserInputAnalysisOutput(BaseModel):
-    """
-    FINAL comprehensive structured output from the InputProcessor component,
-    after all analysis (including repetition checks) is complete.
-    This object will be used by the StateUpdater.
-    """
-
-    overall_intent: Literal[
-        "Greeting",
-        "Farewell",
-        "Questioning",
-        "StatingInformationOrOpinion",
-        "ExpressingObjection",
-        "ExpressingNeedOrPain",
-        "RespondingToAgent",
-        "VagueOrUnclear",
-        "OffTopic",
-        "PositiveFeedback",
-        "NegativeFeedback",
-        "RequestingClarificationFromAgent",
-    ] = Field(..., description="The primary, overall intent of the user's message.")
-
-    extracted_questions: List[ExtractedQuestionAnalysis] = (
-        Field(  # Uses the detailed analysis
-            default_factory=list,
-            description="All distinct questions identified, including their repetition analysis.",
-        )
-    )
-    extracted_objections: List[ExtractedObjection] = Field(default_factory=list)
-    extracted_needs_or_pains: List[ExtractedNeedOrPain] = Field(default_factory=list)
-    analysis_of_response_to_agent_action: PendingAgentActionResponseAnalysis
-    is_primarily_vague_statement: bool = Field(False)
-    is_primarily_off_topic: bool = Field(False)
-
-    class Config:
-        extra = "forbid"
-
-
 # --- Schemas for the INTERMEDIATE output of the first LLM call (extraction only) ---
 
 
@@ -163,6 +125,49 @@ class InitiallyExtractedQuestion(BaseModel):
         extra = "forbid"
 
 
+class ReactionToPresentation(BaseModel):
+    """Analysis of user's reaction if agent just presented a solution."""
+
+    reaction_type: Optional[
+        Literal[
+            "positive_interest",  # Ex: "Gostei!", "Parece bom", "Quero saber mais"
+            "specific_question",  # Fez pergunta sobre a solução apresentada
+            "new_objection_to_solution",  # Levantou objeção à solução apresentada
+            "neutral_or_vague",  # Ex: "Ok", "Entendi", "Vou pensar"
+            "off_topic_or_unrelated",
+            "not_applicable",  # Se o agente não acabou de apresentar uma solução
+        ]
+    ] = Field(
+        "not_applicable", description="User's reaction type to a solution presentation."
+    )
+    details: Optional[str] = Field(
+        None, description="Specific text of question or objection if applicable."
+    )
+
+
+class ObjectionAfterRebuttalStatus(BaseModel):
+    """Analysis of an objection's status after the agent attempted a rebuttal."""
+
+    # Qual objeção estava sendo tratada (texto da objeção original)
+    original_objection_text_handled: Optional[str] = Field(None)
+
+    status: Optional[
+        Literal[
+            "appears_resolved",  # Ex: "Ah, entendi agora!", "Faz sentido", cliente segue para compra
+            "still_persists",  # Cliente reitera a mesma objeção ou dúvida
+            "new_objection_raised",  # Cliente levanta uma objeção DIFERENTE
+            "unclear_still_evaluating",  # Cliente ainda está pensando, não deu sinal claro
+            "changed_topic",  # Cliente mudou de assunto, ignorando o rebuttal
+            "not_applicable",  # Se o agente não acabou de fazer um rebuttal
+        ]
+    ] = Field(
+        "not_applicable", description="Status of the objection after agent's rebuttal."
+    )
+    new_objection_text: Optional[str] = Field(
+        None, description="Text of the new objection, if raised."
+    )
+
+
 class InitialUserInputAnalysis(BaseModel):
     """
     Structured output from the *first LLM call* in the InputProcessor.
@@ -182,13 +187,70 @@ class InitialUserInputAnalysis(BaseModel):
         "PositiveFeedback",
         "NegativeFeedback",
         "RequestingClarificationFromAgent",
+        "PositiveFeedbackToProposal",
+        "NegativeFeedbackToProposal",
+        "RequestForNextStepInPurchase",
     ] = Field(..., description="The primary, overall intent of the user's message.")
 
     initially_extracted_questions: List[InitiallyExtractedQuestion] = Field(
         default_factory=list,
         description="Questions extracted, pending detailed repetition analysis.",
     )
+
+    reaction_to_solution_presentation: Optional[ReactionToPresentation] = Field(
+        default_factory=ReactionToPresentation,  # Default para not_applicable
+        description="Analysis of user's reaction if agent just presented a solution.",
+    )
+    objection_status_after_rebuttal: Optional[ObjectionAfterRebuttalStatus] = Field(
+        default_factory=ObjectionAfterRebuttalStatus,  # Default para not_applicable
+        description="Analysis of objection status if agent just made a rebuttal.",
+    )
     # The following fields are assumed to be extractable by the first LLM call directly
+    extracted_objections: List[ExtractedObjection] = Field(default_factory=list)
+    extracted_needs_or_pains: List[ExtractedNeedOrPain] = Field(default_factory=list)
+    analysis_of_response_to_agent_action: PendingAgentActionResponseAnalysis
+    is_primarily_vague_statement: bool = Field(False)
+    is_primarily_off_topic: bool = Field(False)
+
+    class Config:
+        extra = "forbid"
+
+
+class UserInputAnalysisOutput(BaseModel):
+    """
+    FINAL comprehensive structured output from the InputProcessor component,
+    after all analysis (including repetition checks) is complete.
+    This object will be used by the StateUpdater.
+    """
+
+    overall_intent: Literal[
+        "Greeting",
+        "Farewell",
+        "Questioning",
+        "StatingInformationOrOpinion",
+        "ExpressingObjection",
+        "ExpressingNeedOrPain",
+        "RespondingToAgent",
+        "VagueOrUnclear",
+        "OffTopic",
+        "PositiveFeedback",
+        "NegativeFeedback",
+        "RequestingClarificationFromAgent",
+        "PositiveFeedbackToProposal",
+        "NegativeFeedbackToProposal",
+        "RequestForNextStepInPurchase",
+    ] = Field(..., description="The primary, overall intent of the user's message.")
+
+    reaction_to_solution_presentation: Optional[ReactionToPresentation]
+    objection_status_after_rebuttal: Optional[ObjectionAfterRebuttalStatus]
+
+    extracted_questions: List[ExtractedQuestionAnalysis] = (
+        Field(  # Uses the detailed analysis
+            default_factory=list,
+            description="All distinct questions identified, including their repetition analysis.",
+        )
+    )
+
     extracted_objections: List[ExtractedObjection] = Field(default_factory=list)
     extracted_needs_or_pains: List[ExtractedNeedOrPain] = Field(default_factory=list)
     analysis_of_response_to_agent_action: PendingAgentActionResponseAnalysis

@@ -385,21 +385,13 @@ async def response_generator_node(
             )
             specific_values["vague_statement_text"] = vague_text
         elif action_command == "ACKNOWLEDGE_AND_TRANSITION":
-            off_topic_text = (
-                state.get("current_agent_goal", {})
-                .get("goal_details", {})
-                .get("text", "[Comentário off-topic não especificado]")
+
+            specific_values["off_topic_text"] = action_params.get(
+                "off_topic_text", "[comentário anterior]"
             )
-            previous_goal = state.get("current_agent_goal", {}).get(
-                "previous_goal_if_interrupted", {}
+            specific_values["previous_goal_topic"] = action_params.get(
+                "previous_goal_topic", "o assunto anterior"
             )
-            # Tentar extrair um tópico do objetivo anterior para a transição
-            # (Isso pode precisar de mais inteligência ou uma estrutura melhor no goal_details)
-            previous_goal_topic = previous_goal.get("goal_details", {}).get(
-                "topic", "o assunto anterior"
-            )
-            specific_values["off_topic_text"] = off_topic_text
-            specific_values["previous_goal_topic"] = previous_goal_topic
 
         elif action_command == "PRESENT_SOLUTION_OFFER":
             selected_prompt = PROMPT_PRESENT_SOLUTION_OFFER

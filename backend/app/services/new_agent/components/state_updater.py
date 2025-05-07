@@ -26,15 +26,32 @@ from ..schemas.input_analysis import (
 
 
 async def _log_missing_information_event(account_id, conversation_id, question_core):
+    """Logs an event when information is missing (placeholder)."""
     logger.warning(
         f"[Analytics Event - TODO] MISSING_INFORMATION: Account={account_id}, Conv={conversation_id}, Question='{question_core}'"
     )
+    # In a real implementation, this would send data to an analytics service.
     pass
 
 
 async def update_conversation_state_node(
     state: RichConversationState, config: Dict[str, Any]
 ) -> Dict[str, Any]:
+    """
+    Updates the conversation state based on the analysis of the user's input.
+
+    This node integrates the structured analysis from the InputProcessor into
+    the RichConversationState, updating the question log, dynamic customer
+    profile (needs, pains, objections), interruption queue, and other relevant
+    metadata for the next turn.
+
+    Args:
+        state: The current conversation state.
+        config: The graph configuration (not typically used directly here).
+
+    Returns:
+        A dictionary containing the state updates (delta).
+    """
     node_name = "update_conversation_state_node"
     logger.info(
         f"--- Starting Node: {node_name} (Turn: {state.get('current_turn_number', 0)}) ---"
@@ -61,19 +78,14 @@ async def update_conversation_state_node(
             "last_processing_error": f"State update failed: Invalid input analysis. Details: {e}"
         }
 
+    # --- Prepare working copies ---
     current_question_log = [
         entry.copy() for entry in state.get("customer_question_log", [])
     ]
-    current_interruptions = [
-        inter.copy() for inter in state.get("user_interruptions_queue", [])
-    ]
+    new_interruptions_this_turn: List[UserInterruption] = []
     current_dynamic_profile_dict = copy.deepcopy(
         state.get("customer_profile_dynamic", {})
     )
-
-    # Construir dynamic_profile_data como um dicionário
-    # A validação de tipo ocorre implicitamente ao acessar chaves esperadas pelo TypedDict
-    # e ao construir os TypedDicts internos como IdentifiedNeedEntry.
     dynamic_profile_data: DynamicCustomerProfile = {
         "identified_needs": [
             IdentifiedNeedEntry(**n)
@@ -100,29 +112,24 @@ async def update_conversation_state_node(
             "last_discerned_intent", None
         ),
     }
-    # Se você quiser forçar uma validação Pydantic aqui (embora TypedDict não tenha .model_validate):
-    try:
-        DynamicCustomerProfile(
-            **dynamic_profile_data
-        )  # Tenta construir para validar estrutura
-    except TypeError as te:
-        logger.error(
-            f"[{node_name}] Constructed dynamic_profile_data does not match TypedDict: {te}"
-        )
-        # Lidar com o erro, talvez resetando para um perfil vazio
-
     profile_changed = False
+    log_changed = False
+    processed_interrupt_texts = set()
 
+    # --- 0. Update Last Discerned Intent ---
     if analysis.overall_intent:
         if dynamic_profile_data.get("last_discerned_intent") != analysis.overall_intent:
             dynamic_profile_data["last_discerned_intent"] = analysis.overall_intent
             profile_changed = True
-            logger.debug(f"Updated last_discerned_intent to: {analysis.overall_intent}")
+            logger.debug(
+                f"[{node_name}] Updated last_discerned_intent to: {analysis.overall_intent}"
+            )
 
-    # --- 1. Processar Perguntas Extraídas ---
+    # --- 1. Process Extracted Questions ---
     newly_added_to_log_count = 0
     updated_log_entry_count = 0
-    questions_for_interrupt_queue_texts: List[str] = []
+    questions_to_interrupt: List[ExtractedQuestionAnalysis] = []
+
     for q_analysis in analysis.extracted_questions:
         log_entry_to_update = None
         if q_analysis.is_repetition and q_analysis.original_question_turn is not None:
@@ -135,10 +142,13 @@ async def update_conversation_state_node(
                 ):
                     log_entry_to_update = log_entry
                     break
+
         if log_entry_to_update:
-            new_status: CustomerQuestionStatusType = log_entry_to_update.get("status")
+            new_status: CustomerQuestionStatusType = log_entry_to_update.get("status")  # type: ignore
+            should_add_to_interrupt = False
             if q_analysis.status_of_original_answer == "answered_satisfactorily":
                 new_status = "repetition_after_satisfactory_answer"
+                should_add_to_interrupt = True
             elif q_analysis.status_of_original_answer == "answered_with_fallback":
                 new_status = "repetition_after_fallback"
                 await _log_missing_information_event(
@@ -146,16 +156,18 @@ async def update_conversation_state_node(
                     state.get("conversation_id"),
                     q_analysis.question_text,
                 )
+                should_add_to_interrupt = True
             else:
                 new_status = "repetition_after_fallback"
+                should_add_to_interrupt = True
+
             if log_entry_to_update.get("status") != new_status:
                 log_entry_to_update["status"] = new_status
                 updated_log_entry_count += 1
-            if new_status in [
-                "repetition_after_satisfactory_answer",
-                "repetition_after_fallback",
-            ]:
-                questions_for_interrupt_queue_texts.append(q_analysis.question_text)
+                log_changed = True
+
+            if should_add_to_interrupt:
+                questions_to_interrupt.append(q_analysis)
         else:
             current_question_log.append(
                 CustomerQuestionEntry(
@@ -169,55 +181,18 @@ async def update_conversation_state_node(
                 )
             )
             newly_added_to_log_count += 1
-            questions_for_interrupt_queue_texts.append(q_analysis.question_text)
-    if newly_added_to_log_count > 0 or updated_log_entry_count > 0:
+            log_changed = True
+            questions_to_interrupt.append(q_analysis)
+
+    if log_changed:
         updated_state_delta["customer_question_log"] = current_question_log
-
-    # --- 2. Processar Objeções Extraídas ---
-    logger.debug(
-        f"[{node_name}] P2 Start: initial identified_objections in dynamic_profile_data: {dynamic_profile_data.get('identified_objections')}"
-    )
-    identified_objections_list_p2 = dynamic_profile_data.setdefault(
-        "identified_objections", []
-    )
-
-    for obj_idx, obj_from_analysis in enumerate(analysis.extracted_objections):
         logger.debug(
-            f"[{node_name}] P2: Processing extracted_objection from analysis #{obj_idx}: '{obj_from_analysis.objection_text}'"
+            f"[{node_name}] Question log updated: {newly_added_to_log_count} added, {updated_log_entry_count} updated."
         )
 
-        is_duplicate = any(
-            existing_obj.get("text") == obj_from_analysis.objection_text
-            and existing_obj.get("status") in ["active", "addressing"]
-            for existing_obj in identified_objections_list_p2  # Checar contra a lista atual
-        )
-        logger.debug(
-            f"[{node_name}] P2: Is '{obj_from_analysis.objection_text}' duplicate in current list? {is_duplicate}"
-        )
-
-        if not is_duplicate:
-            new_objection_entry = IdentifiedObjectionEntry(
-                text=obj_from_analysis.objection_text,
-                status="active",
-                rebuttal_attempts=0,
-                source_turn=next_turn_number,
-                related_to_proposal=None,
-            )
-            identified_objections_list_p2.append(new_objection_entry)
-            profile_changed = True
-            logger.debug(
-                f"[{node_name}] P2: Added new objection: '{obj_from_analysis.objection_text}'. Current list: {identified_objections_list_p2}"
-            )
-        else:
-            logger.debug(
-                f"[{node_name}] P2: Objection '{obj_from_analysis.objection_text}' is a duplicate, not adding again in P2."
-            )
-
-    logger.debug(
-        f"[{node_name}] P2 End: final identified_objections in dynamic_profile_data: {dynamic_profile_data.get('identified_objections')}"
-    )
-
-    # --- 3. Processar Necessidades/Dores Extraídas ---
+    # --- 2. Process Extracted Needs and Pains ---
+    needs_added = 0
+    pains_added = 0
     for np in analysis.extracted_needs_or_pains:
         target_list_key = (
             "identified_needs" if np.type == "need" else "identified_pain_points"
@@ -235,120 +210,169 @@ async def update_conversation_state_node(
                     priority=None,
                     source_turn=next_turn_number,
                 )
+                needs_added += 1
             else:
                 entry_data = IdentifiedPainPointEntry(
                     text=np.text, status="active", source_turn=next_turn_number
                 )
+                pains_added += 1
             target_list_in_profile.append(entry_data)
             profile_changed = True
+    if needs_added > 0 or pains_added > 0:
+        logger.debug(
+            f"[{node_name}] Profile updated: {needs_added} needs, {pains_added} pains added."
+        )
 
-    # --- 4. Processar Status da Objeção Após Rebuttal ---
+    # --- REFINED OBJECTION HANDLING ---
+    objections_list = dynamic_profile_data.setdefault("identified_objections", [])
+    handled_original_objection_text: Optional[str] = None
+    was_persistence_detected = False
+    newly_raised_objection_text_after_rebuttal: Optional[str] = None
+    objections_added_this_turn_texts = set()  # Track texts added in this update
+
+    # 3. Process Status of Objection After Rebuttal FIRST
     if (
         analysis.objection_status_after_rebuttal
         and analysis.objection_status_after_rebuttal.status != "not_applicable"
         and analysis.objection_status_after_rebuttal.original_objection_text_handled
     ):
-        original_obj_text = (
+        original_obj_text_handled = (
             analysis.objection_status_after_rebuttal.original_objection_text_handled
         )
         new_status_from_analysis = analysis.objection_status_after_rebuttal.status
-        new_obj_text = analysis.objection_status_after_rebuttal.new_objection_text
-
-        found_and_updated_original_objection = False
-        identified_objections_list_p4 = dynamic_profile_data.setdefault(
-            "identified_objections", []
+        new_obj_text_if_raised = (
+            analysis.objection_status_after_rebuttal.new_objection_text
         )
-        for i, obj_entry_dict in enumerate(identified_objections_list_p4):
-            if obj_entry_dict.get("text") == original_obj_text and obj_entry_dict.get(
-                "status"
-            ) not in ["resolved", "ignored"]:
-                logger.debug(
-                    f"[{node_name}] P4: Updating status for objection: '{original_obj_text[:50]}...' to '{new_status_from_analysis}'"
-                )
-                original_obj_status_before_update = obj_entry_dict.get("status")
-                current_rebuttal_attempts = obj_entry_dict.get("rebuttal_attempts", 0)
+        handled_original_objection_text = original_obj_text_handled
 
-                if new_status_from_analysis == "appears_resolved":
-                    identified_objections_list_p4[i]["status"] = "resolved"
-                    current_interruptions = [
-                        inter
-                        for inter in current_interruptions
-                        if not (
-                            inter.get("type") == "objection"
-                            and inter.get("text") == original_obj_text
-                        )
-                    ]
-                elif new_status_from_analysis == "still_persists":
-                    identified_objections_list_p4[i]["status"] = "active"
-                    # Remover depois de testar sem e funcionar, entender o pq
-                    # identified_objections_list_p4[i]["rebuttal_attempts"] = (
-                    #     current_rebuttal_attempts + 1
-                    # )
-                    logger.debug(
-                        f"[{node_name}] P4: Objection '{original_obj_text[:50]}' updated to active, attempts incremented."
-                    )
-                elif (
-                    new_status_from_analysis == "new_objection_raised" and new_obj_text
-                ):
-                    identified_objections_list_p4[i]["status"] = "ignored"
-                    is_new_obj_duplicate = any(
-                        eo.get("text") == new_obj_text
-                        and eo.get("status") in ["active", "addressing"]
-                        for eo in identified_objections_list_p4
-                    )
-                    if not is_new_obj_duplicate:
-                        identified_objections_list_p4.append(
-                            IdentifiedObjectionEntry(
-                                text=new_obj_text,
-                                status="active",
-                                rebuttal_attempts=0,
-                                source_turn=next_turn_number,
-                                related_to_proposal=None,
-                            )
-                        )
-                elif new_status_from_analysis in [
-                    "unclear_still_evaluating",
-                    "changed_topic",
-                ]:
-                    identified_objections_list_p4[i]["status"] = "active"
-
-                # Checar se houve mudança real para setar profile_changed
-                if (
-                    identified_objections_list_p4[i].get("status")
-                    != original_obj_status_before_update
-                    or identified_objections_list_p4[i].get("rebuttal_attempts")
-                    != current_rebuttal_attempts
-                ):
-                    profile_changed = True
-                found_and_updated_original_objection = True
+        original_obj_index = -1
+        for i, obj_entry in enumerate(objections_list):
+            if obj_entry.get("text") == original_obj_text_handled:
+                original_obj_index = i
                 break
 
-        if (
-            not found_and_updated_original_objection
-            and new_status_from_analysis == "new_objection_raised"
-            and new_obj_text
-        ):
-            identified_objections_list_p4 = dynamic_profile_data.setdefault(
-                "identified_objections", []
+        if original_obj_index != -1:
+            logger.debug(
+                f"[{node_name}] P3: Found original objection '{original_obj_text_handled}' at index {original_obj_index} to update based on status '{new_status_from_analysis}'."
             )
-            is_new_obj_duplicate = any(
-                eo.get("text") == new_obj_text
-                and eo.get("status") in ["active", "addressing"]
-                for eo in identified_objections_list_p4
+            original_obj_status_before_update = objections_list[original_obj_index].get(
+                "status"
             )
-            if not is_new_obj_duplicate:
-                identified_objections_list_p4.append(
-                    IdentifiedObjectionEntry(
-                        text=new_obj_text,
-                        status="active",
-                        rebuttal_attempts=0,
-                        source_turn=next_turn_number,
-                        related_to_proposal=None,
-                    )
-                )
-                profile_changed = True
 
-    # --- 5. Processar Reação à Apresentação de Solução ---
+            if new_status_from_analysis == "appears_resolved":
+                objections_list[original_obj_index]["status"] = "resolved"
+            elif new_status_from_analysis == "still_persists":
+                objections_list[original_obj_index]["status"] = "active"
+                was_persistence_detected = (
+                    True  # Flag that persistence was handled for the original objection
+                )
+            elif new_status_from_analysis == "new_objection_raised":
+                objections_list[original_obj_index]["status"] = "ignored"
+                if new_obj_text_if_raised:
+                    newly_raised_objection_text_after_rebuttal = new_obj_text_if_raised
+            elif new_status_from_analysis in [
+                "unclear_still_evaluating",
+                "changed_topic",
+            ]:
+                objections_list[original_obj_index][
+                    "status"
+                ] = "active"  # Treat as active/persistent
+
+            if (
+                objections_list[original_obj_index].get("status")
+                != original_obj_status_before_update
+            ):
+                profile_changed = True
+                logger.debug(
+                    f"[{node_name}] P3: Updated status of '{original_obj_text_handled}' from '{original_obj_status_before_update}' to '{objections_list[original_obj_index]['status']}'."
+                )
+        else:
+            logger.warning(
+                f"[{node_name}] P3: Could not find original objection '{original_obj_text_handled}' in profile to update status based on rebuttal analysis."
+            )
+            if (
+                new_status_from_analysis == "new_objection_raised"
+                and new_obj_text_if_raised
+            ):
+                newly_raised_objection_text_after_rebuttal = new_obj_text_if_raised
+
+    # 4. Process Extracted Objections (from current input)
+    objections_added_from_extraction = 0
+    for obj_from_analysis in analysis.extracted_objections:
+        # Skip if this objection text was already identified as the 'newly_raised_objection_text_after_rebuttal'
+        if (
+            newly_raised_objection_text_after_rebuttal
+            and obj_from_analysis.objection_text
+            == newly_raised_objection_text_after_rebuttal
+        ):
+            logger.debug(
+                f"[{node_name}] P4: Skipping extracted objection '{obj_from_analysis.objection_text}' as it was handled as 'new_objection_raised' after rebuttal."
+            )
+            continue
+
+        # Skip if persistence was detected for the original objection. Assume this extracted text is just a rephrasing.
+        if was_persistence_detected:
+            logger.debug(
+                f"[{node_name}] P4: Skipping extracted objection '{obj_from_analysis.objection_text}' because persistence of original objection '{handled_original_objection_text}' was detected."
+            )
+            continue
+
+        # Check for duplicates among existing active/addressing objections
+        is_duplicate = any(
+            existing_obj.get("text") == obj_from_analysis.objection_text
+            and existing_obj.get("status") in ["active", "addressing"]
+            for existing_obj in objections_list
+        )
+        if not is_duplicate:
+            new_objection_entry = IdentifiedObjectionEntry(
+                text=obj_from_analysis.objection_text,
+                status="active",
+                rebuttal_attempts=0,
+                source_turn=next_turn_number,
+                related_to_proposal=None,  # Default
+            )
+            objections_list.append(new_objection_entry)
+            objections_added_from_extraction += 1
+            objections_added_this_turn_texts.add(
+                obj_from_analysis.objection_text
+            )  # Track added text
+            profile_changed = True
+
+    # Add the newly raised objection from the rebuttal analysis if it wasn't added above and isn't duplicate
+    if (
+        newly_raised_objection_text_after_rebuttal
+        and newly_raised_objection_text_after_rebuttal
+        not in objections_added_this_turn_texts
+    ):
+        is_new_duplicate = any(
+            eo.get("text") == newly_raised_objection_text_after_rebuttal
+            and eo.get("status") in ["active", "addressing"]
+            for eo in objections_list
+        )
+        if not is_new_duplicate:
+            objections_list.append(
+                IdentifiedObjectionEntry(
+                    text=newly_raised_objection_text_after_rebuttal,
+                    status="active",
+                    rebuttal_attempts=0,
+                    source_turn=next_turn_number,
+                    related_to_proposal=None,
+                )
+            )
+            profile_changed = True
+            objections_added_this_turn_texts.add(
+                newly_raised_objection_text_after_rebuttal
+            )
+            logger.debug(
+                f"[{node_name}] Added new objection '{newly_raised_objection_text_after_rebuttal}' from rebuttal analysis."
+            )
+
+    if objections_added_from_extraction > 0:
+        logger.debug(
+            f"[{node_name}] Profile updated: {objections_added_from_extraction} new objections added from direct extraction."
+        )
+
+    # 5. Process Reaction to Solution Presentation
     if (
         analysis.reaction_to_solution_presentation
         and analysis.reaction_to_solution_presentation.reaction_type != "not_applicable"
@@ -359,107 +383,159 @@ async def update_conversation_state_node(
         )
         if reaction.reaction_type == "new_objection_to_solution" and reaction.details:
             obj_text_from_reaction = reaction.details
-            identified_objections_list_p5 = dynamic_profile_data.setdefault(
+            objections_list_p5 = dynamic_profile_data.setdefault(
                 "identified_objections", []
             )
-            found_and_updated = False
-            for i, obj_entry_dict in enumerate(identified_objections_list_p5):
-                if obj_entry_dict.get("text") == obj_text_from_reaction:
-                    if obj_entry_dict.get("related_to_proposal") is not True:
-                        identified_objections_list_p5[i]["related_to_proposal"] = True
+            found_existing_objection = False
+            for i, obj_entry in enumerate(objections_list_p5):
+                if obj_entry.get("text") == obj_text_from_reaction:
+                    if obj_entry.get("related_to_proposal") is not True:
+                        objections_list_p5[i]["related_to_proposal"] = True
                         profile_changed = True
-                    found_and_updated = True
+                        logger.debug(
+                            f"[{node_name}] Marked existing objection '{obj_text_from_reaction[:50]}' as related to proposal."
+                        )
+                    found_existing_objection = True
                     break
-            if not found_and_updated:
-                identified_objections_list_p5.append(
-                    IdentifiedObjectionEntry(
-                        text=obj_text_from_reaction,
-                        status="active",
-                        rebuttal_attempts=0,
-                        source_turn=next_turn_number,
-                        related_to_proposal=True,
-                    )
+            if not found_existing_objection:
+                # Add it as a new objection if not already added
+                is_duplicate = any(
+                    existing_obj.get("text") == obj_text_from_reaction
+                    and existing_obj.get("status") in ["active", "addressing"]
+                    for existing_obj in objections_list_p5
                 )
-                profile_changed = True
-        # ... (outros casos de reaction) ...
+                if (
+                    not is_duplicate
+                    and obj_text_from_reaction not in objections_added_this_turn_texts
+                ):
+                    objections_list_p5.append(
+                        IdentifiedObjectionEntry(
+                            text=obj_text_from_reaction,
+                            status="active",
+                            rebuttal_attempts=0,
+                            source_turn=next_turn_number,
+                            related_to_proposal=True,
+                        )
+                    )
+                    profile_changed = True
+                    objections_added_this_turn_texts.add(obj_text_from_reaction)
+                    logger.debug(
+                        f"[{node_name}] Added new objection '{obj_text_from_reaction[:50]}' from presentation reaction."
+                    )
 
-    if profile_changed:
-        updated_state_delta["customer_profile_dynamic"] = dynamic_profile_data
+    # --- 6. Update Interruption Queue (Consolidated) ---
+    # Rebuild the queue based on the final state of questions and objections
 
-    # --- 6. Atualizar Fila de Interrupções (Consolidado) ---
-    # ... (lógica como antes, usando dynamic_profile_data.get("identified_objections", [])) ...
-    for q_text in questions_for_interrupt_queue_texts:
-        if not any(
-            inter.get("text") == q_text and inter.get("type") == "direct_question"
-            for inter in current_interruptions
-        ):
-            current_interruptions.append(
+    # Add questions needing attention
+    for q_analysis in questions_to_interrupt:
+        if q_analysis.question_text not in processed_interrupt_texts:
+            new_interruptions_this_turn.append(
                 UserInterruption(
                     type="direct_question",
-                    text=q_text,
+                    text=q_analysis.question_text,
                     status="pending_resolution",
                     turn_detected=next_turn_number,
                 )
             )
-    for obj_entry_dict in dynamic_profile_data.get("identified_objections", []):
-        if obj_entry_dict.get("status") == "active":
-            if not any(
-                inter.get("text") == obj_entry_dict.get("text")
-                and inter.get("type") == "objection"
-                for inter in current_interruptions
-            ):
-                current_interruptions.append(
-                    UserInterruption(
-                        type="objection",
-                        text=obj_entry_dict.get("text", ""),
-                        status="pending_resolution",
-                        turn_detected=next_turn_number,
-                    )
-                )
-    if analysis.is_primarily_vague_statement:
-        if not any(
-            inter.get("type") == "vague_statement"
-            and inter.get("turn_detected") == next_turn_number
-            for inter in current_interruptions
-        ):
-            current_interruptions.append(
-                UserInterruption(
-                    type="vague_statement",
-                    text=state.get("current_user_input_text", ""),
-                    status="pending_resolution",
-                    turn_detected=next_turn_number,
-                )
-            )
-    if analysis.is_primarily_off_topic:
-        if not any(
-            inter.get("type") == "off_topic_comment"
-            and inter.get("turn_detected") == next_turn_number
-            for inter in current_interruptions
-        ):
-            current_interruptions.append(
-                UserInterruption(
-                    type="off_topic_comment",
-                    text=state.get("current_user_input_text", ""),
-                    status="pending_resolution",
-                    turn_detected=next_turn_number,
-                )
-            )
-    if current_interruptions != state.get(
-        "user_interruptions_queue", []
-    ):  # Comparar com a fila original do estado
-        updated_state_delta["user_interruptions_queue"] = current_interruptions
+            processed_interrupt_texts.add(q_analysis.question_text)
 
-    # --- 7. Processar Análise da Resposta à Ação do Agente ---
+    # Add ACTIVE objections from the *updated* profile
+    for obj_entry in dynamic_profile_data.get("identified_objections", []):
+        obj_text = obj_entry.get("text", "")
+        if (
+            obj_entry.get("status") == "active"
+            and obj_text not in processed_interrupt_texts
+        ):
+            new_interruptions_this_turn.append(
+                UserInterruption(
+                    type="objection",
+                    text=obj_text,
+                    status="pending_resolution",
+                    turn_detected=obj_entry.get(
+                        "source_turn", next_turn_number
+                    ),  # Use source turn if available
+                )
+            )
+            processed_interrupt_texts.add(obj_text)
+
+    # Add vague/off-topic flags
+    if (
+        analysis.is_primarily_vague_statement
+        and "vague" not in processed_interrupt_texts
+    ):
+        vague_text = state.get("current_user_input_text", "[vague statement]")
+        new_interruptions_this_turn.append(
+            UserInterruption(
+                type="vague_statement",
+                text=vague_text,
+                status="pending_resolution",
+                turn_detected=next_turn_number,
+            )
+        )
+        processed_interrupt_texts.add("vague")
+
+    if analysis.is_primarily_off_topic and "off_topic" not in processed_interrupt_texts:
+        off_topic_text = state.get("current_user_input_text", "[off-topic comment]")
+        new_interruptions_this_turn.append(
+            UserInterruption(
+                type="off_topic_comment",
+                text=off_topic_text,
+                status="pending_resolution",
+                turn_detected=next_turn_number,
+            )
+        )
+        processed_interrupt_texts.add("off_topic")
+
+    # Only update the state delta if the queue has actually changed
+    # Compare based on content, not just object identity
+    current_queue_repr = sorted(
+        [str(item) for item in state.get("user_interruptions_queue", [])]
+    )
+    new_queue_repr = sorted([str(item) for item in new_interruptions_this_turn])
+    if new_queue_repr != current_queue_repr:
+        updated_state_delta["user_interruptions_queue"] = new_interruptions_this_turn
+        logger.debug(
+            f"[{node_name}] Interrupt queue updated: {len(new_interruptions_this_turn)} items."
+        )
+
+    # --- 7. Process Analysis of Response to Agent Action ---
     logger.debug(
-        f"Analysis of user response to agent action: {analysis.analysis_of_response_to_agent_action.user_response_to_agent_action}"
+        f"[{node_name}] Analysis of user response to agent action: {analysis.analysis_of_response_to_agent_action.user_response_to_agent_action}"
     )
 
-    # --- 8. Atualizar Metadados e Limpeza ---
+    # --- 8. Final Updates and Cleanup ---
+    if profile_changed:
+        # Convert back to plain dicts if necessary for state serialization
+        # (TypedDicts are structurally dicts, so this might not be needed depending on LangGraph/checkpointer)
+        updated_state_delta["customer_profile_dynamic"] = {
+            "identified_needs": [
+                dict(n) for n in dynamic_profile_data.get("identified_needs", [])
+            ],
+            "identified_pain_points": [
+                dict(p) for p in dynamic_profile_data.get("identified_pain_points", [])
+            ],
+            "identified_objections": [
+                dict(o) for o in dynamic_profile_data.get("identified_objections", [])
+            ],
+            "certainty_levels": dynamic_profile_data.get("certainty_levels"),
+            "last_discerned_intent": dynamic_profile_data.get("last_discerned_intent"),
+        }
+
     updated_state_delta["last_interaction_timestamp"] = time.time()
     updated_state_delta["user_input_analysis_result"] = None
     updated_state_delta["last_processing_error"] = None
 
     logger.info(f"[{node_name}] State update complete for Turn {next_turn_number}.")
     logger.debug(f"[{node_name}] State delta keys: {list(updated_state_delta.keys())}")
+    if profile_changed:
+        logger.trace(
+            f"[{node_name}] Updated dynamic profile: {updated_state_delta.get('customer_profile_dynamic')}"
+        )
+    if log_changed:
+        logger.trace(f"[{node_name}] Updated question log: {current_question_log}")
+    if "user_interruptions_queue" in updated_state_delta:
+        logger.trace(
+            f"[{node_name}] Updated interrupt queue: {updated_state_delta['user_interruptions_queue']}"
+        )
 
     return updated_state_delta

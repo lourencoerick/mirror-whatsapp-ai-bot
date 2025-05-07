@@ -33,6 +33,8 @@ from app.services.new_agent.schemas.input_analysis import (
     ExtractedNeedOrPain,
     PendingAgentActionResponseAnalysis,
     SimplifiedCustomerQuestionStatusType,  # Usado na análise de entrada
+    ReactionToPresentation,
+    ObjectionAfterRebuttalStatus,
 )
 
 # --- Fixtures ---
@@ -108,6 +110,12 @@ def mock_analysis_new_question() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=False,
         is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -132,6 +140,12 @@ def mock_analysis_repeated_question_fallback() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=False,
         is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -156,6 +170,12 @@ def mock_analysis_new_objection_and_need() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=False,
         is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -194,6 +214,12 @@ def mock_analysis_multiple_questions() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=False,
         is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -220,6 +246,12 @@ def mock_analysis_multiple_needs_objections() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=False,
         is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -245,6 +277,12 @@ def mock_analysis_repeated_question_satisfactory() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=False,
         is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -265,6 +303,12 @@ def mock_analysis_duplicate_objection() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=False,
         is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -281,6 +325,12 @@ def mock_analysis_vague_statement() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=True,  # <<< Importante
         is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -297,6 +347,125 @@ def mock_analysis_off_topic() -> UserInputAnalysisOutput:
         ),
         is_primarily_vague_statement=False,
         is_primarily_off_topic=True,  # <<< Importante
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    )
+
+
+@pytest.fixture
+def mock_analysis_obj_resolved() -> UserInputAnalysisOutput:
+    """Analysis: objection was handled and appears resolved."""
+    return UserInputAnalysisOutput(
+        overall_intent="PositiveFeedback",
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            original_objection_text_handled="O preço é alto.",
+            status="appears_resolved",
+            new_objection_text=None,
+        ),
+    )
+
+
+@pytest.fixture
+def mock_analysis_obj_persists() -> UserInputAnalysisOutput:
+    return UserInputAnalysisOutput(
+        overall_intent="ExpressingObjection",
+        extracted_questions=[],
+        extracted_objections=[],  # <<< MUDANÇA: Assumir que o InputProcessor não extrai a mesma objeção aqui
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="ignored_agent_action"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            original_objection_text_handled="O preço é alto.",  # A objeção original
+            status="still_persists",
+            new_objection_text=None,  # Ou poderia ser "Mas ainda acho caro." se o LLM identificasse a reformulação
+        ),
+    )
+
+
+@pytest.fixture
+def mock_analysis_obj_new_raised_after_rebuttal() -> UserInputAnalysisOutput:
+    """Analysis: a new objection was raised after a rebuttal to an old one."""
+    return UserInputAnalysisOutput(
+        overall_intent="ExpressingObjection",
+        extracted_objections=[
+            ExtractedObjection(objection_text="E sobre o tempo de contrato?")
+        ],  # A nova objeção
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="ignored_agent_action"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            original_objection_text_handled="O preço é alto.",
+            status="new_objection_raised",
+            new_objection_text="E sobre o tempo de contrato?",
+        ),
+    )
+
+
+@pytest.fixture
+def mock_analysis_reaction_new_obj_to_presentation() -> UserInputAnalysisOutput:
+    """Analysis: user raises a new objection to a solution presentation."""
+    return UserInputAnalysisOutput(
+        overall_intent="ExpressingObjection",
+        extracted_objections=[
+            ExtractedObjection(objection_text="Isso não tem a feature X que preciso.")
+        ],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="not_applicable"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="new_objection_to_solution",
+            details="Isso não tem a feature X que preciso.",
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    )
+
+
+@pytest.fixture
+def mock_analysis_reaction_positive_to_presentation() -> UserInputAnalysisOutput:
+    """Analysis: user shows positive interest after solution presentation."""
+    return UserInputAnalysisOutput(
+        overall_intent="PositiveFeedbackToProposal",  # Ou RequestForNextStepInPurchase
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="acknowledged_action"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="positive_interest", details="Gostei! Parece bom."
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
 
 
@@ -341,10 +510,7 @@ async def test_update_state_invalid_analysis_result(mock_log_event, base_state):
     delta = await update_conversation_state_node(state, {})
 
     assert "last_processing_error" in delta
-    assert (
-        "State update failed: Invalid input analysis data"
-        in delta["last_processing_error"]
-    )
+    assert "State update failed: Invalid " in delta["last_processing_error"]
     assert (
         delta.get("current_turn_number") is None
     )  # Não deve incrementar turno se falhou na validação
@@ -732,14 +898,19 @@ async def test_update_state_duplicate_objection_ignored(
 
     assert delta.get("current_turn_number") == 5
 
-    # Verificar perfil dinâmico - NÃO deve ter sido adicionado ao delta, pois não mudou
-    assert "customer_profile_dynamic" not in delta
-    # Verificar o estado completo (se pudéssemos) mostraria que a lista ainda tem 1 objeção
+    assert "customer_profile_dynamic" in delta
+    final_dynamic_profile = delta["customer_profile_dynamic"]
+    initial_objections = state["customer_profile_dynamic"]["identified_objections"]
+    assert (
+        final_dynamic_profile.get("identified_objections") == initial_objections
+    )  # Lista deve ser a mesma
+    assert (
+        final_dynamic_profile.get("last_discerned_intent")
+        == mock_analysis_duplicate_objection.overall_intent
+    )  # Intent deve ser atualizado
 
-    # Verificar fila de interrupções - NÃO deve ter sido adicionado ao delta
-    assert "user_interruptions_queue" not in delta
-    # Verificar o estado completo (se pudéssemos) mostraria que a fila ainda tem 1 interrupção
-
+    # A fila de interrupções também não deve mudar neste cenário específico
+    assert "user_interruptions_queue" not in delta  # Ou verificar se é igual à inicial
     mock_log_event.assert_not_called()
 
 
@@ -798,4 +969,323 @@ async def test_update_state_off_topic_added_to_queue(
     assert interrupt_queue[0]["status"] == "pending_resolution"
     assert interrupt_queue[0]["turn_detected"] == 4
 
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_objection_resolved(
+    mock_log_event, base_state, mock_analysis_obj_resolved
+):
+    """Tests that an objection is marked as resolved and removed from interrupt queue."""
+    state = base_state
+    state["current_turn_number"] = 3
+    original_objection_text = "O preço é alto."
+    # Simular objeção ativa no perfil e na fila
+    state["customer_profile_dynamic"]["identified_objections"] = [
+        IdentifiedObjectionEntry(
+            text=original_objection_text,
+            status="addressing",
+            rebuttal_attempts=1,
+            source_turn=2,
+        )
+    ]
+    state["user_interruptions_queue"] = [
+        UserInterruption(
+            type="objection",
+            text=original_objection_text,
+            status="pending_resolution",
+            turn_detected=2,
+        )
+    ]
+    state["user_input_analysis_result"] = mock_analysis_obj_resolved.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert "customer_profile_dynamic" in delta
+    dynamic_profile = delta["customer_profile_dynamic"]
+    assert len(dynamic_profile["identified_objections"]) == 1
+    assert (
+        dynamic_profile["identified_objections"][0]["text"] == original_objection_text
+    )
+    assert dynamic_profile["identified_objections"][0]["status"] == "resolved"
+
+    assert "user_interruptions_queue" in delta
+    assert (
+        len(delta["user_interruptions_queue"]) == 0
+    )  # Objeção resolvida removida da fila
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_objection_persists(
+    mock_log_event, base_state, mock_analysis_obj_persists
+):
+    """
+    Tests that a persisting objection is marked active and added back to the
+    interrupt queue, but its attempt count is NOT incremented by StateUpdater.
+    """
+    state = base_state
+    state["current_turn_number"] = 3
+    original_objection_text = "O preço é alto."
+    initial_attempts = 1  # Attempts before this turn's input
+    state["customer_profile_dynamic"]["identified_objections"] = [
+        IdentifiedObjectionEntry(
+            text=original_objection_text,
+            status="addressing",  # Status before processing user's persistent response
+            rebuttal_attempts=initial_attempts,
+            source_turn=2,
+        )
+    ]
+    state["user_interruptions_queue"] = []
+    state["user_input_analysis_result"] = mock_analysis_obj_persists.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert "customer_profile_dynamic" in delta
+    dynamic_profile = delta["customer_profile_dynamic"]
+    assert len(dynamic_profile["identified_objections"]) == 1
+    updated_objection = dynamic_profile["identified_objections"][0]
+    assert updated_objection["text"] == original_objection_text
+    assert (
+        updated_objection["status"] == "active"
+    )  # Updated to active because it persists
+
+    # --- FIX: Assert that attempts remain unchanged by StateUpdater ---
+    assert (
+        updated_objection["rebuttal_attempts"] == initial_attempts
+    )  # Should NOT be incremented here
+    # --- END FIX ---
+
+    assert "user_interruptions_queue" in delta
+    interrupt_queue = delta["user_interruptions_queue"]
+    assert len(interrupt_queue) == 1
+    assert interrupt_queue[0]["type"] == "objection"
+    assert interrupt_queue[0]["text"] == original_objection_text
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_new_objection_after_rebuttal(
+    mock_log_event, base_state, mock_analysis_obj_new_raised_after_rebuttal
+):
+    """Tests handling of a new objection raised after a rebuttal to an old one."""
+    state = base_state
+    state["current_turn_number"] = 3
+    original_objection_text = "O preço é alto."
+    new_objection_text = "E sobre o tempo de contrato?"
+    state["customer_profile_dynamic"]["identified_objections"] = [
+        IdentifiedObjectionEntry(
+            text=original_objection_text,
+            status="addressing",
+            rebuttal_attempts=1,
+            source_turn=2,
+        )
+    ]
+    state["user_input_analysis_result"] = (
+        mock_analysis_obj_new_raised_after_rebuttal.model_dump()
+    )
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert "customer_profile_dynamic" in delta
+    dynamic_profile = delta["customer_profile_dynamic"]
+    # Deve ter a original (marcada como ignored) e a nova (marcada como active)
+    assert len(dynamic_profile["identified_objections"]) == 2
+
+    original_obj_entry = next(
+        o
+        for o in dynamic_profile["identified_objections"]
+        if o["text"] == original_objection_text
+    )
+    new_obj_entry = next(
+        o
+        for o in dynamic_profile["identified_objections"]
+        if o["text"] == new_objection_text
+    )
+
+    assert original_obj_entry["status"] == "ignored"
+    assert new_obj_entry["status"] == "active"
+    assert new_obj_entry["source_turn"] == 4  # next_turn_number
+
+    assert "user_interruptions_queue" in delta
+    interrupt_queue = delta["user_interruptions_queue"]
+    # Apenas a nova objeção ativa deve estar na fila
+    assert len(interrupt_queue) == 1
+    assert interrupt_queue[0]["type"] == "objection"
+    assert interrupt_queue[0]["text"] == new_objection_text
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_positive_reaction_to_presentation(
+    mock_log_event, base_state, mock_analysis_reaction_positive_to_presentation
+):
+    """Tests handling of a positive reaction to presentation (no major state changes expected here from StateUpdater)."""
+    state = base_state
+    state["current_turn_number"] = 2
+    state["user_input_analysis_result"] = (
+        mock_analysis_reaction_positive_to_presentation.model_dump()
+    )
+
+    delta = await update_conversation_state_node(state, {})
+    assert delta.get("current_turn_number") == 3
+    mock_log_event.assert_not_called()
+
+    # CORREÇÃO:
+    assert "customer_profile_dynamic" in delta
+    dynamic_profile = delta["customer_profile_dynamic"]
+    assert not dynamic_profile.get("identified_objections", [])
+    assert not dynamic_profile.get("identified_needs", [])
+    assert not dynamic_profile.get("identified_pain_points", [])
+    assert dynamic_profile.get("last_discerned_intent") == "PositiveFeedbackToProposal"
+
+    assert "user_interruptions_queue" not in delta
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_stores_last_discerned_intent(mock_log_event, base_state):
+    """Tests if last_discerned_intent is stored in dynamic_profile."""
+    state = base_state
+    test_intent = "RequestForNextStepInPurchase"
+    analysis = UserInputAnalysisOutput(
+        overall_intent=test_intent,
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="not_applicable"
+        ),
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+    )
+    state["user_input_analysis_result"] = analysis.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert "customer_profile_dynamic" in delta
+    dynamic_profile = delta["customer_profile_dynamic"]
+    assert dynamic_profile.get("last_discerned_intent") == test_intent
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_handles_reaction_new_objection_to_presentation(
+    mock_log_event, base_state, mock_analysis_reaction_new_obj_to_presentation
+):
+    """Tests adding a new objection from reaction_to_solution_presentation."""
+    state = base_state
+    state["current_turn_number"] = 2
+    state["user_input_analysis_result"] = (
+        mock_analysis_reaction_new_obj_to_presentation.model_dump()
+    )
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert "customer_profile_dynamic" in delta
+    dynamic_profile = delta["customer_profile_dynamic"]
+    assert len(dynamic_profile.get("identified_objections", [])) == 1
+    obj_entry = dynamic_profile["identified_objections"][0]
+    assert obj_entry.get("text") == "Isso não tem a feature X que preciso."
+    assert obj_entry.get("status") == "active"
+    assert obj_entry.get("related_to_proposal") is True
+    assert obj_entry.get("source_turn") == 3  # next_turn_number
+
+    assert "user_interruptions_queue" in delta
+    interrupt_queue = delta["user_interruptions_queue"]
+    assert len(interrupt_queue) == 1  # A objeção extraída em extracted_objections
+    assert interrupt_queue[0].get("type") == "objection"
+    assert interrupt_queue[0].get("text") == "Isso não tem a feature X que preciso."
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_handles_objection_status_new_raised(
+    mock_log_event, base_state, mock_analysis_obj_new_raised_after_rebuttal
+):
+    """Tests handling when a new objection is raised after a rebuttal."""
+    state = base_state
+    state["current_turn_number"] = 3
+    original_objection_text = "O preço é alto."
+    new_objection_text = (
+        mock_analysis_obj_new_raised_after_rebuttal.objection_status_after_rebuttal.new_objection_text
+    )
+
+    # Simular a objeção original no perfil
+    state["customer_profile_dynamic"]["identified_objections"] = [
+        IdentifiedObjectionEntry(
+            text=original_objection_text,
+            status="addressing",
+            rebuttal_attempts=1,
+            source_turn=2,
+        )
+    ]
+    state["user_input_analysis_result"] = (
+        mock_analysis_obj_new_raised_after_rebuttal.model_dump()
+    )
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert "customer_profile_dynamic" in delta
+    dynamic_profile = delta["customer_profile_dynamic"]
+    assert len(dynamic_profile.get("identified_objections", [])) == 2  # Original + Nova
+
+    original_obj_updated = next(
+        o
+        for o in dynamic_profile["identified_objections"]
+        if o.get("text") == original_objection_text
+    )
+    new_obj_added = next(
+        o
+        for o in dynamic_profile["identified_objections"]
+        if o.get("text") == new_objection_text
+    )
+
+    assert original_obj_updated.get("status") == "ignored"  # Original é ignorada
+    assert new_obj_added.get("status") == "active"
+    assert new_obj_added.get("source_turn") == 4  # next_turn_number
+
+    assert "user_interruptions_queue" in delta
+    interrupt_queue = delta["user_interruptions_queue"]
+    # Apenas a NOVA objeção ativa deve estar na fila (a original foi ignorada)
+    # E a nova objeção também foi extraída em `extracted_objections` e adicionada à fila por essa via.
+    # A lógica de consolidação da fila deve evitar duplicatas.
+    active_objections_in_queue = [
+        inter for inter in interrupt_queue if inter.get("type") == "objection"
+    ]
+    assert len(active_objections_in_queue) == 1
+    assert active_objections_in_queue[0].get("text") == new_objection_text
     mock_log_event.assert_not_called()

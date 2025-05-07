@@ -7,6 +7,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage  # Para _format_recent_chat_history
 from langchain_core.prompts import ChatPromptTemplate
 
+
 try:
     from trustcall import create_extractor
 
@@ -25,10 +26,16 @@ from ..schemas.input_analysis import (
     InitiallyExtractedQuestion,
     SingleRepetitionCheckOutput,
     SimplifiedCustomerQuestionStatusType,
+    ReactionToPresentation,
+    ObjectionAfterRebuttalStatus,
 )
 
 # Importar a definição do estado principal
-from ..state_definition import RichConversationState, CustomerQuestionEntry
+from ..state_definition import (
+    RichConversationState,
+    CustomerQuestionEntry,
+    PendingAgentAction,
+)
 
 
 # --- Constantes ---
@@ -90,7 +97,7 @@ async def _call_structured_llm(
             )
             formatted_prompt = prompt_template_str.format(**prompt_values)
             logger.debug(
-                f"[{node_name_for_logging}] Invoking TrustCall extractor with prompt:\n{formatted_prompt[:500]}..."
+                f"[{node_name_for_logging}] Invoking TrustCall extractor with prompt:\n{formatted_prompt[:50000]}..."
             )
             result = await extractor.ainvoke(formatted_prompt)
             logger.debug(
@@ -129,7 +136,7 @@ async def _call_structured_llm(
 
 # --- Sub-Etapa: Extração Inicial ---
 PROMPT_INITIAL_EXTRACTION = """
-Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. Sua tarefa é analisar a "ÚLTIMA MENSAGEM DO CLIENTE" no contexto do "HISTÓRICO DA CONVERSA" e da "ÚLTIMA AÇÃO DO AGENTE" (o que o agente disse/perguntou imediatamente antes da mensagem do cliente).
+Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. Sua tarefa é analisar a "ÚLTIMA MENSAGEM DO CLIENTE" no contexto do "HISTÓRICO DA CONVERSA", da "ÚLTIMA AÇÃO DO AGENTE" e do "TIPO DA ÚLTIMA AÇÃO DO AGENTE".
 
 **Contexto Fornecido:**
 
@@ -142,77 +149,103 @@ Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. S
     ```
     {last_agent_action_text}
     ```
-    (Se for o início da conversa, este campo será "N/A - Início da conversa" ou similar.)
 
-3.  **HISTÓRICO RECENTE DA CONVERSA (excluindo a "ÚLTIMA MENSAGEM DO CLIENTE"):**
-    (Formato: "Usuário: [texto]" ou "Agente: [texto]")
+3.  **TIPO DA ÚLTIMA AÇÃO DO AGENTE:** (Ex: "PRESENT_SOLUTION_OFFER", "GENERATE_REBUTTAL", "ASK_SPIN_QUESTION", "N/A")
+    ```
+    {last_agent_action_type} 
+    ```
+    (Se "GENERATE_REBUTTAL", o texto da objeção original tratada será: "{original_objection_text_if_rebuttal}")
+
+4.  **HISTÓRICO RECENTE DA CONVERSA (excluindo a "ÚLTIMA MENSAGEM DO CLIENTE"):**
     ```
     {recent_chat_history}
     ```
 
 **Sua Tarefa de Análise (Preencha o JSON `InitialUserInputAnalysis` com precisão):**
 
-1.  **`overall_intent`**: Classifique a intenção principal e predominante da "ÚLTIMA MENSAGEM DO CLIENTE".
-    Valores possíveis: "Greeting", "Farewell", "Questioning", "StatingInformationOrOpinion", "ExpressingObjection", "ExpressingNeedOrPain", "RespondingToAgent", "VagueOrUnclear", "OffTopic", "PositiveFeedback", "NegativeFeedback", "RequestingClarificationFromAgent".
+1.   **`overall_intent`**: Classifique a intenção principal da "ÚLTIMA MENSAGEM DO CLIENTE".
+    Valores possíveis: "Greeting", "Farewell", "Questioning", "StatingInformationOrOpinion", "ExpressingObjection", "ExpressingNeedOrPain", "RespondingToAgent", "VagueOrUnclear", "OffTopic", "PositiveFeedback", "NegativeFeedback", "RequestingClarificationFromAgent", "PositiveFeedbackToProposal", "NegativeFeedbackToProposal", "RequestForNextStepInPurchase".
+    *   **Sinais de Compra:** Se o cliente expressar um desejo claro de prosseguir com a compra, adquirir o produto/serviço, ou perguntar sobre os próximos passos para finalizar (ex: "Quero comprar!", "Como faço o pedido?", "Pode gerar o link de pagamento?", "Vamos fechar negócio!"), classifique como **"RequestForNextStepInPurchase"**.
+    *   **Feedback à Proposta:** Se o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" foi "PRESENT_SOLUTION_OFFER":
+        *   Se a reação for positiva e indicar acordo com a solução (ex: "Gostei!", "Parece perfeito!", "É isso que eu preciso!"), use **"PositiveFeedbackToProposal"**.
+        *   Se a reação for negativa à proposta (ex: "Não acho que isso me atende", "Não é o que eu esperava"), use **"NegativeFeedbackToProposal"**.
+        *   Se for uma pergunta específica sobre a proposta, use "Questioning".
+        *   Se for uma objeção clara à proposta, use "ExpressingObjection".
+2.  **`initially_extracted_questions`**: (Como antes) Identifique TODAS as perguntas explícitas. `question_text`.
 
-2.  **`initially_extracted_questions`** (Lista de `InitiallyExtractedQuestion`):
-    *   Identifique TODAS as perguntas distintas e explícitas na "ÚLTIMA MENSAGEM DO CLIENTE".
-    *   Para CADA pergunta identificada:
-        *   `question_text`: O texto central e normalizado da pergunta. Remova frases introdutórias como "Eu gostaria de saber se..." e foque no núcleo da questão.
+3.  **`extracted_objections`**: (Como antes) Identifique quaisquer objeções claras. `objection_text`.
 
-3.  **`extracted_objections`** (Lista de `ExtractedObjection`):
-    *   Identifique quaisquer objeções claras (ao produto, preço, processo, tempo, valor, etc.).
-    *   Para cada objeção: `objection_text`: O texto central que expressa a objeção.
-
-4.  **`extracted_needs_or_pains`** (Lista de `ExtractedNeedOrPain`):
-    *   Identifique se o cliente descreve alguma necessidade explícita ou ponto de dor/problema.
-    *   Para cada um: `text` (o texto descritivo) e `type` ("need" ou "pain_point").
+4.  **`extracted_needs_or_pains`**: (Como antes) Identifique necessidades ou dores. `text` e `type`.
 
 5.  **`analysis_of_response_to_agent_action`** (Objeto `PendingAgentActionResponseAnalysis`):
-    *   Avalie como a "ÚLTIMA MENSAGEM DO CLIENTE" se relaciona com a "ÚLTIMA AÇÃO DO AGENTE".
+    *   Avalie como a "ÚLTIMA MENSAGEM DO CLIENTE" se relaciona com a "ÚLTIMA AÇÃO DO AGENTE". **Foque em se o cliente abordou diretamente o ponto principal ou pergunta feita pelo agente.**
     *   `user_response_to_agent_action`: Escolha UM dos seguintes:
-        *   "answered_clearly": O cliente respondeu direta e completamente à pergunta/ação específica do agente.
-        *   "partially_answered": O cliente abordou a pergunta/ação do agente, mas de forma incompleta, vaga ou evasiva.
-        *   "ignored_agent_action": O cliente NÃO abordou a pergunta/ação do agente e mudou de assunto, fez uma nova pergunta não relacionada, ou levantou uma objeção não relacionada.
-        *   "acknowledged_action": O cliente apenas reconheceu a declaração do agente (ex: "ok", "entendi", "certo") sem adicionar nova informação substancial ou responder a uma pergunta implícita.
-        *   "not_applicable": A "ÚLTIMA AÇÃO DO AGENTE" não era uma pergunta direta ou não esperava uma resposta específica.
+        *   "answered_clearly": O cliente respondeu direta e completamente à pergunta/ponto principal do agente.
+        *   "partially_answered": O cliente mencionou o ponto do agente, mas de forma incompleta, evasiva, ou adicionou outros pontos não relacionados imediatamente.
+        *   "ignored_agent_action": O cliente NÃO abordou o ponto/pergunta principal do agente e mudou de assunto ou fez algo completamente diferente.
+        *   "acknowledged_action": O cliente apenas reconheceu a declaração do agente (ex: "ok", "entendi") sem adicionar informação ou responder a uma pergunta implícita.
+        *   "not_applicable": Se a ação do agente não esperava uma resposta direta.
 
-6.  **`is_primarily_vague_statement`**: A "ÚLTIMA MENSAGEM DO CLIENTE", em sua essência, é uma declaração vaga, expressa incerteza geral ou confusão, sem apresentar uma pergunta ou objeção específica e clara? (true/false). Defina como `false` a menos que seja claramente vago.
+6.  **`reaction_to_solution_presentation`** (Objeto `ReactionToPresentation`):
+    *   **PREENCHA SOMENTE SE "TIPO DA ÚLTIMA AÇÃO DO AGENTE" for "PRESENT_SOLUTION_OFFER".** Caso contrário, use o default com `reaction_type: "not_applicable"`.
+    *   `reaction_type`: Classifique a reação do cliente à apresentação. Valores: "positive_interest", "specific_question", "new_objection_to_solution", "neutral_or_vague", "off_topic_or_unrelated".
+    *   `details`: Se "specific_question" ou "new_objection_to_solution", forneça o texto da pergunta/objeção.
 
-7.  **`is_primarily_off_topic`**: A "ÚLTIMA MENSAGEM DO CLIENTE" é predominantemente sobre um tópico não relacionado à venda, aos produtos/serviços da empresa, ou ao fluxo da conversa estabelecido? (true/false). Defina como `false` a menos que seja claramente off-topic.
+7.  **`objection_status_after_rebuttal`** (Objeto `ObjectionAfterRebuttalStatus`):
+    *   **PREENCHA SOMENTE SE "TIPO DA ÚLTIMA AÇÃO DO AGENTE" for "GENERATE_REBUTTAL".** Caso contrário, use o default com `status: "not_applicable"`.
+    *   `original_objection_text_handled`: Preencha com o valor de "{original_objection_text_if_rebuttal}" fornecido no contexto.
+    *   `status`: Avalie o status da objeção original após o rebuttal do agente. Valores: "appears_resolved", "still_persists", "new_objection_raised", "unclear_still_evaluating", "changed_topic".
+    *   `new_objection_text`: Se `status` for "new_objection_raised", forneça o texto da nova objeção.
+
+8.  **`is_primarily_vague_statement`**: (Como antes)
+9.  **`is_primarily_off_topic`**: (Como antes)
 
 **Instruções Cruciais:**
-*   Seja extremamente preciso ao preencher cada campo.
-*   Se um campo de lista (ex: `extracted_objections`) não tiver itens, retorne uma lista vazia `[]`.
-*   NÃO realize análise de repetição de perguntas nesta etapa. Apenas extraia o texto das perguntas.
+*   Seja preciso. Se um campo de lista não tiver itens, retorne `[]`.
+*   Preencha `reaction_to_solution_presentation` e `objection_status_after_rebuttal` APENAS quando o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" for relevante.
 
-Responda APENAS com o objeto JSON formatado de acordo com o schema `InitialUserInputAnalysis` e seus sub-modelos. Não inclua nenhuma explicação ou texto adicional fora do JSON.
+Responda APENAS com o objeto JSON formatado de acordo com o schema `InitialUserInputAnalysis`.
 """
 
 
 async def initial_input_extraction_sub_step(
     last_user_message_text: str,
-    last_agent_action_text: Optional[str],
+    # Modificar para aceitar o objeto PendingAgentAction completo
+    last_agent_action_obj: Optional[PendingAgentAction],
     recent_chat_history_str: str,
     llm_fast: BaseChatModel,
 ) -> Optional[InitialUserInputAnalysis]:
-    """
-    Performs the initial LLM call to extract information from user input.
-    """
     node_name = "initial_input_extraction_sub_step"
     logger.info(f"[{node_name}] Starting initial input extraction...")
 
+    last_agent_action_text = "N/A - Início da conversa"
+    last_agent_action_type_str = "N/A"
+    original_objection_text_if_rebuttal_str = "N/A"
+
+    if last_agent_action_obj:
+        last_agent_action_text = last_agent_action_obj.get(
+            "action_generation_text", "N/A"
+        )
+        last_agent_action_type_str = last_agent_action_obj.get("action_type", "N/A")
+        if last_agent_action_type_str == "GENERATE_REBUTTAL":
+            # Assumindo que 'details' contém 'objection_text_to_address'
+            original_objection_text_if_rebuttal_str = last_agent_action_obj.get(
+                "details", {}
+            ).get("objection_text_to_address", "N/A")
+
     prompt_values = {
         "last_user_message_text": last_user_message_text,
-        "last_agent_action_text": last_agent_action_text or "N/A - Início da conversa",
+        "last_agent_action_text": last_agent_action_text,
+        "last_agent_action_type": last_agent_action_type_str,  # NOVO
+        "original_objection_text_if_rebuttal": original_objection_text_if_rebuttal_str,  # NOVO
         "recent_chat_history": recent_chat_history_str,
     }
 
     analysis_object = await _call_structured_llm(
         llm=llm_fast,
-        prompt_template_str=PROMPT_INITIAL_EXTRACTION,
+        prompt_template_str=PROMPT_INITIAL_EXTRACTION,  # Usar o prompt atualizado
         prompt_values=prompt_values,
-        output_schema=InitialUserInputAnalysis,
+        output_schema=InitialUserInputAnalysis,  # Schema de saída
         node_name_for_logging=node_name,
     )
 
@@ -220,6 +253,22 @@ async def initial_input_extraction_sub_step(
         logger.info(
             f"[{node_name}] Initial extraction successful. Intent: {analysis_object.overall_intent}"
         )
+        if (
+            analysis_object.reaction_to_solution_presentation
+            and analysis_object.reaction_to_solution_presentation.reaction_type
+            != "not_applicable"
+        ):
+            logger.info(
+                f"    Reaction to presentation: {analysis_object.reaction_to_solution_presentation.reaction_type}"
+            )
+        if (
+            analysis_object.objection_status_after_rebuttal
+            and analysis_object.objection_status_after_rebuttal.status
+            != "not_applicable"
+        ):
+            logger.info(
+                f"    Objection status after rebuttal: {analysis_object.objection_status_after_rebuttal.status}"
+            )
     else:
         logger.error(f"[{node_name}] Initial extraction failed.")
     return analysis_object
@@ -403,6 +452,7 @@ async def process_user_input_node(
         last_agent_action_text = last_agent_action.get("action_generation_text")
 
     # messages are List[BaseMessage]
+    last_agent_action_obj: Optional[PendingAgentAction] = state.get("last_agent_action")
     raw_messages_history: List[BaseMessage] = state.get("messages", [])
     recent_chat_history_str = _format_recent_chat_history(
         raw_messages_history, limit=RECENT_HISTORY_LIMIT
@@ -411,7 +461,7 @@ async def process_user_input_node(
     # 1. Extração Inicial
     initial_analysis = await initial_input_extraction_sub_step(
         last_user_message_text=last_user_message_text,
-        last_agent_action_text=last_agent_action_text,
+        last_agent_action_obj=last_agent_action_obj,  # Passar o objeto
         recent_chat_history_str=recent_chat_history_str,
         llm_fast=llm_fast,
     )
@@ -434,6 +484,8 @@ async def process_user_input_node(
     # 3. Combinar para formar o UserInputAnalysisOutput final
     final_analysis = UserInputAnalysisOutput(
         overall_intent=initial_analysis.overall_intent,
+        reaction_to_solution_presentation=initial_analysis.reaction_to_solution_presentation,
+        objection_status_after_rebuttal=initial_analysis.objection_status_after_rebuttal,
         extracted_questions=updated_questions_with_repetition_info,
         extracted_objections=initial_analysis.extracted_objections,
         extracted_needs_or_pains=initial_analysis.extracted_needs_or_pains,

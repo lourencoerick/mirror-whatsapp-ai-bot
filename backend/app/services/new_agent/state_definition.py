@@ -186,6 +186,7 @@ class DynamicCustomerProfile(TypedDict):
     identified_pain_points: List[IdentifiedPainPointEntry]
     identified_objections: List[IdentifiedObjectionEntry]
     certainty_levels: CustomerCertaintyLevels
+    last_discerned_intent: Optional[str]
     # communication_style_preference: Optional[str] # E.g., "direct", "formal", "friendly" (advanced)
     # key_information_provided: Dict[str, Any] # E.g., {"email": "test@example.com"}
 

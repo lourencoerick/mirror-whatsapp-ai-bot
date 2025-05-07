@@ -20,14 +20,17 @@ from app.services.new_agent.schemas.input_analysis import (
     InitiallyExtractedQuestion,
     SingleRepetitionCheckOutput,
     SimplifiedCustomerQuestionStatusType,
-    PendingAgentActionResponseAnalysis,  # Adicionar se não estiver já
-    ExtractedObjection,  # Adicionar
-    ExtractedNeedOrPain,  # Adicionar
+    PendingAgentActionResponseAnalysis,
+    ExtractedObjection,
+    ExtractedNeedOrPain,
+    ReactionToPresentation,
+    ObjectionAfterRebuttalStatus,
 )
 from app.services.new_agent.state_definition import (
     RichConversationState,
     CustomerQuestionEntry,
     PendingAgentAction,
+    AgentActionType,
 )
 
 from langchain_core.language_models import BaseChatModel
@@ -613,6 +616,12 @@ async def test_process_user_input_node_success_flow(
         analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
             user_response_to_agent_action="not_applicable"
         ),
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
     )
     mock_initial_extraction.return_value = mock_initial_result
 
@@ -654,9 +663,7 @@ async def test_process_user_input_node_success_flow(
 
     mock_initial_extraction.assert_called_once_with(
         last_user_message_text=test_state["current_user_input_text"],
-        last_agent_action_text=test_state["last_agent_action"][
-            "action_generation_text"
-        ],
+        last_agent_action_obj=test_state["last_agent_action"],
         recent_chat_history_str="Histórico Formatado Mock",
         llm_fast=mock_llm_fast,
     )
@@ -674,6 +681,13 @@ async def test_process_user_input_node_success_flow(
     # assert result_dict["last_processing_error"] is None  # Espera sucesso
 
     # Validar o conteúdo do resultado (opcional, mas bom)
+    final_analysis_dict = result_dict["user_input_analysis_result"]
+    final_analysis_dict["reaction_to_solution_presentation"] = (
+        mock_initial_result.reaction_to_solution_presentation.model_dump()
+    )
+    final_analysis_dict["objection_status_after_rebuttal"] = (
+        mock_initial_result.objection_status_after_rebuttal.model_dump()
+    )
     final_analysis = UserInputAnalysisOutput.model_validate(
         result_dict["user_input_analysis_result"]
     )
@@ -750,3 +764,377 @@ async def test_process_user_input_node_initial_extraction_fails(
     assert "Initial input extraction LLM call failed" in result_dict.get(
         "last_processing_error", ""
     )
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.input_processor._call_structured_llm",
+    new_callable=AsyncMock,
+)
+async def test_initial_extraction_reaction_to_presentation_positive(
+    mock_call_structured_llm, mock_llm_fast
+):
+    """
+    Testa a extração da reação do cliente após uma apresentação de solução (interesse positivo).
+    """
+    last_agent_action = PendingAgentAction(
+        action_type="PRESENT_SOLUTION_OFFER",  # <<< Agente apresentou solução
+        details={"product_name_to_present": "Plano Pro"},
+        action_generation_text="Apresento o Plano Pro...",
+        attempts=1,
+    )
+    user_message = "Gostei muito! Parece ótimo."
+
+    # Configurar o mock para _call_structured_llm para retornar o que esperamos do LLM
+    expected_llm_output = InitialUserInputAnalysis(
+        overall_intent="PositiveFeedbackToProposal",
+        initially_extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="acknowledged_action"
+        ),  # Ou "answered_clearly" dependendo do prompt
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="positive_interest", details=None
+        ),  # <<< Campo chave
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),  # Default
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+    )
+    mock_call_structured_llm.return_value = expected_llm_output
+
+    result = await initial_input_extraction_sub_step(
+        last_user_message_text=user_message,
+        last_agent_action_obj=last_agent_action,
+        recent_chat_history_str="Agente: Apresento o Plano Pro...",
+        llm_fast=mock_llm_fast,
+    )
+
+    assert result is not None
+    assert result.reaction_to_solution_presentation is not None
+    assert result.reaction_to_solution_presentation.reaction_type == "positive_interest"
+    assert result.objection_status_after_rebuttal.status == "not_applicable"
+
+    # Verificar se os campos corretos foram passados para o prompt
+    mock_call_structured_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_structured_llm.call_args
+    assert (
+        call_kwargs["prompt_values"]["last_agent_action_type"]
+        == "PRESENT_SOLUTION_OFFER"
+    )
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.input_processor._call_structured_llm",
+    new_callable=AsyncMock,
+)
+async def test_initial_extraction_reaction_to_presentation_question(
+    mock_call_structured_llm, mock_llm_fast
+):
+    """
+    Testa a extração da reação do cliente após uma apresentação (pergunta específica).
+    """
+    last_agent_action = PendingAgentAction(
+        action_type="PRESENT_SOLUTION_OFFER",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    user_message = "Isso inclui suporte prioritário?"
+
+    expected_llm_output = InitialUserInputAnalysis(
+        overall_intent="Questioning",
+        initially_extracted_questions=[
+            InitiallyExtractedQuestion(question_text="Isso inclui suporte prioritário?")
+        ],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),  # Ou "ignored_agent_action" se a pergunta for nova
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="specific_question",
+            details="Isso inclui suporte prioritário?",
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    )
+    mock_call_structured_llm.return_value = expected_llm_output
+
+    result = await initial_input_extraction_sub_step(
+        user_message, last_agent_action, "", mock_llm_fast
+    )
+
+    assert result is not None
+    assert result.reaction_to_solution_presentation.reaction_type == "specific_question"
+    assert (
+        result.reaction_to_solution_presentation.details
+        == "Isso inclui suporte prioritário?"
+    )
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.input_processor._call_structured_llm",
+    new_callable=AsyncMock,
+)
+async def test_initial_extraction_objection_status_resolved(
+    mock_call_structured_llm, mock_llm_fast
+):
+    """
+    Testa a extração do status da objeção após um rebuttal (objeção resolvida).
+    """
+    original_objection = "O preço é um pouco alto."
+    last_agent_action = PendingAgentAction(
+        action_type="GENERATE_REBUTTAL",  # <<< Agente fez rebuttal
+        details={"objection_text_to_address": original_objection},
+        action_generation_text="Entendo sobre o preço, mas considere o valor...",
+        attempts=1,
+    )
+    user_message = "Ah, agora faz sentido! Obrigado."
+
+    expected_llm_output = InitialUserInputAnalysis(
+        overall_intent="PositiveFeedback",  # Ou algo como "Acknowledgement"
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),  # Default
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(  # <<< Campo chave
+            original_objection_text_handled=original_objection,
+            status="appears_resolved",
+            new_objection_text=None,
+        ),
+    )
+    mock_call_structured_llm.return_value = expected_llm_output
+
+    result = await initial_input_extraction_sub_step(
+        user_message, last_agent_action, "", mock_llm_fast
+    )
+
+    assert result is not None
+    assert result.objection_status_after_rebuttal is not None
+    assert result.objection_status_after_rebuttal.status == "appears_resolved"
+    assert (
+        result.objection_status_after_rebuttal.original_objection_text_handled
+        == original_objection
+    )
+    assert result.reaction_to_solution_presentation.reaction_type == "not_applicable"
+
+    mock_call_structured_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_structured_llm.call_args
+    assert call_kwargs["prompt_values"]["last_agent_action_type"] == "GENERATE_REBUTTAL"
+    assert (
+        call_kwargs["prompt_values"]["original_objection_text_if_rebuttal"]
+        == original_objection
+    )
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.input_processor._call_structured_llm",
+    new_callable=AsyncMock,
+)
+async def test_initial_extraction_objection_status_new_raised(
+    mock_call_structured_llm, mock_llm_fast
+):
+    """
+    Testa a extração do status da objeção após um rebuttal (nova objeção levantada).
+    """
+    original_objection = "O preço é um pouco alto."
+    new_objection = "Mas e o tempo de contrato?"
+    last_agent_action = PendingAgentAction(
+        action_type="GENERATE_REBUTTAL",
+        details={"objection_text_to_address": original_objection},
+        action_generation_text="...",
+        attempts=1,
+    )
+    user_message = f"Entendi sobre o preço, mas e o tempo de contrato?"
+
+    expected_llm_output = InitialUserInputAnalysis(
+        overall_intent="ExpressingObjection",  # Ou "Questioning" dependendo do tom
+        extracted_objections=[
+            ExtractedObjection(objection_text=new_objection)
+        ],  # Nova objeção também é extraída aqui
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="ignored_agent_action"
+        ),  # Ignorou o rebuttal e levantou nova
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            original_objection_text_handled=original_objection,
+            status="new_objection_raised",
+            new_objection_text=new_objection,
+        ),
+    )
+    mock_call_structured_llm.return_value = expected_llm_output
+
+    result = await initial_input_extraction_sub_step(
+        user_message, last_agent_action, "", mock_llm_fast
+    )
+
+    assert result is not None
+    assert result.objection_status_after_rebuttal.status == "new_objection_raised"
+    assert result.objection_status_after_rebuttal.new_objection_text == new_objection
+    assert (
+        result.objection_status_after_rebuttal.original_objection_text_handled
+        == original_objection
+    )
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.input_processor._call_structured_llm",
+    new_callable=AsyncMock,
+)
+async def test_initial_extraction_other_action_type_defaults_new_fields(
+    mock_call_structured_llm, mock_llm_fast
+):
+    """
+    Testa se os novos campos (reaction_to_presentation, objection_status_after_rebuttal)
+    ficam com status "not_applicable" quando a última ação do agente não é relevante.
+    """
+    last_agent_action = PendingAgentAction(
+        action_type="ASK_SPIN_QUESTION",  # Ação não relevante para os novos campos
+        details={"spin_type": "Problem"},
+        action_generation_text="Quais problemas você enfrenta?",
+        attempts=1,
+    )
+    user_message = "Meu problema é X."
+
+    expected_llm_output = InitialUserInputAnalysis(
+        overall_intent="RespondingToAgent",
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),
+        # Os campos novos devem vir com o default de "not_applicable" do Pydantic model
+        # ou o LLM deve ser instruído a preenchê-los assim.
+        # O prompt já instrui o LLM a usar o default se não aplicável.
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable", original_objection_text_handled=None
+        ),
+    )
+    mock_call_structured_llm.return_value = expected_llm_output
+
+    result = await initial_input_extraction_sub_step(
+        user_message, last_agent_action, "", mock_llm_fast
+    )
+
+    assert result is not None
+    assert result.reaction_to_solution_presentation.reaction_type == "not_applicable"
+    assert result.objection_status_after_rebuttal.status == "not_applicable"
+
+    mock_call_structured_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_structured_llm.call_args
+    assert call_kwargs["prompt_values"]["last_agent_action_type"] == "ASK_SPIN_QUESTION"
+    assert call_kwargs["prompt_values"]["original_objection_text_if_rebuttal"] == "N/A"
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.input_processor._call_structured_llm",
+    new_callable=AsyncMock,
+)
+async def test_initial_extraction_detects_request_for_purchase(
+    mock_call_structured_llm, mock_llm_fast
+):
+    """
+    Testa se o InputProcessor detecta uma intenção clara de compra.
+    """
+    last_agent_action = PendingAgentAction(
+        action_type="PRESENT_SOLUTION_OFFER",
+        details={},
+        action_generation_text="Apresento o Plano X...",
+        attempts=1,
+    )
+    user_message = "Perfeito, quero comprar! Como faço o pagamento?"
+
+    expected_llm_output = InitialUserInputAnalysis(
+        overall_intent="RequestForNextStepInPurchase",  # <<< Chave
+        initially_extracted_questions=[
+            InitiallyExtractedQuestion(question_text="Como faço o pagamento?")
+        ],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),  # Ou "ignored_agent_action" se a pergunta for dominante
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="positive_interest", details="Perfeito, quero comprar!"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+        # ... outros campos com defaults ...
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+    )
+    mock_call_structured_llm.return_value = expected_llm_output
+
+    result = await initial_input_extraction_sub_step(
+        user_message, last_agent_action, "Histórico...", mock_llm_fast
+    )
+
+    assert result is not None
+    assert result.overall_intent == "RequestForNextStepInPurchase"
+    mock_call_structured_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_structured_llm.call_args
+    assert (
+        call_kwargs["prompt_values"]["last_agent_action_type"]
+        == "PRESENT_SOLUTION_OFFER"
+    )
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.input_processor._call_structured_llm",
+    new_callable=AsyncMock,
+)
+async def test_initial_extraction_detects_positive_feedback_to_proposal(
+    mock_call_structured_llm, mock_llm_fast
+):
+    """
+    Testa se o InputProcessor detecta feedback positivo à proposta.
+    """
+    last_agent_action = PendingAgentAction(
+        action_type="PRESENT_SOLUTION_OFFER",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    user_message = "Gostei muito da solução, parece ideal!"
+
+    expected_llm_output = InitialUserInputAnalysis(
+        overall_intent="PositiveFeedbackToProposal",  # <<< Chave
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="acknowledged_action"
+        ),
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="positive_interest",
+            details="Gostei muito da solução, parece ideal!",
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+        initially_extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+    )
+    mock_call_structured_llm.return_value = expected_llm_output
+
+    result = await initial_input_extraction_sub_step(
+        user_message, last_agent_action, "Histórico...", mock_llm_fast
+    )
+
+    assert result is not None
+    assert result.overall_intent == "PositiveFeedbackToProposal"
+    mock_call_structured_llm.assert_called_once()
