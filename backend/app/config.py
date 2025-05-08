@@ -70,6 +70,19 @@ class Settings(BaseSettings):
     MESSAGE_QUEUE_NAME: str = "message_queue"
     BATCH_ARQ_QUEUE_NAME: str = "batch_queue"
 
+    RESPONSE_SENDER_WORKER_INTERNAL_URL: Optional[str] = (
+        "https://response-sender-worker-g4mps25xua-uc.a.run.app"
+    )
+    MESSAGE_CONSUMER_WORKER_INTERNAL_URL: Optional[str] = (
+        "https://message-consumer-worker-g4mps25xua-uc.a.run.app"
+    )
+    BATCH_WORKER_INTERNAL_URL: Optional[str] = (
+        "https://batch-arq-worker-g4mps25xua-uc.a.run.app"
+    )
+    AI_REPLIER_INTERNAL_URL: Optional[str] = (
+        "https://ai-replier-worker-g4mps25xua-uc.a.run.app"
+    )
+
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True

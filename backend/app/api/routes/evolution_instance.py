@@ -30,6 +30,7 @@ from app.core.arq_manager import get_arq_pool
 
 from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.helper.websocket import publish_to_instance_ws
+from app.core.wake_workers import wake_worker
 from app.config import Settings, get_settings
 
 settings: Settings = get_settings()
@@ -417,6 +418,7 @@ async def trigger_whatsapp_contact_sync(
 
     # 2. Enqueue the Background Task
     try:
+        await wake_worker(settings.BATCH_WORKER_INTERNAL_URL)
         arq_task = await arq_pool.enqueue_job(
             SYNC_WAPP_CONTACT_ARQ_TASK_NAME,
             instance_id=instance_id,

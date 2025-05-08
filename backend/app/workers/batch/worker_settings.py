@@ -201,12 +201,8 @@ async def on_startup(ctx: Dict[str, Any]) -> None:
     if LANGCHAIN_AVAILABLE and AzureChatOpenAI:
         logger.info("Initializing LLM clients for Batch tasks...")
         try:
-            openai_api_key = os.getenv("OPENAI_API_KEY")
-            if not openai_api_key:
-                raise EnvironmentError("OPENAI_API_KEY environment variable not set.")
-
             # General LLM (used by Researcher, potentially Ingester)
-            general_model = os.getenv("ARQ_GENERAL_LLM_MODEL", "gpt-4o-mini")
+            general_model = os.getenv("ARQ_GENERAL_LLM_MODEL", "gpt-4o")
             llm_general = AzureChatOpenAI(
                 model=general_model,
                 temperature=0.0,
