@@ -31,8 +31,6 @@ from app.core.arq_manager import (
     close_arq_pool,
 )  #
 
-from app.core.wake_workers import wake_worker
-
 # --- Schema & Model Imports ---
 from app.api.schemas.message import MessageCreate
 from app.models.conversation import ConversationStatusEnum, Conversation
@@ -149,7 +147,6 @@ class MessageConsumer:
                         )
                     else:
                         try:
-                            await wake_worker(settings.AI_REPLIER_INTERNAL_URL)
                             await self.arq_pool.enqueue_job(
                                 AI_REPLY_TASK_NAME,
                                 _queue_name=AI_REPLY_QUEUE_NAME,
