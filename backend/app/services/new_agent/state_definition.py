@@ -1,11 +1,11 @@
 # backend/app/services/ai_reply/new_agent/state_definition.py
 
 from typing import TypedDict, List, Optional, Dict, Any, Literal
-from typing_extensions import Annotated  # For LangGraph message accumulation
+from typing_extensions import Annotated
 from uuid import UUID
+import time  # Import time for default timestamp
 
 # --- LangGraph Message Accumulation ---
-# This is often used in the state if messages are appended directly within graph operations.
 try:
     from langgraph.graph.message import add_messages
 
@@ -15,12 +15,9 @@ except ImportError:
         x + y
         if isinstance(x, list) and isinstance(y, list)
         else (y if x is None else x)
-    )  # Simplified fallback
-    LANGGRAPH_AVAILABLE = False
-    print(
-        "WARNING: langgraph.graph.message.add_messages not found. "
-        "Message accumulation might behave as simple list concatenation."
     )
+    LANGGRAPH_AVAILABLE = False
+    print("WARNING: langgraph.graph.message.add_messages not found.")
 
 # --- LangChain Core Message Type ---
 try:
@@ -30,17 +27,14 @@ try:
 except ImportError:
     LANGCHAIN_CORE_AVAILABLE = False
     BaseMessage = Any  # type: ignore
-    print(
-        "WARNING: langchain_core.messages.BaseMessage not found. "
-        "Message history typing will be 'Any'."
-    )
+    print("WARNING: langchain_core.messages.BaseMessage not found.")
 
-# --- Application Specific Schemas (using Any to avoid circular deps in this core file) ---
-# In a real setup, you'd ensure these are resolvable or use forward references if needed.
-CompanyProfileSchema = (
-    Any  # Placeholder for app.api.schemas.company_profile.CompanyProfileSchema
-)
-BotAgentRead = Any  # Placeholder for app.api.schemas.bot_agent.BotAgentRead
+# --- Application Specific Schemas (using Any to avoid circular deps) ---
+# Ideally, import these properly or use forward references if needed.
+# from app.api.schemas.company_profile import CompanyProfileSchema
+# from app.api.schemas.bot_agent import BotAgentRead
+CompanyProfileSchema = Any
+BotAgentRead = Any
 
 
 # === Enums and Literals for State Fields ===
@@ -55,50 +49,69 @@ AgentGoalType = Literal[
     "ATTEMPTING_CLOSE",
     "PROCESSING_ORDER",
     "ENDING_CONVERSATION",
-    "IDLE",  # New: Represents a state waiting for user input without a proactive agent goal
+    "IDLE",
 ]
+"""Defines the possible high-level objectives of the sales agent."""
 
 AgentActionType = Literal[
     "ASK_SPIN_QUESTION",
     "MAKE_CERTAINTY_STATEMENT",
     "PRESENT_SOLUTION_OFFER",
     "GENERATE_REBUTTAL",
-    "ASK_CLARIFYING_QUESTION",  # Agent asks to clarify user's vague statement
+    "ASK_CLARIFYING_QUESTION",
     "INITIATE_CLOSING",
     "CONFIRM_ORDER_DETAILS",
-    "PROCESS_ORDER_CONFIRMATION",  # Agent confirms order is (theoretically) processed
+    "PROCESS_ORDER_CONFIRMATION",
     "HANDLE_CLOSING_CORRECTION",
     "GENERATE_GREETING",
     "GENERATE_FAREWELL",
-    "ANSWER_DIRECT_QUESTION",  # Agent answers a direct question from user
-    "ACKNOWLEDGE_AND_TRANSITION",  # General acknowledgement and moving on
-    "HANDLE_IMPASSE",  # When stuck on an unanswerable question
+    "ANSWER_DIRECT_QUESTION",
+    "ACKNOWLEDGE_AND_TRANSITION",
+    "HANDLE_IMPASSE",
 ]
+"""Defines the specific low-level actions the agent can plan and execute."""
 
 SpinQuestionType = Literal["Situation", "Problem", "Implication", "NeedPayoff"]
+"""Types of questions used in the SPIN selling methodology."""
+
 CertaintyFocusType = Literal["product", "agent", "company"]
+"""Areas where customer certainty can be assessed."""
 
 CustomerQuestionStatusType = Literal[
-    "newly_asked",  # Freshly asked by the user in the current turn
-    "answered_satisfactorily",  # Agent provided a good answer previously
-    "answered_with_fallback",  # Agent couldn't answer (used fallback) previously
-    "pending_agent_answer",  # User asked, agent hasn't responded yet in this turn's plan
+    "newly_asked",
+    "answered_satisfactorily",
+    "answered_with_fallback",
+    "pending_agent_answer",
     "repetition_after_satisfactory_answer",
     "repetition_after_fallback",
-    "ignored_by_agent",  # Agent decided to ignore after multiple fallbacks (impasse)
+    "ignored_by_agent",
 ]
+"""Tracks the status of questions asked by the customer."""
 
 ObjectionStatusType = Literal[
-    "active",  # Newly raised or re-raised
-    "addressing",  # Agent is currently formulating a rebuttal
-    "addressed_needs_check",  # Agent offered a rebuttal, waiting for user reaction
-    "resolved",  # User indicates objection is no longer a blocker
-    "ignored",  # Agent decided to move on after failed rebuttals
+    "active",
+    "addressing",
+    "addressed_needs_check",
+    "resolved",
+    "ignored",
 ]
+"""Tracks the status of objections raised by the customer."""
 
 UserInterruptionType = Literal[
     "direct_question", "objection", "vague_statement", "off_topic_comment"
 ]
+"""Classifies the type of user input that interrupts the agent's flow."""
+
+ClosingProcessStatusType = Literal[
+    "not_started",
+    "attempt_made",
+    "awaiting_confirmation",
+    "confirmation_rejected",
+    "needs_correction",
+    "confirmed_success",
+    "confirmed_failed_to_process",
+]
+"""Tracks the current stage of the sales closing process."""
 
 
 # === Detailed Sub-TypedDicts for RichConversationState ===
@@ -106,45 +119,87 @@ UserInterruptionType = Literal[
 
 class AgentActionDetails(TypedDict, total=False):
     """
-    Specific parameters for an agent's action.
-    Keys are optional and depend on the action_type.
+    Specific parameters for an agent's planned action.
+
+    Keys are optional and depend on the `action_type`.
+
+    Attributes:
+        spin_type: The type of SPIN question to ask.
+        certainty_focus: The focus area for a certainty statement.
+        objection_text_to_address: The specific objection text for rebuttal.
+        question_to_answer_text: The user's question text to be answered.
+        proposed_product_name: The name of the product being proposed.
+        product_name: Product name used in closing actions.
+        price: Price used in closing actions.
+        price_info: Additional price context (e.g., '/month').
+        context: Contextual information for handling corrections or transitions.
+        off_topic_text: Text of the off-topic comment being acknowledged.
+        previous_goal_topic: Topic to transition back to after interruption.
+        product_name_to_present: Product name for PRESENT_SOLUTION_OFFER.
+        key_benefit_to_highlight: Benefit to focus on for PRESENT_SOLUTION_OFFER.
+        reason: Reason for generating a farewell message.
     """
 
     spin_type: Optional[SpinQuestionType]
     certainty_focus: Optional[CertaintyFocusType]
     objection_text_to_address: Optional[str]
-    question_to_answer_text: Optional[str]  # User's question text
+    question_to_answer_text: Optional[str]
     proposed_product_name: Optional[str]
-    # ... other details as needed for different actions
+    # Closing related
+    product_name: Optional[str]
+    price: Optional[float]
+    price_info: Optional[str]
+    # Correction/Transition related
+    context: Optional[str]
+    off_topic_text: Optional[str]
+    previous_goal_topic: Optional[str]
+    # Presentation related
+    product_name_to_present: Optional[str]
+    key_benefit_to_highlight: Optional[str]
+    # Farewell related
+    reason: Optional[str]
 
 
 class PendingAgentAction(TypedDict):
     """
-    Represents the action the agent just performed or was about to perform,
-    which the user's latest message might be a response to.
+    Represents the action the agent just performed or was about to perform.
+
+    Used to provide context for interpreting the user's next message and for
+    tracking action history.
+
+    Attributes:
+        action_type: The type of the action performed.
+        details: Specific parameters used for this action.
+        action_generation_text: The actual text generated by the LLM for this action.
+        attempts: Number of times this specific action was attempted/re-iterated (future use).
     """
 
     action_type: AgentActionType
     details: AgentActionDetails
-    action_generation_text: Optional[str]  # The actual text generated for this action
-    attempts: int  # Number of times this specific action was attempted/re-iterated
+    action_generation_text: Optional[str]
+    attempts: int
 
 
 class AgentGoal(TypedDict):
-    """Defines the agent's current high-level objective for the conversation."""
+    """
+    Defines the agent's current high-level objective for the conversation.
+
+    Attributes:
+        goal_type: The primary objective (e.g., INVESTIGATING_NEEDS).
+        previous_goal_if_interrupted: Stores the previous goal if the current
+            goal is temporary (e.g., handling an interruption). Recursive structure
+            represented as Dict for simplicity.
+        goal_details: A dictionary containing specific details relevant to the
+            current goal (e.g., SPIN question counters, objection text).
+    """
 
     goal_type: AgentGoalType
-    # Stores the previous goal if the current goal is a temporary interruption (e.g., handling a direct question)
-    previous_goal_if_interrupted: Optional[
-        Dict[str, Any]
-    ]  # Recursive AgentGoal, use Dict for simplicity here
-    goal_details: Optional[
-        Dict[str, Any]
-    ]  # E.g., specific product to present, objection to handle
+    previous_goal_if_interrupted: Optional[Dict[str, Any]]  # Recursive AgentGoal
+    goal_details: Optional[Dict[str, Any]]
 
 
 class IdentifiedNeedEntry(TypedDict):
-    """An identified customer need."""
+    """Represents an identified customer need."""
 
     text: str
     status: Literal["active", "addressed_by_agent", "confirmed_by_user"]
@@ -153,7 +208,7 @@ class IdentifiedNeedEntry(TypedDict):
 
 
 class IdentifiedPainPointEntry(TypedDict):
-    """An identified customer pain point."""
+    """Represents an identified customer pain point."""
 
     text: str
     status: Literal["active", "addressed_by_agent", "confirmed_by_user"]
@@ -161,17 +216,17 @@ class IdentifiedPainPointEntry(TypedDict):
 
 
 class IdentifiedObjectionEntry(TypedDict):
-    """An identified customer objection."""
+    """Represents an identified customer objection."""
 
-    text: str  # The core of the objection
+    text: str  # The core text of the objection
     status: ObjectionStatusType
-    rebuttal_attempts: int
+    rebuttal_attempts: int  # How many times agent tried to rebut this
     source_turn: int
-    related_to_proposal: Optional[bool]  # Was this objection about a specific proposal?
+    related_to_proposal: Optional[bool]  # Was this about a specific proposal?
 
 
 class CustomerCertaintyLevels(TypedDict):
-    """Customer's perceived certainty levels (scale 0-10)."""
+    """Customer's perceived certainty levels (scale 0-10, optional)."""
 
     product: Optional[int]
     agent: Optional[int]
@@ -180,45 +235,64 @@ class CustomerCertaintyLevels(TypedDict):
 
 
 class DynamicCustomerProfile(TypedDict):
-    """Aggregates inferred data about the customer."""
+    """
+    Aggregates dynamically inferred data about the customer during the conversation.
+
+    Attributes:
+        identified_needs: List of identified customer needs.
+        identified_pain_points: List of identified customer pain points.
+        identified_objections: List of identified customer objections.
+        certainty_levels: Estimated customer certainty levels.
+        last_discerned_intent: The most recently identified user intent.
+    """
 
     identified_needs: List[IdentifiedNeedEntry]
     identified_pain_points: List[IdentifiedPainPointEntry]
     identified_objections: List[IdentifiedObjectionEntry]
     certainty_levels: CustomerCertaintyLevels
     last_discerned_intent: Optional[str]
-    # communication_style_preference: Optional[str] # E.g., "direct", "formal", "friendly" (advanced)
-    # key_information_provided: Dict[str, Any] # E.g., {"email": "test@example.com"}
 
 
 class CustomerQuestionEntry(TypedDict):
     """
     Tracks a specific question asked by the customer and how it was handled.
+
     Used for repetition detection and ensuring questions are addressed.
+
+    Attributes:
+        original_question_text: Full text from user message part containing the question.
+        extracted_question_core: The essential part of the question (normalized).
+        turn_asked: Turn number when this question was first identified.
+        status: Current status of the question handling.
+        agent_direct_response_summary: Summary of agent's response if directly answered.
+        repetition_of_turn: If a repetition, points to the turn_asked of the first instance.
+        similarity_vector: Optional embedding for similarity checks (future use).
     """
 
-    original_question_text: (
-        str  # Full text from user message part containing the question
-    )
-    extracted_question_core: str  # The essential part of the question
-    turn_asked: int  # Turn number when this question was first identified
+    original_question_text: str
+    extracted_question_core: str
+    turn_asked: int
     status: CustomerQuestionStatusType
-    # Summary of how the agent responded IF this question was the primary focus of a response
     agent_direct_response_summary: Optional[str]
-    # If this is a repetition, points to the turn_asked of the first instance
     repetition_of_turn: Optional[int]
-    # Embedding or hash for similarity checks
-    similarity_vector: Optional[List[float]]  # Or a string hash
+    similarity_vector: Optional[List[float]]
 
 
 class UserInterruption(TypedDict):
     """
-    Represents a point where the user's input deviates from the agent's
-    current pending action or goal, requiring a temporary shift in focus.
+    Represents a point where user input deviates from the agent's flow.
+
+    Used by the Planner to prioritize handling these deviations.
+
+    Attributes:
+        type: The type of interruption (question, objection, etc.).
+        text: The core text of the interruption.
+        status: Whether the interruption is pending resolution or resolved.
+        turn_detected: The turn number when the interruption was detected.
     """
 
     type: UserInterruptionType
-    text: str  # The core text of the interruption (e.g., the question, the objection)
+    text: str
     status: Literal["pending_resolution", "resolved", "acknowledged"]
     turn_detected: int
 
@@ -240,9 +314,46 @@ class ProposedSolution(TypedDict):
 
 class RichConversationState(TypedDict):
     """
-    The central, rich state representation for an AI sales agent conversation.
+    The central state representation for an AI sales agent conversation.
+
     Manages all aspects of the dialogue, agent's strategy, customer understanding,
-    and operational metadata.
+    and operational metadata required for the LangGraph execution flow.
+
+    Attributes:
+        account_id: Unique identifier for the account/client.
+        conversation_id: Unique identifier for this specific conversation.
+        bot_agent_id: Optional identifier for the specific bot agent configuration used.
+        company_profile: Static information about the company (name, offerings, etc.).
+        agent_config: Configuration specific to the bot agent instance.
+
+        messages: The history of messages in the conversation (accumulated).
+        current_user_input_text: The latest message received from the user for processing.
+        current_turn_number: The current turn number in the conversation.
+
+        current_agent_goal: The agent's current high-level objective.
+        last_agent_action: The last action performed by the agent.
+        user_interruptions_queue: List of pending user interruptions to be handled.
+        next_agent_action_command: The specific action planned for the current turn.
+        action_parameters: Parameters required for the planned action.
+
+        customer_profile_dynamic: Dynamically inferred information about the customer.
+        customer_question_log: Log of questions asked by the customer.
+        current_turn_extracted_questions: Temporary list of questions extracted in the current turn (used by StateUpdater).
+
+        active_proposal: Details of the solution currently proposed to the customer.
+        closing_process_status: Current status of the sales closing process.
+        last_objection_handled_turn: Turn number when the last objection was addressed (future use).
+
+        retrieved_knowledge_for_next_action: Context retrieved from RAG for the planned action.
+        last_agent_generation_text: Raw text output from the response generator LLM.
+        final_agent_message_text: Formatted text ready to be sent to the user.
+        conversation_summary_for_llm: Optional summary for providing long-term context to LLMs.
+        last_interaction_timestamp: Timestamp of the last message processed.
+        is_simulation: Flag indicating if the conversation is a simulation.
+
+        user_input_analysis_result: Temporary storage for the output of the InputProcessor node.
+        last_processing_error: Stores error message from the last failed node execution.
+        disengagement_reason: Optional reason why the conversation ended prematurely.
     """
 
     # --- Core Identifiers & Configuration ---
@@ -269,35 +380,34 @@ class RichConversationState(TypedDict):
 
     # --- Customer Question Tracking ---
     customer_question_log: List[CustomerQuestionEntry]
-    current_turn_extracted_questions: List[CustomerQuestionEntry]
+    current_turn_extracted_questions: List[CustomerQuestionEntry]  # Temp field
 
     # --- Sales Process Specific State ---
     active_proposal: Optional[ProposedSolution]
-    closing_process_status: Optional[
-        Literal[
-            "not_started",
-            "attempt_made",
-            "awaiting_confirmation",
-            "confirmation_rejected",
-            "needs_correction",
-            "confirmed_success",
-            "confirmed_failed_to_process",
-        ]
-    ]
+    closing_process_status: Optional[ClosingProcessStatusType]
     last_objection_handled_turn: Optional[int]
 
     # --- Context for Generation & Operational Data ---
-    retrieved_knowledge_for_next_action: Optional[str]
-    last_agent_generation_text: Optional[str]
+    retrieved_knowledge_for_next_action: Optional[str]  # RAG context
+    last_agent_generation_text: Optional[str]  # Raw LLM output
+    final_agent_message_text: Optional[str]  # Formatted output
     conversation_summary_for_llm: Optional[str]
     last_interaction_timestamp: float
     is_simulation: bool
 
-    # --- Resultado da Análise do Input (NOVO CAMPO) ---
-    # Este campo armazenará temporariamente o resultado do process_user_input_node
-    # para ser usado pelo state_updater_node.
-    user_input_analysis_result: Optional[Dict[str, Any]]
+    # --- Temporary fields for inter-node communication ---
+    user_input_analysis_result: Optional[Dict[str, Any]]  # Output of InputProcessor
 
     # --- Error Handling & System Status ---
     last_processing_error: Optional[str]
     disengagement_reason: Optional[str]
+
+    # --- Default values for initialization ---
+    # It's often better to handle defaults in the graph initialization
+    # but providing some here can be helpful for type checking.
+    # Example (adjust as needed):
+    # def __init__(self, **kwargs):
+    #     super().__init__(**kwargs)
+    #     self.setdefault("current_turn_number", 0)
+    #     self.setdefault("messages", [])
+    #     # ... other defaults
