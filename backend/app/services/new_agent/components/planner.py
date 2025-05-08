@@ -485,12 +485,12 @@ async def goal_and_action_planner_node(
                     None  # Clear it as we are resuming
                 )
                 # Reset goal-specific details upon resumption for certain goals
-                if effective_goal.get("goal_type") == "INVESTIGATING_NEEDS":
-                    effective_goal["goal_details"] = {
-                        "spin_questions_asked_this_cycle": 0,
-                        "last_spin_type_asked": None,
-                    }
-                elif effective_goal.get("goal_type") == "ATTEMPTING_CLOSE":
+                # if effective_goal.get("goal_type") == "INVESTIGATING_NEEDS":
+                #     effective_goal["goal_details"] = {
+                #         "spin_questions_asked_this_cycle": 0,
+                #         "last_spin_type_asked": None,
+                #     }
+                if effective_goal.get("goal_type") == "ATTEMPTING_CLOSE":
                     # When resuming ATTEMPTING_CLOSE, we might need to re-evaluate the step
                     # For now, let's assume it resumes to 'initial_attempt' or the planner logic will pick the right step.
                     # If it had specific sub-steps, those might need to be reset or re-evaluated.
