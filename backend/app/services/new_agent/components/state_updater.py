@@ -434,62 +434,11 @@ async def update_conversation_state_node(
     if isinstance(last_action, dict):  # Check if it's a dictionary before getting type
         last_action_type = last_action.get("action_type")
 
-    # # Only update status if the agent just tried to initiate closing
-    # if last_action_type == "INITIATE_CLOSING":
-    #     if analysis.overall_intent == "ConfirmingCloseAttempt":
-    #         if current_closing_status != "awaiting_confirmation":
-    #             updated_state_delta["closing_process_status"] = "awaiting_confirmation"
-    #             closing_status_changed = True
-    #             logger.info(
-    #                 f"[{node_name}] Closing status updated to awaiting_confirmation."
-    #             )
-    #     elif analysis.overall_intent == "RejectingCloseAttempt":
-    #         if current_closing_status != "confirmation_rejected":
-    #             updated_state_delta["closing_process_status"] = "confirmation_rejected"
-    #             closing_status_changed = True
-    #             logger.info(
-    #                 f"[{node_name}] Closing status updated to confirmation_rejected."
-    #             )
-    #     elif analysis.overall_intent == "RequestingOrderCorrection":
-    #         if current_closing_status != "needs_correction":
-    #             updated_state_delta["closing_process_status"] = "needs_correction"
-    #             closing_status_changed = True
-    #             logger.info(
-    #                 f"[{node_name}] Closing status updated to needs_correction."
-    #             )
-    #     # If user raised objection or asked question, the interruption queue handles it,
-    #     # and the closing status might implicitly revert or stay as 'attempt_made'.
-    #     # We might need more explicit logic later if needed.
-
-    # # --- ADDED: Update status based on response to CONFIRM_ORDER_DETAILS ---
-    # elif last_action_type == "CONFIRM_ORDER_DETAILS":
-    #     if analysis.overall_intent == "FinalOrderConfirmation":
-    #         if current_closing_status != "confirmed_success":
-    #             updated_state_delta["closing_process_status"] = "confirmed_success"
-    #             closing_status_changed = True
-    #             logger.info(
-    #                 f"[{node_name}] Closing status updated to confirmed_success."
-    #             )
-    #     elif (
-    #         analysis.overall_intent == "RejectingCloseAttempt"
-    #     ):  # Can still reject here
-    #         if current_closing_status != "confirmation_rejected":
-    #             updated_state_delta["closing_process_status"] = "confirmation_rejected"
-    #             closing_status_changed = True
-    #             logger.info(
-    #                 f"[{node_name}] Closing status updated to confirmation_rejected (at details stage)."
-    #             )
-    #     elif (
-    #         analysis.overall_intent == "RequestingOrderCorrection"
-    #     ):  # Can still ask for correction
-    #         if current_closing_status != "needs_correction":
-    #             updated_state_delta["closing_process_status"] = "needs_correction"
-    #             closing_status_changed = True
-    #             logger.info(
-    #                 f"[{node_name}] Closing status updated to needs_correction (at details stage)."
-    #             )
-
-    if last_action_type in ["INITIATE_CLOSING", "CONFIRM_ORDER_DETAILS"]:
+    if last_action_type in [
+        "INITIATE_CLOSING",
+        "CONFIRM_ORDER_DETAILS",
+        "HANDLE_CLOSING_CORRECTION",
+    ]:
         if (
             analysis.overall_intent == "ConfirmingCloseAttempt"
             and last_action_type == "INITIATE_CLOSING"
@@ -525,6 +474,21 @@ async def update_conversation_state_node(
                 closing_status_changed = True
                 logger.info(
                     f"[{node_name}] Closing status updated to needs_correction (after {last_action_type})."
+                )
+
+        elif analysis.overall_intent == "ProvidingCorrectionDetails":
+            # Store correction details (e.g., in a temporary field or log) - For now, just log
+            if analysis.correction_details_text:
+                logger.info(
+                    f"[{node_name}] User provided correction details: {analysis.correction_details_text}"
+                )
+                # TODO: Decide how to store/use this text later (e.g., update active_proposal?)
+            # Set status back to awaiting confirmation for the planner
+            if current_closing_status != "awaiting_confirmation":
+                updated_state_delta["closing_process_status"] = "awaiting_confirmation"
+                closing_status_changed = True
+                logger.info(
+                    f"[{node_name}] Closing status updated to awaiting_confirmation (after correction provided)."
                 )
 
     # --- 6. Update Interruption Queue (Consolidated) ---
