@@ -23,6 +23,11 @@ from app.services.helper.websocket import (
     publish_to_account_conversations_ws,
 )
 
+from app.core.wake_workers import wake_worker
+from app.config import get_settings
+
+settings = get_settings()
+
 router = APIRouter()
 queue = RedisQueue(queue_name="response_queue")
 
@@ -281,7 +286,7 @@ async def create_outgoing_message(
                     "[queue] Failed to connect to response queue. Cannot enqueue message."
                 )
             else:
-
+                await wake_worker(settings.RESPONSE_SENDER_WORKER_INTERNAL_URL)
                 await queue.enqueue({"message_id": str(message.id)})
                 logger.info(f"[queue] Message {message.id} enqueued for delivery")
         else:

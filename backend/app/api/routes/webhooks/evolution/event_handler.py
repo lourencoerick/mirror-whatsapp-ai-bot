@@ -20,6 +20,11 @@ from app.services.helper.websocket import publish_to_instance_ws
 from app.services.helper.webhook import find_account_id_from_source
 from app.services.parser.parse_webhook_to_message import parse_webhook_to_message
 
+from app.core.wake_workers import wake_worker
+from app.config import get_settings
+
+settings = get_settings()
+
 
 async def handle_connection_update(
     instance_id: UUID,
@@ -155,6 +160,9 @@ async def handle_message(
             logger.error(f"[webhook] {e}")
             raise e
 
+        await wake_worker(settings.MESSAGE_CONSUMER_WORKER_INTERNAL_URL)
+        await wake_worker(settings.AI_REPLIER_INTERNAL_URL)
+        await wake_worker(settings.RESPONSE_SENDER_WORKER_INTERNAL_URL)
         await queue.enqueue(message)
         logger.info(f"[webhook] Enqueued Evolution message: {message.get('source_id')}")
 
