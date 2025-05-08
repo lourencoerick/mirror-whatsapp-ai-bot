@@ -182,6 +182,11 @@ class InitialUserInputAnalysis(BaseModel):
         "ExpressingObjection",
         "ExpressingNeedOrPain",
         "RespondingToAgent",
+        "ConfirmingCloseAttempt",  # <<< NEW INTENT: User agrees to proceed after INITIATE_CLOSING
+        "RejectingCloseAttempt",  # (Future) User declines after INITIATE_CLOSING
+        "RequestingOrderCorrection",
+        "ProvidingCorrectionDetails",
+        "FinalOrderConfirmation",
         "VagueOrUnclear",
         "OffTopic",
         "PositiveFeedback",
@@ -211,6 +216,9 @@ class InitialUserInputAnalysis(BaseModel):
     analysis_of_response_to_agent_action: PendingAgentActionResponseAnalysis
     is_primarily_vague_statement: bool = Field(False)
     is_primarily_off_topic: bool = Field(False)
+    correction_details_text: Optional[str] = Field(
+        None, description="Specific text provided by user for correction"
+    )
 
     class Config:
         extra = "forbid"
@@ -231,6 +239,11 @@ class UserInputAnalysisOutput(BaseModel):
         "ExpressingObjection",
         "ExpressingNeedOrPain",
         "RespondingToAgent",
+        "ConfirmingCloseAttempt",  # <<< NEW INTENT: User agrees to proceed after INITIATE_CLOSING
+        "RejectingCloseAttempt",  # (Future) User declines after INITIATE_CLOSING
+        "RequestingOrderCorrection",
+        "ProvidingCorrectionDetails",
+        "FinalOrderConfirmation",
         "VagueOrUnclear",
         "OffTopic",
         "PositiveFeedback",
@@ -256,6 +269,9 @@ class UserInputAnalysisOutput(BaseModel):
     analysis_of_response_to_agent_action: PendingAgentActionResponseAnalysis
     is_primarily_vague_statement: bool = Field(False)
     is_primarily_off_topic: bool = Field(False)
+    correction_details_text: Optional[str] = Field(
+        None, description="Specific text provided by user for correction"
+    )
 
     class Config:
         extra = "forbid"
