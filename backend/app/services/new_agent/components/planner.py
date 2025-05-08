@@ -18,6 +18,7 @@ from ..state_definition import (
     IdentifiedObjectionEntry,
     IdentifiedPainPointEntry,
     DynamicCustomerProfile,
+    ProposedSolution,  # Added import
 )
 
 INTERRUPTION_TO_ACTION_MAP: Dict[str, AgentActionType] = {
@@ -38,13 +39,16 @@ def _find_priority_interruption(
 ) -> Optional[UserInterruption]:
     """
     Finds the highest priority pending interruption in the queue.
-    Current priority: Objection > Question > Vague > OffTopic.
+
+    Current priority order (highest to lowest):
+    Objection > Direct Question > Vague Statement > Off-Topic Comment.
 
     Args:
-        queue: The list of user interruptions.
+        queue: The list of user interruption dictionaries from the state.
 
     Returns:
-        The highest priority pending interruption or None.
+        The highest priority pending interruption dictionary, or None if no
+        pending interruptions are found.
     """
     # Priority: Objection > Question > Vague > OffTopic
     for type_to_check in [
@@ -68,11 +72,16 @@ def _get_goal_for_interruption(
     """
     Determines the temporary goal type and details based on an interruption.
 
+    Maps an interruption type to a corresponding temporary agent goal
+    (e.g., HANDLING_OBJECTION, CLARIFYING_USER_INPUT) and extracts relevant
+    details from the interruption object.
+
     Args:
-        interruption: The user interruption object.
+        interruption: The user interruption dictionary.
 
     Returns:
-        A tuple containing the AgentGoalType and goal details dictionary.
+        A tuple containing the determined AgentGoalType and a dictionary
+        with goal-specific details (like the objection text or question text).
     """
     interruption_type = interruption.get("type")
     interruption_text = interruption.get("text", "")
@@ -83,9 +92,7 @@ def _get_goal_for_interruption(
         goal_type = "HANDLING_OBJECTION"
         goal_details = {"original_objection_text": interruption_text}
     elif interruption_type == "direct_question":
-        goal_type = (
-            "CLARIFYING_USER_INPUT"  # Using this goal type for answering questions too
-        )
+        goal_type = "CLARIFYING_USER_INPUT"
         goal_details = {"text": interruption_text, "clarification_type": "question"}
     elif interruption_type == "vague_statement":
         goal_type = "CLARIFYING_USER_INPUT"
@@ -95,8 +102,7 @@ def _get_goal_for_interruption(
         goal_details = {"reason": "Handling off-topic", "text": interruption_text}
     else:
         logger.warning(f"Unknown interruption type '{interruption_type}' encountered.")
-        # Fallback goal? Or handle as error? For now, let CLARIFYING handle it.
-        goal_type = "CLARIFYING_USER_INPUT"
+        goal_type = "CLARIFYING_USER_INPUT"  # Fallback
         goal_details = {"text": interruption_text, "clarification_type": "unknown"}
 
     return goal_type, goal_details
@@ -107,14 +113,19 @@ def _get_previous_goal_to_store(
 ) -> Optional[AgentGoal]:
     """
     Determines which goal to store as the 'previous_goal_if_interrupted'.
-    Avoids nesting temporary goals deeply.
+
+    This prevents nesting temporary goals (like handling an objection while
+    already handling a question). If the current goal is already a temporary
+    one, its own 'previous_goal' is stored instead.
 
     Args:
-        current_goal: The goal active before the interruption.
-        goal_type_for_interruption: The type of the new temporary goal.
+        current_goal: The goal active before the interruption was detected.
+        goal_type_for_interruption: The type of the new temporary goal being set.
 
     Returns:
-        The goal to store as the previous one, or None.
+        The goal object (as a dictionary) to be stored in the
+        'previous_goal_if_interrupted' field of the new temporary goal,
+        or None if no previous goal should be stored.
     """
     # If the interruption goal is the same as the current one, keep the existing previous goal
     if current_goal.get("goal_type") == goal_type_for_interruption:
@@ -136,12 +147,19 @@ def _check_goal_resumption(
     """
     Checks if the agent should resume a previously interrupted goal.
 
+    Resumption occurs if the current goal is a temporary one (like
+    clarification or objection handling) and the condition for its completion
+    is met (e.g., no more pending interruptions of that type, or the handled
+    objection is marked as 'resolved' in the profile).
+
     Args:
         current_goal: The current goal object from the state.
-        customer_profile: The dynamic customer profile.
+        customer_profile: The dynamic customer profile dictionary.
 
     Returns:
-        A tuple: (should_resume: bool, goal_to_resume: Optional[AgentGoal]).
+        A tuple containing:
+            - bool: True if a previous goal should be resumed, False otherwise.
+            - Optional[AgentGoal]: The goal object to be resumed, or None.
     """
     previous_goal_to_resume = current_goal.get("previous_goal_if_interrupted")
     if not previous_goal_to_resume:
@@ -149,7 +167,7 @@ def _check_goal_resumption(
 
     current_goal_type = current_goal.get("goal_type")
 
-    # Resume after temporary clarification/transition goals are done
+    # Resume after temporary clarification/transition goals are done (assuming interruption queue is clear)
     if current_goal_type in ["CLARIFYING_USER_INPUT", "ACKNOWLEDGE_AND_TRANSITION"]:
         logger.info(
             f"Temporary goal {current_goal_type} completed. Attempting to resume."
@@ -162,7 +180,6 @@ def _check_goal_resumption(
             "original_objection_text"
         )
         if original_objection_text:
-            # Check the profile for the objection's status
             obj_entry = _find_objection_in_profile(
                 customer_profile, original_objection_text
             )
@@ -191,34 +208,32 @@ def _find_objection_in_profile(
 ) -> Optional[IdentifiedObjectionEntry]:
     """
     Finds a specific objection entry in the profile by its text.
-    Uses exact match for now.
 
     Args:
-        customer_profile: The dynamic customer profile.
-        objection_text: The text of the objection to find.
+        customer_profile: The dynamic customer profile dictionary.
+        objection_text: The exact text of the objection to find.
 
     Returns:
-        The found objection entry dictionary or None.
+        The found objection entry dictionary (TypedDict) or None if not found.
     """
-    # Ensure objection_text is not None before comparison
     if objection_text is None:
         return None
     for obj_entry in customer_profile.get("identified_objections", []):
-        # Use exact match for reliability
         if obj_entry.get("text") == objection_text:
-            return obj_entry
+            return obj_entry  # type: ignore
     return None
 
 
 def _get_next_spin_type(last_spin_type: Optional[SpinQuestionType]) -> SpinQuestionType:
     """
-    Determines the next SPIN question type in the sequence.
+    Determines the next SPIN question type in the standard S->P->I->N sequence.
+    Loops back to 'Problem' after 'NeedPayoff'.
 
     Args:
-        last_spin_type: The type of the last SPIN question asked.
+        last_spin_type: The type of the last SPIN question asked, or None if starting.
 
     Returns:
-        The next SPIN question type.
+        The next SpinQuestionType in the sequence.
     """
     if last_spin_type == "Situation":
         return "Problem"
@@ -238,14 +253,22 @@ def _select_product_and_benefit_for_presentation(
 ) -> Tuple[str, str]:
     """
     Selects a product and key benefit to highlight based on identified needs.
-    Prioritizes confirmed needs, then active needs. Uses simple keyword matching.
+
+    Prioritizes confirmed needs over active needs, sorting by priority and then
+    turn number. Performs simple keyword matching between the highest priority
+    need and the company's offerings. Defaults to the first offering if no
+    match is found or if needs are unclear.
 
     Args:
-        customer_profile: The dynamic customer profile.
-        company_profile_offerings: List of offerings from the company profile.
+        customer_profile: The dynamic customer profile dictionary.
+        company_profile_offerings: A list of offering dictionaries from the
+                                   company profile, expected to have 'name' and
+                                   'short_description' keys.
 
     Returns:
-        A tuple containing the product name and the key benefit string.
+        A tuple containing:
+            - str: The name of the product selected for presentation.
+            - str: A string describing the key benefit linked to the need.
     """
     product_to_present = "Nossa Solução Principal"
     key_benefit = "atender às suas necessidades gerais"
@@ -254,13 +277,9 @@ def _select_product_and_benefit_for_presentation(
     )
     target_need: Optional[IdentifiedNeedEntry] = None
 
-    # Prioritize confirmed needs, then active needs, sorted by priority/turn
-    confirmed_needs = [
-        n for n in identified_needs if n.get("status") == "confirmed_by_user"
-    ]
-    active_needs = [n for n in identified_needs if n.get("status") == "active"]
+    # Combine and sort needs: confirmed first, then by priority, then by turn
     needs_to_consider = sorted(
-        confirmed_needs + active_needs,
+        identified_needs,
         key=lambda x: (
             x.get("status") == "confirmed_by_user",
             x.get("priority", 0),
@@ -270,19 +289,17 @@ def _select_product_and_benefit_for_presentation(
     )
 
     if needs_to_consider:
-        target_need = needs_to_consider[0]
+        target_need = needs_to_consider[0]  # type: ignore
 
     if target_need:
         target_need_text = target_need.get("text", "sua necessidade principal")
         key_benefit = f"o seu desafio em relação a '{target_need_text}'"
 
         if company_profile_offerings:
-            best_match_score = (
-                -1
-            )  # Use -1 to ensure first offering is chosen if no keywords match
+            best_match_score = -1
             best_match_product = company_profile_offerings[0].get(
                 "name", product_to_present
-            )  # Fallback to first
+            )
 
             try:
                 need_keywords = {
@@ -305,16 +322,15 @@ def _select_product_and_benefit_for_presentation(
                 logger.warning(
                     f"Error during keyword matching for product selection: {e}"
                 )
-                # Keep the default/first product in case of error
 
             product_to_present = best_match_product
             if best_match_score > 0:
                 logger.debug(
-                    f"Planner: Matched need '{target_need_text}' to product '{product_to_present}' based on keywords (Score: {best_match_score})."
+                    f"Planner: Matched need '{target_need_text}' to product '{product_to_present}' (Score: {best_match_score})."
                 )
             else:
                 logger.debug(
-                    f"Planner: No specific product keyword match for need '{target_need_text}', defaulting to '{product_to_present}'."
+                    f"Planner: No specific keyword match for need '{target_need_text}', defaulting to '{product_to_present}'."
                 )
         else:
             logger.warning("Planner: No company offerings found to match needs.")
@@ -328,15 +344,27 @@ async def goal_and_action_planner_node(
 ) -> Dict[str, Any]:
     """
     Determines the agent's next goal and action based on the current state.
-    Prioritizes high-level transitions (like buying signals), then interruptions,
-    then goal resumption, then standard goal progression.
+
+    This node acts as the central decision-making unit for the agent. It follows
+    a prioritized flow:
+    1. Check for high-priority goal transitions (e.g., buying signal detected).
+    2. Check for and handle pending user interruptions (objections, questions, etc.).
+    3. Check if a previous goal should be resumed (after handling an interruption).
+    4. If none of the above apply, determine the next action based on the
+       current effective goal's logic (e.g., continue SPIN, handle objection
+       attempts, initiate closing steps).
 
     Args:
-        state: The current conversation state.
-        config: The graph configuration.
+        state: The current conversation state dictionary.
+        config: The graph configuration dictionary.
 
     Returns:
-        A dictionary containing the state updates for the planner's decisions.
+        A dictionary containing the state updates decided by the planner, including:
+            - `current_agent_goal`: The determined goal for the next step.
+            - `next_agent_action_command`: The specific action the agent should perform.
+            - `action_parameters`: A dictionary of parameters needed for the action.
+            - `user_interruptions_queue`: Updated queue if an interruption was handled.
+            - `last_processing_error`: Cleared if planner runs successfully.
     """
     node_name = "goal_and_action_planner_node"
     current_turn = state.get("current_turn_number", 0)
@@ -354,6 +382,7 @@ async def goal_and_action_planner_node(
     if current_goal_from_state.get("goal_details") is None:
         current_goal_from_state["goal_details"] = {}
     interruptions_queue = state.get("user_interruptions_queue", [])
+    # Cast to help type checker, profile is extensively used
     customer_profile = cast(
         DynamicCustomerProfile, copy.deepcopy(state.get("customer_profile_dynamic", {}))
     )
@@ -365,11 +394,9 @@ async def goal_and_action_planner_node(
     goal_determined_by_high_priority_transition = False
     goal_determined_by_interruption = False
     resumed_goal_this_turn = False
-    interruption_to_handle: Optional[UserInterruption] = (
-        None  # Store handled interruption
-    )
+    interruption_to_handle: Optional[UserInterruption] = None
 
-    # --- Check for High-Priority Goal Transitions FIRST ---
+    # Check for High-Priority Goal Transitions FIRST
     current_goal_type = effective_goal.get("goal_type")
     if current_goal_type == "PRESENTING_SOLUTION":
         last_intent = customer_profile.get("last_discerned_intent")
@@ -393,7 +420,7 @@ async def goal_and_action_planner_node(
             )
             goal_determined_by_high_priority_transition = True
 
-    # --- If no high-priority transition, check for Interruptions ---
+    # If no high-priority transition, check for Interruptions
     if not goal_determined_by_high_priority_transition:
         interruption_to_handle = _find_priority_interruption(interruptions_queue)
         if interruption_to_handle:
@@ -413,7 +440,7 @@ async def goal_and_action_planner_node(
             )
             goal_determined_by_interruption = True
         else:
-            # --- If no interruption, check for Goal Resumption ---
+            # If no interruption, check for Goal Resumption
             should_resume, goal_to_resume = _check_goal_resumption(
                 current_goal_from_state, customer_profile
             )
@@ -584,7 +611,6 @@ async def goal_and_action_planner_node(
                 effective_goal["goal_details"]["last_spin_type_asked"] = next_spin_type
 
         elif effective_goal_type == "PRESENTING_SOLUTION":
-            # Buying signal transition already handled before interruption check
             if (
                 last_agent_action
                 and last_agent_action.get("action_type") == "PRESENT_SOLUTION_OFFER"
@@ -602,7 +628,6 @@ async def goal_and_action_planner_node(
             active_proposal = state.get("active_proposal")
             closing_step = effective_goal.get("goal_details", {}).get("closing_step")
 
-            # Decide action based on status
             if closing_status == "awaiting_confirmation":
                 logger.info(f"[{node_name}] Planning to confirm details.")
                 planned_action_command = "CONFIRM_ORDER_DETAILS"
@@ -615,7 +640,6 @@ async def goal_and_action_planner_node(
                         "price_info"
                     )
                 effective_goal["goal_details"]["closing_step"] = "confirming_details"
-
             elif closing_status == "confirmed_success":
                 logger.info(f"[{node_name}] Planning final processing step.")
                 planned_action_command = "PROCESS_ORDER_CONFIRMATION"
@@ -624,7 +648,6 @@ async def goal_and_action_planner_node(
                         "product_name"
                     )
                 effective_goal["goal_details"]["closing_step"] = "processing"
-
             elif closing_status == "needs_correction":
                 logger.info(f"[{node_name}] Planning action to handle correction.")
                 planned_action_command = "HANDLE_CLOSING_CORRECTION"
@@ -640,7 +663,6 @@ async def goal_and_action_planner_node(
                         "Estávamos finalizando seu pedido."
                     )
                 effective_goal["goal_details"]["closing_step"] = "handling_correction"
-
             elif (
                 closing_status == "not_started"
                 or (closing_status == "attempt_made" and not last_agent_action)
@@ -662,7 +684,6 @@ async def goal_and_action_planner_node(
                         "product_name"
                     )
                     planned_action_parameters["price"] = active_proposal.get("price")
-
             elif closing_status == "confirmation_rejected":
                 logger.info(
                     f"[{node_name}] Closing attempt rejected by user. Transitioning."
@@ -672,17 +693,14 @@ async def goal_and_action_planner_node(
                 effective_goal["previous_goal_if_interrupted"] = None
                 planned_action_command = "GENERATE_FAREWELL"
                 planned_action_parameters["reason"] = "Closing attempt rejected"
-
-            else:  # Includes attempt_made (and agent just acted), confirmed_failed_to_process etc.
+            else:
                 logger.info(
                     f"[{node_name}] In ATTEMPTING_CLOSE, status is '{closing_status}'. Waiting."
                 )
                 planned_action_command = None
 
         elif effective_goal_type == "ENDING_CONVERSATION":
-            if (
-                not planned_action_command
-            ):  # If impasse/rejection logic didn't already set an action
+            if not planned_action_command:
                 logger.info(
                     f"[{node_name}] In ENDING_CONVERSATION goal. Planning farewell."
                 )
