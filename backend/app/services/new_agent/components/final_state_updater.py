@@ -21,8 +21,30 @@ async def finalize_turn_state_node(
     state: RichConversationState, config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    Updates the state at the very end of the agent's turn, after response generation and formatting.
-    Adds the final AI message to history, records the action taken, and cleans up temporary fields.
+    Performs final state updates at the end of the agent's turn.
+
+    This node is responsible for:
+    1. Adding the final formatted AI message (from `final_agent_message_text`
+       or falling back to `last_agent_generation_text`) to the message history.
+    2. Recording the action performed by the agent in this turn (`last_agent_action`)
+       based on the `next_agent_action_command` and `action_parameters` set by
+       the Planner, and the `last_agent_generation_text` from the Generator.
+    3. If the action was `GENERATE_REBUTTAL`, updates the corresponding objection's
+       status to 'addressing' and increments its `rebuttal_attempts` count in the
+       customer profile.
+    4. Clearing temporary fields from the state that are only relevant within a
+       single turn (e.g., `next_agent_action_command`, `action_parameters`,
+       `retrieved_knowledge_for_next_action`, generation texts, analysis result).
+
+    Args:
+        state: The current conversation state dictionary.
+        config: The graph configuration dictionary (not used in this node).
+
+    Returns:
+        A dictionary containing the state updates (delta) to be merged into the
+        main conversation state. This includes the updated message history,
+        the recorded last action, potentially updated customer profile, and
+        cleared temporary fields.
     """
     node_name = "finalize_turn_state_node"
     current_turn = state.get("current_turn_number", "N/A")
