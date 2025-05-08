@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - master
-      - feat/wakeup_worker_mecanism
     paths:
       - "backend/**"
       - "Dockerfile"
