@@ -35,8 +35,8 @@ MAX_REBUTTAL_ATTEMPTS_PER_OBJECTION = 2
 def _find_priority_interruption(
     queue: List[UserInterruption],
 ) -> Optional[UserInterruption]:
-    """Finds the highest priority interruption (simple first-found for now)."""
-    # Prioritize Objection > Question > Vague > OffTopic
+    """Finds the highest priority interruption."""
+    # Priority: Objection > Question > Vague > OffTopic
     for type_to_check in [
         "objection",
         "direct_question",
@@ -223,21 +223,11 @@ def _select_product_and_benefit_for_presentation(
 async def goal_and_action_planner_node(
     state: RichConversationState, config: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """
-    Determines the agent's next goal and action based on the current state.
-
-    Args:
-        state: The current conversation state.
-        config: The graph configuration.
-
-    Returns:
-        A dictionary containing the state updates for the planner's decisions.
-    """
+    # ... (initial setup and logging) ...
     node_name = "goal_and_action_planner_node"
     current_turn = state.get("current_turn_number", 0)
     logger.info(f"--- Starting Node: {node_name} (Turn: {current_turn}) ---")
 
-    # Get working copies
     current_goal_from_state = copy.deepcopy(
         state.get(
             "current_agent_goal",
@@ -256,51 +246,78 @@ async def goal_and_action_planner_node(
     company_profile = state.get("company_profile", {})
 
     # --- 1. Determine Effective Goal for this Turn ---
-    effective_goal: AgentGoal
-    interruption_to_handle = _find_priority_interruption(interruptions_queue)
-    handled_interruption_this_turn = False
-    resumed_goal_this_turn = False  # <<< ADD FLAG
+    effective_goal: AgentGoal = current_goal_from_state
+    goal_determined_by_high_priority_transition = False  # <<< Renamed flag
+    goal_determined_by_interruption = False
+    resumed_goal_this_turn = False
 
-    if interruption_to_handle:
-        logger.info(
-            f"[{node_name}] Prioritizing interruption: Type='{interruption_to_handle.get('type')}', Text='{interruption_to_handle.get('text', '')[:50]}...'"
+    # --- Check for High-Priority Goal Transitions FIRST ---
+    current_goal_type = effective_goal.get("goal_type")
+    if current_goal_type == "PRESENTING_SOLUTION":
+        last_intent = customer_profile.get("last_discerned_intent")
+        active_objections = any(
+            obj.get("status") == "active"
+            for obj in customer_profile.get("identified_objections", [])
         )
-        goal_type_for_interruption, goal_details_for_interruption = (
-            _get_goal_for_interruption(interruption_to_handle)
+        strong_buying_signal = (
+            last_intent
+            in ["RequestForNextStepInPurchase", "PositiveFeedbackToProposal"]
+            and not active_objections
         )
-        previous_goal_to_store = _get_previous_goal_to_store(
-            current_goal_from_state, goal_type_for_interruption
-        )
-        effective_goal = AgentGoal(
-            goal_type=goal_type_for_interruption,
-            previous_goal_if_interrupted=previous_goal_to_store,
-            goal_details=goal_details_for_interruption,
-        )
-        handled_interruption_this_turn = True
-    else:
-        should_resume, goal_to_resume = _check_goal_resumption(
-            current_goal_from_state, customer_profile
-        )
-        if should_resume and goal_to_resume:
+        if strong_buying_signal:
             logger.info(
-                f"[{node_name}] Resuming previous goal: {goal_to_resume.get('goal_type')}"
+                f"[{node_name}] High-Priority Transition: Strong buying signal detected (Intent: {last_intent}). Transitioning to ATTEMPTING_CLOSE."
             )
-            effective_goal = copy.deepcopy(goal_to_resume)
-            effective_goal["previous_goal_if_interrupted"] = None
-            resumed_goal_this_turn = True  # <<< SET FLAG
-            # Reset goal-specific details upon resumption
-            if effective_goal.get("goal_type") == "INVESTIGATING_NEEDS":
-                effective_goal["goal_details"] = {
-                    "spin_questions_asked_this_cycle": 0,
-                    "last_spin_type_asked": None,
-                }
-            elif effective_goal.get("goal_details") is None:
-                effective_goal["goal_details"] = {}
-            # Add resets for other resumable goals if needed
+            effective_goal = AgentGoal(
+                goal_type="ATTEMPTING_CLOSE",
+                goal_details={"closing_step": "initial_attempt"},
+                previous_goal_if_interrupted=None,
+            )
+            goal_determined_by_high_priority_transition = True  # <<< Set specific flag
+
+    # --- If no high-priority transition, check for Interruptions ---
+    interruption_to_handle = None  # Define outside the block
+    if not goal_determined_by_high_priority_transition:
+        interruption_to_handle = _find_priority_interruption(interruptions_queue)
+        if interruption_to_handle:
+            logger.info(
+                f"[{node_name}] Prioritizing interruption: Type='{interruption_to_handle.get('type')}', Text='{interruption_to_handle.get('text', '')[:50]}...'"
+            )
+            goal_type_for_interruption, goal_details_for_interruption = (
+                _get_goal_for_interruption(interruption_to_handle)
+            )
+            previous_goal_to_store = _get_previous_goal_to_store(
+                current_goal_from_state, goal_type_for_interruption
+            )
+            effective_goal = AgentGoal(
+                goal_type=goal_type_for_interruption,
+                previous_goal_if_interrupted=previous_goal_to_store,
+                goal_details=goal_details_for_interruption,
+            )
+            goal_determined_by_interruption = True  # <<< Set specific flag
         else:
-            effective_goal = current_goal_from_state
-            if effective_goal.get("goal_details") is None:
-                effective_goal["goal_details"] = {}
+            # --- If no interruption, check for Goal Resumption ---
+            should_resume, goal_to_resume = _check_goal_resumption(
+                current_goal_from_state, customer_profile
+            )
+            if should_resume and goal_to_resume:
+                logger.info(
+                    f"[{node_name}] Resuming previous goal: {goal_to_resume.get('goal_type')}"
+                )
+                effective_goal = copy.deepcopy(goal_to_resume)
+                effective_goal["previous_goal_if_interrupted"] = None
+                resumed_goal_this_turn = True
+                if effective_goal.get("goal_type") == "INVESTIGATING_NEEDS":
+                    effective_goal["goal_details"] = {
+                        "spin_questions_asked_this_cycle": 0,
+                        "last_spin_type_asked": None,
+                    }
+                elif effective_goal.get("goal_details") is None:
+                    effective_goal["goal_details"] = {}
+
+    # Ensure details dict exists if not set above
+    if effective_goal.get("goal_details") is None:
+        effective_goal["goal_details"] = {}
 
     logger.info(
         f"[{node_name}] Effective goal for planning: {effective_goal.get('goal_type')}"
@@ -315,11 +332,11 @@ async def goal_and_action_planner_node(
     planned_action_parameters: AgentActionDetails = {}
     effective_goal_type = effective_goal.get("goal_type", "IDLE")
 
-    # --- FIX: Skip action planning if goal was just resumed ---
+    # --- FIX: Skip action planning ONLY if goal was just RESUMED ---
     if not resumed_goal_this_turn:
         # --- Action Planning Logic per Goal (Place the entire if/elif block here) ---
         if effective_goal_type == "HANDLING_OBJECTION":
-            # ... (objection handling logic as before) ...
+            # ... (logic as before)
             original_objection_text = effective_goal.get("goal_details", {}).get(
                 "original_objection_text"
             )
@@ -341,7 +358,9 @@ async def goal_and_action_planner_node(
                         logger.warning(
                             f"[{node_name}] Max rebuttal attempts ({attempts}) reached for objection '{original_objection_text[:30]}'. Handling impasse."
                         )
-                        effective_goal["goal_type"] = "ENDING_CONVERSATION"
+                        effective_goal["goal_type"] = (
+                            "ENDING_CONVERSATION"  # Update goal
+                        )
                         effective_goal["goal_details"] = {
                             "reason": f"Impasse on objection: {original_objection_text}"
                         }
@@ -368,7 +387,7 @@ async def goal_and_action_planner_node(
                 planned_action_command = None
 
         elif effective_goal_type == "CLARIFYING_USER_INPUT":
-            # ... (clarification logic as before) ...
+            # ... (logic as before)
             clarification_type = effective_goal.get("goal_details", {}).get(
                 "clarification_type"
             )
@@ -386,7 +405,7 @@ async def goal_and_action_planner_node(
                 planned_action_command = "ASK_CLARIFYING_QUESTION"
 
         elif effective_goal_type == "ACKNOWLEDGE_AND_TRANSITION":
-            # ... (ack/transition logic as before) ...
+            # ... (logic as before)
             planned_action_command = "ACKNOWLEDGE_AND_TRANSITION"
             planned_action_parameters["off_topic_text"] = effective_goal.get(
                 "goal_details", {}
@@ -401,7 +420,7 @@ async def goal_and_action_planner_node(
             planned_action_parameters["previous_goal_topic"] = prev_goal_topic
 
         elif effective_goal_type == "INVESTIGATING_NEEDS":
-            # ... (SPIN logic as corrected before) ...
+            # ... (logic as before)
             spin_details = effective_goal.get("goal_details", {})
             spin_questions_asked = spin_details.get(
                 "spin_questions_asked_this_cycle", 0
@@ -428,7 +447,7 @@ async def goal_and_action_planner_node(
                 logger.info(
                     f"[{node_name}] Transitioning from SPIN. Reason: {exit_reason}"
                 )
-                effective_goal["goal_type"] = "PRESENTING_SOLUTION"
+                effective_goal["goal_type"] = "PRESENTING_SOLUTION"  # Update goal
                 product_to_present, key_benefit = (
                     _select_product_and_benefit_for_presentation(
                         customer_profile, company_profile.get("offering_overview", [])
@@ -453,50 +472,54 @@ async def goal_and_action_planner_node(
                 effective_goal["goal_details"]["last_spin_type_asked"] = next_spin_type
 
         elif effective_goal_type == "PRESENTING_SOLUTION":
-            # ... (presentation/closing transition logic as before) ...
-            last_intent = customer_profile.get("last_discerned_intent")
-            active_objections = any(
-                obj.get("status") == "active"
-                for obj in customer_profile.get("identified_objections", [])
-            )
-            strong_buying_signal = (
-                last_intent
-                in ["RequestForNextStepInPurchase", "PositiveFeedbackToProposal"]
-                and not active_objections
-            )
-            if strong_buying_signal:
+            # ... (logic as before - note: buying signal check already happened)
+            if (
+                last_agent_action
+                and last_agent_action.get("action_type") == "PRESENT_SOLUTION_OFFER"
+            ):
                 logger.info(
-                    f"[{node_name}] Strong buying signal detected (Intent: {last_intent}). Transitioning to ATTEMPTING_CLOSE."
+                    f"[{node_name}] Agent just presented solution. Waiting for user response."
                 )
-                effective_goal["goal_type"] = "ATTEMPTING_CLOSE"
-                effective_goal["goal_details"] = {"closing_step": "initial_attempt"}
-                effective_goal["previous_goal_if_interrupted"] = None
-                planned_action_command = "INITIATE_CLOSING"
-                active_proposal = state.get("active_proposal")
+                planned_action_command = None
+            else:
+                logger.info(
+                    f"[{node_name}] In PRESENTING_SOLUTION state, but not just presented and no buying signal. Waiting."
+                )
+                planned_action_command = None
+
+        elif effective_goal_type == "ATTEMPTING_CLOSE":
+            closing_status = state.get("closing_process_status", "not_started")
+            active_proposal = state.get("active_proposal")  # Get proposal details
+
+            # --- ADDED: Logic based on closing_status ---
+            if closing_status == "awaiting_confirmation":
+                logger.info(
+                    f"[{node_name}] User confirmed initial close. Planning to confirm details."
+                )
+                planned_action_command = "CONFIRM_ORDER_DETAILS"
+                # Pass proposal details for the confirmation message
                 if active_proposal:
                     planned_action_parameters["product_name"] = active_proposal.get(
                         "product_name"
                     )
                     planned_action_parameters["price"] = active_proposal.get("price")
-            else:
-                if (
-                    last_agent_action
-                    and last_agent_action.get("action_type") == "PRESENT_SOLUTION_OFFER"
-                ):
-                    logger.info(
-                        f"[{node_name}] Agent just presented solution. Waiting for user response."
+                    planned_action_parameters["price_info"] = active_proposal.get(
+                        "price_info"
                     )
-                    planned_action_command = None
-                else:
-                    logger.info(
-                        f"[{node_name}] In PRESENTING_SOLUTION state, but not just presented and no buying signal. Waiting."
-                    )
-                    planned_action_command = None
 
-        elif effective_goal_type == "ATTEMPTING_CLOSE":
-            # ... (closing logic as before) ...
-            closing_status = state.get("closing_process_status", "not_started")
-            if (
+            elif closing_status == "confirmed_success":
+                logger.info(
+                    f"[{node_name}] Order details confirmed by user. Planning final processing step."
+                )
+                planned_action_command = "PROCESS_ORDER_CONFIRMATION"
+                # Pass details needed for the final confirmation message/action
+                if active_proposal:
+                    planned_action_parameters["product_name"] = active_proposal.get(
+                        "product_name"
+                    )
+
+            # --- END ADDED ---
+            elif (
                 closing_status == "not_started"
                 or not last_agent_action
                 or last_agent_action.get("action_type")
@@ -506,23 +529,57 @@ async def goal_and_action_planner_node(
                     "HANDLE_CLOSING_CORRECTION",
                 ]
             ):
-                logger.info(f"[{node_name}] Initiating closing process.")
+                logger.info(
+                    f"[{node_name}] Initiating closing process (goal already set or restarting)."
+                )
                 planned_action_command = "INITIATE_CLOSING"
                 effective_goal["goal_details"] = {"closing_step": "initial_attempt"}
-                active_proposal = state.get("active_proposal")
                 if active_proposal:
                     planned_action_parameters["product_name"] = active_proposal.get(
                         "product_name"
                     )
                     planned_action_parameters["price"] = active_proposal.get("price")
-            else:
+            # --- ADDED: Handle other statuses (optional for now) ---
+            elif closing_status == "needs_correction":
                 logger.info(
-                    f"[{node_name}] In ATTEMPTING_CLOSE, waiting for user response to action: {last_agent_action.get('action_type') if last_agent_action else 'N/A'}"
+                    f"[{node_name}] Closing needs correction. Planning action to handle correction."
+                )
+                planned_action_command = "HANDLE_CLOSING_CORRECTION"
+                # Pass context if needed, e.g., what was being confirmed
+                if (
+                    last_agent_action
+                    and last_agent_action.get("action_type") == "CONFIRM_ORDER_DETAILS"
+                ):
+                    planned_action_parameters["context"] = (
+                        "Estávamos confirmando os detalhes do pedido."
+                    )
+                else:
+                    planned_action_parameters["context"] = (
+                        "Estávamos finalizando seu pedido."
+                    )
+            # Potentially ask what needs correction based on user input analysis
+            elif closing_status == "confirmation_rejected":
+                logger.info(
+                    f"[{node_name}] Closing attempt rejected by user. Transitioning."
+                )
+                # Transition back or end conversation? For now, let's end.
+                effective_goal["goal_type"] = "ENDING_CONVERSATION"
+                effective_goal["goal_details"] = {"reason": "Closing attempt rejected"}
+                effective_goal["previous_goal_if_interrupted"] = None
+                planned_action_command = (
+                    "GENERATE_FAREWELL"  # Or ACKNOWLEDGE_AND_TRANSITION
+                )
+                planned_action_parameters["reason"] = "Closing attempt rejected"
+
+            # --- END ADDED ---
+            else:  # Includes attempt_made, confirmed_success, confirmed_failed_to_process
+                logger.info(
+                    f"[{node_name}] In ATTEMPTING_CLOSE, status is '{closing_status}'. Waiting for user response or external process."
                 )
                 planned_action_command = None
 
         elif effective_goal_type == "ENDING_CONVERSATION":
-            # ... (ending logic as before) ...
+            # ... (logic as before)
             if (
                 not planned_action_command
             ):  # If impasse logic didn't already set an action
@@ -537,11 +594,11 @@ async def goal_and_action_planner_node(
                 }
 
         elif effective_goal_type == "IDLE" or effective_goal_type == "GREETING":
-            # ... (idle/greeting logic as before) ...
+            # ... (logic as before)
             logger.info(
                 f"[{node_name}] Goal is {effective_goal_type}. Transitioning to INVESTIGATING_NEEDS."
             )
-            effective_goal["goal_type"] = "INVESTIGATING_NEEDS"
+            effective_goal["goal_type"] = "INVESTIGATING_NEEDS"  # Update goal
             planned_action_command = "ASK_SPIN_QUESTION"
             planned_action_parameters["spin_type"] = "Situation"
             effective_goal["goal_details"] = {
@@ -555,14 +612,14 @@ async def goal_and_action_planner_node(
         )
         planned_action_command = None
 
-    # --- 3. Update Interrupt Queue if Action Planned for Interruption ---
-    # (Keep this logic as it was)
+    # --- 3. Update Interrupt Queue ---
+    # Remove interruption only if it was handled by setting a temporary goal AND an action was planned for it
     updated_interruptions_queue = list(state.get("user_interruptions_queue", []))
     if (
-        handled_interruption_this_turn
+        goal_determined_by_interruption
         and planned_action_command
         and interruption_to_handle
-    ):
+    ):  # Check the specific flag
         try:
             idx_to_remove = -1
             for i, item in enumerate(updated_interruptions_queue):
@@ -587,7 +644,7 @@ async def goal_and_action_planner_node(
 
     # --- 4. Prepare Delta ---
     updated_state_delta: Dict[str, Any] = {}
-    # Always include the effective_goal determined by the planner in the delta
+    # Always include the effective_goal
     updated_state_delta["current_agent_goal"] = effective_goal
     # Update queue only if it changed
     if updated_interruptions_queue != state.get("user_interruptions_queue", []):
@@ -603,7 +660,7 @@ async def goal_and_action_planner_node(
         updated_state_delta["next_agent_action_command"] = None
         updated_state_delta["action_parameters"] = {}
         logger.info(f"[{node_name}] No specific action planned for this turn.")
-    # Clear previous errors if planner runs successfully
+    # Clear previous errors
     updated_state_delta["last_processing_error"] = None
     logger.info(
         f"[{node_name}] Planner finished. Final Planned Goal: {effective_goal.get('goal_type')}"
