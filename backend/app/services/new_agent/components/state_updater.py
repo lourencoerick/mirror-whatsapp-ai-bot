@@ -423,6 +423,110 @@ async def update_conversation_state_node(
                         f"[{node_name}] Added new objection '{obj_text_from_reaction[:50]}' from presentation reaction."
                     )
 
+    # --- NEW: 5b. Process Confirmation/Rejection of Closing Attempt ---
+    closing_status_changed = False
+    current_closing_status = state.get("closing_process_status", "not_started")
+
+    last_action = state.get(
+        "last_agent_action"
+    )  # Get the action object (could be None)
+    last_action_type = None
+    if isinstance(last_action, dict):  # Check if it's a dictionary before getting type
+        last_action_type = last_action.get("action_type")
+
+    # # Only update status if the agent just tried to initiate closing
+    # if last_action_type == "INITIATE_CLOSING":
+    #     if analysis.overall_intent == "ConfirmingCloseAttempt":
+    #         if current_closing_status != "awaiting_confirmation":
+    #             updated_state_delta["closing_process_status"] = "awaiting_confirmation"
+    #             closing_status_changed = True
+    #             logger.info(
+    #                 f"[{node_name}] Closing status updated to awaiting_confirmation."
+    #             )
+    #     elif analysis.overall_intent == "RejectingCloseAttempt":
+    #         if current_closing_status != "confirmation_rejected":
+    #             updated_state_delta["closing_process_status"] = "confirmation_rejected"
+    #             closing_status_changed = True
+    #             logger.info(
+    #                 f"[{node_name}] Closing status updated to confirmation_rejected."
+    #             )
+    #     elif analysis.overall_intent == "RequestingOrderCorrection":
+    #         if current_closing_status != "needs_correction":
+    #             updated_state_delta["closing_process_status"] = "needs_correction"
+    #             closing_status_changed = True
+    #             logger.info(
+    #                 f"[{node_name}] Closing status updated to needs_correction."
+    #             )
+    #     # If user raised objection or asked question, the interruption queue handles it,
+    #     # and the closing status might implicitly revert or stay as 'attempt_made'.
+    #     # We might need more explicit logic later if needed.
+
+    # # --- ADDED: Update status based on response to CONFIRM_ORDER_DETAILS ---
+    # elif last_action_type == "CONFIRM_ORDER_DETAILS":
+    #     if analysis.overall_intent == "FinalOrderConfirmation":
+    #         if current_closing_status != "confirmed_success":
+    #             updated_state_delta["closing_process_status"] = "confirmed_success"
+    #             closing_status_changed = True
+    #             logger.info(
+    #                 f"[{node_name}] Closing status updated to confirmed_success."
+    #             )
+    #     elif (
+    #         analysis.overall_intent == "RejectingCloseAttempt"
+    #     ):  # Can still reject here
+    #         if current_closing_status != "confirmation_rejected":
+    #             updated_state_delta["closing_process_status"] = "confirmation_rejected"
+    #             closing_status_changed = True
+    #             logger.info(
+    #                 f"[{node_name}] Closing status updated to confirmation_rejected (at details stage)."
+    #             )
+    #     elif (
+    #         analysis.overall_intent == "RequestingOrderCorrection"
+    #     ):  # Can still ask for correction
+    #         if current_closing_status != "needs_correction":
+    #             updated_state_delta["closing_process_status"] = "needs_correction"
+    #             closing_status_changed = True
+    #             logger.info(
+    #                 f"[{node_name}] Closing status updated to needs_correction (at details stage)."
+    #             )
+
+    if last_action_type in ["INITIATE_CLOSING", "CONFIRM_ORDER_DETAILS"]:
+        if (
+            analysis.overall_intent == "ConfirmingCloseAttempt"
+            and last_action_type == "INITIATE_CLOSING"
+        ):
+            # Only move to awaiting_confirmation after initial confirmation
+            if current_closing_status != "awaiting_confirmation":
+                updated_state_delta["closing_process_status"] = "awaiting_confirmation"
+                closing_status_changed = True
+                logger.info(
+                    f"[{node_name}] Closing status updated to awaiting_confirmation."
+                )
+        elif (
+            analysis.overall_intent == "FinalOrderConfirmation"
+            and last_action_type == "CONFIRM_ORDER_DETAILS"
+        ):
+            # Only move to confirmed_success after final confirmation
+            if current_closing_status != "confirmed_success":
+                updated_state_delta["closing_process_status"] = "confirmed_success"
+                closing_status_changed = True
+                logger.info(
+                    f"[{node_name}] Closing status updated to confirmed_success."
+                )
+        elif analysis.overall_intent == "RejectingCloseAttempt":
+            if current_closing_status != "confirmation_rejected":
+                updated_state_delta["closing_process_status"] = "confirmation_rejected"
+                closing_status_changed = True
+                logger.info(
+                    f"[{node_name}] Closing status updated to confirmation_rejected (after {last_action_type})."
+                )
+        elif analysis.overall_intent == "RequestingOrderCorrection":
+            if current_closing_status != "needs_correction":
+                updated_state_delta["closing_process_status"] = "needs_correction"
+                closing_status_changed = True
+                logger.info(
+                    f"[{node_name}] Closing status updated to needs_correction (after {last_action_type})."
+                )
+
     # --- 6. Update Interruption Queue (Consolidated) ---
     # Rebuild the queue based on the final state of questions and objections
 
@@ -504,7 +608,7 @@ async def update_conversation_state_node(
     )
 
     # --- 8. Final Updates and Cleanup ---
-    if profile_changed:
+    if profile_changed or closing_status_changed:
         # Convert back to plain dicts if necessary for state serialization
         # (TypedDicts are structurally dicts, so this might not be needed depending on LangGraph/checkpointer)
         updated_state_delta["customer_profile_dynamic"] = {
