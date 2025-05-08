@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     MESSAGE_QUEUE_NAME: str = "message_queue"
     BATCH_ARQ_QUEUE_NAME: str = "batch_queue"
 
+    RESPONSE_SENDER_WORKER_INTERNAL_URL: Optional[str]
+    MESSAGE_CONSUMER_WORKER_INTERNAL_URL: Optional[str]
+    BATCH_WORKER_INTERNAL_URL: Optional[str]
+    AI_REPLIER_INTERNAL_URL: Optional[str]
+
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True
