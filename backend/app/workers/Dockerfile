@@ -24,9 +24,7 @@ COPY ./backend /workspace/backend
 ENV PYTHONPATH /workspace/backend
 
 # --- Configuração do Entrypoint ---
-# Copia o script de entrada para dentro da imagem
 COPY ./backend/app/workers/worker-entrypoint.sh /worker-entrypoint.sh
-# Torna o script executável
 RUN chmod +x /worker-entrypoint.sh
 
 

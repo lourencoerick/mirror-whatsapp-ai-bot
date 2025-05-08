@@ -50,6 +50,7 @@ from app.api.schemas.knowledge_document import (
     PaginatedKnowledgeDocumentRead,
 )
 
+from app.core.wake_workers import wake_worker
 from app.config import get_settings, Settings
 
 settings: Settings = get_settings()
@@ -185,6 +186,7 @@ async def upload_knowledge_file(
 
     job: Optional[Job] = None
     try:
+        await wake_worker(settings.BATCH_WORKER_INTERNAL_URL)
         job = await arq_pool.enqueue_job(
             KNOWLEDGE_TASK_NAME,
             account_id=account_id,
@@ -304,6 +306,7 @@ async def add_knowledge_url(
 
     job: Optional[Job] = None
     try:
+        await wake_worker(settings.BATCH_WORKER_INTERNAL_URL)
         job = await arq_pool.enqueue_job(
             KNOWLEDGE_TASK_NAME,
             account_id=account_id,
@@ -422,6 +425,7 @@ async def add_knowledge_text(
 
     job: Optional[Job] = None
     try:
+        await wake_worker(settings.BATCH_WORKER_INTERNAL_URL)
         job = await arq_pool.enqueue_job(
             KNOWLEDGE_TASK_NAME,
             account_id=account_id,

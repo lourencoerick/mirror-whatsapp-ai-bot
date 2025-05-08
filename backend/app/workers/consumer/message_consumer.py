@@ -31,7 +31,6 @@ from app.core.arq_manager import (
     close_arq_pool,
 )  #
 
-
 # --- Schema & Model Imports ---
 from app.api.schemas.message import MessageCreate
 from app.models.conversation import ConversationStatusEnum, Conversation

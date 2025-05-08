@@ -20,13 +20,16 @@ from app.api.schemas.research import (
     ResearchJobStatusEnum,
 )
 
-# Define the router
-router = APIRouter()
+
+from app.core.wake_workers import wake_worker
 
 # Define the name of the Arq task function as defined in the worker
 from app.config import get_settings, Settings
 
 settings: Settings = get_settings()
+
+# Define the router
+router = APIRouter()
 
 RESEARCH_TASK_NAME = "run_profile_research"
 BATCH_ARQ_QUEUE_NAME = settings.BATCH_ARQ_QUEUE_NAME
@@ -63,6 +66,7 @@ async def start_research_task(
         )
 
     try:
+        await wake_worker(settings.BATCH_WORKER_INTERNAL_URL)
         job: Optional[Job] = await arq_pool.enqueue_job(
             RESEARCH_TASK_NAME,
             url=url_to_research,

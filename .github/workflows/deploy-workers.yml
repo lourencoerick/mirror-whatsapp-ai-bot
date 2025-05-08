@@ -4,7 +4,7 @@ name: Build, Push and Deploy Worker Images
 
 on:
   push:
-    branches: [master, feat/azure_llm]
+    branches: [master]
     paths:
       - "backend/app/workers/**"
       - "backend/app/services/researcher/**"

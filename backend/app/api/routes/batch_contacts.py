@@ -40,6 +40,8 @@ from app.services.cloud_storage import save_import_file_gcs
 from app.workers.batch.contacts.tasks.contact_importer import (
     ARQ_TASK_NAME as CONTACT_IMPORTER_ARQ_TASK_NAME,
 )
+
+from app.core.wake_workers import wake_worker
 from app.config import get_settings, Settings
 
 settings: Settings = get_settings()
@@ -149,7 +151,7 @@ async def initiate_contact_import(
     # 3. Enqueue Background Task (ARQ)
     arq_job_id = None
     try:
-
+        await wake_worker(settings.RESPONSE_SENDER_WORKER_INTERNAL_URL)
         arq_task = await arq_pool.enqueue_job(
             CONTACT_IMPORTER_ARQ_TASK_NAME,
             _job_id=f"contact_import_{job_id}",

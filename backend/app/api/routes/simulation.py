@@ -58,7 +58,7 @@ from app.models.simulation.persona import Persona
 from app.models.contact import Contact
 from app.simulation.repositories import persona as persona_repo  # Import repo namespace
 
-
+from app.core.wake_workers import wake_worker
 from app.config import get_settings
 
 settings = get_settings()
@@ -238,6 +238,7 @@ async def enqueue_simulation_message(
         f"Received simulation message to enqueue for conversation {conversation_id} from user {user_id}"
     )
 
+    await wake_worker(settings.AI_REPLIER_INTERNAL_URL)
     simulation_message_enqueue_response = await _enqueue_simulation_message(
         db=db,
         account_id=account_id,
