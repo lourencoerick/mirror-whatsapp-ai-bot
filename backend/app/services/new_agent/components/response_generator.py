@@ -345,63 +345,87 @@ ACTION_TO_PROMPT_MAP: Dict[AgentActionType, ChatPromptTemplate] = {
     "PRESENT_SOLUTION_OFFER": PROMPT_PRESENT_SOLUTION_OFFER,
     "INITIATE_CLOSING": PROMPT_INITIATE_CLOSING,
     "CONFIRM_ORDER_DETAILS": PROMPT_CONFIRM_ORDER_DETAILS,
-    "PROCESS_ORDER_CONFIRMATION": PROMPT_PROCESS_ORDER_CONFIRMATION,  # <<< ADDED
+    "PROCESS_ORDER_CONFIRMATION": PROMPT_PROCESS_ORDER_CONFIRMATION,
     "HANDLE_CLOSING_CORRECTION": PROMPT_HANDLE_CLOSING_CORRECTION,
-    "GENERATE_FAREWELL": PROMPT_GENERATE_FAREWELL,  #
-    # ... etc
+    "GENERATE_FAREWELL": PROMPT_GENERATE_FAREWELL,
 }
 
 
 # --- Função Auxiliar para Preparar Contexto Comum ---
-# (Definida anteriormente, pode ser movida para utils)
 def _prepare_common_prompt_context(state: RichConversationState) -> Dict[str, Any]:
-    """Prepares common context variables needed by most generator prompts."""
+    """
+    Prepares common context variables needed by most generator prompts.
+
+    Extracts information like company profile details (name, tone, language,
+    offerings, fallback info), recent chat history, and RAG context from the
+    current state to be used in various LLM prompts.
+
+    Args:
+        state: The current conversation state dictionary.
+
+    Returns:
+        A dictionary containing common context variables like 'company_name',
+        'language', 'sales_tone', 'chat_history', 'rag_context', etc.
+    """
     profile_dict = state.get("company_profile", {})
+    # Use model_validate for Pydantic models if available and needed
     profile = (
         CompanyProfileSchema.model_validate(profile_dict)
-        if profile_dict
-        else CompanyProfileSchema()
+        if profile_dict and hasattr(CompanyProfileSchema, "model_validate")
+        else profile_dict
     )
+
     messages = state.get("messages", [])
     chat_history = _format_recent_chat_history(messages)
     last_user_message = (
         messages[-1].content if messages and messages[-1].type == "human" else "N/A"
     )
-    offerings = getattr(profile, "offering_overview", []) or []
-    offering_summary = (
-        "\n".join([f"- {o.name}: {o.short_description}" for o in offerings]) or "N/A"
-    )
-    key_points = (
-        "\n".join([f"- {p}" for p in getattr(profile, "key_selling_points", [])])
-        if getattr(profile, "key_selling_points", [])
-        else "N/A"
+
+    # Safely access profile attributes using .get() for dictionaries
+    company_name = profile.get("company_name", "nossa empresa")
+    language = profile.get("language", "pt-br")
+    sales_tone = profile.get("sales_tone", "profissional")
+    business_description = profile.get("business_description", "N/A")
+    offerings = profile.get("offering_overview", []) or []
+    key_selling_points_list = profile.get("key_selling_points", []) or []
+    communication_guidelines_list = profile.get("communication_guidelines", []) or []
+    address = profile.get("address")
+    opening_hours = profile.get("opening_hours")
+    fallback_contact_info = profile.get(
+        "fallback_contact_info", "Desculpe, não tenho essa informação no momento."
     )
 
+    offering_summary = (
+        "\n".join(
+            [f"- {o.get('name')}: {o.get('short_description')}" for o in offerings]
+        )
+        if offerings
+        else "N/A"
+    )
+    key_points = (
+        "\n".join([f"- {p}" for p in key_selling_points_list])
+        if key_selling_points_list
+        else "N/A"
+    )
+    communication_guidelines = (
+        "\n".join(communication_guidelines_list)
+        if communication_guidelines_list
+        else "N/A"
+    )
+    company_address_info = f"Endereço: {address}" if address else ""
+    opening_hours_info = f"Horário: {opening_hours}" if opening_hours else ""
+
     return {
-        "company_name": getattr(profile, "company_name", "nossa empresa"),
-        "language": getattr(profile, "language", "pt-br"),
-        "sales_tone": getattr(profile, "sales_tone", "profissional"),
-        "business_description": getattr(profile, "business_description", "N/A"),
+        "company_name": company_name,
+        "language": language,
+        "sales_tone": sales_tone,
+        "business_description": business_description,
         "offering_summary": offering_summary,
         "key_selling_points": key_points,
-        "company_address_info": (
-            f"Endereço: {profile.address}" if getattr(profile, "address", None) else ""
-        ),
-        "opening_hours_info": (
-            f"Horário: {profile.opening_hours}"
-            if getattr(profile, "opening_hours", None)
-            else ""
-        ),
-        "communication_guidelines": (
-            "\n".join(getattr(profile, "communication_guidelines", []))
-            if getattr(profile, "communication_guidelines", [])
-            else "N/A"
-        ),
-        "fallback_text": getattr(
-            profile,
-            "fallback_contact_info",
-            "Desculpe, não tenho essa informação no momento.",
-        ),
+        "company_address_info": company_address_info,
+        "opening_hours_info": opening_hours_info,
+        "communication_guidelines": communication_guidelines,
+        "fallback_text": fallback_contact_info,
         "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
         "chat_history": chat_history,
         "last_user_message": last_user_message,
@@ -410,25 +434,38 @@ def _prepare_common_prompt_context(state: RichConversationState) -> Dict[str, An
     }
 
 
-# --- Função Auxiliar para Chamada LLM (Pode ir para utils) ---
+# --- Função Auxiliar para Chamada LLM ---
 async def _call_llm_for_generation(
     llm: BaseChatModel,
     prompt: ChatPromptTemplate,
     prompt_values: Dict[str, Any],
     node_name_for_logging: str,
 ) -> Optional[str]:
-    """Helper function to invoke LLM chain for text generation."""
+    """
+    Invokes the LLM chain to generate text based on a prompt and values.
+
+    Args:
+        llm: The language model instance to use for generation.
+        prompt: The ChatPromptTemplate defining the prompt structure.
+        prompt_values: A dictionary containing values to fill the prompt template.
+        node_name_for_logging: A string identifier for logging purposes.
+
+    Returns:
+        The generated text as a string, or None if generation fails or
+        returns an empty string.
+    """
     try:
+        # Simple chain: prompt -> LLM -> String Output Parser
         chain = prompt | llm | StrOutputParser()
         logger.debug(f"[{node_name_for_logging}] Invoking LLM generation chain...")
-        # logger.trace(f"[{node_name_for_logging}] Prompt Values: {json.dumps(prompt_values, indent=2, default=str)}")
+        # logger.trace(f"[{node_name_for_logging}] Prompt Values: {json.dumps(prompt_values, indent=2, default=str)}") # Optional detailed logging
 
         generated_text = await chain.ainvoke(prompt_values)
-        generated_text = generated_text.strip()
+        generated_text = generated_text.strip() if generated_text else ""
 
         if not generated_text:
             logger.warning(f"[{node_name_for_logging}] LLM returned empty string.")
-            return None  # Retornar None para indicar falha ou vazio
+            return None
 
         return generated_text
     except Exception as e:
@@ -439,13 +476,27 @@ async def _call_llm_for_generation(
 
 
 # --- Nó Principal do Gerador de Resposta ---
-
-
 async def response_generator_node(
     state: RichConversationState, config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    LangGraph node that generates the agent's text response based on the planned action.
+    Generates the agent's text response based on the planned action command.
+
+    This node selects the appropriate prompt based on the 'next_agent_action_command'
+    and 'action_parameters' from the state, prepares the full context (common
+    and action-specific), invokes the primary language model, and returns the
+    generated text. It handles potential errors during context preparation or
+    LLM invocation by returning a fallback message and logging errors.
+
+    Args:
+        state: The current conversation state dictionary.
+        config: The graph configuration dictionary, expected to contain the
+                'llm_primary_instance' under the 'configurable' key.
+
+    Returns:
+        A dictionary containing the generated text under the key
+        'last_agent_generation_text', or None if no action was planned.
+        Includes 'last_processing_error' if an error occurred.
     """
     node_name = "response_generator_node"
     logger.info(
@@ -458,7 +509,7 @@ async def response_generator_node(
     action_command: Optional[AgentActionType] = state.get("next_agent_action_command")
     action_params: AgentActionDetails = state.get("action_parameters", {})
 
-    # --- Validações ---
+    # --- Validations ---
     if not llm_primary:
         logger.error(f"[{node_name}] llm_primary_instance not found in config.")
         return {
@@ -469,13 +520,13 @@ async def response_generator_node(
         logger.warning(
             f"[{node_name}] No action command planned. Skipping response generation."
         )
-        return {"last_agent_generation_text": None}  # Não é um erro, apenas skip
+        return {"last_agent_generation_text": None}
 
     logger.info(
         f"[{node_name}] Generating response for action: {action_command} with params: {action_params}"
     )
 
-    # --- Preparar Contexto Comum ---
+    # --- Prepare Context ---
     try:
         common_context = _prepare_common_prompt_context(state)
     except Exception as e:
@@ -485,7 +536,7 @@ async def response_generator_node(
             "last_processing_error": f"Context preparation failed: {e}",
         }
 
-    # --- Selecionar Prompt e Preparar Valores Específicos ---
+    # --- Select Prompt and Prepare Specific Values ---
     selected_prompt = ACTION_TO_PROMPT_MAP.get(action_command)
     specific_values: Dict[str, Any] = {}
 
@@ -499,7 +550,7 @@ async def response_generator_node(
             "last_processing_error": f"No prompt for action {action_command}",
         }
 
-    # Preencher valores específicos baseado na ação
+    # Populate specific values based on the action command
     try:
         if action_command == "ANSWER_DIRECT_QUESTION":
             specific_values["question_to_answer"] = action_params.get(
@@ -512,8 +563,6 @@ async def response_generator_node(
                 "objection_text_to_address", "[Objeção não especificada]"
             )
         elif action_command == "ASK_CLARIFYING_QUESTION":
-            # Tentar pegar o texto vago do goal_details associado a esta ação
-            # Assumindo que o Planner colocou o texto vago no goal_details quando definiu o goal CLARIFYING_USER_INPUT
             vague_text = (
                 state.get("current_agent_goal", {})
                 .get("goal_details", {})
@@ -521,24 +570,20 @@ async def response_generator_node(
             )
             specific_values["vague_statement_text"] = vague_text
         elif action_command == "ACKNOWLEDGE_AND_TRANSITION":
-
             specific_values["off_topic_text"] = action_params.get(
                 "off_topic_text", "[comentário anterior]"
             )
             specific_values["previous_goal_topic"] = action_params.get(
                 "previous_goal_topic", "o assunto anterior"
             )
-
         elif action_command == "PRESENT_SOLUTION_OFFER":
-            selected_prompt = PROMPT_PRESENT_SOLUTION_OFFER
+            # Note: Prompt already selected by map
             specific_values["product_name_to_present"] = action_params.get(
                 "product_name_to_present", "[Produto não especificado]"
             )
             specific_values["key_benefit_to_highlight"] = action_params.get(
                 "key_benefit_to_highlight", "[Benefício não especificado]"
             )
-            # Adicionar outros casos aqui..
-
         elif action_command == "INITIATE_CLOSING":
             product_name = action_params.get("product_name")
             price = action_params.get("price")
@@ -547,18 +592,21 @@ async def response_generator_node(
             if product_name:
                 product_info += f"o *{product_name}*"
                 product_fallback = f"o *{product_name}*"
-                if price:
-                    product_info += f" (R${price:.2f})"  # Basic price formatting
+                if price is not None:
+                    try:
+                        product_info += f" (R${price:.2f})"
+                    except (TypeError, ValueError):
+                        logger.warning(
+                            f"Could not format price for INITIATE_CLOSING: {price}"
+                        )
             else:
                 product_info = "este pedido"
-
             specific_values["product_name_price_info"] = product_info
             specific_values["product_name_fallback"] = product_fallback
-
         elif action_command == "CONFIRM_ORDER_DETAILS":
             product_name = action_params.get("product_name", "o produto selecionado")
             price = action_params.get("price")
-            price_info_suffix = action_params.get("price_info", "")  # e.g., "/mês"
+            price_info_suffix = action_params.get("price_info", "")
             price_str = "valor combinado"
             if price is not None:
                 try:
@@ -567,74 +615,68 @@ async def response_generator_node(
                     logger.warning(
                         f"Could not format price for CONFIRM_ORDER_DETAILS: {price}"
                     )
-                    price_str = "valor informado"  # Fallback if formatting fails
-
+                    price_str = "valor informado"
             specific_values["product_name"] = product_name
             specific_values["price_info"] = price_str
-
         elif action_command == "PROCESS_ORDER_CONFIRMATION":
             specific_values["product_name"] = action_params.get(
                 "product_name", "seu pedido"
             )
-
         elif action_command == "HANDLE_CLOSING_CORRECTION":
             specific_values["context"] = action_params.get(
                 "context", "Estávamos finalizando seu pedido."
             )
-
         elif action_command == "GENERATE_FAREWELL":
             specific_values["reason"] = action_params.get(
                 "reason", "concluindo a conversa"
             )
-            # Pass fallback contact info from common context if needed by prompt
             specific_values["fallback_contact_info"] = common_context.get(
                 "fallback_text", ""
             )
 
-    except KeyError as e:
-        logger.error(
-            f"[{node_name}] Missing expected key in action_parameters or goal_details for action {action_command}: {e}"
+    except (
+        Exception
+    ) as e:  # Catch potential errors during parameter extraction/formatting
+        logger.exception(
+            f"[{node_name}] Error preparing specific values for action {action_command}: {e}"
         )
         fallback_text = common_context.get(
             "fallback_text", "Erro ao preparar a resposta."
         )
         return {
             "last_agent_generation_text": fallback_text,
-            "last_processing_error": f"Missing data for action {action_command}: {e}",
+            "last_processing_error": f"Data preparation error for action {action_command}: {e}",
         }
 
-    # --- Invocar LLM ---
+    # --- Invoke LLM ---
     prompt_values = {**common_context, **specific_values}
     generated_text = await _call_llm_for_generation(
         llm=llm_primary,
         prompt=selected_prompt,
         prompt_values=prompt_values,
-        node_name_for_logging=f"{node_name}:{action_command}",  # Log mais específico
+        node_name_for_logging=f"{node_name}:{action_command}",
     )
 
     if generated_text is None:
-        # Usar fallback se a geração falhou ou retornou vazio
+        # Use fallback if generation failed or returned empty
         generated_text = common_context.get(
             "fallback_text", "Não consegui gerar uma resposta no momento."
         )
         logger.warning(
             f"[{node_name}] LLM generation failed or returned empty for {action_command}. Using fallback."
         )
-        # Manter o erro no estado se a chamada LLM falhou? Ou apenas usar fallback?
-        # Vamos usar fallback mas limpar o erro por enquanto, assumindo que o fallback é aceitável.
         error_msg = f"LLM generation failed or empty for {action_command}"
-        # Retornar o fallback e o erro
         return {
             "last_agent_generation_text": generated_text,
-            "last_processing_error": error_msg,
+            "last_processing_error": error_msg,  # Report the error
         }
 
     logger.info(
         f"[{node_name}] Generated response text (Action: {action_command}): '{generated_text[:100]}...'"
     )
 
-    # Retornar o texto gerado. O próximo nó (StateUpdater final ou OutputFormatter) o usará.
+    # Return the generated text to be used by the next node
     return {
         "last_agent_generation_text": generated_text,
-        "last_processing_error": None,  # Limpar erro se a geração foi bem-sucedida
+        "last_processing_error": None,  # Clear previous errors on success
     }
