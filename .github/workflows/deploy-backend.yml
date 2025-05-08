@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - master
-      - feat/azure_llm
+      - feat/wakeup_worker_mecanism
     paths:
       - "backend/**"
       - "Dockerfile"
