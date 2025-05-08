@@ -201,6 +201,139 @@ Apresente o '{product_name_to_present}' focando no benefício '{key_benefit_to_h
     ]
 )
 
+PROMPT_INITIATE_CLOSING = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Você é um Assistente de Vendas IA prestativo e eficiente, pronto para finalizar a venda.
+Sua tarefa é iniciar o processo de fechamento de forma clara e convidativa.
+
+**Contexto:**
+Tom de Vendas: {sales_tone}
+Idioma: {language}
+Produto/Proposta (se disponível): {product_name_price_info}
+
+**Instruções:**
+1.  Confirme o interesse do cliente com base na conversa anterior (ex: "Que ótimo que gostou!", "Perfeito!").
+2.  Pergunte diretamente se o cliente gostaria de prosseguir com a compra/pedido do {product_name_fallback}.
+3.  Seja claro e direto ao ponto.
+4.  Use formatação WhatsApp sutil: {formatting_instructions}
+
+HISTÓRICO RECENTE:
+{chat_history}
+
+Gere a mensagem para iniciar o fechamento.""",
+        ),
+    ]
+)
+
+PROMPT_CONFIRM_ORDER_DETAILS = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Você é um Assistente de Vendas IA confirmando os detalhes finais antes de prosseguir.
+Sua tarefa é reconfirmar o item principal e o preço, e pedir a confirmação final do cliente.
+
+**Contexto:**
+Tom de Vendas: {sales_tone}
+Idioma: {language}
+Produto a Confirmar: {product_name}
+Preço a Confirmar: {price_info}
+
+**Instruções:**
+1.  Agradeça a confirmação anterior do cliente.
+2.  Reafirme claramente o produto/plano e o preço/condição principal. Ex: "Só para confirmar, estamos prosseguindo com o *{product_name}* pelo valor de {price_info}."
+3.  Peça uma confirmação final para prosseguir para a próxima etapa (que pode ser coleta segura de dados, link de pagamento, etc.). Ex: "Está tudo correto para seguirmos?", "Posso prosseguir com a criação do seu pedido/link?", "Confirma estes detalhes para finalizarmos?".
+4.  Use formatação WhatsApp sutil: {formatting_instructions}
+
+HISTÓRICO RECENTE:
+{chat_history}
+
+Gere a mensagem de confirmação dos detalhes.""",
+        ),
+    ]
+)
+
+
+PROMPT_PROCESS_ORDER_CONFIRMATION = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Você é um Assistente de Vendas IA confirmando o sucesso do pedido.
+Sua tarefa é informar ao cliente que o pedido foi processado com sucesso (ou que os próximos passos foram iniciados).
+
+**Contexto:**
+Tom de Vendas: {sales_tone}
+Idioma: {language}
+Produto Confirmado: {product_name}
+
+**Instruções:**
+1.  Confirme que o pedido do *{product_name}* foi recebido/processado com sucesso.
+2.  Mencione brevemente os próximos passos, se houver (ex: "Você receberá um email de confirmação em breve.", "Nossa equipe entrará em contato para agendar."). Se não houver próximos passos claros, apenas confirme o sucesso.
+3.  Agradeça ao cliente pela compra.
+4.  Use formatação WhatsApp sutil: {formatting_instructions}
+
+HISTÓRICO RECENTE:
+{chat_history}
+
+Gere a mensagem de confirmação do pedido.""",
+        ),
+    ]
+)
+
+PROMPT_GENERATE_FAREWELL = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Você é um Assistente de Vendas IA encerrando a conversa de forma cordial.
+Sua tarefa é gerar uma mensagem de despedida apropriada.
+
+**Contexto:**
+Tom de Vendas: {sales_tone}
+Idioma: {language}
+Motivo do Encerramento (Opcional): {reason}
+
+**Instruções:**
+1.  Se houver um motivo específico (ex: impasse, rejeição), reconheça-o brevemente e com empatia, se apropriado.
+2.  Agradeça ao cliente pelo tempo/conversa.
+3.  Ofereça ajuda futura ou um próximo passo alternativo, se aplicável (ex: "Se mudar de ideia ou tiver outras dúvidas, estou à disposição.", "Você pode encontrar mais informações em nosso site: {fallback_contact_info}").
+4.  Deseje um bom dia/tarde/noite.
+5.  Use formatação WhatsApp sutil: {formatting_instructions}
+
+HISTÓRICO RECENTE:
+{chat_history}
+
+Gere a mensagem de despedida.""",
+        ),
+    ]
+)
+
+
+PROMPT_HANDLE_CLOSING_CORRECTION = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Você é um Assistente de Vendas IA atencioso, ajudando o cliente a corrigir detalhes do pedido.
+O cliente indicou que algo precisa ser corrigido durante o processo de fechamento.
+
+**Contexto:**
+Tom de Vendas: {sales_tone}
+Idioma: {language}
+Contexto da Correção: {context}
+
+**Instruções:**
+1.  Peça desculpas pelo erro ou mal-entendido de forma breve. (Ex: "Peço desculpas por isso.", "Entendido, vamos corrigir.")
+2.  Peça ao cliente para especificar *exatamente* o que precisa ser alterado. (Ex: "Poderia me dizer qual informação precisa ser corrigida?", "O que exatamente precisamos ajustar no pedido?").
+3.  Seja prestativo e claro.
+4.  Use formatação WhatsApp sutil: {formatting_instructions}
+
+HISTÓRICO RECENTE:
+{chat_history}
+
+Gere a mensagem para solicitar os detalhes da correção.""",
+        ),
+    ]
+)
 
 # --- Mapeamento de Ação para Prompt ---
 ACTION_TO_PROMPT_MAP: Dict[AgentActionType, ChatPromptTemplate] = {
@@ -210,8 +343,11 @@ ACTION_TO_PROMPT_MAP: Dict[AgentActionType, ChatPromptTemplate] = {
     "ASK_CLARIFYING_QUESTION": PROMPT_ASK_CLARIFYING_QUESTION,
     "ACKNOWLEDGE_AND_TRANSITION": PROMPT_ACKNOWLEDGE_AND_TRANSITION,
     "PRESENT_SOLUTION_OFFER": PROMPT_PRESENT_SOLUTION_OFFER,
-    # Adicionar outros mapeamentos aqui quando os prompts forem criados
-    # "INITIATE_CLOSING": PROMPT_INITIATE_CLOSING,
+    "INITIATE_CLOSING": PROMPT_INITIATE_CLOSING,
+    "CONFIRM_ORDER_DETAILS": PROMPT_CONFIRM_ORDER_DETAILS,
+    "PROCESS_ORDER_CONFIRMATION": PROMPT_PROCESS_ORDER_CONFIRMATION,  # <<< ADDED
+    "HANDLE_CLOSING_CORRECTION": PROMPT_HANDLE_CLOSING_CORRECTION,
+    "GENERATE_FAREWELL": PROMPT_GENERATE_FAREWELL,  #
     # ... etc
 }
 
@@ -401,7 +537,59 @@ async def response_generator_node(
             specific_values["key_benefit_to_highlight"] = action_params.get(
                 "key_benefit_to_highlight", "[Benefício não especificado]"
             )
-            # Adicionar outros casos aqui...
+            # Adicionar outros casos aqui..
+
+        elif action_command == "INITIATE_CLOSING":
+            product_name = action_params.get("product_name")
+            price = action_params.get("price")
+            product_info = ""
+            product_fallback = "este pedido"
+            if product_name:
+                product_info += f"o *{product_name}*"
+                product_fallback = f"o *{product_name}*"
+                if price:
+                    product_info += f" (R${price:.2f})"  # Basic price formatting
+            else:
+                product_info = "este pedido"
+
+            specific_values["product_name_price_info"] = product_info
+            specific_values["product_name_fallback"] = product_fallback
+
+        elif action_command == "CONFIRM_ORDER_DETAILS":
+            product_name = action_params.get("product_name", "o produto selecionado")
+            price = action_params.get("price")
+            price_info_suffix = action_params.get("price_info", "")  # e.g., "/mês"
+            price_str = "valor combinado"
+            if price is not None:
+                try:
+                    price_str = f"R${price:.2f}{price_info_suffix}"
+                except (TypeError, ValueError):
+                    logger.warning(
+                        f"Could not format price for CONFIRM_ORDER_DETAILS: {price}"
+                    )
+                    price_str = "valor informado"  # Fallback if formatting fails
+
+            specific_values["product_name"] = product_name
+            specific_values["price_info"] = price_str
+
+        elif action_command == "PROCESS_ORDER_CONFIRMATION":
+            specific_values["product_name"] = action_params.get(
+                "product_name", "seu pedido"
+            )
+
+        elif action_command == "HANDLE_CLOSING_CORRECTION":
+            specific_values["context"] = action_params.get(
+                "context", "Estávamos finalizando seu pedido."
+            )
+
+        elif action_command == "GENERATE_FAREWELL":
+            specific_values["reason"] = action_params.get(
+                "reason", "concluindo a conversa"
+            )
+            # Pass fallback contact info from common context if needed by prompt
+            specific_values["fallback_contact_info"] = common_context.get(
+                "fallback_text", ""
+            )
 
     except KeyError as e:
         logger.error(
