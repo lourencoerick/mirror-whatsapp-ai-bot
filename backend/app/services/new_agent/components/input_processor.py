@@ -50,8 +50,20 @@ def _format_recent_chat_history(
     messages: List[BaseMessage], limit: int = RECENT_HISTORY_LIMIT
 ) -> str:
     """
-    Formats the recent chat history for the LLM prompt from LangChain BaseMessage objects.
-    Excludes the very last message if it's the current user input.
+    Formats the recent chat history for inclusion in LLM prompts.
+
+    Excludes the latest message (assumed to be the current user input being processed).
+    Formats messages with 'Usuário:' or 'Agente:' prefixes.
+
+    Args:
+        messages: The list of BaseMessage objects from the conversation state.
+        limit: The maximum number of *past* messages (excluding the current one)
+               to include.
+
+    Returns:
+        A formatted string representing the recent chat history, or a
+        placeholder string if the history is empty or only contains the
+        current message.
     """
     if not messages:
         return "Nenhum histórico de conversa recente."
@@ -86,7 +98,23 @@ async def _call_structured_llm(
     output_schema: Any,  # Pydantic Model (e.g., InitialUserInputAnalysis)
     node_name_for_logging: str,
 ) -> Optional[Any]:
-    """Helper function to call LLM for structured output using TrustCall or with_structured_output."""
+    """
+    Helper function to call an LLM and attempt structured output extraction.
+
+    Uses TrustCall's create_extractor if available, otherwise falls back to
+    LangChain's llm.with_structured_output method if the LLM supports it.
+
+    Args:
+        llm: The language model instance.
+        prompt_template_str: The string template for the prompt.
+        prompt_values: A dictionary of values to format the prompt template.
+        output_schema: The Pydantic model defining the desired output structure.
+        node_name_for_logging: A string identifier for logging messages.
+
+    Returns:
+        An instance of the output_schema populated with the LLM's response,
+        or None if the structured call fails or no valid output is extracted.
+    """
     try:
         if TRUSTCALL_AVAILABLE:
             # TrustCall's create_extractor might be better initialized once if config doesn't change
@@ -171,6 +199,26 @@ Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. S
         *   Se a reação for negativa à proposta (ex: "Não acho que isso me atende", "Não é o que eu esperava"), use **"NegativeFeedbackToProposal"**.
         *   Se for uma pergunta específica sobre a proposta, use "Questioning".
         *   Se for uma objeção clara à proposta, use "ExpressingObjection".
+
+   *   **Resposta ao Início do Fechamento:** Se o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" foi "INITIATE_CLOSING":
+        *   Se o cliente concordar em prosseguir (ex: "Sim", "Ok", "Pode confirmar", "Vamos lá"), classifique como **"ConfirmingCloseAttempt"**.
+        *   Se o cliente recusar (ex: "Não, obrigado", "Ainda não", "Vou pensar mais"), classifique como **"RejectingCloseAttempt"**.
+        *   Se o cliente pedir uma correção (ex: "Sim, mas o endereço está errado"), classifique como **"RequestingOrderCorrection"**.
+        *   Se levantar uma nova objeção, use "ExpressingObjection".
+        *   Se fizer uma pergunta, use "Questioning". 
+    
+    *   **Resposta à Confirmação de Detalhes:** Se o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" foi "CONFIRM_ORDER_DETAILS":
+        *   Se o cliente confirmar final (ex: "Sim, tudo certo", "Confirmo", "Pode finalizar"), classifique como **"FinalOrderConfirmation"**.
+        *   Se pedir correção: **"RequestingOrderCorrection"**.
+        *   Se recusar/desistir: **"RejectingCloseAttempt"**.
+        *   Outros casos: "ExpressingObjection", "Questioning", etc.       
+
+ *     **Resposta à Solicitação de Correção:** Se o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" foi "HANDLE_CLOSING_CORRECTION":
+        *   Se o cliente fornecer os detalhes da correção (ex: "O CEP é 99999-000", "Mude a quantidade para 2"), classifique como **"ProvidingCorrectionDetails"**.
+        *   Se ele disser que não precisa mais corrigir ou confirmar, use "ConfirmingCloseAttempt" ou "FinalOrderConfirmation".
+        *   Se ele recusar, use "RejectingCloseAttempt".
+        *   Outros casos: "Questioning", "ExpressingObjection", etc.                
+        
 2.  **`initially_extracted_questions`**: (Como antes) Identifique TODAS as perguntas explícitas. `question_text`.
 
 3.  **`extracted_objections`**: (Como antes) Identifique quaisquer objeções claras. `objection_text`.
@@ -199,6 +247,7 @@ Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. S
 
 8.  **`is_primarily_vague_statement`**: (Como antes)
 9.  **`is_primarily_off_topic`**: (Como antes)
+10. **`correction_details_text`**: Se `overall_intent` for "ProvidingCorrectionDetails", extraia o texto específico que o usuário forneceu como correção. Caso contrário, deixe como `null`.
 
 **Instruções Cruciais:**
 *   Seja preciso. Se um campo de lista não tiver itens, retorne `[]`.
@@ -215,6 +264,25 @@ async def initial_input_extraction_sub_step(
     recent_chat_history_str: str,
     llm_fast: BaseChatModel,
 ) -> Optional[InitialUserInputAnalysis]:
+    """
+    Performs the initial LLM call to extract structured information from user input.
+
+    Uses the `PROMPT_INITIAL_EXTRACTION` template to guide the LLM. Extracts
+    overall intent, potential questions/objections/needs/pains, analyzes the
+    response relative to the agent's last action, and assesses reactions to
+    presentations or rebuttals if applicable.
+
+    Args:
+        last_user_message_text: The text content of the user's latest message.
+        last_agent_action_obj: The PendingAgentAction dictionary representing
+                               the agent's last action, or None.
+        recent_chat_history_str: Formatted string of recent conversation history.
+        llm_fast: The language model instance designated for faster tasks.
+
+    Returns:
+        An InitialUserInputAnalysis object containing the extracted information,
+        or None if the LLM call or parsing fails.
+    """
     node_name = "initial_input_extraction_sub_step"
     logger.info(f"[{node_name}] Starting initial input extraction...")
 
@@ -297,7 +365,16 @@ async def check_single_repetition_with_llm(
     llm_fast: BaseChatModel,
 ) -> bool:
     """
-    Uses an LLM to check if a new question is a semantic repetition of a single logged question.
+    Uses an LLM to check if a new question is a semantic repetition of a logged one.
+
+    Args:
+        new_question_text: The text of the newly extracted question.
+        logged_question_core_text: The core text of a question from the log.
+        llm_fast: The language model instance for the check.
+
+    Returns:
+        True if the LLM determines it's a semantic repetition, False otherwise
+        (including cases where the LLM call fails or the logged text is empty).
     """
     node_name = "check_single_repetition_with_llm"
     if not logged_question_core_text:  # Sanity check
@@ -332,7 +409,23 @@ async def analyze_question_repetitions_sub_step(
     current_turn_number: int,  # Needed to avoid comparing with self if log is updated mid-turn
 ) -> List[ExtractedQuestionAnalysis]:
     """
-    Analyzes extracted questions for repetition against a log of previous questions using an LLM.
+    Analyzes extracted questions for repetition against a log using an LLM.
+
+    Iterates through questions extracted by the initial step. For each, it
+    compares against entries in the customer question log (most recent first)
+    using `check_single_repetition_with_llm`. Populates the final
+    `ExtractedQuestionAnalysis` object with repetition status and details
+    about the original question/answer if a repetition is found.
+
+    Args:
+        initially_extracted_questions: List of questions from initial analysis.
+        customer_question_log: The existing log of questions asked previously.
+        llm_fast: The language model instance for repetition checks.
+        current_turn_number: The current turn number, used to avoid self-comparison.
+
+    Returns:
+        A list of ExtractedQuestionAnalysis objects, one for each input question,
+        with repetition details populated.
     """
     node_name = "analyze_question_repetitions_sub_step_llm"
     logger.info(
@@ -418,9 +511,29 @@ async def process_user_input_node(
     state: RichConversationState, config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    LangGraph node to process the user's input.
-    It extracts information, analyzes for repetitions, and prepares the
-    analysis for the StateUpdater.
+    Processes the user's input message to extract structured information.
+
+    This node orchestrates the input analysis process:
+    1. Performs initial extraction of intent, entities (questions, objections,
+       needs, pains), and contextual reactions using an LLM.
+    2. Analyzes extracted questions for semantic repetition against the
+       conversation history using another LLM call per question/log entry pair.
+    3. Combines the results into a final `UserInputAnalysisOutput` object.
+    4. Returns the analysis result in the state delta under the key
+       'user_input_analysis_result' for the StateUpdaterNode to consume.
+
+    Args:
+        state: The current conversation state dictionary. Requires keys like
+               'current_user_input_text', 'messages', 'last_agent_action',
+               'customer_question_log', 'current_turn_number'.
+        config: The graph configuration dictionary, expected to contain the
+                'llm_fast_instance' under the 'configurable' key.
+
+    Returns:
+        A dictionary containing the state update:
+            - 'user_input_analysis_result': A dictionary representation of the
+              `UserInputAnalysisOutput` object, or None if processing fails.
+            - 'last_processing_error': An error message if a critical step fails.
     """
     node_name = "process_user_input_node"
     logger.info(
@@ -492,6 +605,7 @@ async def process_user_input_node(
         analysis_of_response_to_agent_action=initial_analysis.analysis_of_response_to_agent_action,
         is_primarily_vague_statement=initial_analysis.is_primarily_vague_statement,
         is_primarily_off_topic=initial_analysis.is_primarily_off_topic,
+        correction_details_text=initial_analysis.correction_details_text,
     )
 
     logger.info(
@@ -502,6 +616,10 @@ async def process_user_input_node(
             logger.debug(
                 f"  Q{q_idx+1}: '{q_info.question_text[:50]}...' Repetition: {q_info.is_repetition} (Original Turn: {q_info.original_question_turn}, Original Answer: {q_info.status_of_original_answer})"
             )
+    if final_analysis.correction_details_text:
+        logger.debug(
+            f"  Correction Details Text: '{final_analysis.correction_details_text[:100]}...'"
+        )
 
     # Retorna o resultado para ser adicionado ao estado pelo LangGraph
     # O StateUpdaterNode usará state.get("user_input_analysis_result")
