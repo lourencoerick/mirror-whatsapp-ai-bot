@@ -55,15 +55,39 @@ except ImportError:
 RAG_CHUNK_LIMIT_DEFAULT = 3
 RAG_SIMILARITY_THRESHOLD_DEFAULT = 0.75  # Ajustar conforme necessário
 
+
 # --- Nó Principal ---
-
-
 async def knowledge_retriever_node(
     state: RichConversationState, config: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
-    LangGraph node that retrieves relevant knowledge chunks from the vector database
-    based on the context needed for the planned agent action.
+    Retrieves relevant knowledge chunks based on the planned agent action.
+
+    This node performs Retrieval-Augmented Generation (RAG). It determines the
+    query text based on the 'next_agent_action_command' and 'action_parameters'
+    (e.g., the user's question text or the objection text). It then generates
+    an embedding for the query, searches the vector database for similar
+    knowledge chunks associated with the account, and formats the retrieved
+    chunks into a context string.
+
+    Args:
+        state: The current conversation state dictionary. Expected keys:
+               'account_id', 'next_agent_action_command', 'action_parameters'.
+        config: The graph configuration dictionary. Expected keys:
+                'configurable': {
+                    'db_session_factory': async_sessionmaker[AsyncSession],
+                    'rag_chunk_limit': Optional[int],
+                    'rag_similarity_threshold': Optional[float]
+                }
+
+    Returns:
+        A dictionary containing the state update:
+            - 'retrieved_knowledge_for_next_action': A formatted string
+              containing the retrieved context, or a message indicating no
+              relevant information was found or an error occurred.
+            - 'last_processing_error': An error message if a critical dependency
+              (like DB session factory or embedding function) is missing,
+              otherwise None.
     """
     node_name = "knowledge_retriever_node"
     logger.info(
