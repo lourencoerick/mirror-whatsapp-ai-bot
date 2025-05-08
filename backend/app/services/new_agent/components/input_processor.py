@@ -221,7 +221,9 @@ Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. S
         
 2.  **`initially_extracted_questions`**: (Como antes) Identifique TODAS as perguntas explícitas. `question_text`.
 
-3.  **`extracted_objections`**: (Como antes) Identifique quaisquer objeções claras. `objection_text`.
+3.  **`extracted_objections`**: Identifique quaisquer objeções claras na "ÚLTIMA MENSAGEM DO CLIENTE".
+    *   Para cada objeção, forneça o `objection_text`.
+    *   **IMPORTANTE**: Capture a frase ou sentenças que *melhor representam a preocupação central do cliente*. Se a objeção for expressa através de uma pergunta seguida de uma afirmação (ex: "Isso é muito caro? Não sei se consigo pagar."), capture a essência completa (ex: "Isso é muito caro? Não sei se consigo pagar." ou "Preço muito caro, não sei se consigo pagar."). Se for uma declaração direta (ex: "O prazo de entrega é muito longo."), capture essa declaração. Tente ser conciso, mas completo.
 
 4.  **`extracted_needs_or_pains`**: (Como antes) Identifique necessidades ou dores. `text` e `type`.
 
