@@ -469,6 +469,200 @@ def mock_analysis_reaction_positive_to_presentation() -> UserInputAnalysisOutput
     )
 
 
+@pytest.fixture
+def mock_analysis_confirming_close() -> UserInputAnalysisOutput:
+    """Analysis result for user confirming the closing initiation."""
+    return UserInputAnalysisOutput(
+        overall_intent="ConfirmingCloseAttempt",  # <<< New Intent
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"  # Example
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    )
+
+
+@pytest.fixture
+def mock_analysis_rejecting_close() -> UserInputAnalysisOutput:
+    """Analysis result for user rejecting the closing initiation."""
+    return UserInputAnalysisOutput(
+        overall_intent="RejectingCloseAttempt",  # <<< New Intent
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"  # Example
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    )
+
+
+@pytest.fixture
+def mock_analysis_requesting_correction() -> UserInputAnalysisOutput:
+    """Analysis result for user requesting correction during closing."""
+    return UserInputAnalysisOutput(
+        overall_intent="RequestingOrderCorrection",  # <<< New Intent
+        extracted_questions=[
+            ExtractedQuestionAnalysis(
+                question_text="O endereço está errado.", is_repetition=False
+            )
+        ],  # Example
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"  # Example
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    )
+
+
+# tests/unit/test_state_updater.py
+# At the end of the fixtures section
+
+
+@pytest.fixture
+def mock_analysis_confirming_close() -> UserInputAnalysisOutput:
+    """Analysis result for user confirming the closing initiation."""
+    return UserInputAnalysisOutput(
+        overall_intent="ConfirmingCloseAttempt",
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+        correction_details_text=None,
+    )
+
+
+@pytest.fixture
+def mock_analysis_rejecting_close() -> UserInputAnalysisOutput:
+    """Analysis result for user rejecting the closing initiation."""
+    return UserInputAnalysisOutput(
+        overall_intent="RejectingCloseAttempt",
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+        correction_details_text=None,
+    )
+
+
+@pytest.fixture
+def mock_analysis_requesting_correction() -> UserInputAnalysisOutput:
+    """Analysis result for user requesting correction during closing."""
+    return UserInputAnalysisOutput(
+        overall_intent="RequestingOrderCorrection",
+        extracted_questions=[
+            ExtractedQuestionAnalysis(
+                question_text="O endereço está errado.", is_repetition=False
+            )
+        ],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+        correction_details_text=None,
+    )
+
+
+@pytest.fixture
+def mock_analysis_providing_correction() -> UserInputAnalysisOutput:
+    """Analysis result for user providing correction details."""
+    correction_text = "O CEP correto é 99999-000"
+    return UserInputAnalysisOutput(
+        overall_intent="ProvidingCorrectionDetails",
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+        correction_details_text=correction_text,  # Include the text
+    )
+
+
+@pytest.fixture
+def mock_analysis_final_confirmation() -> UserInputAnalysisOutput:
+    """Analysis result for user giving final confirmation."""
+    return UserInputAnalysisOutput(
+        overall_intent="FinalOrderConfirmation",
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"
+        ),
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+        correction_details_text=None,
+    )
+
+
 # --- Testes ---
 
 
@@ -1288,4 +1482,434 @@ async def test_state_updater_handles_objection_status_new_raised(
     ]
     assert len(active_objections_in_queue) == 1
     assert active_objections_in_queue[0].get("text") == new_objection_text
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_awaiting_confirmation(
+    mock_log_event, base_state, mock_analysis_confirming_close
+):
+    """Tests closing_status becomes awaiting_confirmation."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "attempt_made"  # Status before user confirmation
+    # Simulate last action was INITIATE_CLOSING
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = mock_analysis_confirming_close.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    assert "closing_process_status" in delta
+    assert delta["closing_process_status"] == "awaiting_confirmation"
+    assert "customer_profile_dynamic" in delta  # Because intent changed
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "ConfirmingCloseAttempt"
+    )
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_confirmation_rejected(
+    mock_log_event, base_state, mock_analysis_rejecting_close
+):
+    """Tests closing_status becomes confirmation_rejected."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "attempt_made"
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = mock_analysis_rejecting_close.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    assert "closing_process_status" in delta
+    assert delta["closing_process_status"] == "confirmation_rejected"
+    assert "customer_profile_dynamic" in delta
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "RejectingCloseAttempt"
+    )
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_needs_correction(
+    mock_log_event, base_state, mock_analysis_requesting_correction
+):
+    """Tests closing_status becomes needs_correction."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "attempt_made"
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = (
+        mock_analysis_requesting_correction.model_dump()
+    )
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    assert "closing_process_status" in delta
+    assert delta["closing_process_status"] == "needs_correction"
+    assert "customer_profile_dynamic" in delta
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "RequestingOrderCorrection"
+    )
+    # Check if the question about correction was added to interrupt queue
+    assert "user_interruptions_queue" in delta
+    assert len(delta["user_interruptions_queue"]) == 1
+    assert delta["user_interruptions_queue"][0]["type"] == "direct_question"
+    assert delta["user_interruptions_queue"][0]["text"] == "O endereço está errado."
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_closing_status_no_change_if_last_action_not_initiate(
+    mock_log_event, base_state, mock_analysis_confirming_close
+):
+    """Tests closing_status doesn't change if last action wasn't INITIATE_CLOSING."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "not_started"  # Initial status
+    # Simulate last action was something else
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="ASK_SPIN_QUESTION",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = (
+        mock_analysis_confirming_close.model_dump()
+    )  # User confirms, but irrelevant now
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    # closing_process_status should NOT be in the delta as it didn't change
+    assert "closing_process_status" not in delta
+    assert "customer_profile_dynamic" in delta  # Intent changed
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "ConfirmingCloseAttempt"
+    )
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_closing_status_no_change_if_intent_irrelevant(
+    mock_log_event, base_state, mock_analysis_new_question
+):
+    """Tests closing_status doesn't change if intent is irrelevant, even after INITIATE_CLOSING."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "attempt_made"
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    # User asks a question instead of confirming/rejecting
+    state["user_input_analysis_result"] = mock_analysis_new_question.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    # closing_process_status should NOT be in the delta
+    assert "closing_process_status" not in delta
+    assert "customer_profile_dynamic" in delta  # Intent changed
+    assert delta["customer_profile_dynamic"]["last_discerned_intent"] == "Questioning"
+    # Check question was added to queue
+    assert "user_interruptions_queue" in delta
+    assert len(delta["user_interruptions_queue"]) == 1
+    assert delta["user_interruptions_queue"][0]["type"] == "direct_question"
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_awaiting_confirmation(
+    mock_log_event, base_state, mock_analysis_confirming_close
+):
+    """Tests closing_status becomes awaiting_confirmation after INITIATE_CLOSING."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "attempt_made"  # Status before user confirmation
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = mock_analysis_confirming_close.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    assert "closing_process_status" in delta
+    assert delta["closing_process_status"] == "awaiting_confirmation"
+    assert "customer_profile_dynamic" in delta  # Because intent changed
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "ConfirmingCloseAttempt"
+    )
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_confirmation_rejected(
+    mock_log_event, base_state, mock_analysis_rejecting_close
+):
+    """Tests closing_status becomes confirmation_rejected after INITIATE_CLOSING."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "attempt_made"
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = mock_analysis_rejecting_close.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    assert "closing_process_status" in delta
+    assert delta["closing_process_status"] == "confirmation_rejected"
+    assert "customer_profile_dynamic" in delta
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "RejectingCloseAttempt"
+    )
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_needs_correction_after_initiate(
+    mock_log_event, base_state, mock_analysis_requesting_correction
+):
+    """Tests closing_status becomes needs_correction after INITIATE_CLOSING."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "attempt_made"
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = (
+        mock_analysis_requesting_correction.model_dump()
+    )
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    assert "closing_process_status" in delta
+    assert delta["closing_process_status"] == "needs_correction"
+    assert "customer_profile_dynamic" in delta
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "RequestingOrderCorrection"
+    )
+    assert "user_interruptions_queue" in delta  # Check question added
+    assert any(
+        q["type"] == "direct_question" and q["text"] == "O endereço está errado."
+        for q in delta["user_interruptions_queue"]
+    )
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_needs_correction_after_confirm(
+    mock_log_event, base_state, mock_analysis_requesting_correction
+):
+    """Tests closing_status becomes needs_correction after CONFIRM_ORDER_DETAILS."""
+    state = base_state
+    state["current_turn_number"] = 5
+    state["closing_process_status"] = (
+        "awaiting_confirmation"  # Status before correction request
+    )
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="CONFIRM_ORDER_DETAILS",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = (
+        mock_analysis_requesting_correction.model_dump()
+    )
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 6
+    assert "closing_process_status" in delta
+    assert delta["closing_process_status"] == "needs_correction"
+    assert "customer_profile_dynamic" in delta
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "RequestingOrderCorrection"
+    )
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_awaiting_confirmation_after_correction(
+    mock_log_event, base_state, mock_analysis_providing_correction
+):
+    """Tests closing_status becomes awaiting_confirmation after user provides correction details."""
+    state = base_state
+    state["current_turn_number"] = 7
+    state["closing_process_status"] = (
+        "needs_correction"  # Status before user provides correction
+    )
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="HANDLE_CLOSING_CORRECTION",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = (
+        mock_analysis_providing_correction.model_dump()
+    )
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 8
+    assert "closing_process_status" in delta
+    assert (
+        delta["closing_process_status"] == "awaiting_confirmation"
+    )  # Back to awaiting confirmation
+    assert "customer_profile_dynamic" in delta
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "ProvidingCorrectionDetails"
+    )
+    # We are not asserting changes to active_proposal here yet
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_sets_confirmed_success(
+    mock_log_event, base_state, mock_analysis_final_confirmation
+):
+    """Tests closing_status becomes confirmed_success after final confirmation."""
+    state = base_state
+    state["current_turn_number"] = 9
+    state["closing_process_status"] = (
+        "awaiting_confirmation"  # Status before final confirmation
+    )
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="CONFIRM_ORDER_DETAILS",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = mock_analysis_final_confirmation.model_dump()
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 10
+    assert "closing_process_status" in delta
+    assert delta["closing_process_status"] == "confirmed_success"
+    assert "customer_profile_dynamic" in delta
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "FinalOrderConfirmation"
+    )
+    mock_log_event.assert_not_called()
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.state_updater._log_missing_information_event",
+    new_callable=AsyncMock,
+)
+async def test_state_updater_closing_status_no_change_if_last_action_not_closing(
+    mock_log_event, base_state, mock_analysis_confirming_close
+):
+    """Tests closing_status doesn't change if last action wasn't a closing one."""
+    state = base_state
+    state["current_turn_number"] = 3
+    state["closing_process_status"] = "not_started"  # Initial status
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="ASK_SPIN_QUESTION",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["user_input_analysis_result"] = (
+        mock_analysis_confirming_close.model_dump()
+    )  # User confirms, but irrelevant now
+
+    delta = await update_conversation_state_node(state, {})
+
+    assert delta.get("current_turn_number") == 4
+    assert "closing_process_status" not in delta  # Status should not change
+    assert "customer_profile_dynamic" in delta
+    assert (
+        delta["customer_profile_dynamic"]["last_discerned_intent"]
+        == "ConfirmingCloseAttempt"
+    )
     mock_log_event.assert_not_called()

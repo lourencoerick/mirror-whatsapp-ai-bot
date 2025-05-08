@@ -25,6 +25,7 @@ from app.services.new_agent.state_definition import (
     IdentifiedNeedEntry,
     IdentifiedObjectionEntry,
     DynamicCustomerProfile,  # Import DynamicCustomerProfile
+    ProposedSolution,
 )
 
 # --- Fixtures ---
@@ -747,3 +748,287 @@ def test_get_next_spin_type_sequence():
     assert _get_next_spin_type("Implication") == "NeedPayoff"
     assert _get_next_spin_type("NeedPayoff") == "Problem"
     assert _get_next_spin_type("UnknownType") == "Situation"  # type: ignore
+
+
+@pytest.mark.asyncio
+async def test_planner_transitions_to_closing_on_buying_signal(base_state_for_planner):
+    """Tests PRESENTING_SOLUTION -> ATTEMPTING_CLOSE transition and immediate action."""  # Updated docstring
+    state = base_state_for_planner
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="PRESENTING_SOLUTION",
+        goal_details={"presenting_product": "Produto Top"},
+        previous_goal_if_interrupted=None,
+    )
+    state["last_agent_action"] = PendingAgentAction(  # Not PRESENT_SOLUTION_OFFER
+        action_type="ANSWER_DIRECT_QUESTION",
+        details={},
+        action_generation_text="Sim.",
+        attempts=1,
+    )
+    state["user_interruptions_queue"] = []
+    state["customer_profile_dynamic"][
+        "last_discerned_intent"
+    ] = "RequestForNextStepInPurchase"
+    state["customer_profile_dynamic"][
+        "identified_objections"
+    ] = []  # No active objections
+    proposal = ProposedSolution(
+        product_name="Produto Top",
+        price=100.0,
+        turn_proposed=1,
+        status="proposed",
+        key_benefits_highlighted=[],
+    )
+    state["active_proposal"] = proposal
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta
+    assert delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "closing_step": "initial_attempt"
+    }
+
+    # --- FIX: Assert that INITIATE_CLOSING IS planned in the same cycle ---
+    assert delta.get("next_agent_action_command") == "INITIATE_CLOSING"
+    assert (
+        delta.get("action_parameters", {}).get("product_name")
+        == proposal["product_name"]
+    )
+    assert delta.get("action_parameters", {}).get("price") == proposal["price"]
+    # --- END FIX ---
+
+
+@pytest.mark.asyncio
+async def test_planner_initiates_closing_when_goal_is_attempting_close_not_started(
+    base_state_for_planner,
+):
+    """Tests planning INITIATE_CLOSING when goal=ATTEMPTING_CLOSE and status=not_started."""
+    state = base_state_for_planner
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="ATTEMPTING_CLOSE",
+        goal_details={},  # Details will be added by planner
+        previous_goal_if_interrupted=None,
+    )
+    state["closing_process_status"] = "not_started"
+    state["user_interruptions_queue"] = []
+    state["last_agent_action"] = None
+    state["active_proposal"] = ProposedSolution(
+        product_name="Produto Close",
+        price=50.0,
+        turn_proposed=1,
+        status="proposed",
+        key_benefits_highlighted=[],
+    )
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta  # Goal details are updated
+    assert delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "closing_step": "initial_attempt"
+    }
+    assert delta["next_agent_action_command"] == "INITIATE_CLOSING"
+    assert delta["action_parameters"].get("product_name") == "Produto Close"
+    assert delta["action_parameters"].get("price") == 50.0
+
+
+@pytest.mark.asyncio
+async def test_planner_confirms_details_when_awaiting_confirmation(
+    base_state_for_planner,
+):
+    """Tests planning CONFIRM_ORDER_DETAILS when status=awaiting_confirmation."""
+    state = base_state_for_planner
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="ATTEMPTING_CLOSE",
+        goal_details={"closing_step": "initial_attempt"},  # Previous step
+        previous_goal_if_interrupted=None,
+    )
+    state["closing_process_status"] = (
+        "awaiting_confirmation"  # <<< Status set by StateUpdater
+    )
+    state["user_interruptions_queue"] = []
+    state["last_agent_action"] = PendingAgentAction(  # Last action was initiating
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+    state["active_proposal"] = ProposedSolution(
+        product_name="Produto Confirm",
+        price=123.45,
+        price_info="/ano",
+        turn_proposed=2,
+        status="proposed",
+        key_benefits_highlighted=[],
+    )
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta  # Goal details might update later
+    assert delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
+    assert delta["next_agent_action_command"] == "CONFIRM_ORDER_DETAILS"
+    assert delta["action_parameters"].get("product_name") == "Produto Confirm"
+    assert delta["action_parameters"].get("price") == 123.45
+    assert delta["action_parameters"].get("price_info") == "/ano"
+
+
+@pytest.mark.asyncio
+async def test_planner_handles_correction_when_needs_correction(base_state_for_planner):
+    """Tests planning HANDLE_CLOSING_CORRECTION when status=needs_correction."""
+    state = base_state_for_planner
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="ATTEMPTING_CLOSE",
+        goal_details={"closing_step": "awaiting_confirmation"},  # Example previous step
+        previous_goal_if_interrupted=None,
+    )
+    state["closing_process_status"] = (
+        "needs_correction"  # <<< Status set by StateUpdater
+    )
+    state["user_interruptions_queue"] = []
+    state["last_agent_action"] = (
+        PendingAgentAction(  # Last action was confirming details
+            action_type="CONFIRM_ORDER_DETAILS",
+            details={},
+            action_generation_text="...",
+            attempts=1,
+        )
+    )
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta
+    assert delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
+    assert delta["next_agent_action_command"] == "HANDLE_CLOSING_CORRECTION"
+    # assert delta.get("action_parameters") == {}  # No specific params planned yet
+
+
+@pytest.mark.asyncio
+async def test_planner_ends_conversation_when_rejected(base_state_for_planner):
+    """Tests transitioning to ENDING_CONVERSATION when status=confirmation_rejected."""
+    state = base_state_for_planner
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="ATTEMPTING_CLOSE",
+        goal_details={"closing_step": "initial_attempt"},
+        previous_goal_if_interrupted=None,
+    )
+    state["closing_process_status"] = (
+        "confirmation_rejected"  # <<< Status set by StateUpdater
+    )
+    state["user_interruptions_queue"] = []
+    state["last_agent_action"] = PendingAgentAction(  # Last action was initiating
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta
+    assert delta["current_agent_goal"]["goal_type"] == "ENDING_CONVERSATION"
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "reason": "Closing attempt rejected"
+    }
+    assert (
+        delta["next_agent_action_command"] == "GENERATE_FAREWELL"
+    )  # Action planned for ending
+
+
+@pytest.mark.asyncio
+async def test_planner_waits_when_closing_status_is_attempt_made(
+    base_state_for_planner,
+):
+    """Tests no action is planned when status=attempt_made (waiting for user)."""
+    state = base_state_for_planner
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="ATTEMPTING_CLOSE",
+        goal_details={"closing_step": "initial_attempt"},
+        previous_goal_if_interrupted=None,
+    )
+    state["closing_process_status"] = "attempt_made"  # <<< Status
+    state["user_interruptions_queue"] = []
+    state["last_agent_action"] = PendingAgentAction(  # Last action was initiating
+        action_type="INITIATE_CLOSING",
+        details={},
+        action_generation_text="...",
+        attempts=1,
+    )
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta  # Goal is always returned
+    assert delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
+    assert delta.get("next_agent_action_command") is None  # Wait
+    assert delta.get("action_parameters") == {}
+
+
+@pytest.mark.asyncio
+async def test_planner_initiates_closing_when_goal_is_attempting_close_not_started(
+    base_state_for_planner,
+):
+    """Tests planning INITIATE_CLOSING when goal=ATTEMPTING_CLOSE and status=not_started."""
+    state = base_state_for_planner
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="ATTEMPTING_CLOSE",
+        goal_details={},  # Planner should add details
+        previous_goal_if_interrupted=None,
+    )
+    state["closing_process_status"] = "not_started"
+    state["user_interruptions_queue"] = []
+    state["last_agent_action"] = None
+    state["active_proposal"] = ProposedSolution(
+        product_name="Produto Close",
+        price=50.0,
+        turn_proposed=1,
+        status="proposed",
+        key_benefits_highlighted=[],
+    )
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta  # Goal details are updated
+    assert delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "closing_step": "initial_attempt"
+    }
+    assert delta["next_agent_action_command"] == "INITIATE_CLOSING"
+    assert delta["action_parameters"].get("product_name") == "Produto Close"
+    assert delta["action_parameters"].get("price") == 50.0
+
+
+@pytest.mark.asyncio
+async def test_planner_processes_order_when_confirmed_success(base_state_for_planner):
+    """Tests planning PROCESS_ORDER_CONFIRMATION when status=confirmed_success."""
+    state = base_state_for_planner
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="ATTEMPTING_CLOSE",
+        goal_details={"closing_step": "confirming_details"},  # Example previous step
+        previous_goal_if_interrupted=None,
+    )
+    state["closing_process_status"] = "confirmed_success"  # <<< Status
+    state["user_interruptions_queue"] = []
+    state["last_agent_action"] = (
+        PendingAgentAction(  # Last action was confirming details
+            action_type="CONFIRM_ORDER_DETAILS",
+            details={},
+            action_generation_text="...",
+            attempts=1,
+        )
+    )
+    state["active_proposal"] = ProposedSolution(
+        product_name="Produto Final",
+        price=999,
+        turn_proposed=2,
+        status="proposed",
+        key_benefits_highlighted=[],
+    )
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta
+    assert (
+        delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
+    )  # Stays here for now
+    assert delta["next_agent_action_command"] == "PROCESS_ORDER_CONFIRMATION"
+    assert delta["action_parameters"].get("product_name") == "Produto Final"

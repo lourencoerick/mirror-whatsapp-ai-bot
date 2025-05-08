@@ -451,3 +451,363 @@ async def test_generator_selects_correct_prompt_for_ack_transition(
 
     assert delta.get("last_agent_generation_text") == expected_llm_response
     assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.response_generator._call_llm_for_generation",
+    new_callable=AsyncMock,
+)
+@patch(
+    "app.services.new_agent.components.response_generator._prepare_common_prompt_context"
+)
+async def test_generator_selects_correct_prompt_for_initiate_closing_no_details(
+    mock_prepare_context, mock_call_llm, base_state_for_generator, mock_llm_primary
+):
+    """Tests prompt selection and parameter preparation for INITIATE_CLOSING without proposal details."""
+    state = base_state_for_generator
+    action: AgentActionType = "INITIATE_CLOSING"
+    params: AgentActionDetails = {}  # No product/price details provided by Planner
+    state["next_agent_action_command"] = action
+    state["action_parameters"] = params
+
+    common_context_mock = {"language": "pt-br", "sales_tone": "eficiente"}  # Example
+    mock_prepare_context.return_value = common_context_mock
+    expected_llm_response = "Perfeito! Gostaria de prosseguir com este pedido?"
+    mock_call_llm.return_value = expected_llm_response
+
+    config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
+    delta = await response_generator_node(state, config)
+
+    mock_prepare_context.assert_called_once_with(state)
+    mock_call_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_llm.call_args
+
+    assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
+    assert (
+        "Gere a mensagem para iniciar o fechamento"
+        in call_kwargs["prompt"].messages[0].prompt.template
+    )
+
+    # Check specific values passed to the prompt
+    expected_specific_values = {
+        "product_name_price_info": "este pedido",  # Default when no details
+        "product_name_fallback": "este pedido",  # Default when no details
+    }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
+    assert call_kwargs["prompt_values"] == expected_prompt_values
+    assert call_kwargs["llm"] == mock_llm_primary
+
+    assert delta.get("last_agent_generation_text") == expected_llm_response
+    assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.response_generator._call_llm_for_generation",
+    new_callable=AsyncMock,
+)
+@patch(
+    "app.services.new_agent.components.response_generator._prepare_common_prompt_context"
+)
+async def test_generator_selects_correct_prompt_for_initiate_closing_with_details(
+    mock_prepare_context, mock_call_llm, base_state_for_generator, mock_llm_primary
+):
+    """Tests prompt selection and parameter preparation for INITIATE_CLOSING with proposal details."""
+    state = base_state_for_generator
+    action: AgentActionType = "INITIATE_CLOSING"
+    params: AgentActionDetails = {  # Planner provided details
+        "product_name": "Plano Premium",
+        "price": 99.90,
+    }
+    state["next_agent_action_command"] = action
+    state["action_parameters"] = params
+
+    common_context_mock = {"language": "pt-br", "sales_tone": "eficiente"}
+    mock_prepare_context.return_value = common_context_mock
+    expected_llm_response = "Perfeito! Gostaria então de prosseguir com o pedido do *Plano Premium* (R$99.90)?"
+    mock_call_llm.return_value = expected_llm_response
+
+    config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
+    delta = await response_generator_node(state, config)
+
+    mock_prepare_context.assert_called_once_with(state)
+    mock_call_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_llm.call_args
+
+    assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
+    assert (
+        "Gere a mensagem para iniciar o fechamento"
+        in call_kwargs["prompt"].messages[0].prompt.template
+    )
+
+    # Check specific values passed to the prompt
+    expected_specific_values = {
+        "product_name_price_info": "o *Plano Premium* (R$99.90)",  # Formatted string
+        "product_name_fallback": "o *Plano Premium*",  # Fallback uses name
+    }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
+    assert call_kwargs["prompt_values"] == expected_prompt_values
+    assert call_kwargs["llm"] == mock_llm_primary
+
+    assert delta.get("last_agent_generation_text") == expected_llm_response
+    assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.response_generator._call_llm_for_generation",
+    new_callable=AsyncMock,
+)
+@patch(
+    "app.services.new_agent.components.response_generator._prepare_common_prompt_context"
+)
+async def test_generator_selects_correct_prompt_for_confirm_details(
+    mock_prepare_context, mock_call_llm, base_state_for_generator, mock_llm_primary
+):
+    """Tests prompt selection and parameter preparation for CONFIRM_ORDER_DETAILS."""
+    state = base_state_for_generator
+    action: AgentActionType = "CONFIRM_ORDER_DETAILS"
+    params: AgentActionDetails = {  # Planner provided details
+        "product_name": "Plano Avançado",
+        "price": 299.00,
+        "price_info": "/mês",
+    }
+    state["next_agent_action_command"] = action
+    state["action_parameters"] = params
+
+    common_context_mock = {"language": "pt-br", "sales_tone": "eficiente"}
+    mock_prepare_context.return_value = common_context_mock
+    expected_llm_response = "Ótimo! Só para confirmar, estamos prosseguindo com o *Plano Avançado* pelo valor de R$299.00/mês. Correto?"
+    mock_call_llm.return_value = expected_llm_response
+
+    config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
+    delta = await response_generator_node(state, config)
+
+    mock_prepare_context.assert_called_once_with(state)
+    mock_call_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_llm.call_args
+
+    assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
+    assert (
+        "Gere a mensagem de confirmação dos detalhes"
+        in call_kwargs["prompt"].messages[0].prompt.template
+    )
+
+    # Check specific values passed to the prompt
+    expected_specific_values = {
+        "product_name": "Plano Avançado",
+        "price_info": "R$299.00/mês",  # Formatted string
+    }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
+    assert call_kwargs["prompt_values"] == expected_prompt_values
+    assert call_kwargs["llm"] == mock_llm_primary
+
+    assert delta.get("last_agent_generation_text") == expected_llm_response
+    assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.response_generator._call_llm_for_generation",
+    new_callable=AsyncMock,
+)
+@patch(
+    "app.services.new_agent.components.response_generator._prepare_common_prompt_context"
+)
+async def test_generator_confirm_details_handles_missing_price_info(
+    mock_prepare_context, mock_call_llm, base_state_for_generator, mock_llm_primary
+):
+    """Tests CONFIRM_ORDER_DETAILS handles missing price or price_info."""
+    state = base_state_for_generator
+    action: AgentActionType = "CONFIRM_ORDER_DETAILS"
+    params: AgentActionDetails = {  # Missing price_info
+        "product_name": "Consulta Avulsa",
+        "price": 500.00,
+        # "price_info": None # Missing
+    }
+    state["next_agent_action_command"] = action
+    state["action_parameters"] = params
+
+    common_context_mock = {"language": "pt-br", "sales_tone": "eficiente"}
+    mock_prepare_context.return_value = common_context_mock
+    expected_llm_response = "Ok! Confirmando então: *Consulta Avulsa* pelo valor de R$500.00. Podemos prosseguir?"
+    mock_call_llm.return_value = expected_llm_response
+
+    config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
+    delta = await response_generator_node(state, config)
+
+    mock_call_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_llm.call_args
+
+    # Check specific values passed to the prompt
+    expected_specific_values = {
+        "product_name": "Consulta Avulsa",
+        "price_info": "R$500.00",  # Formatted string without suffix
+    }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
+    assert call_kwargs["prompt_values"] == expected_prompt_values
+
+    assert delta.get("last_agent_generation_text") == expected_llm_response
+    assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.response_generator._call_llm_for_generation",
+    new_callable=AsyncMock,
+)
+@patch(
+    "app.services.new_agent.components.response_generator._prepare_common_prompt_context"
+)
+async def test_generator_selects_correct_prompt_for_process_order(
+    mock_prepare_context, mock_call_llm, base_state_for_generator, mock_llm_primary
+):
+    """Tests prompt selection and parameters for PROCESS_ORDER_CONFIRMATION."""
+    state = base_state_for_generator
+    action: AgentActionType = "PROCESS_ORDER_CONFIRMATION"
+    params: AgentActionDetails = {  # Planner provided details
+        "product_name": "Plano Super Completo"
+    }
+    state["next_agent_action_command"] = action
+    state["action_parameters"] = params
+
+    common_context_mock = {"language": "pt-br", "sales_tone": "confiante"}  # Example
+    mock_prepare_context.return_value = common_context_mock
+    expected_llm_response = "Excelente! Seu pedido para o *Plano Super Completo* foi processado com sucesso. Obrigado!"
+    mock_call_llm.return_value = expected_llm_response
+
+    config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
+    delta = await response_generator_node(state, config)
+
+    mock_prepare_context.assert_called_once_with(state)
+    mock_call_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_llm.call_args
+
+    assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
+    # Check for identifier in the correct prompt
+    assert (
+        "Gere a mensagem de confirmação do pedido"
+        in call_kwargs["prompt"].messages[0].prompt.template
+    )
+
+    # Check specific values passed to the prompt
+    expected_specific_values = {
+        "product_name": "Plano Super Completo",
+    }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
+    assert call_kwargs["prompt_values"] == expected_prompt_values
+    assert call_kwargs["llm"] == mock_llm_primary
+
+    assert delta.get("last_agent_generation_text") == expected_llm_response
+    assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.response_generator._call_llm_for_generation",
+    new_callable=AsyncMock,
+)
+@patch(
+    "app.services.new_agent.components.response_generator._prepare_common_prompt_context"
+)
+async def test_generator_selects_correct_prompt_for_farewell_rejection(
+    mock_prepare_context, mock_call_llm, base_state_for_generator, mock_llm_primary
+):
+    """Tests prompt selection and parameters for GENERATE_FAREWELL after rejection."""
+    state = base_state_for_generator
+    action: AgentActionType = "GENERATE_FAREWELL"
+    params: AgentActionDetails = {  # Planner provided reason
+        "reason": "Closing attempt rejected"
+    }
+    state["next_agent_action_command"] = action
+    state["action_parameters"] = params
+
+    common_context_mock = {
+        "language": "pt-br",
+        "sales_tone": "compreensivo",
+        "fallback_text": "site.com/contato",  # Example fallback from common context
+    }
+    mock_prepare_context.return_value = common_context_mock
+    expected_llm_response = "Entendo perfeitamente. Agradeço seu tempo e, se mudar de ideia ou tiver dúvidas, pode me chamar! Tenha um ótimo dia."
+    mock_call_llm.return_value = expected_llm_response
+
+    config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
+    delta = await response_generator_node(state, config)
+
+    mock_prepare_context.assert_called_once_with(state)
+    mock_call_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_llm.call_args
+
+    assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
+    # Check for identifier in the correct prompt
+    assert (
+        "Gere a mensagem de despedida"
+        in call_kwargs["prompt"].messages[0].prompt.template
+    )
+
+    # Check specific values passed to the prompt
+    expected_specific_values = {
+        "reason": "Closing attempt rejected",
+        "fallback_contact_info": "site.com/contato",  # Check if fallback is passed
+    }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
+    assert call_kwargs["prompt_values"] == expected_prompt_values
+    assert call_kwargs["llm"] == mock_llm_primary
+
+    assert delta.get("last_agent_generation_text") == expected_llm_response
+    assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+@patch(
+    "app.services.new_agent.components.response_generator._call_llm_for_generation",
+    new_callable=AsyncMock,
+)
+@patch(
+    "app.services.new_agent.components.response_generator._prepare_common_prompt_context"
+)
+async def test_generator_selects_correct_prompt_for_farewell_impasse(
+    mock_prepare_context, mock_call_llm, base_state_for_generator, mock_llm_primary
+):
+    """Tests prompt selection and parameters for GENERATE_FAREWELL after impasse."""
+    state = base_state_for_generator
+    action: AgentActionType = "GENERATE_FAREWELL"
+    params: AgentActionDetails = {  # Planner provided reason
+        "reason": "Impasse on objection: Preço"
+    }
+    state["next_agent_action_command"] = action
+    state["action_parameters"] = params
+
+    common_context_mock = {
+        "language": "pt-br",
+        "sales_tone": "compreensivo",
+        "fallback_text": "site.com/contato",
+    }
+    mock_prepare_context.return_value = common_context_mock
+    expected_llm_response = "Compreendo que não chegamos a um acordo sobre o preço. Agradeço sua honestidade e tempo. Se precisar de algo mais, é só chamar. Tenha um bom dia!"
+    mock_call_llm.return_value = expected_llm_response
+
+    config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
+    delta = await response_generator_node(state, config)
+
+    mock_prepare_context.assert_called_once_with(state)
+    mock_call_llm.assert_called_once()
+    call_args, call_kwargs = mock_call_llm.call_args
+
+    assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
+    assert (
+        "Gere a mensagem de despedida"
+        in call_kwargs["prompt"].messages[0].prompt.template
+    )
+
+    expected_specific_values = {
+        "reason": "Impasse on objection: Preço",
+        "fallback_contact_info": "site.com/contato",
+    }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
+    assert call_kwargs["prompt_values"] == expected_prompt_values
+    assert call_kwargs["llm"] == mock_llm_primary
+
+    assert delta.get("last_agent_generation_text") == expected_llm_response
+    assert delta.get("last_processing_error") is None
