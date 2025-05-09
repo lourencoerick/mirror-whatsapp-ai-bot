@@ -12,6 +12,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from ..state_definition import (
     RichConversationState,
     AgentGoal,
+    AgentActionType,
+    AgentActionDetails,
 )
 
 from .planner import MAX_REBUTTAL_ATTEMPTS_PER_OBJECTION, MAX_SPIN_QUESTIONS_PER_CYCLE
@@ -49,40 +51,59 @@ PROMPT_DETERMINE_PROACTIVE_STEP = ChatPromptTemplate.from_messages(
 
 **ESTADO ATUAL DA CONVERSA (Contexto para sua decisão):**
 
-1.  **Turno Atual da Conversa:** {current_turn_number}
-2.  **Goal Atual do Agente (Goal que o Planner principal definiu antes de decidir por esta iniciativa):**
+1.  **Gatilho para esta Decisão Proativa:** '{trigger_source}'
+    (Valores possíveis: 'user_response_or_stagnation', 'follow_up_timeout')
+
+2.  **Se Gatilho foi 'follow_up_timeout':**
+    - Número da Tentativa Atual de Follow-up (começa em 0 para a 1ª tentativa): {current_follow_up_attempts}
+    - Máximo de Tentativas de Follow-up Permitidas: {max_follow_up_attempts_total}
+    
+
+3.  **Turno Atual da Conversa:** {current_turn_number}
+4.  **Goal Atual do Agente (Goal que o Planner principal definiu antes de decidir por esta iniciativa):**
     - Tipo: {current_goal_type_before_initiative}
     - Detalhes do Goal: {current_goal_details_before_initiative_json}
 
-3.  **Última Ação Realizada pelo Agente (no turno anterior):**
+5.  **Última Ação Realizada pelo Agente (no turno anterior):**
     - Tipo: {last_agent_action_type}
     - Detalhes da Ação: {last_agent_action_details_json}
     - Texto Gerado pelo Agente: "{last_agent_action_text}"
 
-4.  **Última Mensagem do Usuário (que levou a esta necessidade de iniciativa):**
+6.  **Última Mensagem do Usuário (que levou a esta necessidade de iniciativa):**
     - Texto: "{last_user_message_text}"
     - Intenção Discernida (pelo InputProcessor): {last_discerned_intent}
     - Análise da Resposta à Ação do Agente (pelo InputProcessor): {user_response_to_agent_action_analysis}
 
-5.  **Fila de Interrupções Pendentes do Usuário (o Planner principal já as considerou; geralmente vazia aqui):**
+7.  **Fila de Interrupções Pendentes do Usuário (o Planner principal já as considerou; geralmente vazia aqui):**
     {interruptions_queue_formatted}
 
-6.  **Perfil Dinâmico do Cliente (Resumido):**
+8.  **Perfil Dinâmico do Cliente (Resumido):**
     - Objeções Ativas: {active_objections_summary}
     - Objeções Resolvidas Recentemente: {resolved_objections_summary}
     - Necessidades Confirmadas: {confirmed_needs_summary}
     - Status do Processo de Fechamento: {closing_process_status}
 
-7.  **Histórico Recente da Conversa (últimas ~5 trocas):**
+9.  **Histórico Recente da Conversa (últimas ~5 trocas):**
     {chat_history}
 
-8.  **Data e Hora Atuais:** {current_datetime}
+10.  **Data e Hora Atuais:** {current_datetime}
 
 **SUA TAREFA:**
 
 Com base no contexto acima, decida qual `AgentActionType` e `AgentActionDetails` (parâmetros) o agente deve executar proativamente.
 
 **Diretrizes para Decisão:**
+*   **Se `trigger_source` == 'follow_up_timeout':**
+    *   Se `current_follow_up_attempts` < `max_follow_up_attempts_total`:
+        *   Gere uma mensagem de reengajamento gentil. Ação: `ASK_CLARIFYING_QUESTION`.
+        *   Varie a mensagem com base em `current_follow_up_attempts`.
+            *   Tentativa 0 (1º follow-up): "Olá, {company_name} aqui. Notei que nossa conversa pausou. Gostaria de continuar de onde paramos sobre [último tópico/goal] ou precisa de mais um momento?"
+            *   Tentativa 1 (2º follow-up): "Só para checar se você teve chance de pensar sobre [último tópico/goal]. Alguma dúvida ou algo mais em que posso ajudar?"
+            *   Tentativa >1: "Ainda estou à disposição se precisar de algo referente a [último tópico/goal]. Caso contrário, sem problemas!"
+    *   Se `current_follow_up_attempts` >= `max_follow_up_attempts_total`:
+        *   Ação: `GENERATE_FAREWELL`. Parâmetros: {{"reason": "Inatividade do usuário após múltiplas tentativas de follow-up."}}
+        *   Justificativa: "Limite de follow-ups atingido."
+*   **Se `trigger_source` == 'user_response_or_stagnation':**
 
 *   **Objetivo Principal:** Manter o engajamento e progredir a conversa. Se o usuário deu uma resposta mínima (ex: "ok", "entendi") ou a conversa pausou, sua ação deve reengajar e guiar.
 *   **Relevância do Goal:** Sua ação proativa deve, idealmente, ajudar a progredir o `{current_goal_type_before_initiative}` ou transicionar para um novo goal lógico se o atual estiver bloqueado ou concluído.
@@ -206,7 +227,25 @@ async def proactive_step_decider_node(
         if n.get("status") == "confirmed_by_user"
     ]
 
+    # Followup trigger
+    action_params_from_planner = state.get(
+        "action_parameters", {}
+    )  # Parâmetros passados pelo Planner
+    trigger_source = action_params_from_planner.get("trigger_source", "unknown")
+    current_follow_up_attempts = action_params_from_planner.get(
+        "current_follow_up_attempts", 0
+    )
+
+    agent_config_dict = (
+        state.get("agent_config") if isinstance(state.get("agent_config"), dict) else {}
+    )
+    max_follow_up_attempts_total = agent_config_dict.get("max_follow_up_attempts", 3)
+
+    # -- Prompt Values --
     prompt_values = {  # Renamed from prompt_context to prompt_values for clarity with _call_structured_llm
+        "trigger_source": trigger_source,
+        "current_follow_up_attempts": current_follow_up_attempts,
+        "max_follow_up_attempts_total": max_follow_up_attempts_total,
         "current_turn_number": current_turn,
         "current_goal_type_before_initiative": current_goal_before_initiative.get(
             "goal_type"
@@ -264,6 +303,10 @@ async def proactive_step_decider_node(
         node_name_for_logging=node_name,
     )
 
+    next_action_command: Optional[AgentActionType] = None
+    action_params: AgentActionDetails = {}
+    processing_error: Optional[str] = None
+
     if llm_decision:
         logger.info(
             f"[{node_name}] LLM proactive decision: {llm_decision.model_dump_json(indent=2)}"
@@ -272,31 +315,30 @@ async def proactive_step_decider_node(
             logger.info(
                 f"[{node_name}] LLM Justification: {llm_decision.justification}"
             )
+
+        next_action_command = llm_decision.proactive_action_command
+        action_params = llm_decision.proactive_action_parameters or {}
+        # Se a chamada LLM foi bem-sucedida, mesmo que não retorne ação, não é um erro de processamento do nó.
+        processing_error = None
     else:
         logger.warning(
             f"[{node_name}] LLM for proactive step returned None or failed. Defaulting to no action."
         )
-        llm_decision = (
-            ProactiveStepDecision()
-        )  # Garante que temos um objeto com defaults (command=None)
+        processing_error = "LLM proactive step decision failed or was unparsable."
 
     # --- 3. Preparar o delta do estado ---
     updated_state_delta: Dict[str, Any] = {
-        "next_agent_action_command": llm_decision.proactive_action_command,
-        "action_parameters": llm_decision.proactive_action_parameters or {},
-        "last_processing_error": (
-            None
-            if llm_decision.proactive_action_command is not None
-            else "LLM proactive decider returned no action."
-        ),
+        "next_agent_action_command": next_action_command,
+        "action_parameters": action_params,
+        "last_processing_error": processing_error,
     }
     # Se o LLM falhou completamente (llm_decision foi None antes do default), o erro já estaria em last_processing_error
     # Se o _call_structured_llm falhou, ele retorna None, e o log já foi feito lá.
     # Aqui, se llm_decision.proactive_action_command for None, é uma decisão válida do LLM de não agir.
 
-    if llm_decision.proactive_action_command:
+    if next_action_command:
         logger.info(
-            f"[{node_name}] Proactive action decided: {llm_decision.proactive_action_command} with params {llm_decision.proactive_action_parameters}"
+            f"[{node_name}] Proactive action decided: {next_action_command} with params {action_params}"
         )
     else:
         logger.info(
