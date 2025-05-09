@@ -128,6 +128,7 @@ class AgentActionDetails(TypedDict, total=False):
         certainty_focus: The focus area for a certainty statement.
         objection_text_to_address: The specific objection text for rebuttal.
         question_to_answer_text: The user's question text to be answered.
+        question_to_answer_status: The user's question status to be answered.
         proposed_product_name: The name of the product being proposed.
         product_name: Product name used in closing actions.
         price: Price used in closing actions.
@@ -144,6 +145,7 @@ class AgentActionDetails(TypedDict, total=False):
     certainty_focus: Optional[CertaintyFocusType]
     objection_text_to_address: Optional[str]
     question_to_answer_text: Optional[str]
+    question_to_answer_status: Optional[str]
     proposed_product_name: Optional[str]
     # Closing related
     product_name: Optional[str]

@@ -19,6 +19,8 @@ from ..state_definition import (
     IdentifiedPainPointEntry,
     DynamicCustomerProfile,
     ProposedSolution,
+    CustomerQuestionEntry,
+    CustomerQuestionStatusType,
 )
 
 INTERRUPTION_TO_ACTION_MAP: Dict[str, AgentActionType] = {
@@ -64,6 +66,37 @@ def _find_priority_interruption(
             ):
                 return interruption
     return None
+
+
+def _find_question_status_in_log(
+    question_log: List[CustomerQuestionEntry], question_text: str
+) -> CustomerQuestionStatusType:
+    """
+    Finds the status of the most recent log entry for a given question text.
+    Defaults to 'newly_asked' if not found.
+    """
+    if not question_text:
+        return "newly_asked"  # Cannot search for empty question
+
+    normalized_question_text = question_text.strip().lower()
+    # Search backwards to find the most recent entry
+    for i in range(len(question_log) - 1, -1, -1):
+        log_entry = question_log[i]
+        log_core_text = log_entry.get("extracted_question_core", "")
+        if log_core_text and log_core_text.strip().lower() == normalized_question_text:
+            status = log_entry.get("status", "newly_asked")
+            # Ensure status is a valid literal, default if not
+            valid_statuses: List[CustomerQuestionStatusType] = [
+                "newly_asked",
+                "answered_satisfactorily",
+                "answered_with_fallback",
+                "pending_agent_answer",
+                "repetition_after_satisfactory_answer",
+                "repetition_after_fallback",
+                "ignored_by_agent",
+            ]
+            return status if status in valid_statuses else "newly_asked"
+    return "newly_asked"
 
 
 def _get_goal_for_interruption(
@@ -421,6 +454,7 @@ async def goal_and_action_planner_node(
     )
     last_agent_action = copy.deepcopy(state.get("last_agent_action"))
     company_profile = state.get("company_profile", {})
+    customer_question_log = state.get("customer_question_log", [])
 
     effective_goal: AgentGoal = current_goal_from_state
     goal_determined_by_high_priority_transition = False
@@ -584,6 +618,10 @@ async def goal_and_action_planner_node(
         if clarification_type == "question" and text_to_clarify:
             planned_action_command = "ANSWER_DIRECT_QUESTION"
             planned_action_parameters["question_to_answer_text"] = text_to_clarify
+            question_status = _find_question_status_in_log(
+                customer_question_log, text_to_clarify
+            )
+            planned_action_parameters["question_to_answer_status"] = question_status  # type: ignore
         elif clarification_type == "vague" and text_to_clarify:
             planned_action_command = "ASK_CLARIFYING_QUESTION"
             # No specific params needed beyond what ResponseGenerator picks from goal_details

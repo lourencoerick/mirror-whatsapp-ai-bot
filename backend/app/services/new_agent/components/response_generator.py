@@ -3,6 +3,8 @@
 from typing import Dict, List, Optional, Any
 from loguru import logger
 import json
+from datetime import datetime
+import pytz
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
@@ -20,7 +22,7 @@ from ..state_definition import (
 
 # Importar utils de prompt
 from ..prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
-from app.api.schemas.company_profile import CompanyProfileSchema
+from app.api.schemas.company_profile import CompanyProfileSchema, OfferingInfo
 
 # Importar função auxiliar de formatação de histórico
 # (Idealmente de um módulo utils)
@@ -32,7 +34,26 @@ except ImportError:  # Fallback se a estrutura mudar
         return "Histórico indisponível."
 
 
-# --- Prompts (Definidos anteriormente, podem ser movidos para um módulo de prompts) ---
+# --- Prompts ---
+
+PROMPT_GENERATE_GREETING = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Você é o Assistente de Vendas IA inicial da '{company_name}'.
+Sua tarefa é gerar uma mensagem de saudação curta, amigável e profissional para iniciar a conversa com o cliente.
+Use o tom de vendas '{sales_tone}' e o idioma '{language}'.
+Apresente-se brevemente e pergunte como pode ajudar o cliente hoje.
+Mantenha a mensagem concisa.
+Aplique formatação WhatsApp sutil: {formatting_instructions}
+
+Exemplo: "Olá! Sou o assistente virtual da *{company_name}*. Como posso te ajudar hoje?"
+         "Oi! Bem-vindo(a) à *{company_name}*. Em que posso ser útil?"
+
+Gere APENAS a mensagem de saudação.""",
+        ),
+    ]
+)
 
 PROMPT_ANSWER_DIRECT_QUESTION = ChatPromptTemplate.from_messages(
     [
@@ -40,13 +61,14 @@ PROMPT_ANSWER_DIRECT_QUESTION = ChatPromptTemplate.from_messages(
             "system",
             """Você é um Assistente de Vendas IA para '{company_name}'.
 Seu objetivo é responder à pergunta específica do cliente de forma precisa e completa, usando o 'Contexto Relevante' (se disponível) e o 'Perfil da Empresa'.
-Comunique-se em {language} com um tom {sales_tone}. Siga as diretrizes de formatação.
+Comunique-se em {language} com um tom {sales_tone}. A hora atual é {current_datetime}.
 
 **Pergunta Específica do Cliente:**
 {question_to_answer}
 
 **Contexto Relevante (RAG - Use se ajudar a responder):**
 {rag_context}
+--- Fim do Contexto Relevante ---
 
 **Informações do Perfil da Empresa (Use se RAG não for suficiente):**
 Descrição: {business_description}
@@ -54,18 +76,22 @@ Ofertas: {offering_summary}
 {company_address_info}
 {opening_hours_info}
 Diretrizes: {communication_guidelines}
+--- Fim das Informações do Perfil ---
 
-**Instruções:**
-1. Use o Contexto RAG primeiro, se relevante e útil para responder DIRETAMENTE à pergunta.
-2. Se não, use o Perfil da Empresa.
-3. Se ainda não souber a resposta EXATA, use o texto de fallback: '{fallback_text}'
-4. Seja direto e responda APENAS à pergunta feita. NÃO adicione perguntas de acompanhamento ou encerramento neste passo.
-5. Aplique a formatação WhatsApp: {formatting_instructions}
+**Instruções Cruciais:**
+1.  **Priorize o Contexto RAG:** Baseie sua resposta PRIMEIRO no 'Contexto Relevante (RAG)', se ele contiver a informação necessária para responder DIRETAMENTE à pergunta.
+2.  **Use o Perfil da Empresa:** Se o RAG não for suficiente ou relevante, use as 'Informações do Perfil da Empresa'.
+3.  **Seja Honesto:** Se a informação EXATA não estiver no RAG nem no Perfil, use o texto de fallback: '{fallback_text}'. NÃO invente informações (preços, características, prazos, etc.).
+4.  **Foco na Pergunta:** Responda direta e exclusivamente à '{question_to_answer}'. NÃO adicione perguntas de acompanhamento (como 'Isso ajudou?', 'Posso ajudar com algo mais?') nem frases de encerramento genéricas. Termine a resposta logo após fornecer a informação.
+5.  **Use o Histórico:** Consulte o 'Histórico Recente' abaixo para entender o contexto da conversa.
+6.  **Formatação:** Aplique a formatação WhatsApp ({formatting_instructions}) de forma clara e útil.
+{repetition_context_instructions}
 
-HISTÓRICO RECENTE (Contexto):
+HISTÓRICO RECENTE (Contexto da Conversa):
 {chat_history}
+--- Fim do Histórico ---
 
-Responda à pergunta '{question_to_answer}'.""",
+Responda APENAS à pergunta específica do cliente: '{question_to_answer}'.""",
         ),
     ]
 )
@@ -348,8 +374,32 @@ ACTION_TO_PROMPT_MAP: Dict[AgentActionType, ChatPromptTemplate] = {
     "PROCESS_ORDER_CONFIRMATION": PROMPT_PROCESS_ORDER_CONFIRMATION,  # <<< ADDED
     "HANDLE_CLOSING_CORRECTION": PROMPT_HANDLE_CLOSING_CORRECTION,
     "GENERATE_FAREWELL": PROMPT_GENERATE_FAREWELL,  #
+    "GENERATE_GREETING": PROMPT_GENERATE_GREETING,
     # ... etc
 }
+
+
+def _format_list_items(items: List[str], prefix: str = "- ") -> str:
+    """Formats list items with a prefix and newline separators for the prompt."""
+    if not items:
+        return "N/A"
+    return "\n".join([f"{prefix}{item}" for item in items])
+
+
+def _format_offerings(offerings: List[OfferingInfo]) -> str:
+    """Formats the list of offerings, including the link if available."""
+    if not offerings:
+        return "No specific offerings listed."
+    lines = []
+    for offer in offerings:
+        features = ", ".join(offer.key_features) if offer.key_features else "N/A"
+        price = offer.price_info if offer.price_info else "N/A"
+        link_info = f", Link: {offer.link}" if offer.link else ""
+        bonus_items = _format_list_items(offer.bonus_items) or "N/A"
+        lines.append(
+            f"- {offer.name}: {offer.short_description} (Features: {features},\nPreço: {price}{link_info}\nBônus Items:{bonus_items})"
+        )
+    return "\n".join(lines)
 
 
 # --- Função Auxiliar para Preparar Contexto Comum ---
@@ -368,14 +418,13 @@ def _prepare_common_prompt_context(state: RichConversationState) -> Dict[str, An
         messages[-1].content if messages and messages[-1].type == "human" else "N/A"
     )
     offerings = getattr(profile, "offering_overview", []) or []
-    offering_summary = (
-        "\n".join([f"- {o.name}: {o.short_description}" for o in offerings]) or "N/A"
-    )
-    key_points = (
-        "\n".join([f"- {p}" for p in getattr(profile, "key_selling_points", [])])
-        if getattr(profile, "key_selling_points", [])
-        else "N/A"
-    )
+    offering_summary = _format_offerings(offerings) or "N/A"
+
+    key_selling_points = getattr(profile, "key_selling_points", [])
+    key_points = _format_list_items(key_selling_points) or "N/A"
+
+    brasilia_tz = pytz.timezone("America/Sao_Paulo")
+    current_time_str = datetime.now(brasilia_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
 
     return {
         "company_name": getattr(profile, "company_name", "nossa empresa"),
@@ -397,16 +446,14 @@ def _prepare_common_prompt_context(state: RichConversationState) -> Dict[str, An
             if getattr(profile, "communication_guidelines", [])
             else "N/A"
         ),
-        "fallback_text": getattr(
-            profile,
-            "fallback_contact_info",
-            "Desculpe, não tenho essa informação no momento.",
-        ),
+        "fallback_text": getattr(profile, "fallback_contact_info", None)
+        or "Desculpe, não tenho essa informação no momento.",
         "formatting_instructions": WHATSAPP_MARKDOWN_INSTRUCTIONS,
         "chat_history": chat_history,
         "last_user_message": last_user_message,
         "rag_context": state.get("retrieved_knowledge_for_next_action")
         or "Nenhum contexto adicional disponível.",
+        "current_datetime": current_time_str,
     }
 
 
@@ -505,6 +552,22 @@ async def response_generator_node(
             specific_values["question_to_answer"] = action_params.get(
                 "question_to_answer_text", "[Pergunta não especificada]"
             )
+            question_status: Optional[CustomerQuestionStatusType] = action_params.get("question_to_answer_status")  # type: ignore
+            repetition_instructions = ""
+            if question_status == "repetition_after_fallback":
+                repetition_instructions = (
+                    "\n6. **Instrução Adicional:** Esta pergunta é uma repetição de uma anterior que você não conseguiu responder "
+                    "com informações específicas (usou fallback). **NÃO repita o fallback**. Reconheça que já foi perguntado, "
+                    "peça desculpas por ainda não ter a informação e ofereça ajuda alternativa (verificar com equipe, "
+                    "oferecer outra informação, etc.)."
+                )
+            elif question_status == "repetition_after_satisfactory_answer":
+                repetition_instructions = (
+                    "\n6. **Instrução Adicional:** Esta pergunta é uma repetição de uma anterior que você já respondeu "
+                    "satisfatoriamente. Reitere a resposta anterior de forma concisa ou pergunte se o cliente tem alguma dúvida adicional sobre ela."
+                )
+            specific_values["repetition_context_instructions"] = repetition_instructions
+
         elif action_command == "ASK_SPIN_QUESTION":
             specific_values["spin_type"] = action_params.get("spin_type", "Situation")
         elif action_command == "GENERATE_REBUTTAL":

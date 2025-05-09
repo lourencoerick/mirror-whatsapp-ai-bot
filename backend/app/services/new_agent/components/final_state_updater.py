@@ -14,6 +14,8 @@ from ..state_definition import (
     AgentActionType,
     # Se for modificar IdentifiedObjectionEntry, importe-o
     IdentifiedObjectionEntry,
+    CustomerQuestionEntry,
+    CustomerQuestionStatusType,
 )
 
 
@@ -52,12 +54,16 @@ async def finalize_turn_state_node(
 
     updated_state_delta: Dict[str, Any] = {}
     profile_changed_by_final_updater = False  # <<< INICIALIZAR AQUI
+    question_log_changedby_final_updater = False
 
     # --- 1. Adicionar Mensagem do Agente ao Histórico ---
     final_text_to_send = state.get("final_agent_message_text")
     raw_generated_text = state.get("last_agent_generation_text")
 
     current_messages = list(state.get("messages", []))
+    current_question_log: List[CustomerQuestionEntry] = [
+        entry.copy() for entry in state.get("customer_question_log", [])
+    ]
 
     text_for_history = final_text_to_send if final_text_to_send else raw_generated_text
     if text_for_history:
@@ -135,6 +141,67 @@ async def finalize_turn_state_node(
                     logger.warning(
                         f"[{node_name}] Tried to update status for rebutted objection '{objection_text_rebutted[:30]}', but it was not found with 'active' status in profile."
                     )
+
+        elif action_command_executed == "ANSWER_DIRECT_QUESTION":
+
+            question_answered_text = last_action.get("details", {}).get(
+                "question_to_answer_text"
+            )
+            generated_answer_text = last_action.get("action_generation_text", "")
+
+            if question_answered_text and generated_answer_text:
+                # Obter texto de fallback do perfil da empresa
+                company_profile = state.get("company_profile", {})
+                fallback_text = company_profile.get(
+                    "fallback_contact_info", "DEFAULT_FALLBACK_TEXT_IF_MISSING"
+                )
+                if not fallback_text:
+                    fallback_text = "DEFAULT_FALLBACK_TEXT_IF_MISSING"  # Garantir que não seja vazio
+
+                # Encontrar a pergunta correspondente no log (a mais recente com status 'newly_asked')
+                question_log_index_to_update = -1
+                for i in range(len(current_question_log) - 1, -1, -1):
+                    log_entry = current_question_log[i]
+                    # Comparar com o texto da pergunta nos detalhes da ação
+                    if (
+                        log_entry.get("extracted_question_core", "").lower()
+                        == question_answered_text.lower()
+                        and log_entry.get("status") == "newly_asked"
+                    ):
+                        question_log_index_to_update = i
+                        break
+
+                if question_log_index_to_update != -1:
+                    new_status: CustomerQuestionStatusType
+                    # Heurística: Checar se a resposta gerada contém o texto de fallback
+                    if (
+                        fallback_text != "DEFAULT_FALLBACK_TEXT_IF_MISSING"
+                        and fallback_text.lower() in generated_answer_text.lower()
+                    ):
+                        new_status = "answered_with_fallback"
+                        logger.info(
+                            f"[{node_name}] Question '{question_answered_text[:30]}...' answered with fallback."
+                        )
+                    else:
+                        new_status = "answered_satisfactorily"
+                        logger.info(
+                            f"[{node_name}] Question '{question_answered_text[:30]}...' answered satisfactorily."
+                        )
+
+                    # Atualizar o status na cópia do log
+                    current_question_log[question_log_index_to_update][
+                        "status"
+                    ] = new_status
+                    # Opcional: Adicionar resumo da resposta?
+                    # current_question_log[question_log_index_to_update]["agent_direct_response_summary"] = generated_answer_text[:100] # Exemplo
+                    question_log_changedby_final_updater = True
+                    logger.info(
+                        f"[{node_name}] Changing the question log... {current_question_log[question_log_index_to_update]} '"
+                    )
+                else:
+                    logger.warning(
+                        f"[{node_name}] Could not find 'newly_asked' question in log matching answered text: '{question_answered_text[:50]}...'"
+                    )
     elif (
         action_command_executed and not text_for_action_record
     ):  # Ação planejada, mas sem texto
@@ -151,6 +218,9 @@ async def finalize_turn_state_node(
 
     if profile_changed_by_final_updater and dynamic_profile_data_copy is not None:
         updated_state_delta["customer_profile_dynamic"] = dynamic_profile_data_copy
+
+    if question_log_changedby_final_updater:
+        updated_state_delta["customer_question_log"] = current_question_log
 
     # --- 3. Limpar Campos Temporários do Turno ---
     updated_state_delta["next_agent_action_command"] = None
