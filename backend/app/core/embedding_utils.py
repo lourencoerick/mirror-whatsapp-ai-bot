@@ -63,7 +63,7 @@ elif EMBEDDING_PROVIDER == "openai":
 
         # openai_async_client = AsyncAzureOpenAI()
         openai_async_client = AsyncAzureOpenAI(
-            api_version=OPENAI_API_VERSION,
+            api_version="2025-01-01-preview",
             azure_endpoint=AZURE_OPENAI_ENDPOINT,
             api_key=AZURE_OPENAI_API_KEY,
         )
