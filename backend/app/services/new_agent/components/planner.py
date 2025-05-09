@@ -435,6 +435,87 @@ async def goal_and_action_planner_node(
     current_turn = state.get("current_turn_number", 0)
     logger.info(f"--- Starting Node: {node_name} (Turn: {current_turn}) ---")
 
+    trigger_event = state.get("trigger_event")
+    if trigger_event == "follow_up_timeout" and state.get("follow_up_scheduled"):
+        logger.info(
+            f"[{node_name}] Follow-up timeout detected. Planning DECIDE_PROACTIVE_STEP."
+        )
+
+        current_attempts = state.get("follow_up_attempt_count", 0)
+        # O FinalStateUpdater do turno ANTERIOR agendou o follow-up.
+        # Este turno é o resultado desse agendamento. Incrementamos a contagem aqui
+        # para refletir que esta tentativa de follow-up está acontecendo.
+        # O proactive_step_decider usará esta contagem incrementada.
+        # E o FinalStateUpdater deste turno (após a ação de follow-up)
+        # decidirá se agenda o PRÓXIMO follow-up.
+
+        # MAX_FOLLOW_UP_ATTEMPTS_TOTAL deve ser uma constante, ex: 3
+        MAX_FOLLOW_UP_ATTEMPTS_TOTAL = state.get("agent_config", {}).get(
+            "max_follow_up_attempts", 3
+        )  # Obter da config do agente
+
+        if current_attempts < MAX_FOLLOW_UP_ATTEMPTS_TOTAL:
+            updated_state_delta_for_timeout = {
+                "current_agent_goal": copy.deepcopy(
+                    state.get("current_agent_goal")
+                ),  # Manter o goal atual para contexto
+                "next_agent_action_command": "DECIDE_PROACTIVE_STEP",
+                "action_parameters": {
+                    "trigger_source": "follow_up_timeout",
+                    "current_follow_up_attempts": current_attempts,  # Passa a contagem atual (antes de incrementar para o próximo estado)
+                },
+                "user_interruptions_queue": state.get(
+                    "user_interruptions_queue", []
+                ),  # Manter
+                "last_processing_error": None,
+                "trigger_event": None,  # Limpa o evento para o próximo ciclo
+                "follow_up_attempt_count": current_attempts
+                + 1,  # Incrementa para o estado que será salvo
+                # Não resetar follow_up_scheduled aqui; o FinalStateUpdater fará isso se o usuário responder
+                # ou se o proactive_step_decider decidir por um FAREWELL.
+            }
+            logger.info(
+                f"[{node_name}] Proceeding with proactive step for follow-up attempt {current_attempts + 1}."
+            )
+            return updated_state_delta_for_timeout
+        else:
+            logger.warning(
+                f"[{node_name}] Max follow-up attempts ({MAX_FOLLOW_UP_ATTEMPTS_TOTAL}) reached. Ending conversation due to inactivity."
+            )
+            # Transicionar para ENDING_CONVERSATION e planejar FAREWELL
+            farewell_goal = AgentGoal(
+                goal_type="ENDING_CONVERSATION",
+                goal_details={
+                    "reason": f"Inatividade do usuário após {MAX_FOLLOW_UP_ATTEMPTS_TOTAL} tentativas de follow-up."
+                },
+                previous_goal_if_interrupted=None,
+            )
+            updated_state_delta_for_timeout_end = {
+                "current_agent_goal": farewell_goal,
+                "next_agent_action_command": "GENERATE_FAREWELL",
+                "action_parameters": {"reason": "Inatividade prolongada do usuário."},
+                "user_interruptions_queue": [],  # Limpar interrupções
+                "last_processing_error": None,
+                "trigger_event": None,
+                "follow_up_scheduled": False,  # Desagendar follow-ups
+                "follow_up_attempt_count": current_attempts,  # Manter a contagem final
+            }
+            return updated_state_delta_for_timeout_end
+
+    user_analysis = state.get("user_input_analysis_result")  # Já deve ser dict
+    user_response_quality = None
+    is_vague_response = False
+    if user_analysis:
+        analysis_detail = user_analysis.get("analysis_of_response_to_agent_action")
+        if analysis_detail:
+            user_response_quality = analysis_detail.get("user_response_to_agent_action")
+        is_vague_response = user_analysis.get("is_primarily_vague_statement", False)
+    minimal_or_vague_user_response = (
+        user_response_quality
+        in ["acknowledged_action", "partially_answered", "ignored_agent_action"]
+        or is_vague_response
+    )
+
     current_goal_from_state = copy.deepcopy(
         state.get(
             "current_agent_goal",
@@ -649,52 +730,69 @@ async def goal_and_action_planner_node(
         planned_action_parameters["previous_goal_topic"] = prev_goal_topic
 
     elif effective_goal_type == "INVESTIGATING_NEEDS":
-        spin_details = effective_goal.get("goal_details", {})
-        spin_questions_asked = spin_details.get("spin_questions_asked_this_cycle", 0)
-        last_spin_type_asked = spin_details.get("last_spin_type_asked")
-        should_exit_spin, exit_reason = False, ""
-        confirmed_needs = [
-            n
-            for n in customer_profile.get("identified_needs", [])
-            if n.get("status") == "confirmed_by_user"
-        ]
-        if confirmed_needs and last_spin_type_asked == "NeedPayoff":
-            should_exit_spin, exit_reason = (
-                True,
-                f"Confirmed need(s) after NeedPayoff: {[n.get('text','N/A') for n in confirmed_needs]}",
+        logger.debug(f"INVESTIGATING_NEEDS: last agent action: {last_agent_action}")
+        if (
+            minimal_or_vague_user_response
+            and last_agent_action
+            and last_agent_action.get("action_type")
+            in ["ASK_SPIN_QUESTION", "ANSWER_DIRECT_QUESTION", "GENERATE_REBUTTAL"]
+        ):  # Se agente falou e user deu resposta mínima
+            logger.info(
+                f"[{node_name}] User gave minimal/vague response after agent action '{last_agent_action.get('action_type')}'. Deferring to proactive step logic for INVESTIGATING_NEEDS."
             )
-        elif spin_questions_asked >= MAX_SPIN_QUESTIONS_PER_CYCLE:
-            should_exit_spin, exit_reason = (
-                True,
-                f"Max SPIN questions ({MAX_SPIN_QUESTIONS_PER_CYCLE}) reached.",
-            )
-
-        if should_exit_spin:
-            logger.info(f"[{node_name}] Transitioning from SPIN. Reason: {exit_reason}")
-            effective_goal["goal_type"] = "PRESENTING_SOLUTION"
-            product_to_present, key_benefit = (
-                _select_product_and_benefit_for_presentation(
-                    customer_profile, company_profile.get("offering_overview", [])
-                )
-            )
-            planned_action_command = "PRESENT_SOLUTION_OFFER"
-            planned_action_parameters = {
-                "product_name_to_present": product_to_present,
-                "key_benefit_to_highlight": key_benefit,
-            }
-            effective_goal["goal_details"] = {  # Reset details for new goal
-                "presenting_product": product_to_present,
-                "main_benefit_focus": key_benefit,
-            }
+            # planned_action_command permanece None, será pego pela lógica proativa no final
         else:
-            next_spin_type = _get_next_spin_type(last_spin_type_asked)
-            planned_action_command = "ASK_SPIN_QUESTION"
-            planned_action_parameters["spin_type"] = next_spin_type
-            # Update goal_details for the current goal
-            effective_goal["goal_details"]["spin_questions_asked_this_cycle"] = (
-                spin_questions_asked + 1
+
+            spin_details = effective_goal.get("goal_details", {})
+            spin_questions_asked = spin_details.get(
+                "spin_questions_asked_this_cycle", 0
             )
-            effective_goal["goal_details"]["last_spin_type_asked"] = next_spin_type
+            last_spin_type_asked = spin_details.get("last_spin_type_asked")
+            should_exit_spin, exit_reason = False, ""
+            confirmed_needs = [
+                n
+                for n in customer_profile.get("identified_needs", [])
+                if n.get("status") == "confirmed_by_user"
+            ]
+            if confirmed_needs and last_spin_type_asked == "NeedPayoff":
+                should_exit_spin, exit_reason = (
+                    True,
+                    f"Confirmed need(s) after NeedPayoff: {[n.get('text','N/A') for n in confirmed_needs]}",
+                )
+            elif spin_questions_asked >= MAX_SPIN_QUESTIONS_PER_CYCLE:
+                should_exit_spin, exit_reason = (
+                    True,
+                    f"Max SPIN questions ({MAX_SPIN_QUESTIONS_PER_CYCLE}) reached.",
+                )
+
+            if should_exit_spin:
+                logger.info(
+                    f"[{node_name}] Transitioning from SPIN. Reason: {exit_reason}"
+                )
+                effective_goal["goal_type"] = "PRESENTING_SOLUTION"
+                product_to_present, key_benefit = (
+                    _select_product_and_benefit_for_presentation(
+                        customer_profile, company_profile.get("offering_overview", [])
+                    )
+                )
+                planned_action_command = "PRESENT_SOLUTION_OFFER"
+                planned_action_parameters = {
+                    "product_name_to_present": product_to_present,
+                    "key_benefit_to_highlight": key_benefit,
+                }
+                effective_goal["goal_details"] = {  # Reset details for new goal
+                    "presenting_product": product_to_present,
+                    "main_benefit_focus": key_benefit,
+                }
+            else:
+                next_spin_type = _get_next_spin_type(last_spin_type_asked)
+                planned_action_command = "ASK_SPIN_QUESTION"
+                planned_action_parameters["spin_type"] = next_spin_type
+                # Update goal_details for the current goal
+                effective_goal["goal_details"]["spin_questions_asked_this_cycle"] = (
+                    spin_questions_asked + 1
+                )
+                effective_goal["goal_details"]["last_spin_type_asked"] = next_spin_type
 
     elif effective_goal_type == "PRESENTING_SOLUTION":
         if (
@@ -907,6 +1005,93 @@ async def goal_and_action_planner_node(
                 f"[{node_name}] Goal is {effective_goal_type}, already acted. Waiting or re-evaluating."
             )
             planned_action_command = None
+
+    # ---  PROACTIVE STEP DECISION ---
+    if planned_action_command is None:
+
+        agent_is_explicitly_waiting = False
+        if (
+            effective_goal_type == "PRESENTING_SOLUTION"
+            and last_agent_action
+            and last_agent_action.get("action_type") == "PRESENT_SOLUTION_OFFER"
+            and not minimal_or_vague_user_response
+        ):
+            agent_is_explicitly_waiting = True
+        elif (
+            effective_goal_type == "ATTEMPTING_CLOSE"
+            and state.get("closing_process_status") == "attempt_made"
+            and last_agent_action
+            and last_agent_action.get("action_type") == "INITIATE_CLOSING"
+        ):
+            agent_is_explicitly_waiting = True
+        elif effective_goal_type == "HANDLING_OBJECTION":
+            original_objection_text = effective_goal.get("goal_details", {}).get(
+                "original_objection_text"
+            )
+            if original_objection_text:
+                obj_entry = _find_objection_in_profile(
+                    customer_profile, original_objection_text
+                )
+                if obj_entry and obj_entry.get("status") == "addressing":
+                    agent_is_explicitly_waiting = True
+
+        if trigger_event != "follow_up_timeout" and not agent_is_explicitly_waiting:  #
+            logger.debug(
+                f"[{node_name}] No action planned by standard goal logic. Considering proactive step."
+            )
+
+            # Condições para o agente tomar a iniciativa:
+            # 1. Não há interrupções de alta prioridade pendentes.
+            # 2. O agente não está no meio de uma ação que explicitamente requer esperar (ex: acabou de apresentar solução).
+            # 3. A última resposta do usuário foi mínima, ou houve um timeout (sinalizado externamente).
+
+            can_take_initiative = (
+                True  # Começa como True e falsifica se alguma condição não for atendida
+            )
+
+            # Condição 1: Verificar interrupções pendentes (o _find_priority_interruption já foi chamado)
+            if (
+                interruption_to_handle
+            ):  # Se ainda há uma interrupção que não levou a um goal de interrupção (raro, mas possível)
+                logger.debug(
+                    f"[{node_name}] Proactive step deferred: Pending interruption '{interruption_to_handle.get('type')}' still needs handling by main planner logic."
+                )
+                can_take_initiative = False
+
+            if (
+                can_take_initiative and not interruption_to_handle
+            ):  # Reforçando a checagem de interrupção
+                # Não acionar se o goal atual já é um que implica espera por natureza,
+                # a menos que queiramos proatividade mesmo nesses casos (ex: timeout).
+                # Goals que naturalmente esperam: PRESENTING_SOLUTION (após apresentar), ATTEMPTING_CLOSE (após iniciar).
+                # Mas se planned_action_command é None, essa espera já foi considerada.
+                # Exceção: Não tomar iniciativa se o goal for ENDING_CONVERSATION ou se o último foi FAREWELL
+                if effective_goal_type == "ENDING_CONVERSATION" or (
+                    last_agent_action
+                    and last_agent_action.get("action_type") == "GENERATE_FAREWELL"
+                ):
+                    logger.debug(
+                        f"[{node_name}] Conversation is ending or farewell sent. No proactive step."
+                    )
+                else:
+                    logger.info(
+                        f"[{node_name}] Conditions met for considering a proactive step. Planning DECIDE_PROACTIVE_STEP."
+                    )
+                    planned_action_command = "DECIDE_PROACTIVE_STEP"
+                    # Passar o goal atual (antes da iniciativa) como contexto para o nó decisor, se necessário.
+                    # O nó decisor já terá acesso ao estado completo, então isso pode ser redundante.
+                    # action_parameters["current_goal_type_before_initiative"] = effective_goal_type
+                    # action_parameters["current_goal_details_before_initiative"] = effective_goal.get("goal_details")
+                    planned_action_parameters = {
+                        "trigger_source": "user_response_or_stagnation",
+                        "current_follow_up_attempts": state.get(
+                            "follow_up_attempt_count", 0
+                        ),
+                    }
+        else:
+            logger.debug(
+                f"[{node_name}] Turn was triggered by follow_up_timeout, proactive decision already handled or led to FAREWELL. No further action here."
+            )
 
     # --- Update Interrupt Queue ---
     updated_interruptions_queue = list(interruptions_queue)  # Work with a copy

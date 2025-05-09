@@ -17,6 +17,7 @@ from .components.knowledge_retriever import knowledge_retriever_node
 from .components.response_generator import response_generator_node
 from .components.output_formatter import output_formatter_node
 from .components.final_state_updater import finalize_turn_state_node
+from .components.proactive_step_decider_node import proactive_step_decider_node
 
 # --- Função de Roteamento Condicional ---
 
@@ -41,6 +42,10 @@ def route_action(
     """
     action_command = state.get("next_agent_action_command")
     logger.debug(f"[Router: route_action] Planned action: {action_command}")
+
+    if action_command == "DECIDE_PROACTIVE_STEP":
+        logger.info("[Router: route_action] Routing to proactive_step_decider.")
+        return "proactive_step_decider"
 
     # Define actions that require fetching knowledge from the vector store
     actions_requiring_rag = [
@@ -90,6 +95,7 @@ def create_agent_graph(checkpointer: BaseCheckpointSaver) -> StateGraph:
         ("process_input", process_user_input_node),
         ("update_state", update_conversation_state_node),
         ("planner", goal_and_action_planner_node),
+        ("proactive_step_decider", proactive_step_decider_node),
         ("knowledge_retriever", knowledge_retriever_node),
         ("response_generator", response_generator_node),
         ("output_formatter", output_formatter_node),
@@ -122,12 +128,27 @@ def create_agent_graph(checkpointer: BaseCheckpointSaver) -> StateGraph:
         "planner",
         route_action,
         {
+            "proactive_step_decider": "proactive_step_decider",
             "knowledge_retriever": "knowledge_retriever",
             "response_generator": "response_generator",
             END: END,
         },
     )
     logger.debug("Added conditional edges from 'planner' based on route_action")
+
+    workflow.add_conditional_edges(
+        "proactive_step_decider",
+        route_action,
+        {
+            "knowledge_retriever": "knowledge_retriever",
+            "response_generator": "response_generator",
+            END: END,
+        },
+    )
+
+    logger.debug(
+        "Added conditional edges from 'proactive_step_decider' using route_action"
+    )
 
     workflow.add_edge("knowledge_retriever", "response_generator")
     logger.debug("Added edge: knowledge_retriever -> response_generator")
