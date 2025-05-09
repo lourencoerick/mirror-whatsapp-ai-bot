@@ -908,6 +908,56 @@ async def goal_and_action_planner_node(
             )
             planned_action_command = None
 
+    # ---  PROACTIVE STEP DECISION ---
+    if planned_action_command is None:
+        logger.debug(
+            f"[{node_name}] No action planned by standard goal logic. Considering proactive step."
+        )
+
+        # Condições para o agente tomar a iniciativa:
+        # 1. Não há interrupções de alta prioridade pendentes.
+        # 2. O agente não está no meio de uma ação que explicitamente requer esperar (ex: acabou de apresentar solução).
+        # 3. A última resposta do usuário foi mínima, ou houve um timeout (sinalizado externamente).
+
+        can_take_initiative = (
+            True  # Começa como True e falsifica se alguma condição não for atendida
+        )
+
+        # Condição 1: Verificar interrupções pendentes (o _find_priority_interruption já foi chamado)
+        if (
+            interruption_to_handle
+        ):  # Se ainda há uma interrupção que não levou a um goal de interrupção (raro, mas possível)
+            logger.debug(
+                f"[{node_name}] Proactive step deferred: Pending interruption '{interruption_to_handle.get('type')}' still needs handling by main planner logic."
+            )
+            can_take_initiative = False
+
+        if (
+            can_take_initiative and not interruption_to_handle
+        ):  # Reforçando a checagem de interrupção
+            # Não acionar se o goal atual já é um que implica espera por natureza,
+            # a menos que queiramos proatividade mesmo nesses casos (ex: timeout).
+            # Goals que naturalmente esperam: PRESENTING_SOLUTION (após apresentar), ATTEMPTING_CLOSE (após iniciar).
+            # Mas se planned_action_command é None, essa espera já foi considerada.
+            # Exceção: Não tomar iniciativa se o goal for ENDING_CONVERSATION ou se o último foi FAREWELL
+            if effective_goal_type == "ENDING_CONVERSATION" or (
+                last_agent_action
+                and last_agent_action.get("action_type") == "GENERATE_FAREWELL"
+            ):
+                logger.debug(
+                    f"[{node_name}] Conversation is ending or farewell sent. No proactive step."
+                )
+            else:
+                logger.info(
+                    f"[{node_name}] Conditions met for considering a proactive step. Planning DECIDE_PROACTIVE_STEP."
+                )
+                planned_action_command = "DECIDE_PROACTIVE_STEP"
+                # Passar o goal atual (antes da iniciativa) como contexto para o nó decisor, se necessário.
+                # O nó decisor já terá acesso ao estado completo, então isso pode ser redundante.
+                # action_parameters["current_goal_type_before_initiative"] = effective_goal_type
+                # action_parameters["current_goal_details_before_initiative"] = effective_goal.get("goal_details")
+                planned_action_parameters = {}  # O nó proativo usará o estado completo
+
     # --- Update Interrupt Queue ---
     updated_interruptions_queue = list(interruptions_queue)  # Work with a copy
     if (
