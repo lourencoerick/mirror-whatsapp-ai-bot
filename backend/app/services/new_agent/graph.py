@@ -17,7 +17,7 @@ from .components.knowledge_retriever import knowledge_retriever_node
 from .components.response_generator import response_generator_node
 from .components.output_formatter import output_formatter_node
 from .components.final_state_updater import finalize_turn_state_node
-from .components.proactive_step_decider_node import proactive_step_decider_node
+from .components.proactive_step_decider import proactive_step_decider_node
 
 # --- Função de Roteamento Condicional ---
 
