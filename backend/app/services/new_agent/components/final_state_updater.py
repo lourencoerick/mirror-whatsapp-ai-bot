@@ -222,7 +222,75 @@ async def finalize_turn_state_node(
     if question_log_changedby_final_updater:
         updated_state_delta["customer_question_log"] = current_question_log
 
-    # --- 3. Limpar Campos Temporários do Turno ---
+    # --- 3. Gerenciamento de Flags de Follow-up por Inatividade ---
+    trigger_event = state.get("trigger_event")
+
+    # Se o turno foi iniciado por uma mensagem real do usuário (não um timeout)
+    # E havia um follow-up agendado, cancele-o e resete a contagem.
+    if trigger_event == "user_message" or (
+        trigger_event is None and state.get("current_user_input_text") is not None
+    ):
+        if state.get("follow_up_scheduled"):
+            logger.info(
+                f"[{node_name}] User responded. Cancelling scheduled follow-up."
+            )
+            updated_state_delta["follow_up_scheduled"] = False
+            updated_state_delta["follow_up_attempt_count"] = 0
+            updated_state_delta["last_message_from_agent_timestamp"] = (
+                None  # Limpar timestamp
+            )
+
+    # Se o agente enviou uma mensagem neste turno, potencialmente agendar um follow-up
+    if (
+        final_text_to_send
+    ):  # Verifica se uma mensagem foi efetivamente enviada ao usuário
+        # Não agendar follow-up para despedidas ou confirmações finais de pedido
+        actions_that_dont_need_follow_up: List[AgentActionType] = [
+            "GENERATE_FAREWELL",
+            "PROCESS_ORDER_CONFIRMATION",
+        ]
+        # Também não agendar se a ação foi DECIDE_PROACTIVE_STEP, pois ela mesma é um tipo de follow-up
+        # ou leva a uma ação que pode precisar de seu próprio follow-up.
+        if (
+            action_command_executed
+            and action_command_executed not in actions_that_dont_need_follow_up
+            and action_command_executed != "DECIDE_PROACTIVE_STEP"
+        ):
+
+            # Não reagendar se o trigger foi um timeout e o agente acabou de enviar um follow-up
+            # A menos que queiramos follow-ups encadeados, o que precisa de mais lógica.
+            # Por agora, um follow-up por timeout não agenda outro imediatamente.
+            if trigger_event != "follow_up_timeout":
+                logger.info(
+                    f"[{node_name}] Agent sent a message. Scheduling potential follow-up."
+                )
+                updated_state_delta["follow_up_scheduled"] = True
+                updated_state_delta["last_message_from_agent_timestamp"] = time.time()
+                # follow_up_attempt_count é incrementado pelo Planner quando um timeout ocorre
+            else:
+                logger.info(
+                    f"[{node_name}] Agent sent a follow-up message due to timeout. Not re-scheduling follow-up immediately."
+                )
+                # Manter follow_up_scheduled como True se quisermos permitir múltiplos, mas o Planner controlaria o attempt_count.
+                # Por segurança, vamos desativar para evitar loops se o Planner não resetar.
+                # O Planner deve resetar `follow_up_scheduled` se o limite de tentativas for atingido.
+                # Se o LLM do proactive_step_decider_node decidir por GENERATE_FAREWELL,
+                # a condição acima (actions_that_dont_need_follow_up) já o pegaria.
+                # Se o LLM decidir por outra ação, e quisermos outro follow-up,
+                # o `follow_up_scheduled` deve permanecer True.
+                # Vamos assumir que se o trigger foi timeout, o `follow_up_scheduled` já está True
+                # e o `follow_up_attempt_count` foi incrementado pelo Planner.
+                # Se a ação proativa não for um farewell, o `follow_up_scheduled` permanece True.
+                if action_command_executed not in actions_that_dont_need_follow_up:
+                    updated_state_delta["last_message_from_agent_timestamp"] = (
+                        time.time()
+                    )  # Atualiza o timestamp para o novo follow-up
+                else:  # Se a ação proativa foi um farewell, desagenda.
+                    updated_state_delta["follow_up_scheduled"] = False
+                    updated_state_delta["follow_up_attempt_count"] = 0  # Reset
+                    updated_state_delta["last_message_from_agent_timestamp"] = None
+
+    # --- 4. Limpar Campos Temporários do Turno ---
     updated_state_delta["next_agent_action_command"] = None
     updated_state_delta["action_parameters"] = {}
     updated_state_delta["retrieved_knowledge_for_next_action"] = None
@@ -233,6 +301,9 @@ async def finalize_turn_state_node(
         and state["user_input_analysis_result"] is not None
     ):
         updated_state_delta["user_input_analysis_result"] = None
+
+    if state.get("trigger_event") is not None:
+        updated_state_delta["trigger_event"] = None
 
     logger.debug(f"[{node_name}] Cleared temporary turn fields.")
     logger.info(f"[{node_name}] Turn finalization complete for Turn: {current_turn}")
