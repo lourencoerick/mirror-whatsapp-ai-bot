@@ -1,7 +1,7 @@
 # backend/app/services/ai_reply/new_agent/state_definition.py
 
-from typing import TypedDict, List, Optional, Dict, Any, Literal
-from typing_extensions import Annotated
+from typing import List, Optional, Dict, Any, Literal
+from typing_extensions import Annotated, TypedDict
 from uuid import UUID
 import time  # Import time for default timestamp
 
@@ -67,7 +67,8 @@ AgentActionType = Literal[
     "GENERATE_FAREWELL",
     "ANSWER_DIRECT_QUESTION",
     "ACKNOWLEDGE_AND_TRANSITION",
-    "HANDLE_IMPASSE",
+    # "HANDLE_IMPASSE",
+    "DECIDE_PROACTIVE_STEP",
 ]
 """Defines the specific low-level actions the agent can plan and execute."""
 
