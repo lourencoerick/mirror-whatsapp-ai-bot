@@ -259,6 +259,7 @@ async def enqueue_simulation_message(
     )
 
     await wake_worker(settings.AI_REPLIER_INTERNAL_URL)
+    await wake_worker(settings.MESSAGE_CONSUMER_WORKER_INTERNAL_URL)
     simulation_message_enqueue_response = await _enqueue_simulation_message(
         db=db,
         account_id=account_id,
