@@ -114,6 +114,7 @@ ClosingProcessStatusType = Literal[
 ]
 """Tracks the current stage of the sales closing process."""
 
+TriggerEventType = Literal["user_message", "follow_up_timeout"]
 
 # === Detailed Sub-TypedDicts for RichConversationState ===
 
@@ -161,6 +162,10 @@ class AgentActionDetails(TypedDict, total=False):
     key_benefit_to_highlight: Optional[str]
     # Farewell related
     reason: Optional[str]
+
+    # Follow-up
+    trigger_source: Optional[TriggerEventType]
+    current_follow_up_attempts: Optional[int]
 
 
 class PendingAgentAction(TypedDict):
@@ -400,6 +405,15 @@ class RichConversationState(TypedDict):
 
     # --- Temporary fields for inter-node communication ---
     user_input_analysis_result: Optional[Dict[str, Any]]  # Output of InputProcessor
+
+    # --- Follow-up ---
+    follow_up_scheduled: Optional[bool]  # True se um follow-up está "armado"
+    follow_up_attempt_count: Optional[
+        int
+    ]  # Quantos follow-ups por inatividade já foram tentados nesta sequência
+    last_message_from_agent_timestamp: Optional[float]
+    # temporary variable to indicate that the trigger was set!
+    trigger_event: Optional[TriggerEventType]
 
     # --- Error Handling & System Status ---
     last_processing_error: Optional[str]

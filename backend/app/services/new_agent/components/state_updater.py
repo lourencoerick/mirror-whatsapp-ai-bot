@@ -96,6 +96,27 @@ async def update_conversation_state_node(
             "last_processing_error": f"State update failed: Invalid input analysis. Details: {e}"
         }
 
+    trigger_event = state.get("trigger_event")
+    current_user_input_text = state.get("current_user_input_text")
+
+    user_actually_responded = (trigger_event == "user_message") or (
+        trigger_event is None
+        and current_user_input_text is not None
+        and current_user_input_text != "<TIMEOUT_EVENT>"
+    )
+
+    # --- Reset Follow-up flag ---
+    if user_actually_responded:
+        if state.get("follow_up_scheduled"):  # Se um follow-up *estava* agendado
+            logger.info(
+                f"[{node_name}] User responded. Cancelling previously scheduled follow-up and resetting attempt count."
+            )
+            updated_state_delta["follow_up_scheduled"] = False
+            updated_state_delta["follow_up_attempt_count"] = 0
+            updated_state_delta["last_message_from_agent_timestamp"] = None
+        elif state.get("follow_up_attempt_count", 0) != 0:
+            updated_state_delta["follow_up_attempt_count"] = 0
+
     # --- Prepare working copies of mutable state parts ---
     current_question_log = [
         entry.copy() for entry in state.get("customer_question_log", [])

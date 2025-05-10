@@ -4,6 +4,7 @@ import pytest
 import copy
 from uuid import uuid4
 from typing import Dict, Any, Optional, List
+import time
 
 # Importar a função a ser testada e as definições/schemas necessários
 from app.services.new_agent.components.planner import (
@@ -27,6 +28,12 @@ from app.services.new_agent.state_definition import (
     IdentifiedPainPointEntry,
     DynamicCustomerProfile,
     ProposedSolution,
+    TriggerEventType,
+)
+
+from app.services.new_agent.schemas.input_analysis import (
+    UserInputAnalysisOutput,
+    PendingAgentActionResponseAnalysis,
 )
 
 # --- Fixtures ---
@@ -40,30 +47,53 @@ def base_state_for_planner() -> RichConversationState:
         previous_goal_if_interrupted=None,
         goal_details={},
     )
+    # Criar um UserInputAnalysisOutput mínimo para o estado base
+    base_user_input_analysis = UserInputAnalysisOutput(
+        overall_intent="StatingInformationOrOpinion",  # Um default genérico
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="not_applicable"  # Default
+        ),
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        is_primarily_vague_statement=False,
+        is_primarily_off_topic=False,
+        correction_details_text=None,
+        reaction_to_solution_presentation=None,
+        objection_status_after_rebuttal=None,
+    )
+
     state = RichConversationState(
         account_id=uuid4(),
         conversation_id=uuid4(),
         bot_agent_id=None,
-        company_profile={
+        company_profile={  # Adicionar todos os campos esperados por CompanyProfileSchema ou mockar
             "company_name": "Test Co",
+            "business_description": "Test business description",
             "offering_overview": [
                 {
                     "name": "Produto Genérico Adequado",
                     "short_description": "Resolve tudo",
+                    "details_url": None,  # Adicionar campos opcionais se o schema os tiver
+                    "price_info": None,
+                    "category": None,
                 }
             ],
+            "key_selling_points": ["Ponto de venda 1", "Ponto de venda 2"],
+            "communication_guidelines": ["Ser amigável", "Ser direto"],
             "language": "pt-br",
             "sales_tone": "amigável",
-            "business_description": "Empresa de Testes",
-            "key_selling_points": [],
-            "communication_guidelines": [],
-            "fallback_contact_info": "site.com",
-            "address": None,
-            "opening_hours": None,
+            "fallback_contact_info": "contato@testco.com",
+            "address": "Rua Teste, 123",
+            "opening_hours": "9h-18h",
+            "target_audience": "Pequenas e médias empresas",  # Adicionar se usado
+            "delivery_options": "Correios e Transportadora",  # Adicionar se usado
         },
-        agent_config={},
+        agent_config={  # Adicionar agent_config aqui, mesmo que vazio, ou com defaults
+            "max_follow_up_attempts": 3,  # Exemplo de configuração
+        },
         messages=[],
-        current_user_input_text="User input",
+        current_user_input_text="User input inicial",  # Um valor não-None
         current_turn_number=1,
         current_agent_goal=initial_goal,
         last_agent_action=None,
@@ -81,7 +111,7 @@ def base_state_for_planner() -> RichConversationState:
             "last_discerned_intent": None,
         },
         customer_question_log=[],
-        current_turn_extracted_questions=[],
+        current_turn_extracted_questions=[],  # Geralmente gerenciado pelo StateUpdater
         active_proposal=None,
         closing_process_status="not_started",
         last_objection_handled_turn=None,
@@ -89,14 +119,23 @@ def base_state_for_planner() -> RichConversationState:
         last_agent_generation_text=None,
         final_agent_message_text=None,
         conversation_summary_for_llm=None,
-        last_interaction_timestamp=0.0,
+        last_interaction_timestamp=time.time(),
         is_simulation=False,
         last_processing_error=None,
         disengagement_reason=None,
-        user_input_analysis_result=None,
+        user_input_analysis_result=base_user_input_analysis.model_dump(),  # Usar o dump do Pydantic
         next_agent_action_command=None,
         action_parameters={},
+        # Novos campos para follow-up
+        follow_up_scheduled=False,
+        follow_up_attempt_count=0,
+        last_message_from_agent_timestamp=None,
+        trigger_event="user_message",  # Default para user_message se current_user_input_text existe
     )
+    # Ajustar trigger_event se current_user_input_text for None no setup de um teste específico
+    if state["current_user_input_text"] is None:
+        state["trigger_event"] = None  # Ou um trigger_event específico se for o caso
+
     return state
 
 
@@ -917,3 +956,176 @@ def test_get_next_spin_type_sequence():
     assert _get_next_spin_type("Implication") == "NeedPayoff"
     assert _get_next_spin_type("NeedPayoff") == "Problem"
     assert _get_next_spin_type("UnknownType") == "Situation"  # type: ignore
+
+
+# Novos testes para adicionar em app/services/new_agent/tests/unit/test_planner.py
+
+
+@pytest.mark.asyncio
+async def test_planner_handles_follow_up_timeout_and_plans_decide_proactive_step(
+    base_state_for_planner,
+):
+    """
+    Testa se o Planner, ao receber trigger_event='follow_up_timeout' e follow_up_scheduled=True,
+    planeja DECIDE_PROACTIVE_STEP e incrementa follow_up_attempt_count.
+    """
+    state = base_state_for_planner
+    state["trigger_event"] = "follow_up_timeout"
+    state["follow_up_scheduled"] = True
+    state["follow_up_attempt_count"] = 0  # Primeira tentativa de follow-up
+    # Simular uma configuração de agente para max_follow_up_attempts
+    state["agent_config"] = {"max_follow_up_attempts": 3}
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta  # Deve manter o goal atual
+    assert (
+        delta["current_agent_goal"]["goal_type"]
+        == state["current_agent_goal"]["goal_type"]
+    )  # Goal não deve mudar aqui
+
+    assert delta.get("next_agent_action_command") == "DECIDE_PROACTIVE_STEP"
+    assert delta.get("action_parameters") == {
+        "trigger_source": "follow_up_timeout",
+        "current_follow_up_attempts": 0,  # Passa a contagem *antes* do incremento para o decidor
+    }
+    assert delta.get("trigger_event") is None  # Evento deve ser consumido/limpo
+    assert (
+        delta.get("follow_up_attempt_count") == 1
+    )  # Contagem incrementada no estado para o próximo turno
+    assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+async def test_planner_handles_follow_up_timeout_max_attempts_reached(
+    base_state_for_planner,
+):
+    """
+    Testa se o Planner, ao receber trigger_event='follow_up_timeout' e o máximo de
+    tentativas de follow-up ter sido atingido, planeja GENERATE_FAREWELL.
+    """
+    state = base_state_for_planner
+    state["trigger_event"] = "follow_up_timeout"
+    state["follow_up_scheduled"] = True
+    max_attempts = 2
+    state["follow_up_attempt_count"] = max_attempts  # Máximo de tentativas já atingido
+    state["agent_config"] = {"max_follow_up_attempts": max_attempts}
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta
+    assert delta["current_agent_goal"]["goal_type"] == "ENDING_CONVERSATION"
+    assert (
+        "Inatividade do usuário"
+        in delta["current_agent_goal"]["goal_details"]["reason"]
+    )
+
+    assert delta.get("next_agent_action_command") == "GENERATE_FAREWELL"
+    assert "Inatividade prolongada do usuário" in delta.get(
+        "action_parameters", {}
+    ).get("reason", "")
+
+    assert delta.get("trigger_event") is None
+    assert delta.get("follow_up_scheduled") is False  # Deve desagendar
+    assert (
+        delta.get("follow_up_attempt_count") == max_attempts
+    )  # Mantém a contagem final
+    assert delta.get("last_processing_error") is None
+
+
+@pytest.mark.asyncio
+async def test_planner_ignores_follow_up_timeout_if_not_scheduled(
+    base_state_for_planner,
+):
+    """
+    Testa se o Planner ignora trigger_event='follow_up_timeout' se follow_up_scheduled=False,
+    e prossegue com a lógica normal (que para IDLE/GREETING é GENERATE_GREETING).
+    """
+    state = base_state_for_planner  # Goal inicial é IDLE
+    state["trigger_event"] = "follow_up_timeout"
+    state["follow_up_scheduled"] = False  # Follow-up não está agendado
+    state["follow_up_attempt_count"] = 0
+    state["agent_config"] = {"max_follow_up_attempts": 3}
+
+    original_trigger_event = state["trigger_event"]
+    delta = await goal_and_action_planner_node(state, {})
+
+    # Deve seguir a lógica normal para IDLE -> GREETING
+    assert "current_agent_goal" in delta
+    assert delta["current_agent_goal"]["goal_type"] == "GREETING"
+    assert delta.get("next_agent_action_command") == "GENERATE_GREETING"
+    assert delta.get("trigger_event", original_trigger_event) == original_trigger_event
+    assert delta.get("follow_up_attempt_count", 0) == 0  # Não foi incrementado
+
+
+@pytest.mark.asyncio
+async def test_planner_proactive_step_after_minimal_user_response_to_answered_question(
+    base_state_for_planner,
+):
+    """
+    Testa se o Planner, após responder a uma pergunta do usuário e receber uma
+    resposta mínima, planeja DECIDE_PROACTIVE_STEP.
+    """
+    state = base_state_for_planner
+
+    # Configuração inicial: Agente estava investigando necessidades.
+    previous_goal_investigating = AgentGoal(
+        goal_type="INVESTIGATING_NEEDS",
+        goal_details={
+            "last_spin_type_asked": "Problem",
+            "spin_questions_asked_this_cycle": 1,
+        },
+        previous_goal_if_interrupted=None,
+    )
+
+    # Estado ANTES da chamada ao Planner que queremos testar:
+    # O agente acabou de responder a uma pergunta (que era uma interrupção).
+    # O goal atual é o resultado da retomada após a interrupção (CLARIFYING_USER_INPUT) ter sido "concluída".
+    # Ou seja, o Planner já teria retomado INVESTIGATING_NEEDS.
+    state["current_agent_goal"] = previous_goal_investigating  # Goal retomado
+
+    state["last_agent_action"] = (
+        {  # Agente acabou de responder a uma pergunta no turno anterior
+            "action_type": "ANSWER_DIRECT_QUESTION",
+            "details": {
+                "question_to_answer_text": "Qual o seu email?"
+            },  # Pergunta que foi respondida
+            "action_generation_text": "Nosso email é contato@empresa.com.",
+            "attempts": 1,
+        }
+    )
+    # Usuário deu uma resposta mínima à resposta do agente.
+    state["current_user_input_text"] = "vlw"
+    state["user_input_analysis_result"] = {
+        "analysis_of_response_to_agent_action": {
+            "user_response_to_agent_action": "acknowledged_action"  # Resposta mínima
+        },
+        "overall_intent": "RespondingToAgent",  # ou "Acknowledgement"
+        "extracted_questions": [],
+        "extracted_objections": [],
+        "extracted_needs_or_pains": [],
+        "is_primarily_vague_statement": True,
+        "is_primarily_off_topic": False,
+        "correction_details_text": None,
+        "reaction_to_solution_presentation": None,
+        "objection_status_after_rebuttal": None,
+    }
+    state["trigger_event"] = "user_message"
+    state["follow_up_scheduled"] = False
+    state["follow_up_attempt_count"] = 0
+    state["user_interruptions_queue"] = []  # Nenhuma interrupção nova
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta
+    # O goal deve permanecer INVESTIGATING_NEEDS, mas o Planner deve decidir ser proativo.
+    assert delta["current_agent_goal"]["goal_type"] == "INVESTIGATING_NEEDS"
+
+    assert delta.get("next_agent_action_command") == "DECIDE_PROACTIVE_STEP"
+    assert delta.get("action_parameters") == {
+        "trigger_source": "user_response_or_stagnation",
+        "current_follow_up_attempts": 0,
+    }
+    assert delta.get("last_processing_error") is None
+    assert "trigger_event" not in delta
+    assert delta.get("follow_up_attempt_count", 0) == 0
