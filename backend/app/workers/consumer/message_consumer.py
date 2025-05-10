@@ -272,24 +272,6 @@ class MessageConsumer:
             )
         # --- End WebSocket Publishing ---
 
-        if (
-            message.direction == "in"
-            and message.content
-            and final_updated_conversation.status == ConversationStatusEnum.BOT
-        ):
-            ai_task_args = {
-                "account_id": message.account_id,
-                "conversation_id": message.conversation_id,
-                "trigger_message_id": message.id,
-            }
-            logger.debug(
-                f"Message {message.id} eligible for AI reply. Returning args: {ai_task_args}"
-            )
-            return ai_task_args
-        else:
-            logger.debug(f"Message {message.id} not eligible for AI reply.")
-            return None
-
 
 async def main():
     consumer = MessageConsumer()
