@@ -15,6 +15,7 @@ from app.models.message import Message
 
 from app.models.user import User
 from app.services.repository import conversation as conversation_repo
+from app.services.repository import bot_agent as bot_agent_repo
 from app.services.helper.checkpoint import reset_checkpoint
 
 from app.services.queue.iqueue import IQueue
@@ -224,6 +225,19 @@ async def get_simulation_details(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Ambiente de simulação principal não configurado ou incompleto. Tente novamente mais tarde ou contate o suporte.",
+        )
+
+    bot_agent = await bot_agent_repo.get_bot_agent_by_account_id(
+        db=db, account_id=account.id
+    )
+
+    if not bot_agent:
+        logger.warning(
+            f"Primary simulation environment IDs are not fully set up on account {account.id} (User: {user.id})."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ambiente de simulação principal não configurado ou incompleto. Crie seu agente, e depois tente novamente.",
         )
 
     return SimulationDetailsResponse(
