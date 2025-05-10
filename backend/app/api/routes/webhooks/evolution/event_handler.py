@@ -175,7 +175,7 @@ async def handle_message(
         # --- Caminho 2: Debounce para IA ---
         # Extrair dados necessários para o debounce service
 
-        if message.direction == "in":
+        if message.get("direction", "") == "in":
             message_debounce_service = get_message_debounce_service()
             conversation_id_from_payload = message.get("conversation_id")
             current_message_content = message.get("content")
