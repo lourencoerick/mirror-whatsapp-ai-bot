@@ -184,6 +184,7 @@ from app.services.queue.redis_queue import (
     RedisQueue,
 )  # Assuming this is a simple wrapper
 from app.services.helper.websocket import publish_to_conversation_ws
+from app.workers.ai_replier.utils.datetime import calculate_follow_up_delay
 
 # --- Configuration Constants ---
 AI_DELAY_BASE_SECONDS = float(os.getenv("AI_DELAY_BASE_SECONDS", "0.5"))
@@ -700,10 +701,9 @@ async def handle_ai_reply_request(
                     agent_config_from_state = final_state.get(
                         "agent_config", {}
                     )  # agent_config from the graph state
-                    follow_up_delay_seconds = 1
-                    # agent_config_from_state.get(
-                    # "follow_up_timeout_seconds", 3600
-                    # )  # Default 1 hour
+                    follow_up_delay_seconds = agent_config_from_state.get(
+                        "follow_up_timeout_seconds", 1
+                    )  # Default 1 second to test
                     next_follow_up_attempt = final_state.get(
                         "follow_up_attempt_count", 0
                     )  # This should be the attempt for the *next* follow-up
@@ -713,6 +713,13 @@ async def handle_ai_reply_request(
 
                     logger.info(
                         f"{log_prefix} Scheduling follow-up. Delay: {follow_up_delay_seconds}s, Next Attempt: {next_follow_up_attempt}"
+                    )
+
+                    computed_follow_up_delay = calculate_follow_up_delay(
+                        attempt_number=(
+                            next_follow_up_attempt if next_follow_up_attempt > 0 else 1
+                        ),
+                        base_delay_seconds=1,
                     )
 
                     await arq_pool.enqueue_job(
@@ -725,11 +732,11 @@ async def handle_ai_reply_request(
                         ),
                         follow_up_attempt_count_for_this_job=next_follow_up_attempt,
                         origin_agent_message_timestamp=last_agent_msg_ts,
-                        _defer_by=timedelta(seconds=follow_up_delay_seconds),
+                        _defer_by=computed_follow_up_delay,  # timedelta(seconds=1),
                     )
                     logger.info(
-                        f"{log_prefix} Enqueued 'schedule_conversation_follow_up' to '{settings.FOLLOW_UP_SCHEDULER_QUEUE_NAME}' "
-                        f"for ConvID {conversation_id}, scheduled in {follow_up_delay_seconds}s."
+                        f"{log_prefix} Enqueued 'schedule_conversation_follow_up' to '{settings.AI_REPLY_QUEUE_NAME}' "
+                        f"for ConvID {conversation_id}, scheduled in {computed_follow_up_delay}s."
                     )
                 else:
                     if not arq_pool:
