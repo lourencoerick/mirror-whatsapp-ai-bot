@@ -230,7 +230,6 @@ def _compute_delay(response_text: str) -> float:
 async def _process_one_message(
     db: AsyncSession,
     account_id: UUID,
-    trigger_message_id: Optional[str],  # Can be None for follow-ups
     task_id: str,
     agent_config_db: Optional[BotAgentRead],  # Can be None if not found
     final_state: Dict[str, Any],
@@ -246,7 +245,6 @@ async def _process_one_message(
     Args:
         db: The active SQLAlchemy async session.
         account_id: The ID of the account.
-        trigger_message_id: The ID of the message that triggered this AI response.
         task_id: The ID of the current ARQ task.
         agent_config_db: The configuration of the bot agent.
         final_state: The final state from the LangGraph execution.
@@ -283,7 +281,6 @@ async def _process_one_message(
             "intent_classified": final_state.get("intent", ""),
             "bot_agent_id": bot_agent_id_str,
         },
-        triggering_message_id=UUID(trigger_message_id) if trigger_message_id else None,
         is_simulation=conversation.is_simulation,
     )
     ai_message = await message_repo.create_message(db=db, message_data=message_data)
@@ -344,7 +341,7 @@ async def handle_ai_reply_request(
     ctx: dict,
     account_id: UUID,
     conversation_id: UUID,
-    trigger_message_id: Optional[UUID] = None,
+    user_input_content: Optional[str],
     event_type: Optional[str] = None,  # e.g., "user_message", "follow_up_timeout"
     follow_up_attempt_count: Optional[int] = 0,
     **kwargs,
@@ -373,21 +370,20 @@ async def handle_ai_reply_request(
     )
 
     is_follow_up_trigger = event_type == "follow_up_timeout"
-    trigger_message_id_str = str(trigger_message_id) if trigger_message_id else None
 
     if is_follow_up_trigger:
         log_prefix = (
             f"{log_prefix_base}[FollowUpTrigger|Attempt:{follow_up_attempt_count}]"
         )
         logger.info(f"{log_prefix} Starting task for follow-up.")
-    elif trigger_message_id_str:
-        log_prefix = f"{log_prefix_base}[MsgTrigger:{trigger_message_id_str}]"
+    elif user_input_content:
+        log_prefix = f"{log_prefix_base}[MsgTrigger]"
         logger.info(f"{log_prefix} Starting task triggered by message.")
     else:
         logger.error(
-            f"{log_prefix_base} Invalid trigger. Missing IDs or valid event_type. EventType: {event_type}, TriggerMsg: {trigger_message_id_str}"
+            f"{log_prefix_base} Invalid trigger. Missing IDs or valid event_type. EventType: {event_type}"
         )
-        return "Invalid task trigger: Missing trigger_message_id for non-follow-up or invalid event_type."
+        return "Invalid task trigger: Missing user_input_content for non-follow-up or invalid event_type."
 
     # --- 1. Get Dependencies from Context ---
     db_session_factory: Optional[async_sessionmaker[AsyncSession]] = ctx.get(
@@ -492,24 +488,8 @@ async def handle_ai_reply_request(
                 if is_follow_up_trigger:
                     trigger_event_for_graph = "follow_up_timeout"
                     logger.info(f"{log_prefix} Event type set to FOLLOW_UP_TIMEOUT.")
-                elif trigger_message_id_str:
-                    # Ensure history_db is not empty and the first message is the trigger
-                    if (
-                        not history_db
-                        or str(history_db[0].id) != trigger_message_id_str
-                    ):
-                        logger.warning(
-                            f"{log_prefix} Trigger message {trigger_message_id_str} not found as latest in history or history empty. History: {len(history_db) if history_db else 0}. Aborting."
-                        )
-                        return "Trigger message mismatch or history empty"
-
-                    last_db_message = history_db[0]
-                    if last_db_message.direction != "in" or not last_db_message.content:
-                        logger.info(
-                            f"{log_prefix} Latest DB message {last_db_message.id} is not suitable (not 'in' or no content). Skipping."
-                        )
-                        return "Trigger message not suitable (not inbound or empty)"
-                    current_user_input_content = last_db_message.content
+                elif user_input_content:
+                    current_user_input_content = user_input_content
 
                     if (
                         current_user_input_content.lower().strip()
@@ -525,7 +505,6 @@ async def handle_ai_reply_request(
                         await _process_one_message(
                             db,
                             account_id,
-                            trigger_message_id_str,
                             task_id,
                             agent_config_db_model,
                             {},
@@ -663,7 +642,6 @@ async def handle_ai_reply_request(
                         await _process_one_message(
                             db,
                             account_id,
-                            trigger_message_id_str,
                             task_id,
                             agent_config_db_model,
                             final_state,
@@ -684,7 +662,6 @@ async def handle_ai_reply_request(
                             await _process_one_message(
                                 db=db,
                                 account_id=account_id,
-                                trigger_message_id=trigger_message_id_str,  # Pass original trigger
                                 task_id=task_id,
                                 conversation=conversation,
                                 agent_config_db=agent_config_db_model,
