@@ -175,37 +175,39 @@ async def handle_message(
         # --- Caminho 2: Debounce para IA ---
         # Extrair dados necessários para o debounce service
 
-        message_debounce_service = get_message_debounce_service()
-        conversation_id_from_payload = message.get("conversation_id")
-        current_message_content = message.get("content")
+        if message.direction == "in":
+            message_debounce_service = get_message_debounce_service()
+            conversation_id_from_payload = message.get("conversation_id")
+            current_message_content = message.get("content")
 
-        if (
-            not conversation_id_from_payload
-        ):  # Deve ser encontrado por parse_webhook_to_message
-            logger.error(
-                "[webhook:handle_message] conversation_id missing from parsed payload. Cannot proceed with debounce."
+            if (
+                not conversation_id_from_payload
+            ):  # Deve ser encontrado por parse_webhook_to_message
+                logger.error(
+                    "[webhook:handle_message] conversation_id missing from parsed payload. Cannot proceed with debounce."
+                )
+                # Isso seria um erro de lógica no parse_webhook_to_message
+                raise HTTPException(
+                    status_code=500,
+                    detail="Internal error: conversation_id not determined",
+                )
+
+            base_payload_for_debounce = {
+                "account_id": account_id,  # UUID
+                "conversation_id": UUID(
+                    conversation_id_from_payload
+                ),  # Converter para UUID se for string
+            }
+
+            await message_debounce_service.handle_incoming_message(
+                conversation_id=UUID(conversation_id_from_payload),
+                current_message_content=current_message_content,
+                base_payload_for_task=base_payload_for_debounce,
+                task_enqueuer_func=enqueue_ai_processing_task,
             )
-            # Isso seria um erro de lógica no parse_webhook_to_message
-            raise HTTPException(
-                status_code=500, detail="Internal error: conversation_id not determined"
+            logger.info(
+                f"[webhook:handle_message] Message content for conv {conversation_id_from_payload} handed to debounce service."
             )
-
-        base_payload_for_debounce = {
-            "account_id": account_id,  # UUID
-            "conversation_id": UUID(
-                conversation_id_from_payload
-            ),  # Converter para UUID se for string
-        }
-
-        await message_debounce_service.handle_incoming_message(
-            conversation_id=UUID(conversation_id_from_payload),
-            current_message_content=current_message_content,
-            base_payload_for_task=base_payload_for_debounce,
-            task_enqueuer_func=enqueue_ai_processing_task,
-        )
-        logger.info(
-            f"[webhook:handle_message] Message content for conv {conversation_id_from_payload} handed to debounce service."
-        )
 
         return {
             "status": "message enqueued",
