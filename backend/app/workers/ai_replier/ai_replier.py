@@ -7,7 +7,8 @@ import json
 from uuid import UUID, uuid4
 from loguru import logger
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import time
 
 # --- Third-Party Imports ---
 from fastapi.encoders import jsonable_encoder
@@ -15,16 +16,19 @@ from arq.connections import ArqRedis, RedisSettings
 
 # --- LangGraph Imports ---
 try:
-    from app.services.ai_reply.graph import create_reply_graph
-    from app.services.ai_reply.graph_state import ConversationState
+    from app.services.new_agent.graph import create_agent_graph
+    from app.services.new_agent.state_definition import (
+        RichConversationState,
+        TriggerEventType,
+    )
 
-    REPLY_GRAPH_AVAILABLE = True
+    GRAPH_AVAILABLE = True
     logger.info("Successfully imported LangGraph components.")
 except ImportError as e:
     logger.error(f"Failed to import LangGraph components: {e}. AI reply limited.")
-    REPLY_GRAPH_AVAILABLE = False
+    GRAPH_AVAILABLE = False
 
-    class ConversationState(dict):
+    class RichConversationState(dict):
         pass
 
 
@@ -323,14 +327,42 @@ async def handle_ai_reply_request(
     ctx: dict,
     account_id: UUID,
     conversation_id: UUID,
-    trigger_message_id: UUID,
+    trigger_message_id: Optional[UUID] = None,
+    event_type: Optional[str] = None,
+    follow_up_attempt_count: Optional[int] = 0,
+    **kwargs,
 ):
     """
     Arq task using LangGraph with persistence to generate and handle AI replies.
     """
     task_id = ctx.get("job_id", f"adhoc-{uuid4().hex[:6]}")
-    log_prefix = f"[AIReplyTask:{task_id}|Conv:{conversation_id}|Acc:{account_id}]"
-    logger.info(f"{log_prefix} Starting task triggered by Msg: {trigger_message_id}")
+
+    is_follow_up_trigger = event_type == "follow_up_timeout"
+
+    if is_follow_up_trigger:
+        # conversation_id, account_id, bot_agent_id, follow_up_attempt_count
+        # são passados diretamente como argumentos nomeados pelo job arq
+        if not conversation_id or not account_id:
+            logger.error(
+                f"[AIReplyTask:{task_id}] Follow-up trigger missing conversation_id or account_id. Payload: {kwargs}"
+            )
+            return "Follow-up trigger missing critical IDs"
+        log_prefix = (
+            f"[AIReplyTask:{task_id}|FollowUp|Conv:{conversation_id}|Acc:{account_id}]"
+        )
+        logger.info(
+            f"{log_prefix} Starting task for follow-up, attempt {follow_up_attempt_count}"
+        )
+    elif trigger_message_id and conversation_id and account_id:
+        log_prefix = f"[AIReplyTask:{task_id}|MsgTrigger|Conv:{conversation_id}|Acc:{account_id}]"
+        logger.info(
+            f"{log_prefix} Starting task triggered by Msg: {trigger_message_id}"
+        )
+    else:
+        logger.error(
+            f"[AIReplyTask:{task_id}] Invalid trigger. Missing IDs. EventType: {event_type}, TriggerMsg: {trigger_message_id}"
+        )
+        return "Invalid task trigger"
 
     # --- 1. Get Dependencies ---
     db_session_factory: Optional[async_sessionmaker[AsyncSession]] = ctx.get(
@@ -353,7 +385,7 @@ async def handle_ai_reply_request(
 
     if not all(
         [
-            REPLY_GRAPH_AVAILABLE,
+            GRAPH_AVAILABLE,
             REPO_AVAILABLE,
             MODELS_SCHEMAS_AVAILABLE,
             LANGCHAIN_AVAILABLE,
@@ -365,7 +397,7 @@ async def handle_ai_reply_request(
 
     # --- 3. Main Processing Block ---
     ai_response_text: Optional[str] = None
-    final_state: Optional[ConversationState] = None
+    final_state: Optional[RichConversationState] = None
     try:
         # --- 3a. Use Checkpointer Context Manager ---
         serializer = JsonPlusSerializer()
@@ -379,7 +411,7 @@ async def handle_ai_reply_request(
 
             # --- 3b. Compile Graph *with* Checkpointer ---
             logger.debug(f"{log_prefix} Compiling reply graph with checkpointer...")
-            compiled_reply_graph = create_reply_graph(checkpointer=checkpointer)
+            compiled_reply_graph = create_agent_graph(checkpointer=checkpointer)
             logger.debug(f"{log_prefix} Reply graph compiled.")
 
             # --- 3c. Use DB Session from Factory ---
@@ -421,20 +453,51 @@ async def handle_ai_reply_request(
                     logger.warning(f"{log_prefix} No history. Skipping.")
                     return
 
-                last_db_message = history_db[
-                    0
-                ]  # Most recent is first due to query order
-                if last_db_message.direction != "in" or not last_db_message.content:
-                    logger.info(
-                        f"{log_prefix} Latest msg not suitable (not 'in' or no content). Skipping."
+                current_user_input_content: Optional[str] = None
+                trigger_event_for_graph: TriggerEventType = "user_message"  # Default
+
+                if is_follow_up_trigger:
+                    trigger_event_for_graph = "follow_up_timeout"
+                elif trigger_message_id:
+                    last_db_message = history_db[0]
+                    # formatted_history = _format_db_history_to_lc([last_db_message])  Precisa do historico ou o checkpointer ajusta?
+                    if (
+                        last_db_message.direction != "in"
+                        or not last_db_message.content
+                        or str(last_db_message.id) != str(trigger_message_id)
+                    ):
+                        logger.info(
+                            f"{log_prefix} Latest DB message {last_db_message.id} is not the trigger message {trigger_message_id} or not suitable. Skipping."
+                        )
+                        return "Trigger message not suitable"
+                    current_user_input_content = last_db_message.content
+                    if (
+                        current_user_input_content.lower().strip()
+                        == settings.RESET_MESSAGE_TRIGGER.lower().strip()
+                    ):
+                        logger.info(
+                            f"{log_prefix} Reset trigger detected. Simulating reset response."
+                        )
+                        await _process_one_message(
+                            db,
+                            account_id,
+                            str(trigger_message_id),
+                            task_id,
+                            agent_config_db,
+                            {},
+                            conversation,
+                            current_user_input_content.lower().strip(),
+                        )
+                        return "Conversation reset"
+                else:
+                    logger.error(
+                        f"{log_prefix} Task triggered without user message or follow-up event. Aborting."
                     )
-                    return
+                    return "Invalid trigger: no user message or follow-up event"
 
                 # --- Prepare Graph State Input ---
                 # Checkpointer handles loading persisted state. We provide current context.
                 logger.debug(f"{log_prefix} Preparing initial input for LangGraph...")
-                formatted_history = _format_db_history_to_lc([last_db_message])
-
                 profile_dict = CompanyProfileSchema.model_validate(
                     profile_db
                 ).model_dump(mode="json")
@@ -443,37 +506,54 @@ async def handle_ai_reply_request(
                 )
 
                 # Provide the *inputs* needed for this turn, checkpointer merges with saved state
-                current_input: ConversationState = {
-                    "account_id": account_id,  # Pass identifiers
+                current_input: RichConversationState = {
+                    "account_id": account_id,
                     "conversation_id": conversation_id,
                     "bot_agent_id": agent_config_db.id,
-                    "company_profile": profile_dict,
-                    "agent_config": agent_config_dict,
-                    "messages": formatted_history,
-                    "input_message": last_db_message.content,
+                    "company_profile": profile_dict,  # Deve ser um dict validado ou objeto Pydantic
+                    "agent_config": agent_config_dict,  # Deve ser um dict validado ou objeto Pydantic
+                    # Histórico de mensagens (deve ser List[BaseMessage])
+                    "messages": [],  # Assumindo que já está no formato correto formatted_history
+                    # A entrada atual do usuário
+                    "current_user_input_text": current_user_input_content,
+                    # Metadados da conversa
                     "is_simulation": conversation.is_simulation,
-                    # Initialize fields that might be calculated anew each turn or have defaults
-                    "retrieved_context": None,
-                    "generation": None,
-                    "error": None,
-                    # "loop_count": 0,  # Reset loop count? Or let checkpoint manage? Let checkpoint manage.
-                    # "current_objection": None,
-                    # "objection_loop_count": 0,
-                    # Fields managed entirely by checkpoint (don't need to initialize here unless setting default)
-                    # "current_sales_stage": None,
-                    # "customer_needs": [],
-                    # "customer_pain_points": [],
-                    # "spin_question_type": None,
-                    # "problem_mentioned": None,
-                    # "need_expressed": None,
-                    # "last_spin_question_type": None,
-                    # "explicit_need_identified": False, # Checkpointer should load this
-                    # "intent": None,
-                    # "classification_details": None,
-                    # "certainty_level": None,
-                    # "certainty_focus": None,
-                    # "proposed_solution_details": None,
+                    "last_interaction_timestamp": time.time(),  # Atualizar timestamp
+                    "trigger_event": trigger_event_for_graph,
+                    # --- Campos Carregados pelo Checkpointer (Não inicializar aqui, exceto no 1º turno) ---
+                    # O LangGraph/Checkpointer cuidará de carregar os valores destes campos
+                    # do estado salvo anteriormente para este `thread_id` (conversation_id).
+                    # Se for o *primeiro* turno, eles terão seus valores padrão (None, [], 0, etc.)
+                    # ou os valores definidos na inicialização do grafo (se houver).
+                    # Exemplos (NÃO definir na entrada normal, apenas para ilustração):
+                    # "current_turn_number": 0, # Checkpointer gerencia isso
+                    # "current_agent_goal": AgentGoal(goal_type="IDLE", ...), # Checkpointer carrega
+                    # "last_agent_action": None, # Checkpointer carrega
+                    # "user_interruptions_queue": [], # Checkpointer carrega
+                    # "customer_profile_dynamic": {...}, # Checkpointer carrega
+                    # "customer_question_log": [], # Checkpointer carrega
+                    # "active_proposal": None, # Checkpointer carrega
+                    # "closing_process_status": "not_started", # Checkpointer carrega
+                    # "pending_correction_details_for_proposal": None, # Checkpointer carrega
+                    # "applied_correction_details": None, # Checkpointer carrega
+                    # "last_objection_handled_turn": None, # Checkpointer carrega
+                    # --- Campos Calculados/Resetados a Cada Turno (Inicializar como None/Padrão) ---
+                    # Estes são campos que são preenchidos *durante* a execução do grafo em um turno.
+                    # É bom garantir que eles comecem como None ou vazios na entrada do turno.
+                    "next_agent_action_command": None,
+                    "action_parameters": {},
+                    "retrieved_knowledge_for_next_action": None,
+                    "last_agent_generation_text": None,
+                    "final_agent_message_text": None,
+                    "user_input_analysis_result": None,  # Resultado do InputProcessor
+                    "last_processing_error": None,  # Limpar erros anteriores
+                    "conversation_summary_for_llm": None,  # Pode ser carregado/atualizado separadamente
+                    "disengagement_reason": None,  # Geralmente definido ao final
+                    "current_turn_extracted_questions": [],  # Campo temporário, resetar
                 }
+                if is_follow_up_trigger:
+                    current_input["follow_up_attempt_count"] = follow_up_attempt_count
+
                 logger.trace(
                     f"{log_prefix} Current graph input prepared: {current_input}"
                 )
@@ -503,89 +583,76 @@ async def handle_ai_reply_request(
                         if isinstance(msg, AIMessage) and hasattr(msg, "id")
                     }
 
-                # logger.debug(
-                #     f"{log_prefix} Snapshot of the messages of the Current Graph: {previous_checkpoint_message_ids}"
-                # )
-
                 # --- Invoke Graph ---
+                logger.info(f"{log_prefix} Invoking reply graph with checkpointer...")
+                final_state = await compiled_reply_graph.ainvoke(
+                    current_input, config={**graph_config, "recursion_limit": 50}
+                )
 
-                if (
-                    last_db_message.content.lower().strip()
-                    == settings.RESET_MESSAGE_TRIGGER
-                ):
-                    logger.info(
-                        f"{log_prefix}  Trigger de reset conversation process..."
+                logger.info(f"{log_prefix} Reply graph execution finished.")
+                logger.trace(
+                    f"{log_prefix} Final graph state from checkpointer: {final_state}"
+                )
+
+                # --- Process Graph Output ---
+                graph_error = final_state.get("error")
+                final_messages_lc = final_state.get("messages", [])
+                logger.debug(f"List of messages: {final_messages_lc}")
+
+                new_ai_messages_lc: List[AIMessage] = []
+                for msg in final_messages_lc:
+                    if (
+                        isinstance(msg, AIMessage)
+                        and hasattr(msg, "id")
+                        and str(msg.id) not in previous_checkpoint_message_ids
+                    ):
+                        new_ai_messages_lc.append(msg)
+                        logger.debug(
+                            f"{log_prefix} Identified new AI message ID: {msg.id}"
+                        )
+
+                logger.debug(
+                    f"{log_prefix} final messages: {final_messages_lc}, final ai messages: {new_ai_messages_lc}"
+                )
+
+                if graph_error:
+                    logger.error(
+                        f"{log_prefix} Graph execution finished with error: {graph_error}"
                     )
-                    graph_error = None
-                    ai_response_text = settings.RESET_MESSAGE_TRIGGER
-                    final_state = {}
-                    new_ai_messages_lc: List[AIMessage] = [
-                        AIMessage(content=ai_response_text)
-                    ]
+
+                if not new_ai_messages_lc and not graph_error:
+                    logger.warning(
+                        f"{log_prefix} Graph finished but no new AI messages were added."
+                    )
+
+                elif not new_ai_messages_lc and graph_error:
+                    logger.error(
+                        f"{log_prefix} Graph failed and no fallback message generated."
+                    )
+                    raise RuntimeError(f"Graph failed: {graph_error}")
                 else:
-                    logger.info(
-                        f"{log_prefix} Invoking reply graph with checkpointer..."
-                    )
-                    final_state = await compiled_reply_graph.ainvoke(
-                        current_input, config={**graph_config, "recursion_limit": 50}
+                    logger.success(
+                        f"{log_prefix} Graph generated {len(new_ai_messages_lc)} new AI message(s)."
                     )
 
-                    logger.info(f"{log_prefix} Reply graph execution finished.")
-                    logger.trace(
-                        f"{log_prefix} Final graph state from checkpointer: {final_state}"
-                    )
+                last_agent_generation_text = final_state.get(
+                    "last_agent_generation_text", ""
+                )
+                logger.debug(f"Last agent generation {last_agent_generation_text}")
 
-                    # --- Process Graph Output ---
-                    graph_error = final_state.get("error")
-                    final_messages_lc = final_state.get("messages", [])
-
-                    new_ai_messages_lc: List[AIMessage] = []
-                    for msg in final_messages_lc:
-                        if (
-                            isinstance(msg, AIMessage)
-                            and hasattr(msg, "id")
-                            and str(msg.id) not in previous_checkpoint_message_ids
-                        ):
-                            new_ai_messages_lc.append(msg)
-                            logger.debug(
-                                f"{log_prefix} Identified new AI message ID: {msg.id}"
-                            )
-
-                    logger.debug(
-                        f"{log_prefix} final messages: {final_messages_lc}, final ai messages: {new_ai_messages_lc}"
-                    )
-
-                    if graph_error:
-                        logger.error(
-                            f"{log_prefix} Graph execution finished with error: {graph_error}"
-                        )
-
-                    if not new_ai_messages_lc and not graph_error:
-                        logger.warning(
-                            f"{log_prefix} Graph finished but no new AI messages were added."
-                        )
-
-                    elif not new_ai_messages_lc and graph_error:
-                        logger.error(
-                            f"{log_prefix} Graph failed and no fallback message generated."
-                        )
-                        raise RuntimeError(f"Graph failed: {graph_error}")
-                    else:
-                        logger.success(
-                            f"{log_prefix} Graph generated {len(new_ai_messages_lc)} new AI message(s)."
-                        )
-
-                    USE_GENERATION_RESPONSE = True
-                    if USE_GENERATION_RESPONSE:
-                        new_ai_messages_lc = [
-                            AIMessage(content=final_state.get("generation", ""))
-                        ]
+                # USE_GENERATION_RESPONSE = True
+                # if USE_GENERATION_RESPONSE:
+                #     new_ai_messages_lc = [
+                #         AIMessage(
+                #             content=final_state.get(
+                #                 "last_agent_generation_text", ""
+                #             )
+                #         )
+                #     ]
 
                 for _, ai_msg_lc in enumerate(new_ai_messages_lc):
                     if isinstance(ai_msg_lc, AIMessage) and ai_msg_lc.content:
-                        ai_response_text = ai_msg_lc.content.replace(
-                            "**", "*"
-                        )  # correct the bold style for whatsapp
+                        ai_response_text = ai_msg_lc.content
                         await _process_one_message(
                             db=db,
                             account_id=account_id,
@@ -596,6 +663,36 @@ async def handle_ai_reply_request(
                             final_state=final_state,
                             ai_response_text=ai_response_text,
                         )
+
+                # --- Lógica de Agendamento de Follow-up com ARQ ---
+                if final_state.get("follow_up_scheduled"):
+                    agent_config = final_state.get("agent_config", {})
+                    # Usar um nome de config mais específico se possível
+                    delay_s = agent_config.get(
+                        "follow_up_timeout_seconds", 3600
+                    )  # Default 1 hora
+
+                    attempt_for_next_follow_up = final_state.get(
+                        "follow_up_attempt_count", 0
+                    )
+                    origin_ts = final_state.get("last_message_from_agent_timestamp")
+
+                    # Obter o pool arq (você pode injetá-lo ou obtê-lo globalmente como no exemplo)
+
+                    await arq_pool.enqueue_job(
+                        "schedule_conversation_follow_up",  # Nome da função como string
+                        conversation_id=conversation_id,
+                        account_id=account_id,
+                        bot_agent_id=agent_config_db.id,
+                        follow_up_attempt_count_for_this_job=attempt_for_next_follow_up,  # A tentativa que este job irá executar
+                        origin_agent_message_timestamp=origin_ts,
+                        _defer_by=timedelta(
+                            seconds=1
+                        ),  # arq usa timedelta ou int para segundos
+                    )
+                    logger.info(
+                        f"ARQ: Enqueued follow-up for {conversation_id} in {delay_s}s, for attempt {attempt_for_next_follow_up}"
+                    )
 
     except Exception as e:
         logger.exception(
@@ -677,6 +774,12 @@ async def startup(ctx: dict):
             logger.info(f"Fast LLM client initialized: {fast_model_name}")
 
             logger.success("LLM clients initialized.")
+
+            logger.debug("Testing embedding...")
+            embedding_testing_response = await get_embedding("teste")
+            logger.info(f"Embedding of 'teste' : {embedding_testing_response}")
+            logger.success("Embedding util initialized.")
+
         except EnvironmentError as env_err:
             logger.error(f"LLM initialization failed: {env_err}")
         except Exception as llm_init_err:
