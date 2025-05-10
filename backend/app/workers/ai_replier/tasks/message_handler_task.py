@@ -341,7 +341,7 @@ async def handle_ai_reply_request(
     ctx: dict,
     account_id: UUID,
     conversation_id: UUID,
-    user_input_content: Optional[str],
+    user_input_content: Optional[str] = None,
     event_type: Optional[str] = None,  # e.g., "user_message", "follow_up_timeout"
     follow_up_attempt_count: Optional[int] = 0,
     **kwargs,

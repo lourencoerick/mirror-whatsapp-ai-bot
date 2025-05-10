@@ -53,7 +53,7 @@ except ImportError:
 
 # --- Constantes ---
 RAG_CHUNK_LIMIT_DEFAULT = 3
-RAG_SIMILARITY_THRESHOLD_DEFAULT = 0.75  # Ajustar conforme necessário
+RAG_SIMILARITY_THRESHOLD_DEFAULT = 0.5  # Ajustar conforme necessário
 
 
 # --- Nó Principal ---
