@@ -26,6 +26,9 @@ from app.api.schemas.simulation import (
     SimulationMessageEnqueueResponse,
 )
 
+from app.services.debounce.message_debounce import get_message_debounce_service
+from app.services.queue.utils.enqueue import enqueue_ai_processing_task
+
 try:
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
@@ -139,6 +142,23 @@ async def _enqueue_simulation_message(
             f"Enqueued simulation message data with source_id {source_id} for conversation {conversation_id}."
         )
 
+        debounce_service = get_message_debounce_service()
+
+        base_payload_for_debounce = {
+            "account_id": account_id,  # UUID
+            "conversation_id": conversation.id,
+        }
+
+        await debounce_service.handle_incoming_message(
+            conversation_id=conversation.id,
+            current_message_content=message_payload.content,
+            base_payload_for_task=base_payload_for_debounce,
+            task_enqueuer_func=enqueue_ai_processing_task,
+        )
+
+        logger.info(
+            f"[simulation] Message content for conv {conversation_id} handed to debounce service."
+        )
         # --- Return Confirmation ---
         # Return the confirmation dictionary matching the response_model
         return SimulationMessageEnqueueResponse(
