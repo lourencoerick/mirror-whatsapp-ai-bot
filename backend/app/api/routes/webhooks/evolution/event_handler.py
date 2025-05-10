@@ -194,13 +194,12 @@ async def handle_message(
 
             base_payload_for_debounce = {
                 "account_id": account_id,  # UUID
-                "conversation_id": UUID(
-                    conversation_id_from_payload
-                ),  # Converter para UUID se for string
+                "conversation_id": conversation_id_from_payload
+
             }
 
             await message_debounce_service.handle_incoming_message(
-                conversation_id=UUID(conversation_id_from_payload),
+                conversation_id=conversation_id_from_payload,
                 current_message_content=current_message_content,
                 base_payload_for_task=base_payload_for_debounce,
                 task_enqueuer_func=enqueue_ai_processing_task,
