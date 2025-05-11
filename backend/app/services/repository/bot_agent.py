@@ -19,7 +19,7 @@ from app.models.account import Account
 from app.models.inbox import Inbox
 from app.models.conversation import ConversationStatusEnum
 
-from app.api.schemas.bot_agent import BotAgentUpdate
+from app.api.schemas.bot_agent import BotAgentCreate, BotAgentUpdate
 
 
 async def get_bot_agent_by_id(
@@ -113,6 +113,50 @@ async def get_or_create_bot_agent_by_account_id(
             f"Created default BotAgent {default_bot_agent.id} for account {account_id}"
         )
         return default_bot_agent
+    except Exception as e:
+        logger.exception(
+            f"Failed to create default BotAgent for account {account_id}: {e}"
+        )
+        raise
+
+
+async def create_bot_agent(
+    db: AsyncSession, account_id: UUID, bot_agent_data: BotAgentCreate
+) -> BotAgent:
+    """
+    Retrieves the BotAgent for an account, creating a default one if it doesn't exist.
+
+    Args:
+        db: The SQLAlchemy async session.
+        account_id: The UUID of the account.
+        bot_agent_data: The pydantic schema containing the bot agent data.
+
+    Returns:
+        The existing or newly created BotAgent object.
+    """
+    agent = await get_bot_agent_by_account_id(db, account_id)
+    if agent:
+        logger.info(f"There is already a BotAgent found for account {account_id}.")
+        return agent
+
+    try:
+        bot_agent = BotAgent(account_id=account_id, **bot_agent_data)
+        db.add(bot_agent)
+        await db.flush()
+
+        account = await db.get(Account, account_id)
+        inbox = await db.get(Inbox, account.simulation_inbox_id)
+        logger.info(
+            f"Linking the bot agent ({bot_agent.id}) to the simulation inbox: {inbox.id}"
+        )
+        simulation_bot_agent_inbox = BotAgentInbox(
+            account_id=account_id, bot_agent_id=bot_agent.id, inbox_id=inbox.id
+        )
+        db.add(simulation_bot_agent_inbox)
+
+        await db.refresh(bot_agent)
+        logger.info(f"Created default BotAgent {bot_agent.id} for account {account_id}")
+        return bot_agent
     except Exception as e:
         logger.exception(
             f"Failed to create default BotAgent for account {account_id}: {e}"
