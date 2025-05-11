@@ -614,7 +614,11 @@ export interface paths {
          * @description Updates the configuration of a specific Bot Agent.
          */
         put: operations["update_bot_agent_api_v1_bot_agents__bot_agent_id__put"];
-        post?: never;
+        /**
+         * Create Bot Agent
+         * @description Creates a Bot Agent with the passed configuration.
+         */
+        post: operations["create_bot_agent_api_v1_bot_agents__bot_agent_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1135,6 +1139,35 @@ export interface components {
             file: string;
         };
         /**
+         * BotAgentCreate
+         * @description Schema for updating an existing BotAgent.
+         *     All fields are optional on update.
+         * @example {
+         *       "first_message": "Hello! I'm the virtual assistant for [Company Name]. How can I help you today?",
+         *       "name": "Primary Sales Assistant",
+         *       "use_rag": false
+         *     }
+         */
+        BotAgentCreate: {
+            /**
+             * Name
+             * @description Descriptive name for the AI agent.
+             * @default Assistente Principal
+             */
+            name: string | null;
+            /**
+             * First Message
+             * @description Initial message the bot sends to start the conversation (if empty, waits for the user).
+             */
+            first_message?: string | null;
+            /**
+             * Use Rag
+             * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
+             * @default true
+             */
+            use_rag: boolean | null;
+        };
+        /**
          * BotAgentRead
          * @description Schema for returning BotAgent data, including its ID.
          * @example {
@@ -1150,7 +1183,7 @@ export interface components {
             /**
              * Name
              * @description Descriptive name for the AI agent.
-             * @default Primary Assistant
+             * @default Assistente Principal
              */
             name: string | null;
             /**
@@ -1161,7 +1194,7 @@ export interface components {
             /**
              * Use Rag
              * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
-             * @default false
+             * @default true
              */
             use_rag: boolean | null;
             /**
@@ -1191,7 +1224,7 @@ export interface components {
             /**
              * Name
              * @description Descriptive name for the AI agent.
-             * @default Primary Assistant
+             * @default Assistente Principal
              */
             name: string | null;
             /**
@@ -1202,7 +1235,7 @@ export interface components {
             /**
              * Use Rag
              * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
-             * @default false
+             * @default true
              */
             use_rag: boolean | null;
         };
@@ -2428,22 +2461,62 @@ export interface components {
         };
         /**
          * PersonaBase
-         * @description Base Pydantic schema for Persona data.
+         * @description Base Pydantic schema for Persona data, including dynamic behaviors.
+         * @example {
+         *       "behavior_hints": [
+         *         "price_sensitive",
+         *         "impatient",
+         *         "results_oriented"
+         *       ],
+         *       "description": "Cliente interessado no Vendedor IA, mas sensível a preço e um pouco impaciente.",
+         *       "failure_criteria": [
+         *         "event:ai_fallback_detected",
+         *         "turn_count > 8"
+         *       ],
+         *       "information_needed": [
+         *         {
+         *           "attribute": "pricing_model",
+         *           "entity": "Vendedor IA"
+         *         },
+         *         {
+         *           "attribute": "main_benefit",
+         *           "entity": "Vendedor IA"
+         *         }
+         *       ],
+         *       "initial_message": "Olá, esse Vendedor IA parece interessante. Como funciona?",
+         *       "objective": "Entender os benefícios principais do Vendedor IA, ter uma ideia de preço e decidir se vale a pena.",
+         *       "off_topic_questions": [
+         *         "Isso integra com meu sistema de CRM atual?",
+         *         "Vocês oferecem algum outro serviço de automação?"
+         *       ],
+         *       "persona_id": "cliente_dinamico_v2",
+         *       "potential_objections": [
+         *         {
+         *           "objection_text": "Entendi, mas qual o valor exato? Preciso ver se cabe no orçamento.",
+         *           "trigger_keyword": "preço"
+         *         },
+         *         {
+         *           "objection_text": "Ok, mas ainda preciso de um tempo para analisar internamente.",
+         *           "trigger_stage": "Closing"
+         *         }
+         *       ],
+         *       "success_criteria": []
+         *     }
          */
         PersonaBase: {
             /**
              * Persona Id
-             * @description Unique, human-readable snake_case identifier for the persona.
+             * @description Unique, human-readable snake_case identifier.
              */
             persona_id: string;
             /**
              * Description
-             * @description Concise description of the persona and their goal.
+             * @description Concise description of the persona.
              */
             description: string;
             /**
              * Initial Message
-             * @description The first message the persona sends.
+             * @description The first message this persona sends.
              */
             initial_message: string;
             /**
@@ -2453,79 +2526,88 @@ export interface components {
             objective: string;
             /**
              * Information Needed
-             * @description List of facts needed [{'entity': 'X', 'attribute': 'Y'},...]. Entity should match offerings or common topics.
+             * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
              */
-            information_needed: {
+            information_needed?: {
                 [key: string]: string;
             }[];
             /**
-             * Info Attribute To Question Template
-             * @description Mapping of UNIQUE attributes from information_needed to question templates {'attr': 'template {entity}?'}.
+             * Potential Objections
+             * @description List of potential objections the persona might raise based on triggers.
              */
-            info_attribute_to_question_template: {
-                [key: string]: string;
-            };
+            potential_objections?: components["schemas"]["PotentialObjection"][];
+            /**
+             * Off Topic Questions
+             * @description List of potential off-topic questions the persona might ask to interrupt.
+             */
+            off_topic_questions?: string[];
+            /**
+             * Behavior Hints
+             * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
+             */
+            behavior_hints?: string[];
             /**
              * Success Criteria
-             * @description List of criteria defining simulation success.
-             * @default [
-             *       "state:all_info_extracted"
-             *     ]
+             * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
              */
-            success_criteria: string[];
+            success_criteria?: string[];
             /**
              * Failure Criteria
              * @description List of criteria defining simulation failure.
              * @default [
              *       "event:ai_fallback_detected",
-             *       "turn_count > 8"
+             *       "turn_count > 10"
              *     ]
              */
             failure_criteria: string[];
         };
         /**
          * PersonaCreate
-         * @description Schema for creating a new Persona. Requires the ID of an existing Contact.
-         *     The 'simulation_contact_identifier' will be automatically set based on the
-         *     linked Contact's identifier.
+         * @description Schema for creating a new Persona.
          * @example {
-         *       "contact_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-         *       "description": "Cliente decidido a comprar o produto Y se o preço for bom.",
-         *       "failure_criteria": [
-         *         "turn_count > 5"
+         *       "behavior_hints": [
+         *         "busy",
+         *         "interested",
+         *         "implementation_focused"
          *       ],
-         *       "info_attribute_to_question_template": {
-         *         "price": "Qual é o preço do {entity}?"
-         *       },
+         *       "contact_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+         *       "description": "Lead que entende o valor, mas tem objeção sobre tempo de implementação.",
+         *       "failure_criteria": [
+         *         "turn_count > 6"
+         *       ],
          *       "information_needed": [
          *         {
-         *           "attribute": "price",
-         *           "entity": "Produto Y"
+         *           "attribute": "implementation_time",
+         *           "entity": "Vendedor IA"
          *         }
          *       ],
-         *       "initial_message": "Quanto custa o produto Y?",
-         *       "objective": "Confirmar o preço do produto Y e efetuar a compra.",
-         *       "persona_id": "comprador_produto_y",
-         *       "success_criteria": [
-         *         "state:all_info_extracted",
-         *         "event:purchase_intent_confirmed"
-         *       ]
+         *       "initial_message": "Gostei da ideia da qualificação automática.",
+         *       "objective": "Superar a objeção sobre implementação e avançar para teste.",
+         *       "off_topic_questions": [],
+         *       "persona_id": "lead_qualificado_objecao",
+         *       "potential_objections": [
+         *         {
+         *           "objection_text": "Parece bom, mas quanto tempo leva pra implementar tudo isso?",
+         *           "trigger_keyword": "implementação"
+         *         }
+         *       ],
+         *       "success_criteria": []
          *     }
          */
         PersonaCreate: {
             /**
              * Persona Id
-             * @description Unique, human-readable snake_case identifier for the persona.
+             * @description Unique, human-readable snake_case identifier.
              */
             persona_id: string;
             /**
              * Description
-             * @description Concise description of the persona and their goal.
+             * @description Concise description of the persona.
              */
             description: string;
             /**
              * Initial Message
-             * @description The first message the persona sends.
+             * @description The first message this persona sends.
              */
             initial_message: string;
             /**
@@ -2535,60 +2617,104 @@ export interface components {
             objective: string;
             /**
              * Information Needed
-             * @description List of facts needed [{'entity': 'X', 'attribute': 'Y'},...]. Entity should match offerings or common topics.
+             * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
              */
-            information_needed: {
+            information_needed?: {
                 [key: string]: string;
             }[];
             /**
-             * Info Attribute To Question Template
-             * @description Mapping of UNIQUE attributes from information_needed to question templates {'attr': 'template {entity}?'}.
+             * Potential Objections
+             * @description List of potential objections the persona might raise based on triggers.
              */
-            info_attribute_to_question_template: {
-                [key: string]: string;
-            };
+            potential_objections?: components["schemas"]["PotentialObjection"][];
+            /**
+             * Off Topic Questions
+             * @description List of potential off-topic questions the persona might ask to interrupt.
+             */
+            off_topic_questions?: string[];
+            /**
+             * Behavior Hints
+             * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
+             */
+            behavior_hints?: string[];
             /**
              * Success Criteria
-             * @description List of criteria defining simulation success.
-             * @default [
-             *       "state:all_info_extracted"
-             *     ]
+             * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
              */
-            success_criteria: string[];
+            success_criteria?: string[];
             /**
              * Failure Criteria
              * @description List of criteria defining simulation failure.
              * @default [
              *       "event:ai_fallback_detected",
-             *       "turn_count > 8"
+             *       "turn_count > 10"
              *     ]
              */
             failure_criteria: string[];
             /**
              * Contact Id
              * Format: uuid
-             * @description The UUID of the existing Contact record to link this Persona to.
              */
             contact_id: string;
         };
         /**
          * PersonaRead
-         * @description Schema for reading Persona data, including database ID and timestamps.
+         * @description Schema for reading Persona data.
+         * @example {
+         *       "behavior_hints": [
+         *         "price_sensitive",
+         *         "impatient",
+         *         "results_oriented"
+         *       ],
+         *       "description": "Cliente interessado no Vendedor IA, mas sensível a preço e um pouco impaciente.",
+         *       "failure_criteria": [
+         *         "event:ai_fallback_detected",
+         *         "turn_count > 8"
+         *       ],
+         *       "information_needed": [
+         *         {
+         *           "attribute": "pricing_model",
+         *           "entity": "Vendedor IA"
+         *         },
+         *         {
+         *           "attribute": "main_benefit",
+         *           "entity": "Vendedor IA"
+         *         }
+         *       ],
+         *       "initial_message": "Olá, esse Vendedor IA parece interessante. Como funciona?",
+         *       "objective": "Entender os benefícios principais do Vendedor IA, ter uma ideia de preço e decidir se vale a pena.",
+         *       "off_topic_questions": [
+         *         "Isso integra com meu sistema de CRM atual?",
+         *         "Vocês oferecem algum outro serviço de automação?"
+         *       ],
+         *       "persona_id": "cliente_dinamico_v2",
+         *       "potential_objections": [
+         *         {
+         *           "objection_text": "Entendi, mas qual o valor exato? Preciso ver se cabe no orçamento.",
+         *           "trigger_keyword": "preço"
+         *         },
+         *         {
+         *           "objection_text": "Ok, mas ainda preciso de um tempo para analisar internamente.",
+         *           "trigger_stage": "Closing"
+         *         }
+         *       ],
+         *       "success_criteria": []
+         *     }
          */
         PersonaRead: {
             /**
              * Persona Id
-             * @description Unique, human-readable snake_case identifier for the persona.
+             * @description Unique, human-readable snake_case identifier.
              */
             persona_id: string;
             /**
              * Description
-             * @description Concise description of the persona and their goal.
+             * @description Concise description of the persona.
              */
             description: string;
             /**
              * Initial Message
-             * @description The first message the persona sends.
+             * @description The first message this persona sends.
              */
             initial_message: string;
             /**
@@ -2598,64 +2724,88 @@ export interface components {
             objective: string;
             /**
              * Information Needed
-             * @description List of facts needed [{'entity': 'X', 'attribute': 'Y'},...]. Entity should match offerings or common topics.
+             * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
              */
-            information_needed: {
+            information_needed?: {
                 [key: string]: string;
             }[];
             /**
-             * Info Attribute To Question Template
-             * @description Mapping of UNIQUE attributes from information_needed to question templates {'attr': 'template {entity}?'}.
+             * Potential Objections
+             * @description List of potential objections the persona might raise based on triggers.
              */
-            info_attribute_to_question_template: {
-                [key: string]: string;
-            };
+            potential_objections?: components["schemas"]["PotentialObjection"][];
+            /**
+             * Off Topic Questions
+             * @description List of potential off-topic questions the persona might ask to interrupt.
+             */
+            off_topic_questions?: string[];
+            /**
+             * Behavior Hints
+             * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
+             */
+            behavior_hints?: string[];
             /**
              * Success Criteria
-             * @description List of criteria defining simulation success.
-             * @default [
-             *       "state:all_info_extracted"
-             *     ]
+             * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
              */
-            success_criteria: string[];
+            success_criteria?: string[];
             /**
              * Failure Criteria
              * @description List of criteria defining simulation failure.
              * @default [
              *       "event:ai_fallback_detected",
-             *       "turn_count > 8"
+             *       "turn_count > 10"
              *     ]
              */
             failure_criteria: string[];
             /**
              * Id
              * Format: uuid
-             * @description Unique identifier for the Persona record.
              */
             id: string;
             /**
              * Contact Id
              * Format: uuid
-             * @description The UUID of the associated Contact record.
              */
             contact_id: string;
-            /**
-             * Simulation Contact Identifier
-             * @description Contact identifier used in simulation (e.g., phone number).
-             */
+            /** Simulation Contact Identifier */
             simulation_contact_identifier: string;
             /**
              * Created At
              * Format: date-time
-             * @description Timestamp of creation.
              */
             created_at: string;
             /**
              * Updated At
              * Format: date-time
-             * @description Timestamp of last update.
              */
             updated_at: string;
+        };
+        /**
+         * PotentialObjection
+         * @description Defines a potential objection and its trigger.
+         * @example {
+         *       "objection_text": "Esse preço está um pouco acima do que eu esperava.",
+         *       "trigger_keyword": "preço",
+         *       "trigger_stage": "Presentation"
+         *     }
+         */
+        PotentialObjection: {
+            /**
+             * Trigger Keyword
+             * @description A keyword in the AI's response that might trigger this objection (lowercase).
+             */
+            trigger_keyword?: string | null;
+            /**
+             * Trigger Stage
+             * @description A sales stage where this objection is likely to occur (e.g., 'Presentation', 'Closing').
+             */
+            trigger_stage?: string | null;
+            /**
+             * Objection Text
+             * @description The text of the objection the persona would raise.
+             */
+            objection_text: string;
         };
         /**
          * ResearchJobStatusEnum
@@ -3965,6 +4115,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_bot_agent_api_v1_bot_agents__bot_agent_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BotAgentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BotAgentRead"];
+                };
             };
             /** @description Validation Error */
             422: {

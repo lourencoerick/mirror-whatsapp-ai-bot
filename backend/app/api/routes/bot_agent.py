@@ -12,6 +12,7 @@ from app.models.bot_agent import BotAgent
 from app.models.inbox import Inbox  # Needed for response model hint
 from app.api.schemas.bot_agent import (
     BotAgentRead,
+    BotAgentCreate,
     BotAgentUpdate,
     AgentInboxAssociationUpdate,
     # AgentInboxAssociationRead, # If needed later
@@ -64,10 +65,42 @@ async def list_bot_agents(
     account_id = auth_context.account.id
     logger.info(f"Listing Bot Agents for account {account_id}")
     # In MVP, we get/create the single one. In future, this might list multiple.
-    bot_agent = await bot_agent_repo.get_or_create_bot_agent_by_account_id(
+    bot_agent = await bot_agent_repo.get_bot_agent_by_account_id(
         db=db, account_id=account_id
     )
     return [bot_agent]  # Return as a list
+
+
+@router.post(
+    "/{bot_agent_id}",
+    response_model=BotAgentRead,
+    summary="Create Bot Agent",
+    description="Creates a Bot Agent with the passed configuration.",
+)
+async def create_bot_agent(
+    bot_agent_data: BotAgentCreate,
+    auth_context: AuthContext = Depends(get_auth_context),
+    db: AsyncSession = Depends(get_db),
+) -> BotAgent:
+    """Creates a Bot Agent"""
+    account_id = auth_context.account.id
+    logger.info(f"Creating Bot Agent for account {account_id}")
+
+    try:
+        bot_agent = await bot_agent_repo.create_bot_agent(
+            db=db, account_id=account_id, bot_agent_data=bot_agent_data
+        )
+        await db.commit()
+        await db.refresh(bot_agent)  # Refresh to get latest state after commit
+        logger.info(f"Bot Agent {bot_agent.id} created successfully.")
+        return bot_agent
+    except Exception as e:
+        await db.rollback()
+        logger.exception(f"Error updating Bot Agent for account {account_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update Bot Agent.",
+        ) from e
 
 
 @router.get(
