@@ -233,11 +233,11 @@ async def get_simulation_details(
 
     if not bot_agent:
         logger.warning(
-            f"Primary simulation environment IDs are not fully set up on account {account.id} (User: {user.id})."
+            f"No bot agent created yet for the account {account.id} (User: {user.id})."
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Ambiente de simulação principal não configurado ou incompleto. Crie seu agente, e depois tente novamente.",
+            detail="Ambiente de simulação principal não configurado ou incompleto. Crie seu agente, e tente novamente.",
         )
 
     return SimulationDetailsResponse(
