@@ -145,13 +145,9 @@ export default function EditInboxPage() {
             Carregando Configurações...
           </span>
         ) : inboxData ? (
-          <h1 className="text-2xl md:text-3xl tracking-tight">
-            Configurações: {inboxData.name}
-          </h1>
+          `Configurações: ${inboxData.name}`
         ) : (
-          <h1 className="text-2xl md:text-3xl tracking-tight">
-            Configurações da Caixa de Entrada
-          </h1>
+          `Configurações da Caixa de Entrada`
         )}
       </div>
     );

@@ -37,9 +37,7 @@ const ITEMS_PER_PAGE = 10;
 export default function ContactsPage() {
   const { setPageTitle } = useLayoutContext();
   useEffect(() => {
-    setPageTitle(
-      <h1 className="text-2xl md:text-3xl tracking-tight">Contatos</h1>
-    );
+    setPageTitle("Contatos");
   }, [setPageTitle]);
 
   // --- Component States ---

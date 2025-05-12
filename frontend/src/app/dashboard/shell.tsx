@@ -27,7 +27,7 @@ const DashboardHeader = () => {
         orientation="vertical"
         className="mx-2 data-[orientation=vertical]:h-4"
       />
-      <h1 className="text-2xl font-semibold truncate whitespace-nowrap">
+      <h1 className="text-2xl md:text-3xl tracking-tight font-semibold truncate whitespace-nowrap">
         {pageTitle}
       </h1>
     </header>

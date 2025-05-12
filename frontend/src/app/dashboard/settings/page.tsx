@@ -80,9 +80,7 @@ const DEFAULT_AGENT_USE_RAG = true;
 export default function SettingsPage(): JSX.Element {
   const { setPageTitle } = useLayoutContext();
   useEffect(() => {
-    setPageTitle(
-      <h1 className="text-2xl md:text-3xl tracking-tight">Configurações</h1>
-    );
+    setPageTitle("Configurações");
   }, [setPageTitle]);
 
   const fetcher = useAuthenticatedFetch();
