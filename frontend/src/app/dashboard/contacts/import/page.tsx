@@ -23,9 +23,7 @@ const ContactImportPage: React.FC = () => {
           <span className="font-semibold">Contatos</span>
         </Link>
         <span className="text-sm text-muted-foreground">/</span>
-        <span className="text-2xl md:text-3xl tracking-tight">
-          Importar Contatos
-        </span>
+        {"Importar Contatos"}
       </div>
     );
   }, [setPageTitle]);
