@@ -75,7 +75,7 @@ export default function DashboardPage() {
   const { setPageTitle } = useLayoutContext();
 
   useEffect(() => {
-    setPageTitle(<h1 className="text-2xl md:text-3xl tracking-tight">Home</h1>);
+    setPageTitle("Home");
   }, [setPageTitle]);
 
   // Textos traduzidos para pt-BR e títulos revisados para concisão

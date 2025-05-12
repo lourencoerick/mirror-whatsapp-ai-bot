@@ -125,9 +125,7 @@ export default function CreateInboxPage() {
         {isLoading ? (
           <span className="font-semibold text-md">Carregando...</span>
         ) : (
-          <h1 className="text-2xl md:text-3xl tracking-tight">
-            Cria Nova Caixa de Entrada
-          </h1>
+          "Cria Nova Caixa de Entrada"
         )}
       </div>
     );

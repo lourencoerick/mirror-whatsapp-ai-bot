@@ -59,11 +59,7 @@ const KnowledgeBasePage = () => {
   const { setPageTitle } = useLayoutContext();
 
   useEffect(() => {
-    setPageTitle(
-      <h1 className="text-2xl md:text-3xl tracking-tight">
-        Base de Conhecimento
-      </h1>
-    );
+    setPageTitle("Base de Conhecimento");
   }, [setPageTitle]);
 
   // --- State ---
@@ -188,12 +184,7 @@ const KnowledgeBasePage = () => {
   // --- Render Logic ---
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6 flex flex-col h-full">
-      {/* Page Header */}
       <div className="flex justify-between items-center">
-        {/* Title (pt-BR) */}
-        {/* <h1 className="text-3xl font-bold tracking-tight">
-          Base de Conhecimento
-        </h1> */}
         {/* Subtle loading indicator for background fetches/polling */}
         {isFetching && !isLoadingDocuments && (
           <Loader2

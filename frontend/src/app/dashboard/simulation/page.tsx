@@ -47,9 +47,7 @@ const AGENT_NOT_CREATED_ERROR_SUBSTRING = "Crie seu agente"; // Substring from b
 export default function SimulationPage() {
   const { setPageTitle } = useLayoutContext();
   useEffect(() => {
-    setPageTitle(
-      <h1 className="text-2xl md:text-3xl tracking-tight">Modo de Simulação</h1>
-    );
+    setPageTitle("Modo de Simulação");
   }, [setPageTitle]);
 
   const fetcher = useAuthenticatedFetch();

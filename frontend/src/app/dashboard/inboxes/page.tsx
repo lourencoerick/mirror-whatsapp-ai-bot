@@ -19,9 +19,7 @@ export default function InboxesPage() {
   const { setPageTitle } = useLayoutContext();
 
   useEffect(() => {
-    setPageTitle(
-      <h1 className="text-2xl md:text-3xl tracking-tight">Caixas de Entrada</h1>
-    );
+    setPageTitle("Caixas de Entrada");
   }, [setPageTitle]);
 
   return <InboxList />;
