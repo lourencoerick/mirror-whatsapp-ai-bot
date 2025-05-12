@@ -1,15 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // services/api/botAgent.ts
-import { FetchFunction } from '@/hooks/use-authenticated-fetch'; // Adjust path
-import { components } from '@/types/api'; // Import from the generated types file
+import { FetchFunction } from "@/hooks/use-authenticated-fetch"; // Adjust path
+import { components } from "@/types/api"; // Import from the generated types file
 
 // Define type aliases for better readability using the generated types
-type BotAgentRead = components['schemas']['BotAgentRead'];
-type BotAgentUpdate = components['schemas']['BotAgentUpdate'];
-type AgentInboxAssociationUpdate = components['schemas']['AgentInboxAssociationUpdate'];
-type InboxRead = components['schemas']['InboxRead']; // Assuming InboxRead is generated
+type BotAgentRead = components["schemas"]["BotAgentRead"];
+type BotAgentCreate = components["schemas"]["BotAgentCreate"];
+type BotAgentUpdate = components["schemas"]["BotAgentUpdate"];
+type AgentInboxAssociationUpdate =
+  components["schemas"]["AgentInboxAssociationUpdate"];
+type InboxRead = components["schemas"]["InboxRead"]; // Assuming InboxRead is generated
 
-const API_V1_BASE = '/api/v1';
+const API_V1_BASE = "/api/v1";
 
 /**
  * Fetches the Bot Agent for the current account.
@@ -19,28 +21,78 @@ const API_V1_BASE = '/api/v1';
  * @throws Error on network or API errors.
  */
 export const getMyBotAgent = async (
-    fetcher: FetchFunction
+  fetcher: FetchFunction
 ): Promise<BotAgentRead | null> => {
-    const endpoint = `${API_V1_BASE}/bot-agents/`;
-    const response = await fetcher(endpoint, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-    });
+  const endpoint = `${API_V1_BASE}/bot-agents/`;
+  const response = await fetcher(endpoint, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
 
-    if (!response.ok) {
-        let errorDetail = `API returned status ${response.status}`;
-        try { const errorData = await response.json(); errorDetail = errorData.detail || errorDetail; } catch (e) { /* Ignore */ }
-        throw new Error(`Failed to fetch bot agents: ${errorDetail}`);
+  if (!response.ok) {
+    let errorDetail = `API returned status ${response.status}`;
+    try {
+      const errorData = await response.json();
+      errorDetail = errorData.detail || errorDetail;
+    } catch (e) {
+      /* Ignore */
+    }
+    throw new Error(`Failed to fetch bot agents: ${errorDetail}`);
+  }
+
+  // The API returns a list, use the generated type for the list item
+  const data: BotAgentRead[] = await response.json();
+  if (data && data.length > 0) {
+    return data[0]; // Return the first agent
+  } else {
+    console.log("No Bot Agent found for this account.");
+    return null;
+  }
+};
+
+/**
+ * Creates a new Bot Agent for the current account.
+ * @param {FetchFunction} fetcher - The authenticated fetch function.
+ * @param {BotAgentCreate} agentData - The data for the new agent.
+ * @returns {Promise<BotAgentRead>} The created BotAgent data.
+ * @throws {Error} On network or API errors, including 409 Conflict if an agent already exists.
+ */
+export const createMyBotAgent = async (
+  fetcher: FetchFunction,
+  agentData: BotAgentCreate
+): Promise<BotAgentRead> => {
+  const endpoint = `${API_V1_BASE}/bot-agents/`;
+  const response = await fetcher(endpoint, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(agentData),
+  });
+
+  if (!response.ok) {
+    let errorDetail = `API returned status ${response.status}`;
+    try {
+      const errorData = await response.json();
+      errorDetail = errorData.detail || errorDetail;
+    } catch (e) {
+      /* Ignore if response is not JSON */
     }
 
-    // The API returns a list, use the generated type for the list item
-    const data: BotAgentRead[] = await response.json();
-    if (data && data.length > 0) {
-        return data[0]; // Return the first agent
-    } else {
-        console.log('No Bot Agent found for this account.');
-        return null;
+    if (response.status === 409) {
+      throw new Error(
+        `Failed to create bot agent: ${
+          errorDetail || "An agent already exists for this account."
+        }`
+      );
     }
+    throw new Error(`Failed to create bot agent: ${errorDetail}`);
+  }
+
+  // Expect 201 Created status, response body contains the created agent
+  const data: BotAgentRead = await response.json();
+  return data;
 };
 
 /**
@@ -52,29 +104,37 @@ export const getMyBotAgent = async (
  * @throws Error on network or API errors.
  */
 export const updateMyBotAgent = async (
-    fetcher: FetchFunction,
-    agentId: string, // UUID as string
-    agentData: BotAgentUpdate // Use the generated type
-): Promise<BotAgentRead> => { // Return type uses generated type
-    const endpoint = `${API_V1_BASE}/bot-agents/${agentId}`;
-    const response = await fetcher(endpoint, {
-        method: 'PUT',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(agentData),
-    });
+  fetcher: FetchFunction,
+  agentId: string, // UUID as string
+  agentData: BotAgentUpdate // Use the generated type
+): Promise<BotAgentRead> => {
+  // Return type uses generated type
+  const endpoint = `${API_V1_BASE}/bot-agents/${agentId}`;
+  const response = await fetcher(endpoint, {
+    method: "PUT",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(agentData),
+  });
 
-    if (!response.ok) {
-        let errorDetail = `API returned status ${response.status}`;
-        if (response.status === 404) errorDetail = 'Bot Agent not found';
-        else { try { const errorData = await response.json(); errorDetail = errorData.detail || errorDetail; } catch (e) { /* Ignore */ } }
-        throw new Error(`Failed to update bot agent ${agentId}: ${errorDetail}`);
+  if (!response.ok) {
+    let errorDetail = `API returned status ${response.status}`;
+    if (response.status === 404) errorDetail = "Bot Agent not found";
+    else {
+      try {
+        const errorData = await response.json();
+        errorDetail = errorData.detail || errorDetail;
+      } catch (e) {
+        /* Ignore */
+      }
     }
+    throw new Error(`Failed to update bot agent ${agentId}: ${errorDetail}`);
+  }
 
-    const data: BotAgentRead = await response.json(); // Use the generated type
-    return data;
+  const data: BotAgentRead = await response.json(); // Use the generated type
+  return data;
 };
 
 /**
@@ -86,31 +146,38 @@ export const updateMyBotAgent = async (
  * @throws Error on network or API errors.
  */
 export const setAgentInboxes = async (
-    fetcher: FetchFunction,
-    agentId: string,
-    inboxIds: string[] // Keep as string array for input
+  fetcher: FetchFunction,
+  agentId: string,
+  inboxIds: string[] // Keep as string array for input
 ): Promise<void> => {
-    const endpoint = `${API_V1_BASE}/bot-agents/${agentId}/inboxes`;
-    // Use the generated type for the payload structure
-    const payload: AgentInboxAssociationUpdate = { inbox_ids: inboxIds };
+  const endpoint = `${API_V1_BASE}/bot-agents/${agentId}/inboxes`;
+  // Use the generated type for the payload structure
+  const payload: AgentInboxAssociationUpdate = { inbox_ids: inboxIds };
 
-    const response = await fetcher(endpoint, {
-        method: 'PUT',
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-    });
+  const response = await fetcher(endpoint, {
+    method: "PUT",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 
-    if (response.status === 204) {
-        return; // Success
+  if (response.status === 204) {
+    return; // Success
+  }
+
+  let errorDetail = `API returned status ${response.status}`;
+  if (response.status === 404) errorDetail = "Bot Agent not found";
+  else {
+    try {
+      const errorData = await response.json();
+      errorDetail = errorData.detail || errorDetail;
+    } catch (e) {
+      /* Ignore */
     }
-
-    let errorDetail = `API returned status ${response.status}`;
-    if (response.status === 404) errorDetail = 'Bot Agent not found';
-    else { try { const errorData = await response.json(); errorDetail = errorData.detail || errorDetail; } catch (e) { /* Ignore */ } }
-    throw new Error(`Failed to set agent inboxes for ${agentId}: ${errorDetail}`);
+  }
+  throw new Error(`Failed to set agent inboxes for ${agentId}: ${errorDetail}`);
 };
 
 /**
@@ -121,22 +188,32 @@ export const setAgentInboxes = async (
  * @throws Error on network or API errors.
  */
 export const getAgentInboxes = async (
-    fetcher: FetchFunction,
-    agentId: string
-): Promise<InboxRead[]> => { // Use the generated InboxRead type
-     const endpoint = `${API_V1_BASE}/bot-agents/${agentId}/inboxes`;
-     const response = await fetcher(endpoint, {
-         method: 'GET',
-         headers: { Accept: 'application/json' },
-     });
+  fetcher: FetchFunction,
+  agentId: string
+): Promise<InboxRead[]> => {
+  // Use the generated InboxRead type
+  const endpoint = `${API_V1_BASE}/bot-agents/${agentId}/inboxes`;
+  const response = await fetcher(endpoint, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
 
-     if (!response.ok) {
-        let errorDetail = `API returned status ${response.status}`;
-        if (response.status === 404) errorDetail = 'Bot Agent not found';
-        else { try { const errorData = await response.json(); errorDetail = errorData.detail || errorDetail; } catch (e) { /* Ignore */ } }
-        throw new Error(`Failed to get agent inboxes for ${agentId}: ${errorDetail}`);
-     }
+  if (!response.ok) {
+    let errorDetail = `API returned status ${response.status}`;
+    if (response.status === 404) errorDetail = "Bot Agent not found";
+    else {
+      try {
+        const errorData = await response.json();
+        errorDetail = errorData.detail || errorDetail;
+      } catch (e) {
+        /* Ignore */
+      }
+    }
+    throw new Error(
+      `Failed to get agent inboxes for ${agentId}: ${errorDetail}`
+    );
+  }
 
-     const data: InboxRead[] = await response.json(); // Use the generated type
-     return data;
+  const data: InboxRead[] = await response.json(); // Use the generated type
+  return data;
 };
