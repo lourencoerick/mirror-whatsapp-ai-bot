@@ -586,11 +586,15 @@ export interface paths {
         };
         /**
          * List Bot Agents for Account
-         * @description Retrieves all Bot Agents associated with the authenticated user's active account (currently assumes only one).
+         * @description Retrieves Bot Agents associated with the authenticated user's active account. Currently, it's expected that an account has at most one Bot Agent.
          */
         get: operations["list_bot_agents_api_v1_bot_agents__get"];
         put?: never;
-        post?: never;
+        /**
+         * Create Bot Agent
+         * @description Creates a new Bot Agent for the authenticated user's account. An account can only have one Bot Agent.
+         */
+        post: operations["create_bot_agent_api_v1_bot_agents__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -614,11 +618,7 @@ export interface paths {
          * @description Updates the configuration of a specific Bot Agent.
          */
         put: operations["update_bot_agent_api_v1_bot_agents__bot_agent_id__put"];
-        /**
-         * Create Bot Agent
-         * @description Creates a Bot Agent with the passed configuration.
-         */
-        post: operations["create_bot_agent_api_v1_bot_agents__bot_agent_id__post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4047,6 +4047,46 @@ export interface operations {
             };
         };
     };
+    create_bot_agent_api_v1_bot_agents__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BotAgentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BotAgentRead"];
+                };
+            };
+            /** @description Bot Agent already exists for this account */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_bot_agent_details_api_v1_bot_agents__bot_agent_id__get: {
         parameters: {
             query?: never;
@@ -4115,39 +4155,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_bot_agent_api_v1_bot_agents__bot_agent_id__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BotAgentCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BotAgentRead"];
-                };
             };
             /** @description Validation Error */
             422: {
