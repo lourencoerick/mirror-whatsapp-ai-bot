@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/dashboard/settings/page.tsx
 "use client";
 
@@ -69,6 +70,8 @@ const MIN_TOTAL_CREATION_DISPLAY_TIME =
   AGENT_CREATION_STEPS.length * AGENT_CREATION_STEP_DURATION;
 
 const DEFAULT_AGENT_NAME = "Assistente Principal";
+const DEFAULT_AGENT_FIRST_MESSAGE = null;
+const DEFAULT_AGENT_USE_RAG = true;
 
 /**
  * Renders the main settings page, allowing users to manage their
@@ -108,6 +111,7 @@ export default function SettingsPage(): JSX.Element {
     isLoading: isLoadingAgentInitial,
     isError: isErrorAgent,
     error: errorAgent,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isFetching: isFetchingAgent,
   } = useQuery<BotAgentData | null>({
     queryKey: AGENT_QUERY_KEY,
@@ -131,92 +135,83 @@ export default function SettingsPage(): JSX.Element {
     : null;
 
   const [creationStepMessage, setCreationStepMessage] = useState<string>("");
-  const [creationCurrentStepState, setCreationCurrentStepState] =
-    useState<number>(0); // Renamed to avoid conflict
+  const [creationCurrentStep, setCreationCurrentStep] = useState<number>(0);
   const creationIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const apiCallTimestampRef = useRef<number>(0);
+  const apiCallStartTimestampRef = useRef<number>(0);
 
-  const agentCreationMutation = useMutation({
+  const agentCreationMutation = useMutation<
+    BotAgentData,
+    Error,
+    BotAgentCreateData
+  >({
     mutationFn: async (data: BotAgentCreateData) => {
       if (!fetcher) throw new Error("Fetcher not available");
 
-      apiCallTimestampRef.current = Date.now();
-      const agentPromise = createMyBotAgent(fetcher, data);
+      apiCallStartTimestampRef.current = Date.now();
+      let newAgent: BotAgentData | undefined;
+      let visualStepsCompleted = false;
 
-      // This ref will hold the latest step reached by the interval
-      // to be accessible by the delay logic after Promise.all
-      const currentVisualStepRef = { current: 0 };
-
-      const stepsDisplayPromise = new Promise<void>((resolveStepsDisplay) => {
-        // Local currentStep for this promise's interval
-        let stepForInterval = 0;
-        setCreationStepMessage(AGENT_CREATION_STEPS[stepForInterval]);
-        setCreationCurrentStepState(stepForInterval); // Update state for progress bar
-        currentVisualStepRef.current = stepForInterval;
+      // Start visual steps interval
+      const stepsDisplayPromise = new Promise<void>((resolveSteps) => {
+        let currentStepForInterval = 0;
+        // Initial message set in onMutate, here we just update state for progress bar
+        setCreationCurrentStep(currentStepForInterval);
 
         if (creationIntervalRef.current)
           clearInterval(creationIntervalRef.current);
         creationIntervalRef.current = setInterval(() => {
-          stepForInterval++;
-          setCreationCurrentStepState(stepForInterval); // Update state for progress bar
-          currentVisualStepRef.current = stepForInterval;
-
-          if (stepForInterval < AGENT_CREATION_STEPS.length) {
-            setCreationStepMessage(AGENT_CREATION_STEPS[stepForInterval]);
+          currentStepForInterval++;
+          setCreationCurrentStep(currentStepForInterval);
+          if (currentStepForInterval < AGENT_CREATION_STEPS.length) {
+            setCreationStepMessage(
+              AGENT_CREATION_STEPS[currentStepForInterval]
+            );
           } else {
             if (creationIntervalRef.current)
               clearInterval(creationIntervalRef.current);
-            creationIntervalRef.current = null; // Explicitly nullify
-            resolveStepsDisplay();
+            creationIntervalRef.current = null;
+            visualStepsCompleted = true;
+            resolveSteps();
           }
         }, AGENT_CREATION_STEP_DURATION);
       });
 
-      // Wait for both the API call to finish AND the visual steps to complete (or API to fail)
-      let newAgent: BotAgentData | undefined;
-      let apiError: Error | undefined;
-
       try {
-        // Wait for both promises. If agentPromise rejects, Promise.all will reject.
-        [newAgent] = await Promise.all([agentPromise, stepsDisplayPromise]);
-      } catch (err) {
-        apiError = err as Error;
-        // If API failed, we still want to ensure the steps interval is cleared
+        // Perform API call
+        newAgent = await createMyBotAgent(fetcher, data);
+
+        // Wait for visual steps to complete if API finished first
+        if (!visualStepsCompleted) {
+          await stepsDisplayPromise;
+        }
+
+        // Ensure minimum display time after API success and visual steps completion
+        const elapsedTime = Date.now() - apiCallStartTimestampRef.current;
+        const remainingTime = MIN_TOTAL_CREATION_DISPLAY_TIME - elapsedTime;
+        if (remainingTime > 0) {
+          await new Promise((resolveDelay) =>
+            setTimeout(resolveDelay, remainingTime)
+          );
+        }
+
+        if (!newAgent) {
+          // Should not happen if createMyBotAgent resolves correctly
+          throw new Error("Agent creation succeeded but returned no data.");
+        }
+        return newAgent;
+      } catch (error) {
+        // If API call fails, clear interval and re-throw to be caught by onError
         if (creationIntervalRef.current) {
           clearInterval(creationIntervalRef.current);
           creationIntervalRef.current = null;
         }
-        // We don't wait for stepsDisplayPromise to complete if API fails.
-        // The error will be thrown and handled by onError.
-        throw apiError;
+        // Ensure visualStepsCompleted is true so we don't try to await stepsDisplayPromise again if error occurs
+        visualStepsCompleted = true;
+        throw error; // Re-throw the original error
       }
-
-      // If API finished very fast AND all steps were displayed, ensure we wait for the minimum display time
-      const elapsedTime = Date.now() - apiCallTimestampRef.current;
-      const remainingTime = MIN_TOTAL_CREATION_DISPLAY_TIME - elapsedTime;
-
-      // Only add delay if API was successful, all steps were shown, and there's remaining time
-      if (
-        newAgent &&
-        currentVisualStepRef.current >= AGENT_CREATION_STEPS.length - 1 &&
-        remainingTime > 0
-      ) {
-        await new Promise((resolveDelay) =>
-          setTimeout(resolveDelay, remainingTime)
-        );
-      }
-
-      if (!newAgent && !apiError) {
-        // This case should ideally not be reached if agentPromise resolves with data or rejects
-        throw new Error(
-          "Agent creation did not return data and did not error."
-        );
-      }
-
-      return newAgent as BotAgentData; // newAgent could be undefined if API failed and was caught by outer try/catch
     },
     onMutate: () => {
-      setCreationCurrentStepState(0); // Use the renamed state setter
+      setCreationCurrentStep(0);
       setCreationStepMessage(AGENT_CREATION_STEPS[0]);
     },
     onSuccess: (newAgentData) => {
@@ -229,24 +224,18 @@ export default function SettingsPage(): JSX.Element {
       queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEY });
       setActiveTab("agent");
       setNewAgentName(DEFAULT_AGENT_NAME);
-      setCreationStepMessage("");
-      if (creationIntervalRef.current) {
-        clearInterval(creationIntervalRef.current);
-        creationIntervalRef.current = null;
-      }
+      setCreationStepMessage(""); // Clear message
+      // Interval should be cleared by mutationFn or onSettled
     },
     onError: (error: Error) => {
       toast.error("Falha ao Criar Vendedor IA", {
         description: error.message || "Ocorreu um erro desconhecido.",
       });
-      setCreationStepMessage("");
-      if (creationIntervalRef.current) {
-        clearInterval(creationIntervalRef.current);
-        creationIntervalRef.current = null;
-      }
+      setCreationStepMessage(""); // Clear message
+      // Interval should be cleared by mutationFn or onSettled
     },
     onSettled: () => {
-      setCreationCurrentStepState(0); // Use the renamed state setter
+      setCreationCurrentStep(0); // Reset step for progress bar
       if (creationIntervalRef.current) {
         clearInterval(creationIntervalRef.current);
         creationIntervalRef.current = null;
@@ -355,10 +344,16 @@ export default function SettingsPage(): JSX.Element {
         pollingIntervalRef.current = null;
       }
     }
+    // Cleanup for intervals on component unmount
     return () => {
-      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-      if (creationIntervalRef.current)
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      if (creationIntervalRef.current) {
         clearInterval(creationIntervalRef.current);
+        creationIntervalRef.current = null;
+      }
     };
   }, [pollingJobId, pollJobStatus]);
 
@@ -398,7 +393,11 @@ export default function SettingsPage(): JSX.Element {
       });
       return;
     }
-    const agentPayload: BotAgentCreateData = { name: trimmedName };
+    const agentPayload: BotAgentCreateData = {
+      name: trimmedName,
+      first_message: DEFAULT_AGENT_FIRST_MESSAGE,
+      use_rag: DEFAULT_AGENT_USE_RAG,
+    };
     agentCreationMutation.mutate(agentPayload);
   };
 
@@ -425,7 +424,12 @@ export default function SettingsPage(): JSX.Element {
     pollingStatus !== "complete";
 
   const renderAgentCreationArea = (): JSX.Element | null => {
-    if (agentData || isLoadingAgentInitial || agentCreationMutation.isPending) {
+    if (
+      agentData ||
+      isLoadingAgentInitial ||
+      agentCreationMutation.isPending ||
+      agentCreationMutation.isError
+    ) {
       return null;
     }
     const agentQueryError = errorAgent as Error | null;
@@ -508,47 +512,76 @@ export default function SettingsPage(): JSX.Element {
   };
 
   const renderAgentCreationProgress = () => {
-    if (!agentCreationMutation.isPending) return null;
-    // Use creationCurrentStepState for the progress bar percentage
-    const progressPercentage = Math.min(
-      ((creationCurrentStepState + 1) / AGENT_CREATION_STEPS.length) * 100,
-      100
-    );
-    return (
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Loader2 className="mr-2 h-6 w-6 animate-spin text-primary" />
-            Criando seu Vendedor IA...
-          </CardTitle>
-          <CardDescription>
-            Por favor, aguarde enquanto preparamos tudo para você. Isso pode
-            levar alguns instantes.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="w-full bg-muted rounded-full h-2.5">
-            <div
-              className="bg-primary h-2.5 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
-          </div>
-          <p className="text-center text-sm text-muted-foreground h-10 flex items-center justify-center">
-            {creationStepMessage || AGENT_CREATION_STEPS[0]}
-          </p>
-          {agentCreationMutation.isError && (
-            <Alert variant="destructive">
+    // Show progress if pending
+    if (agentCreationMutation.isPending) {
+      const progressPercentage = Math.min(
+        ((creationCurrentStep + 1) / AGENT_CREATION_STEPS.length) * 100,
+        100
+      );
+      return (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Loader2 className="mr-2 h-6 w-6 animate-spin text-primary" />
+              Criando seu Vendedor IA...
+            </CardTitle>
+            <CardDescription>
+              Por favor, aguarde enquanto preparamos tudo para você. Isso pode
+              levar alguns instantes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="w-full bg-muted rounded-full h-2.5">
+              <div
+                className="bg-primary h-2.5 rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progressPercentage}%` }}
+              ></div>
+            </div>
+            <p className="text-center text-sm text-muted-foreground h-10 flex items-center justify-center">
+              {creationStepMessage || AGENT_CREATION_STEPS[0]}
+            </p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Show error state if mutation failed
+    if (agentCreationMutation.isError) {
+      return (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center text-destructive">
+              <XCircle className="mr-2 h-6 w-6" />
+              Falha na Criação do Vendedor IA
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert variant="destructive" className="mt-0">
               <XCircle className="h-4 w-4" />
-              <AlertTitle>Falha na Criação</AlertTitle>
+              <AlertTitle>Erro Detalhado</AlertTitle>
               <AlertDescription>
-                {(agentCreationMutation.error as Error)?.message ||
+                {agentCreationMutation.error?.message ||
                   "Ocorreu um erro inesperado."}
               </AlertDescription>
             </Alert>
-          )}
-        </CardContent>
-      </Card>
-    );
+            <Button
+              onClick={() => {
+                agentCreationMutation.reset(); // Reset mutation state
+                // Optionally reset other relevant states like newAgentName if needed
+                setNewAgentName(DEFAULT_AGENT_NAME);
+                setCreationStepMessage(""); // Clear any lingering message
+                setCreationCurrentStep(0);
+              }}
+              className="w-full"
+              variant="outline"
+            >
+              Tentar Novamente
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+    return null; // Don't render if not pending and not error
   };
 
   const isAgentTabDisabled = isLoadingAgentInitial && !agentData;
@@ -634,11 +667,19 @@ export default function SettingsPage(): JSX.Element {
             </div>
 
             <div className={`${activeTab !== "agent" ? "hidden" : ""}`}>
-              {renderAgentCreationProgress()}
+              {/* Render progress OR error from mutation */}
+              {(agentCreationMutation.isPending ||
+                agentCreationMutation.isError) &&
+                renderAgentCreationProgress()}
+
+              {/* Render creation area only if no agent, not loading, not pending, and no error from mutation */}
               {!agentData &&
-                !agentCreationMutation.isPending &&
                 !isLoadingAgentInitial &&
+                !agentCreationMutation.isPending &&
+                !agentCreationMutation.isError &&
                 renderAgentCreationArea()}
+
+              {/* Render form if agent exists and not pending mutation */}
               {agentData && !agentCreationMutation.isPending && (
                 <BotAgentForm
                   initialAgentData={agentData}
@@ -646,9 +687,12 @@ export default function SettingsPage(): JSX.Element {
                   onAgentUpdate={handleAgentUpdate}
                 />
               )}
+
+              {/* Initial loading indicator for agent tab */}
               {isLoadingAgentInitial &&
                 !agentData &&
                 !agentCreationMutation.isPending &&
+                !agentCreationMutation.isError && // also don't show if mutation error is displayed
                 activeTab === "agent" && (
                   <Card className="mt-6">
                     <CardHeader>

@@ -228,7 +228,7 @@ export default function SimulationPage() {
   }
 
   return (
-    <div className="flex items-center justify-center h-[calc(100vh-150px)]">
+    <div className="flex items-center justify-center h-screen">
       <p className="text-muted-foreground">
         Não foi possível carregar o ambiente de simulação. Verifique sua conexão
         ou tente novamente mais tarde.
