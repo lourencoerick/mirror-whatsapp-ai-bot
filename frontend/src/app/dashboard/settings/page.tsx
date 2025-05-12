@@ -2,14 +2,22 @@
 "use client";
 
 import { useLayoutContext } from "@/contexts/layout-context";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, Loader2, Terminal, XCircle } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  BotMessageSquare,
+  CheckCircle,
+  Edit3,
+  Loader2,
+  Sparkles,
+  Terminal,
+  XCircle,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 // Internal Hooks & API Functions
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
-import { getMyBotAgent } from "@/lib/api/bot-agent";
+import { createMyBotAgent, getMyBotAgent } from "@/lib/api/bot-agent";
 import { getCompanyProfile } from "@/lib/api/company-profile";
 import { getResearchJobStatus } from "@/lib/api/research";
 import { components } from "@/types/api";
@@ -17,9 +25,19 @@ import { components } from "@/types/api";
 // UI Components
 import LoadingLogo from "@/components/loading-logo";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Child Page Components (already refactored)
+// Child Page Components
 import { CompanyResearchTrigger } from "@/components/company-research-trigger";
 import { JSX } from "react/jsx-runtime";
 import { BotAgentForm } from "./_components/bot-agent-form";
@@ -28,6 +46,7 @@ import { CompanyProfileForm } from "./_components/company-profile-form";
 // Type definitions using generated schemas
 type CompanyProfileData = components["schemas"]["CompanyProfileSchema-Output"];
 type BotAgentData = components["schemas"]["BotAgentRead"];
+type BotAgentCreateData = components["schemas"]["BotAgentCreate"];
 type JobStatusEnum = components["schemas"]["ResearchJobStatusEnum"];
 type ResearchJobStatusResponse =
   components["schemas"]["ResearchJobStatusResponse"];
@@ -35,15 +54,25 @@ type ResearchJobStatusResponse =
 // --- Constants ---
 const PROFILE_QUERY_KEY = ["companyProfile"];
 const AGENT_QUERY_KEY = ["botAgent"];
-const POLLING_INTERVAL_MS = 5000; // Check job status every 5 seconds
-const MAX_NOT_FOUND_RETRIES = 4; // Max retries if job is not found immediately
+const POLLING_INTERVAL_MS = 5000;
+const MAX_NOT_FOUND_RETRIES = 4;
+
+const AGENT_CREATION_STEPS = [
+  "Preparando para criar seu vendedor...",
+  "Definindo a personalidade do vendedor...",
+  "Ensinando técnicas de vendas avançadas...",
+  "Conectando à sua caixa de entrada principal...",
+  "Quase pronto! Finalizando configurações...",
+];
+const AGENT_CREATION_STEP_DURATION = 2000;
+const MIN_TOTAL_CREATION_DISPLAY_TIME =
+  AGENT_CREATION_STEPS.length * AGENT_CREATION_STEP_DURATION;
+
+const DEFAULT_AGENT_NAME = "Assistente Principal";
 
 /**
  * Renders the main settings page, allowing users to manage their
  * Company Profile and AI Seller (Bot Agent) configurations.
- * Includes functionality to trigger AI-powered profile research and
- * displays the status of ongoing research jobs.
- * Uses React Query for data fetching and caching.
  */
 export default function SettingsPage(): JSX.Element {
   const { setPageTitle } = useLayoutContext();
@@ -56,165 +85,244 @@ export default function SettingsPage(): JSX.Element {
   const fetcher = useAuthenticatedFetch();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<string>("profile");
+  const [newAgentName, setNewAgentName] = useState<string>(DEFAULT_AGENT_NAME);
 
-  // --- Data Fetching with React Query ---
   const {
     data: profileData,
     isLoading: isLoadingProfile,
     isError: isErrorProfile,
     error: errorProfile,
-    isFetching: isFetchingProfile, // Indicates background refetching
+    isFetching: isFetchingProfile,
   } = useQuery<CompanyProfileData | null>({
     queryKey: PROFILE_QUERY_KEY,
-    // Fetch profile only if fetcher is available
     queryFn: () =>
       fetcher ? getCompanyProfile(fetcher) : Promise.resolve(null),
-    enabled: !!fetcher, // Only run query if fetcher is ready
-    staleTime: 5 * 60 * 1000, // Data is considered fresh for 5 minutes
-    refetchOnWindowFocus: false, // Avoid excessive refetches on window focus
-    retry: 1, // Retry once on initial fetch error
-  });
-
-  const {
-    data: agentData,
-    isLoading: isLoadingAgent,
-    isError: isErrorAgent,
-    error: errorAgent,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    isFetching: isFetchingAgent, // Indicates background refetching
-  } = useQuery<BotAgentData | null>({
-    queryKey: AGENT_QUERY_KEY,
-    // Fetch agent data only if fetcher is available
-    queryFn: () => (fetcher ? getMyBotAgent(fetcher) : Promise.resolve(null)),
-    enabled: !!fetcher, // Only run query if fetcher is ready
+    enabled: !!fetcher,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 1,
   });
 
-  // Combined loading state for the initial page load
-  const isLoadingInitial = isLoadingProfile || isLoadingAgent;
-  // Combined error state for initial loading failures
+  const {
+    data: agentData,
+    isLoading: isLoadingAgentInitial,
+    isError: isErrorAgent,
+    error: errorAgent,
+    isFetching: isFetchingAgent,
+  } = useQuery<BotAgentData | null>({
+    queryKey: AGENT_QUERY_KEY,
+    queryFn: () => (fetcher ? getMyBotAgent(fetcher) : Promise.resolve(null)),
+    enabled: !!fetcher,
+    staleTime: 1 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error: any) => {
+      if (error?.message?.includes("No Bot Agent found")) {
+        return false;
+      }
+      return failureCount < 1;
+    },
+  });
+
+  const isLoadingInitial = isLoadingProfile || isLoadingAgentInitial;
   const initialLoadingError = isErrorProfile
     ? (errorProfile as Error)?.message
     : isErrorAgent
     ? (errorAgent as Error)?.message
     : null;
 
-  // --- Research Job Polling State & Logic ---
+  const [creationStepMessage, setCreationStepMessage] = useState<string>("");
+  const [creationCurrentStepState, setCreationCurrentStepState] =
+    useState<number>(0); // Renamed to avoid conflict
+  const creationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const apiCallTimestampRef = useRef<number>(0);
+
+  const agentCreationMutation = useMutation({
+    mutationFn: async (data: BotAgentCreateData) => {
+      if (!fetcher) throw new Error("Fetcher not available");
+
+      apiCallTimestampRef.current = Date.now();
+      const agentPromise = createMyBotAgent(fetcher, data);
+
+      // This ref will hold the latest step reached by the interval
+      // to be accessible by the delay logic after Promise.all
+      const currentVisualStepRef = { current: 0 };
+
+      const stepsDisplayPromise = new Promise<void>((resolveStepsDisplay) => {
+        // Local currentStep for this promise's interval
+        let stepForInterval = 0;
+        setCreationStepMessage(AGENT_CREATION_STEPS[stepForInterval]);
+        setCreationCurrentStepState(stepForInterval); // Update state for progress bar
+        currentVisualStepRef.current = stepForInterval;
+
+        if (creationIntervalRef.current)
+          clearInterval(creationIntervalRef.current);
+        creationIntervalRef.current = setInterval(() => {
+          stepForInterval++;
+          setCreationCurrentStepState(stepForInterval); // Update state for progress bar
+          currentVisualStepRef.current = stepForInterval;
+
+          if (stepForInterval < AGENT_CREATION_STEPS.length) {
+            setCreationStepMessage(AGENT_CREATION_STEPS[stepForInterval]);
+          } else {
+            if (creationIntervalRef.current)
+              clearInterval(creationIntervalRef.current);
+            creationIntervalRef.current = null; // Explicitly nullify
+            resolveStepsDisplay();
+          }
+        }, AGENT_CREATION_STEP_DURATION);
+      });
+
+      // Wait for both the API call to finish AND the visual steps to complete (or API to fail)
+      let newAgent: BotAgentData | undefined;
+      let apiError: Error | undefined;
+
+      try {
+        // Wait for both promises. If agentPromise rejects, Promise.all will reject.
+        [newAgent] = await Promise.all([agentPromise, stepsDisplayPromise]);
+      } catch (err) {
+        apiError = err as Error;
+        // If API failed, we still want to ensure the steps interval is cleared
+        if (creationIntervalRef.current) {
+          clearInterval(creationIntervalRef.current);
+          creationIntervalRef.current = null;
+        }
+        // We don't wait for stepsDisplayPromise to complete if API fails.
+        // The error will be thrown and handled by onError.
+        throw apiError;
+      }
+
+      // If API finished very fast AND all steps were displayed, ensure we wait for the minimum display time
+      const elapsedTime = Date.now() - apiCallTimestampRef.current;
+      const remainingTime = MIN_TOTAL_CREATION_DISPLAY_TIME - elapsedTime;
+
+      // Only add delay if API was successful, all steps were shown, and there's remaining time
+      if (
+        newAgent &&
+        currentVisualStepRef.current >= AGENT_CREATION_STEPS.length - 1 &&
+        remainingTime > 0
+      ) {
+        await new Promise((resolveDelay) =>
+          setTimeout(resolveDelay, remainingTime)
+        );
+      }
+
+      if (!newAgent && !apiError) {
+        // This case should ideally not be reached if agentPromise resolves with data or rejects
+        throw new Error(
+          "Agent creation did not return data and did not error."
+        );
+      }
+
+      return newAgent as BotAgentData; // newAgent could be undefined if API failed and was caught by outer try/catch
+    },
+    onMutate: () => {
+      setCreationCurrentStepState(0); // Use the renamed state setter
+      setCreationStepMessage(AGENT_CREATION_STEPS[0]);
+    },
+    onSuccess: (newAgentData) => {
+      toast.success("Vendedor IA Criado!", {
+        description: `${
+          newAgentData.name || DEFAULT_AGENT_NAME
+        } está pronto para começar.`,
+      });
+      queryClient.setQueryData(AGENT_QUERY_KEY, newAgentData);
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEY });
+      setActiveTab("agent");
+      setNewAgentName(DEFAULT_AGENT_NAME);
+      setCreationStepMessage("");
+      if (creationIntervalRef.current) {
+        clearInterval(creationIntervalRef.current);
+        creationIntervalRef.current = null;
+      }
+    },
+    onError: (error: Error) => {
+      toast.error("Falha ao Criar Vendedor IA", {
+        description: error.message || "Ocorreu um erro desconhecido.",
+      });
+      setCreationStepMessage("");
+      if (creationIntervalRef.current) {
+        clearInterval(creationIntervalRef.current);
+        creationIntervalRef.current = null;
+      }
+    },
+    onSettled: () => {
+      setCreationCurrentStepState(0); // Use the renamed state setter
+      if (creationIntervalRef.current) {
+        clearInterval(creationIntervalRef.current);
+        creationIntervalRef.current = null;
+      }
+    },
+  });
+
   const [pollingJobId, setPollingJobId] = useState<string | null>(null);
   const [pollingStatus, setPollingStatus] = useState<JobStatusEnum | null>(
     null
   );
   const [pollingError, setPollingError] = useState<string | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  // Ref to count consecutive "not found" errors during polling
   const notFoundRetryCountRef = useRef<number>(0);
-
   const [isProfileDirty, setIsProfileDirty] = useState<boolean>(false);
 
-  /**
-   * Polls the backend for the status of the currently active research job.
-   * Updates the polling status and handles completion or failure scenarios.
-   * Stops polling when the job finishes or encounters a persistent error.
-   */
   const pollJobStatus = useCallback(async () => {
-    // Stop polling if fetcher or job ID is missing
     if (!fetcher || !pollingJobId) {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
       return;
     }
-
-    console.debug(`Polling status for job: ${pollingJobId}`); // Keep debug logs in English
-    setPollingError(null); // Clear previous polling error
-
+    setPollingError(null);
     try {
       const statusResponse: ResearchJobStatusResponse =
         await getResearchJobStatus(fetcher, pollingJobId);
       setPollingStatus(statusResponse.status);
-      setPollingError(null); // Clear error on successful API call
-      notFoundRetryCountRef.current = 0; // Reset counter since the job was found
-
+      notFoundRetryCountRef.current = 0;
       const isJobFinished = ["complete", "failed", "not_found"].includes(
         statusResponse.status
       );
-
       if (isJobFinished) {
-        console.log(
-          `Job ${pollingJobId} finished with status: ${statusResponse.status}. Stopping polling.`
-        );
-        // Stop the interval timer
-        if (pollingIntervalRef.current) {
+        if (pollingIntervalRef.current)
           clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        const finishedJobId = pollingJobId; // Store ID before resetting state
-        setPollingJobId(null); // Clear the active job ID
-        setPollingStatus(null); // Reset status display
-
-        // Handle different finished states
+        const finishedJobId = pollingJobId;
+        setPollingJobId(null);
+        setPollingStatus(null);
         if (statusResponse.status === "complete") {
           toast.success("Pesquisa Concluída!", {
             description: "O perfil da empresa foi atualizado.",
           });
-          // Invalidate the profile query to trigger a refetch via React Query
           await queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
-          toast.info("Dados do perfil recarregados.");
         } else if (statusResponse.status === "failed") {
           const detail =
             statusResponse.detail || "Erro desconhecido durante a pesquisa.";
           toast.error("Pesquisa Falhou", { description: detail });
-          setPollingError(detail); // Display failure reason in the status alert
+          setPollingError(detail);
         } else {
-          // Status is 'not_found' after potentially retrying
           toast.error("Tarefa de Pesquisa Não Encontrada", {
             description: `A tarefa ${finishedJobId} não pôde mais ser encontrada.`,
           });
           setPollingError(`Tarefa ${finishedJobId} não encontrada.`);
         }
       }
-      // If status is 'queued' or 'in_progress', polling continues automatically
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-      console.error(`Failed to poll job status for ${pollingJobId}:`, error);
       const errorMessage = error.message || "Erro desconhecido";
       const isNotFoundError =
         errorMessage.includes("Job not found") || errorMessage.includes("404");
-
-      // Handle transient "Not Found" errors (job might not be ready immediately)
       if (
         isNotFoundError &&
         notFoundRetryCountRef.current < MAX_NOT_FOUND_RETRIES
       ) {
         notFoundRetryCountRef.current += 1;
-        console.warn(
-          `Job ${pollingJobId} not found yet (attempt ${notFoundRetryCountRef.current}/${MAX_NOT_FOUND_RETRIES}). Retrying...`
-        );
-        // Keep visual status as 'queued' or 'in_progress' to avoid flickering
         setPollingStatus((prev) =>
           prev === "in_progress" ? "in_progress" : "queued"
         );
-        setPollingError(null); // Don't show error yet
+        setPollingError(null);
       } else {
-        // Handle persistent "Not Found" or other API/network errors
-        console.error(
-          `Stopping polling for job ${pollingJobId} due to persistent error: ${errorMessage}`
-        );
         toast.error("Falha na Verificação de Status", {
           description: errorMessage,
         });
-        if (pollingIntervalRef.current) {
+        if (pollingIntervalRef.current)
           clearInterval(pollingIntervalRef.current);
-          pollingIntervalRef.current = null;
-        }
-        setPollingJobId(null); // Stop polling
-        setPollingStatus("failed"); // Visually indicate failure
+        setPollingJobId(null);
+        setPollingStatus("failed");
         setPollingError(`Falha ao obter status da tarefa: ${errorMessage}`);
-        notFoundRetryCountRef.current = 0; // Reset counter
+        notFoundRetryCountRef.current = 0;
       }
     }
   }, [fetcher, pollingJobId, queryClient]);
@@ -222,119 +330,84 @@ export default function SettingsPage(): JSX.Element {
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (isProfileDirty) {
-        const confirmationMessage =
-          "Você tem alterações não salvas. Tem certeza que deseja sair?";
         event.preventDefault();
-        event.returnValue = confirmationMessage;
-        return confirmationMessage;
+        event.returnValue =
+          "Você tem alterações não salvas. Tem certeza que deseja sair?";
+        return event.returnValue;
       }
     };
-
     window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isProfileDirty]);
 
-  // Effect to manage the polling interval lifecycle
   useEffect(() => {
     if (pollingJobId) {
-      notFoundRetryCountRef.current = 0; // Reset retry counter when a new job starts
-      // Clear any existing interval before starting a new one
+      notFoundRetryCountRef.current = 0;
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-      // Poll immediately when a job ID is set
       pollJobStatus();
-      // Start the interval timer
       pollingIntervalRef.current = setInterval(
         pollJobStatus,
         POLLING_INTERVAL_MS
       );
-      console.log(`Polling started for job: ${pollingJobId}`);
     } else {
-      // Clear interval if pollingJobId becomes null
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
-        console.log("Polling stopped.");
       }
     }
-    // Cleanup function to clear interval on component unmount or before effect re-runs
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-        console.log("Polling interval cleared on cleanup.");
-      }
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+      if (creationIntervalRef.current)
+        clearInterval(creationIntervalRef.current);
     };
   }, [pollingJobId, pollJobStatus]);
 
-  // --- Callbacks for Child Components ---
-
-  /**
-   * Callback triggered by CompanyResearchTrigger when a research job is started.
-   * Initializes the polling state.
-   * @param {string | null} jobId - The ID of the started job, or null if starting failed.
-   */
   const handleResearchStarted = useCallback((jobId: string | null) => {
     if (jobId) {
-      console.log(
-        `Research started with Job ID: ${jobId}. Initiating polling.`
-      );
       setPollingJobId(jobId);
-      setPollingStatus("queued"); // Set initial visual status
+      setPollingStatus("queued");
       setPollingError(null);
       setIsProfileDirty(false);
-      notFoundRetryCountRef.current = 0; // Reset retries for the new job
+      notFoundRetryCountRef.current = 0;
     } else {
-      console.error("Research task failed to start.");
-      // Ensure polling state is cleared if starting fails
       setPollingJobId(null);
       setPollingStatus(null);
-      setPollingError("Falha ao iniciar a tarefa de pesquisa."); // Provide feedback
+      setPollingError("Falha ao iniciar a tarefa de pesquisa.");
     }
-  }, []); // No dependencies needed as it only sets state
+  }, []);
 
-  /**
-   * Callback triggered by CompanyProfileForm after a successful manual save.
-   * Updates the React Query cache with the new profile data.
-   * @param {CompanyProfileData} updatedProfile - The updated company profile data.
-   */
   const handleProfileUpdate = useCallback(
     (updatedProfile: CompanyProfileData) => {
-      // Manually update the query cache to reflect the changes immediately
       queryClient.setQueryData(PROFILE_QUERY_KEY, updatedProfile);
-      console.log("Profile cache updated after manual save.");
     },
-    [queryClient] // Depends on queryClient
+    [queryClient]
   );
 
-  /**
-   * Callback triggered by BotAgentForm after a successful manual save.
-   * Updates the React Query cache with the new agent data.
-   * @param {BotAgentData} updatedAgent - The updated bot agent data.
-   */
   const handleAgentUpdate = useCallback(
     (updatedAgent: BotAgentData) => {
-      // Manually update the query cache
       queryClient.setQueryData(AGENT_QUERY_KEY, updatedAgent);
-      console.log("Agent cache updated after manual save.");
-      // Optionally invalidate related queries if needed, e.g., agent's associated inboxes
-      // queryClient.invalidateQueries({ queryKey: ['agentInboxes', updatedAgent.id] });
     },
-    [queryClient] // Depends on queryClient
+    [queryClient]
   );
 
-  // --- Render Helper Functions ---
+  const handleCreateAgent = () => {
+    const trimmedName = newAgentName.trim();
+    if (!trimmedName) {
+      toast.error("Nome Inválido", {
+        description: "Por favor, forneça um nome para o seu vendedor IA.",
+      });
+      return;
+    }
+    const agentPayload: BotAgentCreateData = { name: trimmedName };
+    agentCreationMutation.mutate(agentPayload);
+  };
 
-  /** Renders a loading indicator for the initial page load. */
   const renderLoading = () => (
     <div className="flex justify-center items-center p-10 min-h-[300px]">
       <LoadingLogo />
     </div>
   );
 
-  /** Renders an error message if initial data fetching fails. */
   const renderError = () => (
     <Alert variant="destructive" className="mt-4">
       <Terminal className="h-4 w-4" />
@@ -345,18 +418,143 @@ export default function SettingsPage(): JSX.Element {
     </Alert>
   );
 
-  // Determine if research is actively running (to disable forms/triggers)
   const isResearching =
     pollingJobId !== null &&
     pollingStatus !== "failed" &&
     pollingStatus !== "not_found" &&
-    pollingStatus !== "complete"; // Consider 'complete' as not actively researching
+    pollingStatus !== "complete";
 
-  // --- Main Component Render ---
-  // --- Main Component Render ---
+  const renderAgentCreationArea = (): JSX.Element | null => {
+    if (agentData || isLoadingAgentInitial || agentCreationMutation.isPending) {
+      return null;
+    }
+    const agentQueryError = errorAgent as Error | null;
+    if (
+      agentQueryError &&
+      !agentQueryError.message?.includes("No Bot Agent found") &&
+      !agentCreationMutation.isPending
+    ) {
+      return (
+        <Alert variant="destructive" className="mt-4">
+          <XCircle className="h-4 w-4" />
+          <AlertTitle>Erro ao Verificar Vendedor IA</AlertTitle>
+          <AlertDescription>
+            {agentQueryError.message ||
+              "Não foi possível verificar a existência de um vendedor IA."}
+            <Button
+              variant="link"
+              onClick={() =>
+                queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEY })
+              }
+              className="p-0 h-auto ml-2"
+            >
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <BotMessageSquare className="mr-2 h-6 w-6 text-primary" />
+            Configure seu Vendedor IA
+          </CardTitle>
+          <CardDescription>
+            Dê um nome ao seu vendedor IA e inicie a configuração para
+            automatizar suas vendas!
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <Label htmlFor="new-agent-name" className="mb-1.5 block">
+              <Edit3 className="inline-block mr-2 h-4 w-4" />
+              Nome do Vendedor IA
+            </Label>
+            <Input
+              id="new-agent-name"
+              type="text"
+              value={newAgentName}
+              onChange={(e) => setNewAgentName(e.target.value)}
+              placeholder="Ex: Assistente de Vendas Pro"
+              disabled={agentCreationMutation.isPending}
+              maxLength={255}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Este será o nome exibido para o seu assistente.
+            </p>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Ao clicar no botão abaixo, seu assistente virtual será preparado com
+            as melhores técnicas de vendas e conectado aos seus canais.
+          </p>
+          <Button
+            onClick={handleCreateAgent}
+            disabled={
+              agentCreationMutation.isPending ||
+              !fetcher ||
+              !newAgentName.trim()
+            }
+            size="lg"
+            className="w-full md:w-auto"
+          >
+            <Sparkles className="mr-2 h-5 w-5" />
+            Criar Meu Vendedor IA
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderAgentCreationProgress = () => {
+    if (!agentCreationMutation.isPending) return null;
+    // Use creationCurrentStepState for the progress bar percentage
+    const progressPercentage = Math.min(
+      ((creationCurrentStepState + 1) / AGENT_CREATION_STEPS.length) * 100,
+      100
+    );
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Loader2 className="mr-2 h-6 w-6 animate-spin text-primary" />
+            Criando seu Vendedor IA...
+          </CardTitle>
+          <CardDescription>
+            Por favor, aguarde enquanto preparamos tudo para você. Isso pode
+            levar alguns instantes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="w-full bg-muted rounded-full h-2.5">
+            <div
+              className="bg-primary h-2.5 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progressPercentage}%` }}
+            ></div>
+          </div>
+          <p className="text-center text-sm text-muted-foreground h-10 flex items-center justify-center">
+            {creationStepMessage || AGENT_CREATION_STEPS[0]}
+          </p>
+          {agentCreationMutation.isError && (
+            <Alert variant="destructive">
+              <XCircle className="h-4 w-4" />
+              <AlertTitle>Falha na Criação</AlertTitle>
+              <AlertDescription>
+                {(agentCreationMutation.error as Error)?.message ||
+                  "Ocorreu um erro inesperado."}
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const isAgentTabDisabled = isLoadingAgentInitial && !agentData;
+
   return (
     <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
-      {/* Research Status Area - Displayed only when pollingJobId is active */}
       {pollingJobId && (
         <Alert
           variant={
@@ -371,9 +569,9 @@ export default function SettingsPage(): JSX.Element {
           ) : pollingStatus === "complete" ? (
             <CheckCircle className="h-4 w-4 text-green-600" />
           ) : pollingStatus === "failed" || pollingError ? (
-            <XCircle className="h-4 w-4" /> // Show XCircle for pollingError too
+            <XCircle className="h-4 w-4" />
           ) : (
-            <Terminal className="h-4 w-4" /> // Default icon
+            <Terminal className="h-4 w-4" />
           )}
           <AlertTitle>
             {pollingStatus === "in_progress"
@@ -382,13 +580,13 @@ export default function SettingsPage(): JSX.Element {
               ? "Pesquisa na Fila..."
               : pollingStatus === "complete"
               ? "Pesquisa Concluída"
-              : pollingStatus === "failed" || pollingError // Show failed title also for pollingError
+              : pollingStatus === "failed" || pollingError
               ? "Falha na Pesquisa"
               : "Verificando Status da Pesquisa..."}
           </AlertTitle>
           <AlertDescription>
             {pollingError
-              ? pollingError // Display specific error if polling failed
+              ? pollingError
               : pollingStatus === "complete"
               ? `Tarefa ${pollingJobId} concluída com sucesso.`
               : `Rastreando tarefa: ${pollingJobId}. O status atualiza automaticamente.`}
@@ -396,32 +594,27 @@ export default function SettingsPage(): JSX.Element {
         </Alert>
       )}
 
-      {/* Main Content Area (Loading, Error, or Tabs) */}
-      {isLoadingInitial ? (
-        renderLoading() // Show initial loading state
-      ) : initialLoadingError ? (
-        renderError() // Show initial error state
+      {isLoadingInitial && !initialLoadingError ? (
+        renderLoading()
+      ) : initialLoadingError &&
+        !initialLoadingError.includes("No Bot Agent found") ? (
+        renderError()
       ) : (
-        // Wrapper for Tabs navigation and conditional content display
         <div className="w-full mt-0">
-          {/* Tabs component now only handles the navigation triggers */}
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="w-full" // No margin needed here if wrapper has it
+            className="w-full"
           >
             <TabsList className="grid w-full grid-cols-2 md:max-w-[450px]">
               <TabsTrigger value="profile">Perfil da Empresa</TabsTrigger>
-              <TabsTrigger value="agent">Vendedor IA</TabsTrigger>
+              <TabsTrigger value="agent" disabled={isAgentTabDisabled}>
+                Vendedor IA
+              </TabsTrigger>
             </TabsList>
-            {/* No TabsContent here */}
           </Tabs>
 
-          {/* Container for the actual tab contents, rendered outside Tabs component */}
           <div className="mt-6">
-            {" "}
-            {/* Add margin top for spacing below TabsList */}
-            {/* Content for the 'profile' tab */}
             <div
               className={`space-y-6 ${activeTab !== "profile" ? "hidden" : ""}`}
             >
@@ -439,15 +632,33 @@ export default function SettingsPage(): JSX.Element {
                 onDirtyChange={setIsProfileDirty}
               />
             </div>
-            {/* Content for the 'agent' tab */}
+
             <div className={`${activeTab !== "agent" ? "hidden" : ""}`}>
-              <BotAgentForm
-                initialAgentData={agentData ?? null}
-                fetcher={fetcher!}
-                onAgentUpdate={handleAgentUpdate}
-                // Optionally disable agent form while profile is researching/refetching
-                // disabled={isResearching || isFetchingProfile || isFetchingAgent}
-              />
+              {renderAgentCreationProgress()}
+              {!agentData &&
+                !agentCreationMutation.isPending &&
+                !isLoadingAgentInitial &&
+                renderAgentCreationArea()}
+              {agentData && !agentCreationMutation.isPending && (
+                <BotAgentForm
+                  initialAgentData={agentData}
+                  fetcher={fetcher!}
+                  onAgentUpdate={handleAgentUpdate}
+                />
+              )}
+              {isLoadingAgentInitial &&
+                !agentData &&
+                !agentCreationMutation.isPending &&
+                activeTab === "agent" && (
+                  <Card className="mt-6">
+                    <CardHeader>
+                      <CardTitle>Carregando Vendedor IA...</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <LoadingLogo />
+                    </CardContent>
+                  </Card>
+                )}
             </div>
           </div>
         </div>
