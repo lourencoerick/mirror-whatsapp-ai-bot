@@ -509,7 +509,7 @@ async def handle_ai_reply_request(
                             agent_config_db_model,
                             {},
                             conversation,
-                            "Conversation reset sequence initiated.",
+                            "Conversa resetada! Mande uma nova mensagem, e inicie uma conversa sem histórico.",
                         )
                         await db.commit()  # Commit this specific action
                         logger.info(
