@@ -55,51 +55,93 @@ async def get_agent_or_404(
     "/",
     response_model=List[BotAgentRead],
     summary="List Bot Agents for Account",
-    description="Retrieves all Bot Agents associated with the authenticated user's active account (currently assumes only one).",
+    description="Retrieves Bot Agents associated with the authenticated user's active account. Currently, it's expected that an account has at most one Bot Agent.",
 )
 async def list_bot_agents(
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
-) -> List[BotAgent]:  # Return type is List[Model] for FastAPI response_model conversion
-    """Lists Bot Agents for the current account."""
+) -> List[BotAgent]:
+    """Lists Bot Agents for the current account.
+
+    In the current system design, an account typically has one primary Bot Agent.
+    This endpoint retrieves that agent, returned within a list.
+
+    Args:
+        auth_context: The authentication context containing user and account info.
+        db: The SQLAlchemy async session.
+
+    Returns:
+        A list containing the BotAgent if found, or an empty list if not.
+    """
     account_id = auth_context.account.id
     logger.info(f"Listing Bot Agents for account {account_id}")
-    # In MVP, we get/create the single one. In future, this might list multiple.
     bot_agent = await bot_agent_repo.get_bot_agent_by_account_id(
         db=db, account_id=account_id
     )
-    return [bot_agent]  # Return as a list
+    return [bot_agent] if bot_agent else []
 
 
 @router.post(
-    "/{bot_agent_id}",
+    "/",
     response_model=BotAgentRead,
+    status_code=status.HTTP_201_CREATED,
     summary="Create Bot Agent",
-    description="Creates a Bot Agent with the passed configuration.",
+    description="Creates a new Bot Agent for the authenticated user's account. An account can only have one Bot Agent.",
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "description": "Bot Agent already exists for this account"
+        },
+    },
 )
 async def create_bot_agent(
     bot_agent_data: BotAgentCreate,
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
 ) -> BotAgent:
-    """Creates a Bot Agent"""
+    """Creates a new Bot Agent for the account.
+
+    If a Bot Agent already exists for the account, a 409 Conflict error is returned.
+    The new agent is automatically linked to the account's simulation inbox.
+
+    Args:
+        bot_agent_data: Data for creating the new Bot Agent.
+        auth_context: The authentication context.
+        db: The SQLAlchemy async session.
+
+    Returns:
+        The created BotAgent.
+
+    Raises:
+        HTTPException: 409 if agent already exists, 500 on other creation failures.
+    """
     account_id = auth_context.account.id
-    logger.info(f"Creating Bot Agent for account {account_id}")
+    logger.info(
+        f"Attempting to create Bot Agent for account {account_id} with data: {bot_agent_data.model_dump()}"
+    )
 
     try:
         bot_agent = await bot_agent_repo.create_bot_agent(
             db=db, account_id=account_id, bot_agent_data=bot_agent_data
         )
         await db.commit()
-        await db.refresh(bot_agent)  # Refresh to get latest state after commit
-        logger.info(f"Bot Agent {bot_agent.id} created successfully.")
+        await db.refresh(bot_agent)
+        logger.info(
+            f"Bot Agent {bot_agent.id} created successfully for account {account_id}."
+        )
         return bot_agent
+    except ValueError as ve:
+        await db.rollback()
+        logger.warning(f"Conflict creating Bot Agent for account {account_id}: {ve}")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(ve),
+        ) from ve
     except Exception as e:
         await db.rollback()
-        logger.exception(f"Error updating Bot Agent for account {account_id}: {e}")
+        logger.exception(f"Error creating Bot Agent for account {account_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update Bot Agent.",
+            detail="Failed to create Bot Agent due to an internal error.",
         ) from e
 
 
@@ -115,7 +157,21 @@ async def get_bot_agent_details(
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
 ) -> BotAgent:
-    """Gets details of a specific Bot Agent."""
+    """Gets details of a specific Bot Agent.
+
+    Ensures the requested Bot Agent belongs to the authenticated user's account.
+
+    Args:
+        bot_agent_id: The UUID of the Bot Agent to retrieve.
+        auth_context: The authentication context.
+        db: The SQLAlchemy async session.
+
+    Returns:
+        The BotAgent if found and owned by the account.
+
+    Raises:
+        HTTPException: 404 if not found or not owned.
+    """
     account_id = auth_context.account.id
     logger.info(
         f"Getting details for Bot Agent {bot_agent_id} for account {account_id}"
@@ -144,7 +200,20 @@ async def update_bot_agent(
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
 ) -> BotAgent:
-    """Updates a specific Bot Agent's settings."""
+    """Updates a specific Bot Agent's settings.
+
+    Args:
+        bot_agent_id: The UUID of the Bot Agent to update.
+        agent_update: The data containing updates for the Bot Agent.
+        auth_context: The authentication context.
+        db: The SQLAlchemy async session.
+
+    Returns:
+        The updated BotAgent.
+
+    Raises:
+        HTTPException: 404 if not found, 500 on update failure.
+    """
     account_id = auth_context.account.id
     logger.info(f"Updating Bot Agent {bot_agent_id} for account {account_id}")
 
@@ -182,7 +251,16 @@ async def get_agent_associated_inboxes(
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
 ) -> List[Inbox]:  # Return list of Inbox models
-    """Gets Inboxes associated with a Bot Agent."""
+    """Gets Inboxes associated with a Bot Agent.
+
+    Args:
+        bot_agent_id: The UUID of the Bot Agent.
+        auth_context: The authentication context.
+        db: The SQLAlchemy async session.
+
+    Returns:
+        A list of Inbox models associated with the agent.
+    """
     account_id = auth_context.account.id
     logger.info(f"Getting Inboxes for Bot Agent {bot_agent_id} (Account: {account_id})")
 
@@ -213,7 +291,25 @@ async def set_agent_associated_inboxes(
     auth_context: AuthContext = Depends(get_auth_context),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Sets the Inboxes associated with a Bot Agent."""
+    """Sets the Inboxes associated with a Bot Agent.
+
+    This operation replaces all current inbox associations for the agent with the
+    provided list. It also handles updating conversation statuses in inboxes
+    that are being disassociated from the agent.
+
+    Args:
+        bot_agent_id: The UUID of the Bot Agent.
+        association_data: Data containing the list of Inbox IDs to associate.
+        auth_context: The authentication context.
+        db: The SQLAlchemy async session.
+
+    Returns:
+        A 204 No Content response on success.
+
+    Raises:
+        HTTPException: 404 if agent not found, 400 if inbox IDs are problematic,
+                       500 on other failures.
+    """
     account_id = auth_context.account.id
     inbox_ids = association_data.inbox_ids
     logger.info(

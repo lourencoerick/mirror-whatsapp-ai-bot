@@ -124,43 +124,92 @@ async def create_bot_agent(
     db: AsyncSession, account_id: UUID, bot_agent_data: BotAgentCreate
 ) -> BotAgent:
     """
-    Retrieves the BotAgent for an account, creating a default one if it doesn't exist.
+    Creates a new BotAgent for the specified account.
+    Links the new agent to the account's simulation inbox by default.
 
     Args:
         db: The SQLAlchemy async session.
         account_id: The UUID of the account.
-        bot_agent_data: The pydantic schema containing the bot agent data.
+        bot_agent_data: The Pydantic schema containing the bot agent data.
 
     Returns:
-        The existing or newly created BotAgent object.
+        The newly created BotAgent object.
+
+    Raises:
+        ValueError: If a BotAgent already exists for this account or if
+                    the simulation inbox is not properly configured/found.
     """
-    agent = await get_bot_agent_by_account_id(db, account_id)
-    if agent:
-        logger.info(f"There is already a BotAgent found for account {account_id}.")
-        return agent
+    existing_agent = await get_bot_agent_by_account_id(db, account_id)
+    if existing_agent:
+        logger.warning(
+            f"Attempted to create BotAgent for account {account_id}, but one already exists (ID: {existing_agent.id})."
+        )
+        raise ValueError("A Bot Agent already exists for this account.")
 
+    logger.info(
+        f"Creating new BotAgent for account {account_id} with data: {bot_agent_data.model_dump()}"
+    )
     try:
-        bot_agent = BotAgent(account_id=account_id, **bot_agent_data)
-        db.add(bot_agent)
-        await db.flush()
+        # Use model_dump to convert Pydantic model to dict, exclude_unset=True to only use provided fields or defaults
+        new_agent = BotAgent(
+            account_id=account_id, **bot_agent_data.model_dump(exclude_unset=True)
+        )
+        db.add(new_agent)
+        await db.flush()  # Flush to get the ID for BotAgentInbox and other relationships
 
+        # Link to simulation inbox
         account = await db.get(Account, account_id)
-        inbox = await db.get(Inbox, account.simulation_inbox_id)
-        logger.info(
-            f"Linking the bot agent ({bot_agent.id}) to the simulation inbox: {inbox.id}"
-        )
-        simulation_bot_agent_inbox = BotAgentInbox(
-            account_id=account_id, bot_agent_id=bot_agent.id, inbox_id=inbox.id
-        )
-        db.add(simulation_bot_agent_inbox)
+        if not account:
+            # This should ideally not happen if account_id is validated by auth
+            logger.error(f"Account {account_id} not found during BotAgent creation.")
+            raise ValueError(f"Account {account_id} not found.")
+        if not account.simulation_inbox_id:
+            logger.warning(
+                f"Account {account_id} does not have a simulation_inbox_id. Skipping simulation inbox link."
+            )
+            # Depending on requirements, you might raise an error or allow creation without this link.
+            # For now, we'll log a warning and proceed.
+        else:
+            simulation_inbox = await db.get(Inbox, account.simulation_inbox_id)
+            if not simulation_inbox:
+                logger.error(
+                    f"Simulation Inbox {account.simulation_inbox_id} not found for account {account_id}."
+                )
+                # This could be a configuration issue.
+                raise ValueError(
+                    f"Simulation inbox {account.simulation_inbox_id} configured for account but does not exist."
+                )
 
-        await db.refresh(bot_agent)
-        logger.info(f"Created default BotAgent {bot_agent.id} for account {account_id}")
-        return bot_agent
+            logger.info(
+                f"Linking the new bot agent ({new_agent.id}) to the simulation inbox: {simulation_inbox.id}"
+            )
+            simulation_bot_agent_inbox = BotAgentInbox(
+                account_id=account_id,
+                bot_agent_id=new_agent.id,
+                inbox_id=simulation_inbox.id,
+            )
+            db.add(simulation_bot_agent_inbox)
+            await db.flush()  # Ensure the link is persisted before refresh
+
+        await db.refresh(
+            new_agent
+        )  # Refresh to get all fields, including relationships if eager loaded
+        logger.info(
+            f"Successfully created BotAgent {new_agent.id} for account {account_id}"
+        )
+        return new_agent
+    except IntegrityError as e:
+        # This might catch unique constraint violations if any are defined at DB level
+        # beyond the explicit check above (e.g. if the check was removed).
+        logger.exception(
+            f"Database integrity error while creating BotAgent for account {account_id}: {e}"
+        )
+        raise ValueError("Failed to create Bot Agent due to a data conflict.") from e
     except Exception as e:
         logger.exception(
-            f"Failed to create default BotAgent for account {account_id}: {e}"
+            f"Unexpected error creating BotAgent for account {account_id}: {e}"
         )
+        # Re-raise as a generic Exception or a custom application exception
         raise
 
 
