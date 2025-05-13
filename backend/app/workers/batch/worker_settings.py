@@ -202,7 +202,7 @@ async def on_startup(ctx: Dict[str, Any]) -> None:
         logger.info("Initializing LLM clients for Batch tasks...")
         try:
             # General LLM (used by Researcher, potentially Ingester)
-            general_model = os.getenv("ARQ_GENERAL_LLM_MODEL", "gpt-4o")
+            general_model = os.getenv("ARQ_GENERAL_LLM_MODEL", "gpt-4.1-mini")
             llm_general = AzureChatOpenAI(
                 model=general_model,
                 temperature=0.0,
