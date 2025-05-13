@@ -25,7 +25,6 @@ from ..prompt_utils import WHATSAPP_MARKDOWN_INSTRUCTIONS
 from app.api.schemas.company_profile import CompanyProfileSchema, OfferingInfo
 
 # Importar função auxiliar de formatação de histórico
-# (Idealmente de um módulo utils)
 try:
     from .input_processor import _format_recent_chat_history
 except ImportError:  # Fallback se a estrutura mudar
