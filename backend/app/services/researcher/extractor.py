@@ -62,7 +62,7 @@ except ImportError:
 
 # --- Constants ---
 MAX_TEXT_CHARS_FOR_PROMPT = 140000
-DEFAULT_EXTRACTION_MODEL = "gpt-4o"
+DEFAULT_EXTRACTION_MODEL = "gpt-4.1-mini"
 
 # --- Helper Functions ---
 
