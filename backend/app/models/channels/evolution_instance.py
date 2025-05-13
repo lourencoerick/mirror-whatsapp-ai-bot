@@ -65,3 +65,13 @@ class EvolutionInstance(BaseModel):
     account = relationship(
         "Account", back_populates="evolution_instances", foreign_keys=[account_id]
     )
+
+    inbox = relationship(
+        "Inbox",
+        back_populates="evolution_instance",
+        primaryjoin="EvolutionInstance.id == Inbox.evolution_instance_id",
+        uselist=False,
+    )
+
+    def __repr__(self):
+        return f"<EvolutionInstance(id={self.id}, instance_name='{self.instance_name}', status='{self.status.value}')>"
