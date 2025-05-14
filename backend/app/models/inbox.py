@@ -34,7 +34,13 @@ class Inbox(BaseModel):
     )
     name = Column(String(255), nullable=False)
     channel_type = Column(
-        SAEnum(ChannelTypeEnum, name="channel_type_enum", create_type=True),
+        SAEnum(
+            ChannelTypeEnum,
+            name="channel_type_enum",
+            native_enum=True,
+            values_callable=lambda enum_class: [item.value for item in enum_class],
+            create_type=True,
+        ),
         nullable=False,
     )
 

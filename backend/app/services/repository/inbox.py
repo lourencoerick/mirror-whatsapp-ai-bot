@@ -122,7 +122,7 @@ async def create_inbox(
         new_inbox_model = Inbox(
             account_id=account_id,
             name=inbox_data.name,
-            channel_type=inbox_data.channel_type,
+            channel_type=inbox_data.channel_type.value,
             channel_id=channel_id_value,
             evolution_instance_id=evolution_instance_id,
             whatsapp_cloud_config_id=whatsapp_cloud_config_id,
@@ -134,6 +134,7 @@ async def create_inbox(
             is_simulation=is_simulation_channel,
         )
         db.add(new_inbox_model)
+        await db.flush()
 
         # Associate the creating user as a member of the inbox
         inbox_member = InboxMember(user_id=user_id, inbox_id=new_inbox_model.id)
@@ -144,18 +145,26 @@ async def create_inbox(
         await db.refresh(new_inbox_model)
         await db.refresh(inbox_member)
 
-        # Eagerly load relationships needed for InboxRead schema population by FastAPI
-        # This ensures that if the endpoint returns this SQLAlchemy model,
-        # FastAPI can correctly serialize it into InboxRead including nested objects.
+        relationships_to_load = []
         if new_inbox_model.evolution_instance_id:
-            await db.refresh(new_inbox_model, ["evolution_instance"])
-        elif new_inbox_model.whatsapp_cloud_config_id:
-            await db.refresh(new_inbox_model, ["whatsapp_cloud_config"])
+            relationships_to_load.append("evolution_instance")
+        if new_inbox_model.whatsapp_cloud_config_id:
+            relationships_to_load.append("whatsapp_cloud_config")
 
-        logger.info(
-            f"Inbox '{new_inbox_model.name}' (ID: {new_inbox_model.id}) and InboxMember "
-            f"(User ID: {user_id}) added to session. DB commit pending."
-        )
+        if relationships_to_load:
+            logger.debug(
+                f"Refreshing new_inbox_model (ID: {new_inbox_model.id}) with relationships: {relationships_to_load}"
+            )
+            await db.refresh(new_inbox_model, relationships_to_load)
+            # Verificar se os relacionamentos foram carregados
+            if "evolution_instance" in relationships_to_load:
+                logger.debug(
+                    f"Post-refresh, new_inbox_model.evolution_instance: {new_inbox_model.evolution_instance}"
+                )
+            if "whatsapp_cloud_config" in relationships_to_load:
+                logger.debug(
+                    f"Post-refresh, new_inbox_model.whatsapp_cloud_config: {new_inbox_model.whatsapp_cloud_config}"
+                )
         return new_inbox_model
 
     except IntegrityError as e:
@@ -176,24 +185,43 @@ async def create_inbox(
 
 async def find_inbox_by_id_and_account(
     db: AsyncSession, *, inbox_id: UUID, account_id: UUID
-) -> Optional[Inbox]:
-    """Find a specific inbox by its ID and account.
+) -> Inbox | None:
+    """
+    Finds a single inbox by its ID and account ID, with related channel configs.
 
     Args:
-        db (AsyncSession): Asynchronous database session.
-        inbox_id (UUID): The ID of the inbox to find.
-        account_id (UUID): The ID of the account that must own the inbox.
+        db (AsyncSession): The database session.
+        inbox_id (UUID): The ID of the inbox.
+        account_id (UUID): The ID of the account.
 
     Returns:
-        Optional[Inbox]: The Inbox object if found and authorized, otherwise None.
+        Optional[Inbox]: The Inbox object if found, else None.
     """
-    logger.debug(f"[InboxRepo] Finding inbox by ID={inbox_id} for Account={account_id}")
-    result = await db.execute(
-        select(Inbox).filter(Inbox.id == inbox_id, Inbox.account_id == account_id)
+    logger.debug(
+        f"[InboxRepo] Finding inbox by ID={inbox_id} for Account={account_id} with eager loading"
+    )  # Log atualizado
+    stmt = (
+        select(Inbox)
+        .where(Inbox.id == inbox_id, Inbox.account_id == account_id)
+        .options(
+            selectinload(Inbox.evolution_instance),
+            selectinload(
+                Inbox.whatsapp_cloud_config
+            ),  # Eager load whatsapp_cloud_config
+        )
     )
+    result = await db.execute(stmt)
     inbox = result.scalar_one_or_none()
 
-    if not inbox:
+    if inbox:
+        logger.debug(f"Inbox found: {inbox.id}, Type: {inbox.channel_type}")
+        if inbox.evolution_instance:
+            logger.debug(f"Loaded evolution_instance: {inbox.evolution_instance.id}")
+        if inbox.whatsapp_cloud_config:
+            logger.debug(
+                f"Loaded whatsapp_cloud_config: {inbox.whatsapp_cloud_config.id}"
+            )
+    else:
         logger.warning(
             f"[InboxRepo] Inbox ID={inbox_id} not found or not authorized for Account={account_id}"
         )
