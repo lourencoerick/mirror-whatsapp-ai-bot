@@ -92,3 +92,23 @@ async def get_whatsapp_cloud_config_by_id(
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_config_by_phone_number_id(
+    db: AsyncSession, phone_number_id: str
+) -> WhatsAppCloudConfig | None:
+    """
+    Retrieves a WhatsAppCloudConfig by its phone_number_id.
+
+    Args:
+        db (AsyncSession): The asynchronous database session.
+        phone_number_id (str): The Phone Number ID to search for.
+
+    Returns:
+        Optional[WhatsAppCloudConfig]: The WhatsAppCloudConfig object if found, else None.
+    """
+    stmt = select(WhatsAppCloudConfig).where(
+        WhatsAppCloudConfig.phone_number_id == phone_number_id
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
