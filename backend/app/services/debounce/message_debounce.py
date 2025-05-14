@@ -18,7 +18,7 @@ import redis.asyncio as aioredis  # Para type hinting
 
 # from app.config import settings # Não precisamos de settings aqui diretamente
 
-DEFAULT_DEBOUNCE_DELAY_SECONDS = 5.0  # 5 segundos parece um bom default
+DEFAULT_DEBOUNCE_DELAY_SECONDS = 8.0  # 8 segundos parece um bom default
 REDIS_KEY_PREFIX = "debounce:convo"
 # TTL para a chave Redis um pouco maior que o delay para limpeza, em segundos
 # Ajustado para ser mais generoso, caso o processamento do callback atrase um pouco.
