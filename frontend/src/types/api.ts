@@ -1240,6 +1240,12 @@ export interface components {
             use_rag: boolean | null;
         };
         /**
+         * ChannelTypeEnum
+         * @description Enum for the types of communication channels supported by an Inbox.
+         * @enum {string}
+         */
+        ChannelTypeEnum: "whatsapp_evolution" | "whatsapp_cloud" | "simulation";
+        /**
          * CompanyProfileSchema
          * @description Pydantic schema defining the configuration and knowledge base for the AI seller,
          *     aligned with the CompanyProfile SQLAlchemy model.
@@ -1908,6 +1914,19 @@ export interface components {
          */
         DocumentStatus: "pending" | "processing" | "completed" | "failed";
         /**
+         * EvolutionChannelDetailsInput
+         * @description Schema representing the channel-specific details needed when creating an Inbox
+         *     of type 'whatsapp_evolution_api'. Contains OUR platform ID.
+         */
+        EvolutionChannelDetailsInput: {
+            /**
+             * Platform Instance Id
+             * Format: uuid
+             * @description The platform's unique ID for the configured Evolution instance.
+             */
+            platform_instance_id: string;
+        };
+        /**
          * EvolutionInstanceQRCodeResponse
          * @description Schema for the response of the GET .../qrcode endpoint.
          *     Contains status and QR code data fetched from the shared Evolution server.
@@ -2092,108 +2111,115 @@ export interface components {
         ImportJobStatus: "PENDING" | "PROCESSING" | "COMPLETE" | "FAILED";
         /**
          * InboxCreate
+         * @description Schema for creating a new Inbox.
+         *     Includes common inbox fields and specific configurations for the chosen channel type.
          * @example {
          *       "channel_details": {
-         *         "phone_number": "+15551234567",
-         *         "provider": "cloud"
+         *         "ui_hint": "Use blue theme"
          *       },
-         *       "channel_type": "whatsapp",
+         *       "channel_type": "whatsapp_cloud",
          *       "enable_auto_assignment": true,
+         *       "initial_conversation_status": "OPEN",
          *       "name": "Sales WhatsApp"
          *     }
          */
         InboxCreate: {
             /**
              * Id
-             * @description Unique identifier for the inbox (UUID)
+             * @description Unique identifier for the inbox (UUID).
              */
             id?: string | null;
             /**
              * Name
-             * @description Name of the inbox
+             * @description Name of the inbox.
              */
             name: string;
-            /**
-             * Channel Type
-             * @description Type of the channel (e.g., 'whatsapp')
-             */
-            channel_type: string;
+            /** @description Type of the communication channel. */
+            channel_type: components["schemas"]["ChannelTypeEnum"];
             /**
              * Channel Details
-             * @description Channel specific configuration details (JSON)
+             * @description Legacy or UI-specific channel configuration details (JSON).
              */
             channel_details?: {
                 [key: string]: unknown;
             } | null;
-            /** @description New default status for new conversations (OPEN or PENDING) */
+            /** @description Default status for new conversations (e.g., OPEN, PENDING, BOT). */
             initial_conversation_status?: components["schemas"]["ConversationStatusEnum"] | null;
             /**
              * Enable Auto Assignment
-             * @description Enable automatic assignment for this inbox
+             * @description Enable automatic assignment of conversations for this inbox.
              * @default true
              */
             enable_auto_assignment: boolean | null;
+            /** @description Configuration for linking an existing Evolution API instance. */
+            evolution_instance_to_link?: components["schemas"]["EvolutionChannelDetailsInput"] | null;
+            /** @description Configuration for creating a new WhatsApp Cloud API setup. */
+            whatsapp_cloud_config_to_create?: components["schemas"]["WhatsAppCloudConfigCreateInput"] | null;
         };
         /**
          * InboxRead
+         * @description Schema for representing an Inbox in API responses.
+         *     Includes common fields and populated channel-specific configuration.
          * @example {
          *       "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
-         *       "associated_bot_agent_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
          *       "channel_details": {
-         *         "phone_number": "15551234567",
-         *         "provider": "cloud"
+         *         "ui_hint": "Use blue theme"
          *       },
-         *       "channel_id": "instance_xyz",
-         *       "channel_type": "whatsapp",
+         *       "channel_id": "15551234567",
+         *       "channel_type": "whatsapp_cloud",
          *       "created_at": "2023-10-27T10:00:00Z",
          *       "enable_auto_assignment": true,
          *       "id": "e8a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9f",
          *       "initial_conversation_status": "OPEN",
-         *       "name": "Sales WhatsApp",
-         *       "updated_at": "2023-10-27T11:00:00Z"
+         *       "name": "Sales WhatsApp Cloud",
+         *       "updated_at": "2023-10-27T11:00:00Z",
+         *       "whatsapp_cloud_config": {
+         *         "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
+         *         "app_id": "app_id_example",
+         *         "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+         *         "phone_number_id": "15551234567",
+         *         "waba_id": "waba_id_example",
+         *         "webhook_verify_token": "your_verify_token_here"
+         *       }
          *     }
          */
         InboxRead: {
             /**
              * Id
              * Format: uuid
-             * @description Unique identifier for the inbox
              */
             id: string;
             /**
              * Name
-             * @description Name of the inbox
+             * @description Name of the inbox.
              */
             name: string;
-            /**
-             * Channel Type
-             * @description Type of the channel (e.g., 'whatsapp')
-             */
-            channel_type: string;
+            /** @description Type of the communication channel. */
+            channel_type: components["schemas"]["ChannelTypeEnum"];
             /**
              * Channel Details
-             * @description Channel specific configuration details (JSON)
+             * @description Legacy or UI-specific channel configuration details (JSON).
              */
             channel_details?: {
                 [key: string]: unknown;
             } | null;
-            /** @description New default status for new conversations (OPEN or PENDING) */
+            /** @description Default status for new conversations (e.g., OPEN, PENDING, BOT). */
             initial_conversation_status?: components["schemas"]["ConversationStatusEnum"] | null;
             /**
              * Enable Auto Assignment
-             * @description Enable automatic assignment for this inbox
+             * @description Enable automatic assignment of conversations for this inbox.
              * @default true
              */
             enable_auto_assignment: boolean | null;
             /**
              * Account Id
              * Format: uuid
-             * @description Identifier of the account this inbox belongs to
+             * @description Identifier of the account this inbox belongs to.
              */
             account_id: string;
             /**
              * Channel Id
-             * @description Identifier used by the channel provider (e.g., instanceId, phone_number_id)
+             * @description Identifier used by the channel provider (e.g., Evolution instance_name, WhatsApp phone_number_id).
              */
             channel_id?: string | null;
             /**
@@ -2204,48 +2230,50 @@ export interface components {
             /**
              * Created At
              * Format: date-time
-             * @description Timestamp when the inbox was created
+             * @description Timestamp when the inbox was created.
              */
             created_at: string;
             /**
              * Updated At
              * Format: date-time
-             * @description Timestamp when the inbox was last updated
+             * @description Timestamp when the inbox was last updated.
              */
             updated_at: string;
+            /** @description Details of the linked Evolution API instance, if applicable. */
+            evolution_instance?: components["schemas"]["EvolutionInstanceRead"] | null;
+            /** @description Details of the linked WhatsApp Cloud API configuration, if applicable. */
+            whatsapp_cloud_config?: components["schemas"]["WhatsAppCloudConfigRead"] | null;
         };
         /**
          * InboxUpdate
+         * @description Schema for updating an existing Inbox.
+         *     Allows partial updates to common inbox fields.
          * @example {
          *       "enable_auto_assignment": false,
-         *       "name": "Support WhatsApp"
+         *       "initial_conversation_status": "PENDING",
+         *       "name": "Support WhatsApp Renamed"
          *     }
          */
         InboxUpdate: {
             /**
              * Name
-             * @description New name for the inbox
+             * @description New name for the inbox.
              */
             name?: string | null;
             /**
-             * Channel Type
-             * @description New type of the channel
-             */
-            channel_type?: string | null;
-            /**
              * Channel Details
-             * @description Updated channel specific configuration
+             * @description Updated legacy or UI-specific channel configuration.
              */
             channel_details?: {
                 [key: string]: unknown;
             } | null;
+            /** @description New default status for new conversations. */
+            initial_conversation_status?: components["schemas"]["ConversationStatusEnum"] | null;
             /**
              * Enable Auto Assignment
-             * @description Update auto assignment setting
+             * @description Update auto assignment setting for this inbox.
              */
             enable_auto_assignment?: boolean | null;
-            /** @description New default status for new conversations (OPEN or PENDING) */
-            initial_conversation_status?: components["schemas"]["ConversationStatusEnum"] | null;
         };
         /**
          * IngestResponse
@@ -2962,6 +2990,73 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * WhatsAppCloudConfigCreateInput
+         * @description Schema for providing data to create a WhatsApp Cloud API Configuration.
+         */
+        WhatsAppCloudConfigCreateInput: {
+            /**
+             * Phone Number Id
+             * @description WhatsApp Cloud API Phone Number ID.
+             */
+            phone_number_id: string;
+            /**
+             * Waba Id
+             * @description WhatsApp Business Account ID.
+             */
+            waba_id: string;
+            /**
+             * Webhook Verify Token
+             * @description Verify token for Meta webhook setup.
+             */
+            webhook_verify_token: string;
+            /**
+             * App Id
+             * @description Meta App ID, if applicable.
+             */
+            app_id?: string | null;
+            /**
+             * Access Token
+             * @description Raw System User Access Token for WhatsApp Cloud API.
+             */
+            access_token: string;
+        };
+        /**
+         * WhatsAppCloudConfigRead
+         * @description Schema for reading/returning a WhatsApp Cloud API Configuration.
+         */
+        WhatsAppCloudConfigRead: {
+            /**
+             * Phone Number Id
+             * @description WhatsApp Cloud API Phone Number ID.
+             */
+            phone_number_id: string;
+            /**
+             * Waba Id
+             * @description WhatsApp Business Account ID.
+             */
+            waba_id: string;
+            /**
+             * Webhook Verify Token
+             * @description Verify token for Meta webhook setup.
+             */
+            webhook_verify_token: string;
+            /**
+             * App Id
+             * @description Meta App ID, if applicable.
+             */
+            app_id?: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Account Id
+             * Format: uuid
+             */
+            account_id: string;
         };
     };
     responses: never;
