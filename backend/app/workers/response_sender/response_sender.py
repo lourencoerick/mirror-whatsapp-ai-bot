@@ -7,6 +7,7 @@ from app.database import AsyncSessionLocal
 from app.services.queue.redis_queue import RedisQueue
 from app.services.sender.evolution import send_message as evolution_send_message
 from app.services.repository import message as message_repo
+from app.services.repository import evolution_instance as evolution_instance_repo
 from app.services.helper.checkpoint import reset_checkpoint
 from app.services.repository.message import (
     delete_messages_by_conversation,
@@ -154,10 +155,17 @@ class ResponseSender:
                     message_content + " Ativado! Deleção do histórico feito!"
                 )
 
+            evolution_instance = (
+                await evolution_instance_repo.get_evolution_instance_by_id(
+                    db=db,
+                    instance_id=message.inbox.evolution_instance_id,
+                    account_id=message.account_id,
+                )
+            )
             response = await evolution_send_message(
                 message_content=message_content,
                 phone_number=phone_number,
-                inbox=message.inbox,
+                evolution_instance=evolution_instance,
             )
 
             external_id = response.get("key", {}).get("id")

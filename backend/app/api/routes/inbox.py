@@ -164,7 +164,7 @@ async def update_existing_inbox(
         )
     try:
         updated_inbox = await inbox_repo.update_inbox(
-            db=db, inbox=inbox_to_update, update_data=update_data
+            db=db, inbox_to_update=inbox_to_update, update_data=update_data
         )
         return updated_inbox
     except Exception as e:

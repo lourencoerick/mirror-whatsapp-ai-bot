@@ -8,8 +8,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 from app.config import get_settings
-from app.models.message import Message
-from app.models.inbox import Inbox
+from app.models.channels.evolution_instance import EvolutionInstance
 from app.core.security import decrypt_logical_token
 
 settings = get_settings()
@@ -21,7 +20,9 @@ settings = get_settings()
     retry=retry_if_exception_type(httpx.RequestError),
     reraise=True,
 )
-async def send_message(message_content: str, phone_number: str, inbox: Inbox) -> dict:
+async def send_message(
+    message_content: str, phone_number: str, evolution_instance: EvolutionInstance
+) -> dict:
     """
     Sends a text message using the Evolution API via HTTPX.
     Retries up to 3 times in case of connection-level failures.
@@ -30,14 +31,12 @@ async def send_message(message_content: str, phone_number: str, inbox: Inbox) ->
         message (Message): Must contain:
             - number (str): Recipient phone number
             - text (str): Message content
-        inbox (Inbox): Inbox to send message from
+        evolution_instance (EvolutionInstance): evolution_instance to send message from
     """
     try:
-        logger.debug(f"Inbox: {inbox}")
-        channel_id = inbox.channel_details["id"]
-        api_key = decrypt_logical_token(
-            inbox.channel_details["logical_token_encrypted"]
-        )
+        logger.debug(f"Evolution Instance: {evolution_instance}")
+        instance_id = evolution_instance.id
+        api_key = decrypt_logical_token(evolution_instance.logical_token_encrypted)
 
         payload = {
             "number": phone_number,
@@ -47,7 +46,7 @@ async def send_message(message_content: str, phone_number: str, inbox: Inbox) ->
             "apikey": api_key,
             "Content-Type": "application/json",
         }
-        url = f"{settings.EVOLUTION_API_SHARED_URL}/message/sendText/{channel_id}"
+        url = f"{settings.EVOLUTION_API_SHARED_URL}/message/sendText/{instance_id}"
 
         logger.info(
             f"[evolution_sender] Sending messsa to : {url}\npayload: {payload}\nheaders: {headers}"
