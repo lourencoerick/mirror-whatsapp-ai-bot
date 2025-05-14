@@ -252,7 +252,7 @@ async def find_inboxes_with_association_by_account(
         )
         .where(
             Inbox.account_id == account_id,
-            # Inbox.is_simulation.is_(False),
+            Inbox.is_simulation.is_(False),
         )
         .options(
             selectinload(Inbox.evolution_instance),  # Eager load evolution_instance
