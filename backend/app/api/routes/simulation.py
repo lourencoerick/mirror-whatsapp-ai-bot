@@ -326,13 +326,13 @@ async def reset_simulation_state(  # Nome mais claro
     # ATENÇÃO: Se o LangGraph mudar esses nomes, este código quebrará.
     # A tabela checkpoint_migrations geralmente não deve ser limpa por thread.
     try:
-        # logger.info(f"{log_prefix} Deleting messages...")
+        logger.info(f"{log_prefix} Deleting messages...")
         # Usando SQLAlchemy Core API (mais seguro contra SQL Injection que f-string)
-        # delete_msgs_stmt = delete(Message).where(
-        #     Message.conversation_id == conversation_id
-        # )
-        # await db.execute(delete_msgs_stmt)
-        # logger.info(f"{log_prefix} Messages deleted (if any existed).")
+        delete_msgs_stmt = delete(Message).where(
+            Message.conversation_id == conversation_id
+        )
+        await db.execute(delete_msgs_stmt)
+        logger.info(f"{log_prefix} Messages deleted (if any existed).")
 
         logger.info(
             f"{log_prefix} Deleting checkpoint data for thread_id: {thread_id_str}..."
