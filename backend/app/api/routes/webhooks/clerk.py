@@ -223,7 +223,7 @@ async def handle_clerk_webhook(
         )
         return {"message": "Webhook received but no data to process."}
 
-    if event_type == "user.created":
+    if event_type in ["user.created", "user.updated"]:
         await process_user_created(event_data, db)
     # elif event_type == "user.updated":
     #     process_user_updated(event_data, db, settings)
