@@ -114,7 +114,7 @@ async def initiate_contact_import(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during file upload.",
-        )
+        ) from e
 
     # 2. Create ImportJob record in Database
     db_job = ImportJob(
@@ -146,12 +146,12 @@ async def initiate_contact_import(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not initiate import job record.",
-        )
+        ) from e
 
     # 3. Enqueue Background Task (ARQ)
     arq_job_id = None
     try:
-        await wake_worker(settings.RESPONSE_SENDER_WORKER_INTERNAL_URL)
+        await wake_worker(settings.BATCH_WORKER_INTERNAL_URL)
         arq_task = await arq_pool.enqueue_job(
             CONTACT_IMPORTER_ARQ_TASK_NAME,
             _job_id=f"contact_import_{job_id}",
@@ -188,7 +188,7 @@ async def initiate_contact_import(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Could not enqueue import task: {e}",
-        )
+        ) from e
 
     # 5. Return Success Response (202 Accepted)
     response_data = ContactImportJobStartResponse(

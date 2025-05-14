@@ -1,25 +1,36 @@
 // app/pending-approval/page.tsx
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Clock } from "lucide-react";
-import { Metadata } from "next";
-import { UserButton } from "@clerk/nextjs";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Aplicação Recebida",
-  description: "Sua inscrição para participar do beta está sendo analisada.",
-};
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+import { UserButton } from "@clerk/nextjs";
+import { Clock, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 /**
  * PendingApprovalPage displays a confirmation message
  * when a user’s beta access is being reviewed.
  */
 export default function PendingApprovalPage() {
+  const router = useRouter(); // Hook para navegação
+
+  const handleRefreshOrHome = () => {
+    router.push("/");
+  };
+
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <div className="absolute top-4 right-4">
         <UserButton />
       </div>
-
       <Card className="w-full max-w-md text-center">
         <CardHeader className="space-y-2 pt-6">
           <div
@@ -39,12 +50,27 @@ export default function PendingApprovalPage() {
 
         <CardContent className="space-y-4 pb-6">
           <p className="text-sm text-muted-foreground">
-            Devido ao grande volume de inscrições para o nosso beta, <strong>avaliamos cada candidatura com o máximo de atenção</strong>.
+            Devido ao grande volume de inscrições para o nosso beta,{" "}
+            <strong>avaliamos cada candidatura com o máximo de atenção</strong>.
           </p>
           <p className="text-sm text-muted-foreground">
-            Se você for selecionado, em breve receberá <strong>instruções para nos contar mais sobre sua empresa</strong> e descobrir como, juntos, podemos <strong>transformar seu WhatsApp em uma verdadeira máquina de vendas</strong>!
+            Se você for selecionado, em breve receberá{" "}
+            <strong>instruções para nos contar mais sobre sua empresa</strong> e
+            descobrir como, juntos, podemos{" "}
+            <strong>
+              transformar seu WhatsApp em uma verdadeira máquina de vendas
+            </strong>
+            !
           </p>
         </CardContent>
+        <CardFooter className="flex flex-col items-center justify-center pt-2 pb-6">
+          {" "}
+          {/* Adicionado CardFooter */}
+          <Button onClick={handleRefreshOrHome} variant="outline">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Tentar Novamente
+          </Button>
+        </CardFooter>
       </Card>
     </main>
   );

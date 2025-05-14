@@ -187,9 +187,9 @@ class ResponseSender:
             if message.content.lower().strip() == settings.RESET_MESSAGE_TRIGGER:
                 thread_id_str = str(message.conversation_id)
 
-                await delete_messages_by_conversation(
-                    db=db, conversation_id=message.conversation_id
-                )
+                # await delete_messages_by_conversation(
+                #     db=db, conversation_id=message.conversation_id
+                # )
                 await reset_checkpoint(db=db, thread_id=thread_id_str)
 
                 logger.info(
