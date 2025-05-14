@@ -69,7 +69,7 @@ class CompanyProfileSchema(BaseModel):
 
     # --- AI Behavior & Tone ---
     sales_tone: str = Field(
-        default="friendly, helpful, and professional",
+        default="amigável, prestativo, and profissional",
         description="Adjectives describing the desired communication style.",
     )
     language: str = Field(
@@ -79,12 +79,12 @@ class CompanyProfileSchema(BaseModel):
 
     communication_guidelines: List[str] = Field(
         default_factory=list,
-        description="Specific DOs and DON'Ts for the AI (e.g., 'DO always ask clarifying questions', 'DO NOT invent information not provided').",
+        description="Specific DOs and DON'Ts for the AI (e.g., 'BUSQUE sempre fazer perguntas esclarecedoras', 'EVITE invente informações que não foram fornecidas').",
     )
 
     # --- Objectives and Selling Strategy ---
     ai_objective: str = Field(
-        default="Engage customers, answer questions about offerings, and guide them towards a purchase or next step.",
+        default="Engaje os clientes, responda perguntas sobre as ofertas e oriente-os para uma compra ou próximo passo.",
         description="Main goal of the AI (e.g., close sales, qualify leads, provide product info).",
     )
 
