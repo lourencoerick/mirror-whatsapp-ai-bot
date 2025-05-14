@@ -163,6 +163,8 @@ PROMPT_ASK_CLARIFYING_QUESTION = ChatPromptTemplate.from_messages(
 
 Sua tarefa é fazer **UMA única pergunta aberta** para entender melhor o que o cliente quis dizer ou qual é a sua preocupação/dúvida principal. Mantenha um tom {sales_tone} e use o idioma {language}.
 
+Use o contexto, caso esteja disponível, para te ajudar a formular uma pergunta mais personalizada: "{last_action_context}"
+
 **Exemplos:** "Para que eu possa te ajudar melhor, poderia me dizer um pouco mais sobre o que está pensando?", "O que especificamente sobre [tópico, se houver] te deixou com dúvidas?", "Pode elaborar um pouco mais?".
 
 Use formatação WhatsApp sutil: {formatting_instructions}
@@ -581,6 +583,7 @@ async def response_generator_node(
 
     # Preencher valores específicos baseado na ação
     try:
+
         if action_command == "ANSWER_DIRECT_QUESTION":
             specific_values["question_to_answer"] = action_params.get(
                 "question_to_answer_text", "[Pergunta não especificada]"
@@ -616,6 +619,7 @@ async def response_generator_node(
                 .get("text", "[Declaração vaga não especificada]")
             )
             specific_values["vague_statement_text"] = vague_text
+            specific_values["last_action_context"] = action_params.get("context", "N/A")
         elif action_command == "ACKNOWLEDGE_AND_TRANSITION":
 
             specific_values["off_topic_text"] = action_params.get(
