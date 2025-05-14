@@ -111,7 +111,6 @@ class MessageConsumer:
 
         logger.info("[consumer] Connections established. Listening for messages...")
         while True:
-            ai_task_to_enqueue: Optional[Dict[str, Any]] = None
             try:
                 raw_message: Optional[Union[str, dict]] = (
                     await self.input_queue.dequeue()
@@ -130,7 +129,7 @@ class MessageConsumer:
 
                 async with AsyncSessionLocal() as db:
                     try:
-                        ai_task_to_enqueue = await self._handle_message(db, data)
+                        await self._handle_message(db, data)
                         await db.commit()
                         logger.debug("[consumer] Database transaction committed.")
                     except Exception as e:
@@ -139,30 +138,6 @@ class MessageConsumer:
                         )
                         await db.rollback()
                         raise
-
-                if ai_task_to_enqueue:
-                    if not self.arq_pool:
-                        logger.error(
-                            "[consumer] CRITICAL: Arq Pool not available for enqueueing AI task AFTER DB commit."
-                        )
-                    else:
-                        try:
-                            await self.arq_pool.enqueue_job(
-                                AI_REPLY_TASK_NAME,
-                                _queue_name=AI_REPLY_QUEUE_NAME,
-                                **ai_task_to_enqueue,
-                            )
-                            logger.info(
-                                f"[consumer] Enqueued task via Arq for AI Replier: {ai_task_to_enqueue}"
-                            )
-                        except (ArqConnectionError, EnqueueTimeout) as q_err:
-                            logger.exception(
-                                f"[consumer] CRITICAL: Arq enqueue error AFTER DB commit. Payload: {ai_task_to_enqueue}. Error: {q_err}"
-                            )
-                        except Exception as enqueue_err:
-                            logger.exception(
-                                f"[consumer] CRITICAL: Unexpected Arq enqueue error AFTER DB commit. Payload: {ai_task_to_enqueue}. Error: {enqueue_err}"
-                            )
 
                 elapsed = time.time() - start_time
                 logger.debug(f"[consumer] Processed message in {elapsed:.2f}s")
