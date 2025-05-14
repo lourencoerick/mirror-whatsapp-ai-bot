@@ -5,7 +5,7 @@ from sqlalchemy import select, update, delete
 from typing import Optional, List, Dict, Any, Tuple
 from loguru import logger
 from sqlalchemy.exc import IntegrityError
-
+import enum
 
 from app.models.inbox import Inbox
 from app.models.inbox_member import InboxMember
@@ -205,9 +205,7 @@ async def find_inbox_by_id_and_account(
         .where(Inbox.id == inbox_id, Inbox.account_id == account_id)
         .options(
             selectinload(Inbox.evolution_instance),
-            selectinload(
-                Inbox.whatsapp_cloud_config
-            ),  # Eager load whatsapp_cloud_config
+            selectinload(Inbox.whatsapp_cloud_config),
         )
     )
     result = await db.execute(stmt)
@@ -291,7 +289,12 @@ async def find_inbox_by_channel_id(
         f"[InboxRepo] Finding inbox by ChannelID={channel_id} for Account={account_id}"
     )
     result = await db.execute(
-        select(Inbox).filter_by(account_id=account_id, channel_id=channel_id)
+        select(Inbox)
+        .filter_by(account_id=account_id, channel_id=channel_id)
+        .options(
+            selectinload(Inbox.evolution_instance),
+            selectinload(Inbox.whatsapp_cloud_config),
+        )
     )
     inbox = result.scalar_one_or_none()
 
@@ -369,40 +372,48 @@ async def find_inboxes_by_user_membership(
 
 
 async def update_inbox(
-    db: AsyncSession, *, inbox: Inbox, update_data: InboxUpdate
+    db: AsyncSession,
+    inbox_to_update: Inbox,
+    update_data: InboxUpdate,  # Renomeado 'inbox' para 'inbox_to_update'
 ) -> Inbox:
-    """Update an existing inbox with new data without finalizing the transaction.
+    update_values = update_data.model_dump(exclude_unset=True)
+    for key, value in update_values.items():
+        if isinstance(value, enum.Enum):
+            setattr(inbox_to_update, key, value.value)
+        else:
+            setattr(inbox_to_update, key, value)
 
-    The commit and refresh should be performed by the upper layer.
+    db.add(inbox_to_update)
+    await db.flush()
+    # Não precisa de db.refresh(inbox_to_update) aqui se vamos re-selecionar
 
-    Args:
-        db (AsyncSession): Asynchronous database session.
-        inbox (Inbox): The existing Inbox object to update.
-        update_data (InboxUpdate): Pydantic schema containing the fields to update.
-
-    Returns:
-        Inbox: The updated Inbox object.
-    """
-    logger.info(f"[InboxRepo] Updating Inbox ID={inbox.id}")
-    update_dict = update_data.model_dump(exclude_unset=True)
-
-    if not update_dict:
-        logger.warning(
-            f"[InboxRepo] Update called for Inbox ID={inbox.id} with no data."
+    # Re-selecionar para garantir que os relacionamentos sejam carregados para a resposta
+    stmt = (
+        select(Inbox)
+        .where(
+            Inbox.id == inbox_to_update.id
+        )  # Usar o ID do objeto que acabamos de dar flush
+        .options(
+            selectinload(Inbox.evolution_instance),
+            selectinload(Inbox.whatsapp_cloud_config),
+            # Adicione outros relacionamentos que InboxRead possa precisar, se houver
         )
-        return inbox
+    )
+    result = await db.execute(stmt)
+    updated_inbox_with_relations = result.scalar_one_or_none()
 
-    for key, value in update_dict.items():
-        setattr(inbox, key, value)
+    if not updated_inbox_with_relations:
+        logger.error(
+            f"CRITICAL: Failed to re-fetch inbox {inbox_to_update.id} immediately after update flush."
+        )
+        raise Exception(
+            f"Failed to retrieve updated inbox {inbox_to_update.id} with relations."
+        )
 
-    # Refresh channel specific details if they could be part of InboxRead
-    if inbox.evolution_instance_id:
-        await db.refresh(inbox, ["evolution_instance"])
-    elif inbox.whatsapp_cloud_config_id:
-        await db.refresh(inbox, ["whatsapp_cloud_config"])
-
-    logger.info(f"[InboxRepo] Inbox ID={inbox.id} updated locally")
-    return inbox
+    logger.info(
+        f"Inbox ID {updated_inbox_with_relations.id} updated and re-fetched with relations. DB commit pending."
+    )
+    return updated_inbox_with_relations
 
 
 async def delete_inbox(db: AsyncSession, *, inbox: Inbox) -> bool:

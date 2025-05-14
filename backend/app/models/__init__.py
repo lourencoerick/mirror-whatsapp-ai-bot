@@ -15,6 +15,8 @@ from .subscription import Subscription
 from .user import User
 from .webhook import Webhook
 from .channels.evolution_instance import EvolutionInstance
+from .channels.whatsapp_cloud_config import WhatsAppCloudConfig
+from .channels.channel_types import ChannelTypeEnum
 from .import_job import ImportJob
 from .company_profile import CompanyProfile
 from .simulation.simulation import Simulation
@@ -42,6 +44,8 @@ __all__ = [
     "User",
     "Webhook",
     "EvolutionInstance",
+    "WhatsAppCloudConfig",
+    "ChannelTypeEnum",
     "ImportJob",
     "CompanyProfile",
     "Simulation",
