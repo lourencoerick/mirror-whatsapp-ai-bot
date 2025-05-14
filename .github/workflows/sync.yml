@@ -1,0 +1,29 @@
+name: Sync Upstream Mirror
+
+on:
+  # schedule:
+  #   - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout upstream
+        uses: actions/checkout@v4
+        with:
+          repository: lambda-labs-ai/whatsapp-ai-bot
+          token: ${{ secrets.UPSTREAM_TOKEN }}
+          fetch-depth: 0
+
+      - name: Start ssh-agent and add key
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.MIRROR_SSH_KEY }}
+
+      - name: Push to mirror
+        run: |
+          git remote add mirror git@github.com:lourencoerick/mirror-whatsapp-ai-bot.git
+          git push mirror --force --all
+          git push mirror --force --tags
