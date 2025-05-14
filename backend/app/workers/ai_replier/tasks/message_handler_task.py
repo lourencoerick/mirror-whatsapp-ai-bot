@@ -534,7 +534,9 @@ async def handle_ai_reply_request(
                     "bot_agent_id": str(agent_config_db_model.id),
                     "company_profile": profile_dict,
                     "agent_config": agent_config_dict,
-                    "messages": [],  # Checkpointer loads historical messages
+                    "messages": [
+                        HumanMessage(content=current_user_input_content)
+                    ],  # Checkpointer loads historical messages
                     "current_user_input_text": current_user_input_content,
                     "is_simulation": conversation.is_simulation,
                     "last_interaction_timestamp": time.time(),
