@@ -9,7 +9,7 @@ import { Settings, Trash2 } from "lucide-react";
 import React from "react";
 
 import { components } from "@/types/api";
-export type Inbox = components["schemas"]["InboxRead"];
+type Inbox = components["schemas"]["InboxRead"];
 
 /**
  * Props accepted by the InboxItem component.

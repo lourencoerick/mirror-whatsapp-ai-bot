@@ -26,7 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { InboxItem } from "./inbox-item";
 
-export type Inbox = components["schemas"]["InboxRead"];
+type Inbox = components["schemas"]["InboxRead"];
 
 /**
  * State for managing the delete confirmation dialog.
