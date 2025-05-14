@@ -18,6 +18,7 @@ from ..state_definition import (
     CompanyProfileSchema,
     SpinQuestionType,  # Para type hint
     AgentGoal,  # Para obter detalhes do goal se necessário
+    CustomerQuestionStatusType,
 )
 
 # Importar utils de prompt
@@ -360,6 +361,38 @@ Gere a mensagem para solicitar os detalhes da correção.""",
     ]
 )
 
+PROMPT_SEND_FOLLOW_UP_MESSAGE = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """Você é um Assistente de Vendas da '{company_name}'. O usuário não respondeu à sua última mensagem por um tempo.
+Sua tarefa é enviar uma mensagem de follow-up gentil para tentar reengajar o cliente.
+
+**Contexto da Conversa:**
+- Última mensagem enviada pelo agente (você): "{last_agent_action_text_for_follow_up}"
+- Goal que o agente estava perseguindo antes da pausa: {goal_type_before_pause}
+- Esta é a tentativa de follow-up número: {current_follow_up_attempts_display} (de um total de {max_follow_up_attempts_total} tentativas).
+- Idioma: {language}
+- Tom de Vendas: {sales_tone} (use um tom ainda mais suave e compreensivo para follow-up)
+
+**Instruções para a Mensagem de Follow-up:**
+1.  **Reconheça a Pausa:** Comece de forma suave, ex: "Olá novamente!", "Só para checar...", "Notei que nossa conversa pausou...".
+2.  **Referencie o Contexto:** Mencione brevemente o tópico da sua última mensagem ou o objetivo da conversa para ajudar o cliente a se lembrar. (Use `{last_agent_action_text_for_follow_up}` e `{goal_type_before_pause}` como referência).
+3.  **Seja Convidativo, Não Insistente:**
+    *   **Primeiro Follow-up (tentativa 1 de {max_follow_up_attempts_total}):** "Gostaria de continuar de onde paramos sobre [tópico] ou talvez precise de mais um momento para pensar?"
+    *   **Follow-ups Intermediários:** "Só para checar se você teve chance de pensar sobre [tópico]. Alguma dúvida ou algo mais em que posso ajudar neste momento?"
+    *   **Último Follow-up (tentativa {max_follow_up_attempts_total} de {max_follow_up_attempts_total}):** "Ainda estou à disposição se precisar de algo referente a [tópico]. Caso contrário, sem problemas e agradeço seu tempo até aqui!" (Não faça uma pergunta se for a última tentativa antes de um possível farewell automático).
+4.  **Mantenha Curto e Amigável.**
+5.  **Formatação:** Aplique formatação WhatsApp sutil: {formatting_instructions}
+
+HISTÓRICO RECENTE (para seu contexto, não necessariamente para repetir ao usuário):
+{chat_history}
+
+Gere APENAS a mensagem de follow-up.""",
+        ),
+    ]
+)
+
 # --- Mapeamento de Ação para Prompt ---
 ACTION_TO_PROMPT_MAP: Dict[AgentActionType, ChatPromptTemplate] = {
     "ANSWER_DIRECT_QUESTION": PROMPT_ANSWER_DIRECT_QUESTION,
@@ -374,6 +407,7 @@ ACTION_TO_PROMPT_MAP: Dict[AgentActionType, ChatPromptTemplate] = {
     "HANDLE_CLOSING_CORRECTION": PROMPT_HANDLE_CLOSING_CORRECTION,
     "GENERATE_FAREWELL": PROMPT_GENERATE_FAREWELL,  #
     "GENERATE_GREETING": PROMPT_GENERATE_GREETING,
+    "SEND_FOLLOW_UP_MESSAGE": PROMPT_SEND_FOLLOW_UP_MESSAGE,
     # ... etc
 }
 
@@ -652,6 +686,47 @@ async def response_generator_node(
             specific_values["fallback_contact_info"] = common_context.get(
                 "fallback_text", ""
             )
+        elif action_command == "SEND_FOLLOW_UP_MESSAGE":
+            # Obter a última ação real do agente (não DECIDE_PROACTIVE_STEP)
+            # Isso pode ser um pouco complexo se a última ação foi o próprio DECIDE_PROACTIVE_STEP.
+            # O Planner deveria ter passado o goal original ou a última mensagem do agente como parâmetro.
+            # Por agora, vamos assumir que o `last_agent_action` no estado é a última mensagem *enviada*.
+            last_action_obj = state.get("last_agent_action")
+            last_agent_text_for_follow_up = "nossa conversa anterior"
+            if (
+                last_action_obj
+                and isinstance(last_action_obj, dict)
+                and last_action_obj.get("action_generation_text")
+            ):
+                last_agent_text_for_follow_up = last_action_obj.get(
+                    "action_generation_text", last_agent_text_for_follow_up
+                )
+
+            current_goal_obj = state.get("current_agent_goal")
+            goal_type_before_pause = "tópico anterior"
+            if current_goal_obj and isinstance(current_goal_obj, dict):
+                # Se o goal atual é o resultado de um `DECIDE_PROACTIVE_STEP` que foi acionado por um timeout,
+                # o goal "real" que estava sendo perseguido antes da pausa está no `previous_goal_if_interrupted`
+                # do goal que o Planner definiu quando o timeout foi detectado.
+                # No entanto, o `proactive_step_decider_node` não muda o goal, ele apenas define a próxima ação.
+                # Então, o `current_agent_goal` no estado deve ser o goal que estava ativo.
+                goal_type_before_pause = current_goal_obj.get(
+                    "goal_type", goal_type_before_pause
+                )
+
+            specific_values["last_agent_action_text_for_follow_up"] = (
+                last_agent_text_for_follow_up
+            )
+            specific_values["goal_type_before_pause"] = goal_type_before_pause
+            specific_values["current_follow_up_attempts_display"] = (
+                action_params.get("current_follow_up_attempts", 0) + 1
+            )  # Para display (1ª, 2ª)
+            specific_values["current_follow_up_attempts"] = action_params.get(
+                "current_follow_up_attempts", 0
+            )  # Para lógica no prompt
+            specific_values["max_follow_up_attempts_total"] = action_params.get(
+                "max_follow_up_attempts_total", 2
+            )  # Obter da config do agente se possível
 
     except KeyError as e:
         logger.error(

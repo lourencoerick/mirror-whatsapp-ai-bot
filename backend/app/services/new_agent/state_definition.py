@@ -69,6 +69,7 @@ AgentActionType = Literal[
     "ACKNOWLEDGE_AND_TRANSITION",
     # "HANDLE_IMPASSE",
     "DECIDE_PROACTIVE_STEP",
+    "SEND_FOLLOW_UP_MESSAGE",
 ]
 """Defines the specific low-level actions the agent can plan and execute."""
 

@@ -95,26 +95,28 @@ Com base no contexto acima, decida qual `AgentActionType` e `AgentActionDetails`
 **Diretrizes para Decisão:**
 *   **Se `trigger_source` == 'follow_up_timeout':**
     *   Se `current_follow_up_attempts` < `max_follow_up_attempts_total`:
-        *   Gere uma mensagem de reengajamento gentil. Ação: `ASK_CLARIFYING_QUESTION`.
-        *   Varie a mensagem com base em `current_follow_up_attempts`.
-            *   Tentativa 0 (1º follow-up): "Olá, {company_name} aqui. Notei que nossa conversa pausou. Gostaria de continuar de onde paramos sobre [último tópico/goal] ou precisa de mais um momento?"
-            *   Tentativa 1 (2º follow-up): "Só para checar se você teve chance de pensar sobre [último tópico/goal]. Alguma dúvida ou algo mais em que posso ajudar?"
-            *   Tentativa >1: "Ainda estou à disposição se precisar de algo referente a [último tópico/goal]. Caso contrário, sem problemas!"
+        *   **Ação:** `SEND_FOLLOW_UP_MESSAGE`.
+        *   **Parâmetros (`proactive_action_parameters`):**
+            *   `"current_follow_up_attempts": {current_follow_up_attempts}` (passe o valor recebido)
+            *   `"max_follow_up_attempts_total": {max_follow_up_attempts_total}` (passe o valor recebido)
+            *   (Opcional, mas útil para o prompt de follow-up) `"context_goal_type": "{current_goal_type_before_initiative}"`
+            *   (Opcional, mas útil) `"context_last_agent_message": "{last_agent_action_text}"`
+        *   **Justificativa:** "Usuário inativo. Enviando follow-up [N+1] de [M]."
     *   Se `current_follow_up_attempts` >= `max_follow_up_attempts_total`:
         *   Ação: `GENERATE_FAREWELL`. Parâmetros: {{"reason": "Inatividade do usuário após múltiplas tentativas de follow-up."}}
         *   Justificativa: "Limite de follow-ups atingido."
-*   **Se `trigger_source` == 'user_response_or_stagnation':**
 
-*   **Objetivo Principal:** Manter o engajamento e progredir a conversa. Se o usuário deu uma resposta mínima (ex: "ok", "entendi") ou a conversa pausou, sua ação deve reengajar e guiar.
-*   **Relevância do Goal:** Sua ação proativa deve, idealmente, ajudar a progredir o `{current_goal_type_before_initiative}` ou transicionar para um novo goal lógico se o atual estiver bloqueado ou concluído.
-*   **Exemplos de Iniciativas (NÃO se limite a estes, seja criativo e estratégico):**
-    *   Se o goal era `INVESTIGATING_NEEDS` e o ciclo SPIN não está completo (perguntas < {MAX_SPIN_QUESTIONS_PER_CYCLE}): Sugira a próxima pergunta SPIN (`ASK_SPIN_QUESTION` com o `spin_type` apropriado, ex: se `last_spin_type_asked` foi 'Problem', sugira 'Implication').
-    *   Se uma solução foi apresentada (`PRESENTING_SOLUTION`) e o usuário está hesitante/silencioso/respondeu minimamente: Faça uma pergunta para descobrir a causa da hesitação (`ASK_CLARIFYING_QUESTION` focada na proposta) ou reforce um benefício chave e verifique o interesse (`PRESENT_SOLUTION_OFFER` com foco específico, talvez um benefício diferente).
-    *   Se uma objeção foi recentemente resolvida (ver `resolved_objections_summary`) e o goal anterior era `ATTEMPTING_CLOSE`: Sugira retomar o fechamento (ex: `CONFIRM_ORDER_DETAILS` se `closing_process_status` era `attempt_made`).
-    *   Se o cliente parece pronto (necessidades confirmadas, objeções resolvidas) e o fechamento não foi iniciado: Considere `INITIATE_CLOSING`.
-    *   Se o usuário está silencioso por muito tempo (assuma que esta chamada é devido a um timeout se `last_user_message_text` for antigo ou "N/A" e `user_response_to_agent_action_analysis` indicar ausência de resposta): Envie uma mensagem de reengajamento (pode ser um `ASK_CLARIFYING_QUESTION` genérico como "Olá, {company_name} aqui. Você gostaria de continuar nossa conversa?" ou "Precisa de mais um momento para pensar sobre [último tópico]?").
-*   **Evite Repetição Imediata:** Não sugira EXATAMENTE a mesma ação que o `last_agent_action_type` se a resposta do usuário foi apenas um "ok". Tente uma variação ou um próximo passo lógico.
-*   **Se Nenhuma Ação Proativa Clara:** Se, após analisar tudo, nenhuma ação proativa parecer genuinamente útil ou apropriada (ex: o usuário pediu explicitamente para encerrar, ou a conversa está realmente num impasse intransponível), retorne `null` para `proactive_action_command`.
+*   **Se `trigger_source` == 'user_response_or_stagnation':**
+    *   **Objetivo Principal:** Manter o engajamento e progredir a conversa. Se o usuário deu uma resposta mínima (ex: "ok", "entendi") ou a conversa pausou, sua ação deve reengajar e guiar.
+    *   **Relevância do Goal:** Sua ação proativa deve, idealmente, ajudar a progredir o `{current_goal_type_before_initiative}` ou transicionar para um novo goal lógico se o atual estiver bloqueado ou concluído.
+    *   **Exemplos de Iniciativas (NÃO se limite a estes, seja criativo e estratégico):**
+        *   Se o goal era `INVESTIGATING_NEEDS` e o ciclo SPIN não está completo (perguntas < {MAX_SPIN_QUESTIONS_PER_CYCLE}): Sugira a próxima pergunta SPIN (`ASK_SPIN_QUESTION` com o `spin_type` apropriado, ex: se `last_spin_type_asked` foi 'Problem', sugira 'Implication').
+        *   Se uma solução foi apresentada (`PRESENTING_SOLUTION`) e o usuário está hesitante/silencioso/respondeu minimamente: Faça uma pergunta para descobrir a causa da hesitação (`ASK_CLARIFYING_QUESTION` focada na proposta) ou reforce um benefício chave e verifique o interesse (`PRESENT_SOLUTION_OFFER` com foco específico, talvez um benefício diferente).
+        *   Se uma objeção foi recentemente resolvida (ver `resolved_objections_summary`) e o goal anterior era `ATTEMPTING_CLOSE`: Sugira retomar o fechamento (ex: `CONFIRM_ORDER_DETAILS` se `closing_process_status` era `attempt_made`).
+        *   Se o cliente parece pronto (necessidades confirmadas, objeções resolvidas) e o fechamento não foi iniciado: Considere `INITIATE_CLOSING`.
+        *   Se o usuário está silencioso por muito tempo (assuma que esta chamada é devido a um timeout se `last_user_message_text` for antigo ou "N/A" e `user_response_to_agent_action_analysis` indicar ausência de resposta): Envie uma mensagem de reengajamento (pode ser um `ASK_CLARIFYING_QUESTION` genérico como "Olá, {company_name} aqui. Você gostaria de continuar nossa conversa?" ou "Precisa de mais um momento para pensar sobre [último tópico]?").
+    *   **Evite Repetição Imediata:** Não sugira EXATAMENTE a mesma ação que o `last_agent_action_type` se a resposta do usuário foi apenas um "ok". Tente uma variação ou um próximo passo lógico.
+    *   **Se Nenhuma Ação Proativa Clara:** Se, após analisar tudo, nenhuma ação proativa parecer genuinamente útil ou apropriada (ex: o usuário pediu explicitamente para encerrar, ou a conversa está realmente num impasse intransponível), retorne `null` para `proactive_action_command`.
 
 **FORMATO DE SAÍDA ESPERADO (JSON - Schema `ProactiveStepDecision`):**
 Você DEVE responder APENAS com um objeto JSON que corresponda ao schema `ProactiveStepDecision`.
@@ -318,6 +320,10 @@ async def proactive_step_decider_node(
 
         next_action_command = llm_decision.proactive_action_command
         action_params = llm_decision.proactive_action_parameters or {}
+
+        # add follow-up attempts to action params
+        action_params["current_follow_up_attempts"] = current_follow_up_attempts
+        action_params["max_follow_up_attempts_total"] = max_follow_up_attempts_total
         # Se a chamada LLM foi bem-sucedida, mesmo que não retorne ação, não é um erro de processamento do nó.
         processing_error = None
     else:
