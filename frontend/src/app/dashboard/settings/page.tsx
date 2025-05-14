@@ -69,7 +69,7 @@ const AGENT_CREATION_STEP_DURATION = 2000;
 const MIN_TOTAL_CREATION_DISPLAY_TIME =
   AGENT_CREATION_STEPS.length * AGENT_CREATION_STEP_DURATION;
 
-const DEFAULT_AGENT_NAME = "Assistente Principal";
+const DEFAULT_AGENT_NAME = null;
 const DEFAULT_AGENT_FIRST_MESSAGE = null;
 const DEFAULT_AGENT_USE_RAG = true;
 
@@ -384,7 +384,7 @@ export default function SettingsPage(): JSX.Element {
   );
 
   const handleCreateAgent = () => {
-    const trimmedName = newAgentName.trim();
+    const trimmedName = newAgentName?.trim();
     if (!trimmedName) {
       toast.error("Nome Inválido", {
         description: "Por favor, forneça um nome para o seu vendedor IA.",
@@ -496,7 +496,7 @@ export default function SettingsPage(): JSX.Element {
             disabled={
               agentCreationMutation.isPending ||
               !fetcher ||
-              !newAgentName.trim()
+              !newAgentName?.trim()
             }
             size="lg"
             className="w-full md:w-auto"
