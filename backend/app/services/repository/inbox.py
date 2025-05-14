@@ -368,43 +368,6 @@ async def find_inboxes_by_user_membership(
     return inboxes
 
 
-# async def create_inbox(
-#     db: AsyncSession, *, account_id: UUID, user_id: UUID, inbox_data: InboxCreate
-# ) -> Inbox:
-#     """Create a new inbox for the specified account without finalizing the transaction.
-
-#     The commit and refresh should be performed by the upper layer (e.g., service or endpoint).
-
-#     Args:
-#         db (AsyncSession): Asynchronous database session.
-#         account_id (UUID): The ID of the account to associate the inbox with.
-#         user_id (UUID): The ID of the user creating the inbox (for InboxMember).
-#         inbox_data (InboxCreate): Pydantic schema containing the inbox creation data.
-
-#     Returns:
-#         Inbox: The newly created Inbox object.
-
-#     Raises:
-#         Exception: Propagates any exception encountered (upper layer should handle rollback).
-#     """
-#     logger.info(
-#         f"[InboxRepo] Creating new inbox '{inbox_data.name}' for Account={account_id}"
-#     )
-#     new_inbox = Inbox(
-#         **inbox_data.model_dump(exclude_unset=True),
-#         account_id=account_id,
-#         channel_id=inbox_data.channel_details["id"],  # type: ignore
-#     )
-#     db.add(new_inbox)
-#     await db.flush()
-#     inbox_member = InboxMember(user_id=user_id, inbox_id=new_inbox.id)
-#     db.add(inbox_member)
-#     await db.flush()
-#     # Removed commit and refresh here; these are to be handled by the caller.
-#     logger.info(f"[InboxRepo] New inbox prepared with ID={new_inbox.id}")
-#     return new_inbox
-
-
 async def update_inbox(
     db: AsyncSession, *, inbox: Inbox, update_data: InboxUpdate
 ) -> Inbox:
