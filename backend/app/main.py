@@ -19,6 +19,7 @@ from app.api.routes import websocket as ws_routes
 from app.api.routes.webhooks import clerk as clerk_routes
 from app.api.routes import evolution_instance as evolution_instance_routes
 from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
+from app.api.routes.webhooks.whatsapp_cloud import webhook as whatsapp_cloud_wb_routes
 from app.api.routes import batch_contacts as batch_contacts_routes
 from app.api.routes import research as research_routes
 from app.api.routes import bot_agent as bot_agent_routes
@@ -249,6 +250,11 @@ app.include_router(clerk_routes.router, prefix="", tags=["Clerk Webhooks"])
 app.include_router(
     evolution_wb_routes.router, prefix="", tags=["Evolution Instance Webhooks"]
 )
+
+app.include_router(
+    whatsapp_cloud_wb_routes.router, prefix="", tags=["Whatsapp Cloud Webhooks"]
+)
+
 
 # --- WebSocket Router ---
 logger.info("Including WebSocket router")

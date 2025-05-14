@@ -106,8 +106,6 @@ class Persona(BaseModel):
         UniqueConstraint(
             "simulation_contact_identifier", name="uq_persona_contact_identifier"
         ),
-        Index("ix_personas_persona_id", "persona_id"),
-        Index("ix_personas_contact_id", "contact_id"),
     )
 
     def __repr__(self):
