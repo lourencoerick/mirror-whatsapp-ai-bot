@@ -8,10 +8,20 @@ export default function Footer() {
       <div className="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
         <div className="mb-4 md:mb-0 text-center md:text-left">
           <Link href="/">
-            <span className="text-lg text-primary font-semibold ">{siteMetadata.headerTitle}</span>
+            <span className="text-lg text-primary font-semibold">
+              {siteMetadata.headerTitle}
+            </span>
           </Link>
           <p className="text-sm text-gray-500">
             © {new Date().getFullYear()} {siteMetadata.headerTitle}. Todos os direitos reservados.
+          </p>
+          <p className="text-sm text-gray-500 mt-1">
+            <Link
+              href="/politica-de-privacidade"
+              className="text-blue-600 hover:underline"
+            >
+              Política de Privacidade
+            </Link>
           </p>
         </div>
       </div>
