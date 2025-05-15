@@ -10,7 +10,7 @@ class IncomingMessagePayload(BaseModel):
     Contains raw data from the source platform.
     """
 
-    source_api: Literal["whatsapp_cloud", "whatsapp_evolution"] = Field(
+    source_api: Literal["whatsapp_cloud", "whatsapp_evolution", "simulation"] = Field(
         ..., description="Identifies the API source of the message."
     )
 
@@ -24,9 +24,14 @@ class IncomingMessagePayload(BaseModel):
     # Raw message data from the external platform.
     # This dictionary will be parsed into a platform-specific schema (e.g., WhatsAppMessageSchema)
     # inside the transformation function of the ARQ task.
-    external_raw_message: Dict[str, Any] = Field(
-        ...,
+    external_raw_message: Optional[Dict[str, Any]] = Field(
+        default=None,
         description="Raw payload of the individual message from the source platform.",
+    )
+
+    internal_dto_partial_data: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Data for InternalIncomingMessageDTO used in simulation environment",
     )
 
     class Config:

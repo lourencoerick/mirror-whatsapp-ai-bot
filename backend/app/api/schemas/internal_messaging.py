@@ -49,7 +49,7 @@ class InternalIncomingMessageDTO(BaseModel):
         description="Raw or platform-specific attributes from the original message.",
     )
 
-    source_api: Literal["whatsapp_cloud", "whatsapp_evolution"] = Field(
+    source_api: Literal["whatsapp_cloud", "whatsapp_evolution", "simulation"] = Field(
         ..., description="Source API of the message, for reference."
     )
 

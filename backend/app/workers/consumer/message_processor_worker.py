@@ -3,6 +3,8 @@
 import os
 import asyncio
 from loguru import logger
+import redis.asyncio as aioredis
+from typing import Optional
 
 # --- ARQ Specific Imports ---
 from arq.connections import RedisSettings
@@ -58,6 +60,8 @@ from app.workers.consumer.tasks.process_incoming_message import (
     process_incoming_message_task,
 )
 
+from app.services.debounce.message_debounce import MessageDebounceService
+
 # Se houver outras tarefas relacionadas ao processamento de mensagens (ex: status), importe-as aqui.
 
 
@@ -102,6 +106,32 @@ async def startup(ctx: dict):
             "Message Processor Worker: SQLAlchemy/DB URL unavailable. Database operations will be impaired."
         )
         ctx["db_session_factory"] = None
+
+    # --- Initialize MessageDebounceService ---
+    logger.info(
+        "Message Processor Worker: Initializing MessageDebounceService instance..."
+    )
+    # ARQ injeta sua própria conexão/pool Redis no contexto, geralmente como 'redis'
+    redis_client_from_arq: Optional[aioredis.Redis] = ctx.get("redis")
+
+    if redis_client_from_arq:
+        try:
+            ctx["message_debounce_service_instance"] = MessageDebounceService(
+                redis_client=redis_client_from_arq
+            )
+            logger.success(
+                "Message Processor Worker: MessageDebounceService instance created and stored in context."
+            )
+        except Exception as e_debounce_init:
+            logger.exception(
+                f"Message Processor Worker: Failed to initialize MessageDebounceService: {e_debounce_init}"
+            )
+            ctx["message_debounce_service_instance"] = None
+    else:
+        logger.error(
+            "Message Processor Worker: Redis client ('redis') not found in ARQ context. Debounce service will NOT be available."
+        )
+        ctx["message_debounce_service_instance"] = None
 
     # --- Initialize ARQ Redis Pool (para tarefas que precisam enfileirar outras tarefas, ex: IA) ---
     logger.info(
