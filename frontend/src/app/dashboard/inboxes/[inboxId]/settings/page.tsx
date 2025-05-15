@@ -327,7 +327,7 @@ export default function EditInboxPage() {
       inboxData?.channel_type === "whatsapp_cloud" &&
       inboxData.whatsapp_cloud_config?.phone_number_id
     ) {
-      return `${webhookBaseUrl}/api/v1/webhooks/whatsapp/cloud/${inboxData.whatsapp_cloud_config.phone_number_id}`;
+      return `${webhookBaseUrl}/webhooks/whatsapp/cloud/${inboxData.whatsapp_cloud_config.phone_number_id}`;
     }
     return null;
   }, [inboxData, webhookBaseUrl]);
@@ -396,12 +396,6 @@ export default function EditInboxPage() {
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     <span>Começar Pendente (Requer Humano)</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="OPEN">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <span>Começar Aberta (Requer Humano)</span>
                   </div>
                 </SelectItem>
               </SelectContent>

@@ -24,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useLayoutContext } from "@/contexts/layout-context";
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
 import { ArrowLeft, Bot, Loader2, Terminal, Users } from "lucide-react";
@@ -400,12 +399,6 @@ export default function CreateInboxPage() {
                         <span>Começar Pendente (Requer Humano)</span>
                       </div>
                     </SelectItem>
-                    <SelectItem value="OPEN">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        <span>Começar Aberta (Requer Humano)</span>
-                      </div>
-                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <p
@@ -414,20 +407,6 @@ export default function CreateInboxPage() {
                 >
                   Status padrão para novas conversas nesta caixa de entrada.
                 </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="enableAutoAssignment"
-                  checked={enableAutoAssignment}
-                  onCheckedChange={setEnableAutoAssignment}
-                  disabled={isLoading}
-                />
-                <Label
-                  htmlFor="enableAutoAssignment"
-                  className="cursor-pointer"
-                >
-                  Habilitar atribuição automática de conversas
-                </Label>
               </div>
               {formError && (
                 <Alert variant="destructive" className="mt-4">
