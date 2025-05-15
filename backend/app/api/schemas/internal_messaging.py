@@ -8,49 +8,49 @@ from datetime import datetime
 
 class InternalIncomingMessageDTO(BaseModel):
     """
-    DTO padronizado representando uma mensagem de entrada após a transformação,
-    pronta para ser processada pela lógica de negócios principal.
+    Standardized DTO representing an incoming message after transformation,
+    ready to be processed by the main business logic.
     """
 
-    # Identificadores da nossa plataforma (preenchidos pela função de transformação)
+    # Identifiers from our platform (filled in by the transformation function)
     account_id: UUID
     inbox_id: UUID
     contact_id: UUID
     conversation_id: UUID
 
-    # Dados da mensagem original
+    # Original message data
     external_message_id: str = Field(
         ...,
-        description="ID da mensagem na plataforma de origem (ex: WAMID, ID da Evolution).",
+        description="Message ID on the source platform (e.g., WAMID, Evolution ID).",
     )
     sender_identifier: str = Field(
         ...,
-        description="Identificador do remetente na plataforma de origem (ex: número de telefone, remoteJid).",
+        description="Sender identifier on the source platform (e.g., phone number, remoteJid).",
     )
 
     message_content: Optional[str] = Field(
-        None, description="Conteúdo principal da mensagem (texto, caption de mídia)."
+        None, description="Main content of the message (text, media caption, etc.)."
     )
 
     internal_content_type: str = Field(
         ...,
-        description="Tipo da mensagem normalizado para o sistema interno (ex: text, image, audio).",
+        description="Normalized internal message type (e.g., text, image, audio).",
     )
 
     message_timestamp: datetime = Field(
-        ..., description="Timestamp da mensagem original (UTC)."
+        ..., description="Timestamp of the original message (UTC)."
     )
 
-    # Atributos brutos ou específicos da plataforma que podem ser úteis para processamento posterior
-    # ou para armazenar metadados completos.
-    # Ex: ID de mídia para download, contexto de resposta, botões clicados, etc.
+    # Raw or platform-specific attributes that may be useful for further processing
+    # or for storing complete metadata.
+    # E.g.: media ID for download, reply context, clicked buttons, etc.
     raw_message_attributes: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Atributos brutos ou específicos da plataforma da mensagem original.",
+        description="Raw or platform-specific attributes from the original message.",
     )
 
     source_api: Literal["whatsapp_cloud", "whatsapp_evolution"] = Field(
-        ..., description="API de origem da mensagem, para referência."
+        ..., description="Source API of the message, for reference."
     )
 
     class Config:
@@ -63,8 +63,8 @@ class InternalIncomingMessageDTO(BaseModel):
                 "conversation_id": "d1e2f3g4-h5i6-7890-1234-567890abcdef",
                 "external_message_id": "wamid.XYZ",
                 "sender_identifier": "16505551234",
-                "message_content": "Olá, gostaria de mais informações.",
-                "internal_message_type": "text",
+                "message_content": "Hello, I’d like more information.",
+                "internal_content_type": "text",
                 "message_timestamp": "2023-10-27T10:30:00Z",
                 "raw_message_attributes": {
                     "whatsapp_context": {"from": "16505550000", "id": "wamid.PREVIOUS"}
