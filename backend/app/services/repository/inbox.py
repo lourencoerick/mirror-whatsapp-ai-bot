@@ -7,17 +7,81 @@ from loguru import logger
 from sqlalchemy.exc import IntegrityError
 import enum
 
+from app.models.account import Account
 from app.models.inbox import Inbox
 from app.models.inbox_member import InboxMember
 from app.models.bot_agent_inbox import BotAgentInbox
 from app.api.schemas.inbox import InboxCreate, InboxUpdate
 from app.models.conversation import ConversationStatusEnum
+
 from app.models.channels.channel_types import ChannelTypeEnum
+from app.models.channels.whatsapp_cloud_config import WhatsAppCloudConfig
 from app.services.repository.whatsapp_cloud_config import (
     create_whatsapp_cloud_config,
 )
 
+
 from app.services.repository import evolution_instance as evolution_instance_repo
+
+from pydantic import BaseModel
+
+
+class InboxAccountDetails(BaseModel):
+    inbox: Inbox
+    account: Account
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+async def find_inbox_and_account_by_wpp_cloud_phone_id(
+    db: AsyncSession, wpp_phone_number_id: str
+) -> Optional[InboxAccountDetails]:
+    """
+    Finds an active Inbox and its associated Account based on the
+    WhatsApp Cloud API Phone Number ID.
+
+    Args:
+        db: The SQLAlchemy async session.
+        wpp_phone_number_id: The Phone Number ID from WhatsApp Cloud API,
+                             which is stored in WhatsAppCloudConfig.
+
+    Returns:
+        An InboxAccountDetails object containing the Inbox and Account if found
+        and the inbox is linked to a WhatsAppCloudConfig with the given phone_number_id,
+        otherwise None.
+    """
+    logger.debug(
+        f"Attempting to find Inbox and Account by WhatsApp Cloud Phone Number ID: {wpp_phone_number_id}"
+    )
+
+    stmt = (
+        select(Inbox, Account)
+        .join(
+            WhatsAppCloudConfig,
+            Inbox.whatsapp_cloud_config_id == WhatsAppCloudConfig.id,
+        )
+        .join(Account, Inbox.account_id == Account.id)
+        .where(
+            WhatsAppCloudConfig.phone_number_id == wpp_phone_number_id,
+        )
+        .options(selectinload(Inbox.whatsapp_cloud_config), selectinload(Inbox.account))
+    )
+
+    result = await db.execute(stmt)
+    row = result.one_or_none()
+
+    if row:
+        inbox_instance, account_instance = row
+        logger.info(
+            f"Found Inbox ID {inbox_instance.id} and Account ID {account_instance.id} for WPP Phone Number ID {wpp_phone_number_id}"
+        )
+        return InboxAccountDetails(inbox=inbox_instance, account=account_instance)
+    else:
+        logger.warning(
+            f"No active Inbox/Account found for WhatsApp Cloud Phone Number ID: {wpp_phone_number_id}"
+        )
+        return None
 
 
 async def create_inbox(
