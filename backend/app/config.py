@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     RESPONSE_SENDER_QUEUE_NAME: str = "response_queue"
     AI_REPLY_QUEUE_NAME: str = "ai_reply_queue"
     MESSAGE_QUEUE_NAME: str = "message_queue"
+    MESSAGE_PROCESSING_ARQ_QUEUE_NAME: str = "message_queue2"
     BATCH_ARQ_QUEUE_NAME: str = "batch_queue"
 
     RESPONSE_SENDER_WORKER_INTERNAL_URL: Optional[str] = (
@@ -83,9 +84,13 @@ class Settings(BaseSettings):
         "https://ai-replier-worker-g4mps25xua-uc.a.run.app"
     )
 
+    # --- Meta ---
+    META_APP_SECRET: str = "your-meta-secret"
+
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True
+    ENVIRONMENT: str = "development"
 
     @property
     def DATABASE_URL(self) -> str:
