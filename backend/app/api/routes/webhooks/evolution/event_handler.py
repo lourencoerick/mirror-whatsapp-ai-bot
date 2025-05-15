@@ -1,10 +1,11 @@
 from uuid import UUID
-from typing import Callable, Coroutine, Any, Dict
+from typing import Callable, Coroutine, Any, Dict, Optional
 from fastapi import HTTPException, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
+from sqlalchemy import select
 from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
+from arq.connections import ArqRedis
 
 from app.database import get_db
 from app.models.channels.evolution_instance import EvolutionInstance
@@ -13,19 +14,10 @@ from app.api.schemas.webhooks.evolution import (
     EvolutionWebhookPayload,
 )
 
-from app.api.schemas.message import MessageCreate
+from app.api.schemas.queue_payload import IncomingMessagePayload
 
 
-from app.services.queue.iqueue import IQueue
-from app.services.queue.redis_queue import RedisQueue
-
-from app.services.helper.websocket import publish_to_instance_ws
-from app.services.helper.webhook import find_account_id_from_source
-from app.services.parser.parse_webhook_to_message import parse_webhook_to_message
-
-from app.services.debounce.message_debounce import get_message_debounce_service
-from app.services.queue.utils.enqueue import enqueue_ai_processing_task
-
+from app.core.arq_manager import get_arq_pool
 from app.core.wake_workers import wake_worker
 from app.config import get_settings
 
@@ -113,115 +105,113 @@ async def handle_connection_update(
 
 
 async def handle_message(
+    # The instance_id (UUID) should come from the path of the webhook route,
+    # uniquely identifying our EvolutionInstance record.
+    # The payload.instance (string) is the name from Evolution API.
     instance_id: UUID,
     payload: EvolutionWebhookPayload,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(
+        get_db
+    ),  # db might not be needed if all DB ops are in ARQ task
 ) -> Dict[str, Any]:
     """
-    Webhook to handle messages from Evolution API (unofficial WhatsApp).
-    Parses and enqueues a single message for processing.
+    Webhook to handle messages from Evolution API.
+    Validates payload and enqueues it for asynchronous processing via ARQ.
+
+    Args:
+        instance_id: The internal UUID of our EvolutionInstance model,
+                                  derived from the webhook path.
+        payload: The validated EvolutionWebhookPayload.
+        db: Async database session (may not be needed here).
+
+    Returns:
+        A dictionary indicating the message was enqueued.
     """
-    queue: IQueue = RedisQueue(queue_name="message_queue")
+    log_prefix = f"[EventHandler|Msg|EvoInstanceUUID:{instance_id}]"
+    logger.info(
+        f"{log_prefix} Received event '{payload.event}'. Evo Instance Name from payload: {payload.instance}"
+    )
+
+    # Get ARQ client
+    arq_pool: Optional[ArqRedis] = await get_arq_pool()
+    if not arq_pool:
+        logger.critical(
+            f"{log_prefix} ARQ client (pool) is not available. Cannot enqueue webhook event."
+        )
+        # Return 200 to Evolution API to prevent it from disabling the webhook.
+        # The message will be lost if there's no dead-letter or retry mechanism for this step.
+        # This is a critical monitoring point.
+        raise HTTPException(
+            status_code=503,  # Service Unavailable
+            detail="Message processing queue is currently unavailable. Please try again later.",
+        )
 
     try:
         logger.debug(
-            f"[webhook] Validated Evolution payload: {payload.model_dump_json(indent=2)}"
+            f"{log_prefix} Validated Evolution payload: {payload.model_dump_json(indent=2, exclude_none=True)}"
         )
 
-        event = payload.event or ""
-        logger.info(f"[webhook] Instance: {instance_id}, event {event} ")
-        # instance_id = payload.data.instanceId if payload.data else None
+        event = payload.event
+        # The 'instance' field in the payload is the name/identifier from Evolution.
+        evolution_instance_name_from_payload = payload.instance
 
-        account_id = await find_account_id_from_source(str(instance_id), db)
+        # We're using instance_id from the path as the primary link to our system's instance record.
+        # The transformer task will use this UUID to fetch the AccountID.
 
-        logger.info(f"[webhook] Account {account_id}, event {event} ")
-        if not account_id:
-            logger.warning("[webhook] Account not found for source_id")
-            e = HTTPException(status_code=404, detail="Account not found for source_id")
-            logger.error(f"[webhook] {e}")
-            raise e
-        elif event not in ["messages.upsert"]:
-            logger.warning("[webhook] Not a treatable event")
-            e = HTTPException(status_code=400, detail="Not a treatable event")
-            logger.error(f"[webhook] {e}")
-            raise e
+        if event not in [
+            "messages.upsert",
+            "messages.update",
+        ]:  # Expand if handling more message-like events
+            logger.warning(
+                f"{log_prefix} Event '{event}' is not a processable message event. Skipping."
+            )
+            # Return a 200 OK as we've "handled" it by ignoring it.
+            return {"status": "event_ignored", "event_type": event}
 
-        # try:
-        #     db.execute(
-        #         text("SET LOCAL my.app.account_id = :account_id"),
-        #         {"account_id": str(account_id)},
-        #     )
-        #     logger.debug(f"[webhook] SET LOCAL my.app.account_id = {account_id}")
-        # except SQLAlchemyError as e:
-        #     logger.error(f"[webhook] Error setting local account_id: {e}")
-        #     e = HTTPException(status_code=500, detail="Database error")
-        #     raise e from e
-
-        message: MessageCreate = await parse_webhook_to_message(
-            db=db, account_id=account_id, payload=payload.model_dump()
+        # Construct the payload for the ARQ task
+        # The business_identifier for Evolution will be our internal EvolutionInstance UUID (stringified).
+        # The ARQ task will use this to look up the associated account_id.
+        arq_task_payload = IncomingMessagePayload(
+            source_api="whatsapp_evolution",
+            business_identifier=str(instance_id),
+            external_raw_message=payload.model_dump(by_alias=True, exclude_none=True),
         )
-
-        if not message:
-            e = HTTPException(status_code=400, detail="No valid message found")
-            logger.error(f"[webhook] {e}")
-            raise e
 
         await wake_worker(settings.MESSAGE_CONSUMER_WORKER_INTERNAL_URL)
         await wake_worker(settings.AI_REPLIER_INTERNAL_URL)
         await wake_worker(settings.RESPONSE_SENDER_WORKER_INTERNAL_URL)
-        await queue.enqueue(message)
-        logger.info(f"[webhook] Enqueued Evolution message: {message.get('source_id')}")
+        # Enqueue the task
+        await arq_pool.enqueue_job(
+            "process_incoming_message_task",  # Name of the ARQ task function
+            arq_payload_dict=arq_task_payload.model_dump(),
+            _queue_name=settings.MESSAGE_PROCESSING_ARQ_QUEUE_NAME,
+        )
 
-        # --- Caminho 2: Debounce para IA ---
-        # Extrair dados necessários para o debounce service
+        logger.info(
+            f"{log_prefix} Enqueued event '{event}' for Evo instance name '{evolution_instance_name_from_payload}' (Our UUID: {instance_id}) for async processing."
+        )
 
-        if message.get("direction", "") == "in":
-            message_debounce_service = get_message_debounce_service()
-            conversation_id_from_payload = message.get("conversation_id")
-            current_message_content = message.get("content")
-
-            if (
-                not conversation_id_from_payload
-            ):  # Deve ser encontrado por parse_webhook_to_message
-                logger.error(
-                    "[webhook:handle_message] conversation_id missing from parsed payload. Cannot proceed with debounce."
-                )
-                # Isso seria um erro de lógica no parse_webhook_to_message
-                raise HTTPException(
-                    status_code=500,
-                    detail="Internal error: conversation_id not determined",
-                )
-
-            base_payload_for_debounce = {
-                "account_id": account_id,  # UUID
-                "conversation_id": conversation_id_from_payload
-
-            }
-
-            await message_debounce_service.handle_incoming_message(
-                conversation_id=conversation_id_from_payload,
-                current_message_content=current_message_content,
-                base_payload_for_task=base_payload_for_debounce,
-                task_enqueuer_func=enqueue_ai_processing_task,
-            )
-            logger.info(
-                f"[webhook:handle_message] Message content for conv {conversation_id_from_payload} handed to debounce service."
-            )
-
+        # The source_id of the message itself is not known at this stage,
+        # it will be extracted by the transformer.
         return {
-            "status": "message enqueued",
-            "source_id": message.get("source_id"),
-            "conversation_id": str(message.get("conversation_id")),
+            "status": "message_enqueued_for_processing",
+            "event_type": event,
+            "evolution_instance_name": evolution_instance_name_from_payload,
+            "instance_id": str(instance_id),
         }
 
-    except HTTPException as e:
-        logger.error(f"[webhook] {e}")
+    except HTTPException:
+        # Re-raise HTTPExceptions directly
         raise
     except Exception as e:
-        logger.exception(f"[webhook] Error while handling Evolution payload: {e}")
-        e = HTTPException(status_code=500, detail="Internal Server Error")
-        logger.error(f"[webhook] {e}")
-        raise e
+        logger.exception(
+            f"{log_prefix} Error while preparing to enqueue Evolution payload: {e}"
+        )
+        # For other errors, return a generic 500 to the client (Evolution API)
+        # but log the details. The message might be lost.
+        raise HTTPException(
+            status_code=500, detail="Internal Server Error processing webhook."
+        ) from e
 
 
 async def handle_unknown_event(

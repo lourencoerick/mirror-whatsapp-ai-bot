@@ -168,8 +168,8 @@ async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
                 # Se Evolution também agrupar mensagens ou tiver informações de contato separadas, ajuste aqui.
                 transformed_dto = await transform_evolution_api_to_internal_dto(
                     db=db,
-                    instance_name=arq_payload.business_identifier,
-                    raw_evolution_message_dict=external_value_or_message_dict,  # Assumindo que é a mensagem individual
+                    internal_evolution_instance_uuid=arq_payload.business_identifier,
+                    raw_evolution_webhook_payload_dict=external_value_or_message_dict,  # Assumindo que é a mensagem individual
                 )
                 if transformed_dto:
                     internal_dto_list.append(transformed_dto)
