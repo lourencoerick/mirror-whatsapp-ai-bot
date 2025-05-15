@@ -16,6 +16,7 @@ from app.models.conversation import ConversationStatusEnum
 
 from app.models.channels.channel_types import ChannelTypeEnum
 from app.models.channels.whatsapp_cloud_config import WhatsAppCloudConfig
+from app.models.channels.evolution_instance import EvolutionInstance
 from app.services.repository.whatsapp_cloud_config import (
     create_whatsapp_cloud_config,
 )
@@ -32,6 +33,55 @@ class InboxAccountDetails(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+
+async def find_inbox_and_account_by_evolution_instance_id(
+    db: AsyncSession, evolution_instance_id: UUID
+) -> Optional[InboxAccountDetails]:
+    """
+    Finds an active Inbox and its associated Account based on the
+    WhatsApp Cloud API Phone Number ID.
+
+    Args:
+        db: The SQLAlchemy async session.
+        evolution_instance_id: The Instance ID from Evolution API.
+
+    Returns:
+        An InboxAccountDetails object containing the Inbox and Account if found
+        and the inbox is linked to a WhatsAppCloudConfig with the given phone_number_id,
+        otherwise None.
+    """
+    logger.debug(
+        f"Attempting to find Inbox and Account by Instance ID: {evolution_instance_id}"
+    )
+
+    stmt = (
+        select(Inbox, Account)
+        .join(
+            EvolutionInstance,
+            Inbox.evolution_instance_id == EvolutionInstance.id,
+        )
+        .join(Account, Inbox.account_id == Account.id)
+        .where(
+            EvolutionInstance.id == evolution_instance_id,
+        )
+        .options(selectinload(Inbox.evolution_instance), selectinload(Inbox.account))
+    )
+
+    result = await db.execute(stmt)
+    row = result.one_or_none()
+
+    if row:
+        inbox_instance, account_instance = row
+        logger.info(
+            f"Found Inbox ID {inbox_instance.id} and Account ID {account_instance.id} for Evolution Instance ID {evolution_instance_id}"
+        )
+        return InboxAccountDetails(inbox=inbox_instance, account=account_instance)
+    else:
+        logger.warning(
+            f"No active Inbox/Account found for Evolution Instance ID: {evolution_instance_id}"
+        )
+        return None
 
 
 async def find_inbox_and_account_by_wpp_cloud_phone_id(

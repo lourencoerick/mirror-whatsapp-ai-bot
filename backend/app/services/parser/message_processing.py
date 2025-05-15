@@ -35,10 +35,17 @@ from app.services.helper.websocket import (
     publish_to_conversation_ws,
     publish_to_account_conversations_ws,
 )
+from app.services.debounce.message_debounce import (
+    MessageDebounceService,
+)
+
+from app.services.queue.utils.enqueue import enqueue_ai_processing_task
 
 
 async def process_incoming_message_logic(
-    db: AsyncSession, internal_message: InternalIncomingMessageDTO
+    db: AsyncSession,
+    internal_message: InternalIncomingMessageDTO,
+    debounce_service: Optional[MessageDebounceService],
 ):
     """
     Core logic to process a standardized InternalIncomingMessageDTO.
@@ -53,10 +60,14 @@ async def process_incoming_message_logic(
     4. Publishing WebSocket events to notify clients.
     5. Committing all database changes as a single transaction.
     """
+    log_prefix = f"MsgLogic (ExtID: {internal_message.external_message_id}, ConvoID: {internal_message.conversation_id}):"
+    logger.info(f"{log_prefix} Starting core processing.")
     logger.info(
-        f"Processing message logic for internal DTO, source: {internal_message.source_api}, source_id: {internal_message.external_message_id}"
+        f"{log_prefix} Processing message logic for internal DTO, source: {internal_message.source_api}, source_id: {internal_message.external_message_id}"
     )
-    logger.debug(f"Internal DTO payload: {internal_message.model_dump_json(indent=2)}")
+    logger.debug(
+        f"{log_prefix} Internal DTO payload: {internal_message.model_dump_json(indent=2)}"
+    )
 
     try:
         # --- 1. Prepare MessageCreateSchema for the repository ---
@@ -85,13 +96,13 @@ async def process_incoming_message_logic(
 
         if not db_message:
             logger.error(
-                f"Failed to get or create message for source_id: {internal_message.external_message_id}. Aborting processing for this message."
+                f"{log_prefix} Failed to get or create message for source_id: {internal_message.external_message_id}. Aborting processing for this message."
             )
             # Do not raise to avoid infinite retries in ARQ due to bad data.
             return
 
         logger.info(
-            f"Message record {db_message.id} (external: {db_message.source_id}) obtained/created."
+            f"{log_prefix} Message record {db_message.id} (external: {db_message.source_id}) obtained/created."
         )
 
         # --- 3. Find associated Conversation ---
@@ -103,7 +114,7 @@ async def process_incoming_message_logic(
 
         if not conversation:
             logger.error(
-                f"Conversation {db_message.conversation_id} not found for message {db_message.id}. "
+                f"{log_prefix} Conversation {db_message.conversation_id} not found for message {db_message.id}. "
                 "This is unexpected as it should have been created/found by the transformer. Aborting."
             )
             raise Exception(
@@ -111,7 +122,7 @@ async def process_incoming_message_logic(
             )
 
         logger.info(
-            f"Processing updates for conversation {conversation.id} (current status: {conversation.status.value})"
+            f"{log_prefix} Processing updates for conversation {conversation.id} (current status: {conversation.status.value})"
         )
 
         # --- 4. Update Conversation State ---
@@ -130,7 +141,7 @@ async def process_incoming_message_logic(
             if updated_conv_increment:
                 final_updated_conversation = updated_conv_increment
             logger.debug(
-                f"Incremented unread count for conversation {conversation.id}. New count: {final_updated_conversation.unread_agent_count}"
+                f"{log_prefix} Incremented unread count for conversation {conversation.id}. New count: {final_updated_conversation.unread_agent_count}"
             )
 
             if final_updated_conversation.status == ConversationStatusEnum.CLOSED:
@@ -152,19 +163,61 @@ async def process_incoming_message_logic(
                     if updated_conv_status:
                         final_updated_conversation = updated_conv_status
                     logger.info(
-                        f"Re-opened conversation {final_updated_conversation.id} to status {new_status_on_reopen.value}"
+                        f"{log_prefix} Re-opened conversation {final_updated_conversation.id} to status {new_status_on_reopen.value}"
                     )
                 else:
                     logger.warning(
-                        f"Could not find inbox {final_updated_conversation.inbox_id} or it has no initial_conversation_status defined. Conversation {final_updated_conversation.id} remains {final_updated_conversation.status.value}."
+                        f"{log_prefix} Could not find inbox {final_updated_conversation.inbox_id} or it has no initial_conversation_status defined. Conversation {final_updated_conversation.id} remains {final_updated_conversation.status.value}."
                     )
 
         await update_last_message_snapshot(
             db=db, conversation=final_updated_conversation, message=db_message
         )
         logger.debug(
-            f"Updated last message snapshot for conversation {final_updated_conversation.id}"
+            f"{log_prefix} Updated last message snapshot for conversation {final_updated_conversation.id}"
         )
+
+        # --- DEBOUNCE SERVICE CALL  ---
+        should_trigger_ai_debounce = (
+            db_message.direction == "in"
+            and internal_message.internal_content_type == "text"
+            and internal_message.message_content
+            and conversation.status
+            in [
+                ConversationStatusEnum.BOT,
+                ConversationStatusEnum.OPEN,
+                ConversationStatusEnum.PENDING,
+                ConversationStatusEnum.HUMAN_ACTIVE,
+            ]
+        )
+
+        if should_trigger_ai_debounce:
+            if debounce_service:  # Verificar se a instância foi fornecida
+                logger.info(
+                    f"{log_prefix} Conditions met for AI debounce. Using provided debounce service."
+                )
+                base_payload_for_debounce_task = {
+                    "account_id": internal_message.account_id,
+                    "conversation_id": internal_message.conversation_id,
+                    # Adicionar "last_user_message_id": str(db_message.id) se a IA precisar
+                }
+                await debounce_service.handle_incoming_message(
+                    conversation_id=internal_message.conversation_id,
+                    current_message_content=internal_message.message_content,
+                    base_payload_for_task=base_payload_for_debounce_task,
+                    task_enqueuer_func=enqueue_ai_processing_task,
+                )
+                logger.info(
+                    f"{log_prefix} Message content handed to debounce service for conversation {internal_message.conversation_id}."
+                )
+            else:
+                logger.warning(
+                    f"{log_prefix} Conditions met for AI debounce, but debounce_service was not available/provided. Skipping debounce."
+                )
+        else:
+            logger.info(
+                f"{log_prefix} Conditions not met for AI debounce for this message."
+            )
 
         # --- 5. WebSocket Publishing ---
         try:
@@ -174,11 +227,11 @@ async def process_incoming_message_logic(
                 data={"type": "new_message", "payload": message_for_ws},
             )
             logger.debug(
-                f"WebSocket: Published new_message event for conversation {db_message.conversation_id}"
+                f"{log_prefix} WebSocket: Published new_message event for conversation {db_message.conversation_id}"
             )
         except Exception as e:
             logger.warning(
-                f"WebSocket: Failed to publish new_message {db_message.id}: {e}",
+                f"{log_prefix} WebSocket: Failed to publish new_message {db_message.id}: {e}",
                 exc_info=True,
             )
 
@@ -207,31 +260,31 @@ async def process_incoming_message_logic(
                         },
                     )
                     logger.debug(
-                        f"WebSocket: Published conversation_updated event for {final_updated_conversation.id}"
+                        f"{log_prefix} WebSocket: Published conversation_updated event for {final_updated_conversation.id}"
                     )
                 else:
                     logger.warning(
-                        f"WebSocket: Failed to parse reloaded conversation {final_updated_conversation.id} for update event."
+                        f"{log_prefix} WebSocket: Failed to parse reloaded conversation {final_updated_conversation.id} for update event."
                     )
             else:
                 logger.warning(
-                    f"WebSocket: Could not reload conversation {final_updated_conversation.id} for update event."
+                    f"{log_prefix} WebSocket: Could not reload conversation {final_updated_conversation.id} for update event."
                 )
         except Exception as e:
             logger.warning(
-                f"WebSocket: Failed to publish conversation_updated for {final_updated_conversation.id}: {e}",
+                f"{log_prefix} WebSocket: Failed to publish conversation_updated for {final_updated_conversation.id}: {e}",
                 exc_info=True,
             )
 
         # --- 6. Commit ---
         await db.commit()
         logger.info(
-            f"Successfully processed and committed changes for DTO, source_id: {internal_message.external_message_id}, message_id: {db_message.id}"
+            f"{log_prefix} Successfully processed and committed changes for DTO, source_id: {internal_message.external_message_id}, message_id: {db_message.id}"
         )
 
     except Exception as e:
         logger.exception(
-            f"Core logic error processing DTO for source_id: {internal_message.external_message_id if internal_message else 'Unknown DTO'}"
+            f"{log_prefix} Core logic error processing DTO for source_id: {internal_message.external_message_id if internal_message else 'Unknown DTO'}"
         )
         await db.rollback()
         raise

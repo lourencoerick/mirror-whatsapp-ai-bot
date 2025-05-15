@@ -4,7 +4,8 @@ from uuid import UUID, uuid4
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
+from arq.connections import ArqRedis
 
 from sqlalchemy import delete, text
 
@@ -26,9 +27,6 @@ from app.api.schemas.simulation import (
     SimulationMessageCreate,
     SimulationMessageEnqueueResponse,
 )
-
-from app.services.debounce.message_debounce import get_message_debounce_service
-from app.services.queue.utils.enqueue import enqueue_ai_processing_task
 
 try:
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -64,6 +62,9 @@ from app.simulation.repositories import persona as persona_repo  # Import repo n
 
 from app.core.wake_workers import wake_worker
 from app.config import get_settings
+from app.api.schemas.queue_payload import IncomingMessagePayload
+from app.api.schemas.internal_messaging import InternalIncomingMessageDTO
+from app.core.arq_manager import get_arq_pool
 
 settings = get_settings()
 MESSAGE_QUEUE_NAME = settings.MESSAGE_QUEUE_NAME
@@ -72,110 +73,114 @@ MESSAGE_QUEUE_NAME = settings.MESSAGE_QUEUE_NAME
 async def _enqueue_simulation_message(
     account_id: UUID,
     conversation_id: UUID,
-    message_payload: SimulationMessageCreate,
-    db: AsyncSession,
+    message_payload: SimulationMessageCreate,  # Payload da requisição da UI/API
+    db: AsyncSession,  # db é passado para buscar a conversa
 ) -> SimulationMessageEnqueueResponse:
 
-    # --- Fetch Conversation (ensure related data is loaded if needed by validation/payload) ---
+    logger.info(
+        f"Attempting to enqueue simulation message for conversation {conversation_id}"
+    )
+
+    # --- Fetch Conversation e Validações (como no seu código original) ---
     conversation = await conversation_repo.find_conversation_by_id(
         db, conversation_id=conversation_id, account_id=account_id
     )
-
-    # --- Validation ---
     if not conversation:
         logger.warning(
-            f"Simulation message enqueue failed: Conversation {conversation_id} not found for account {account_id}."
+            f"Simulation: Conversation {conversation_id} not found for account {account_id}."
         )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversa de simulação não encontrada.",
         )
-
     if not conversation.is_simulation:
         logger.warning(
-            f"Account {account_id} attempted to enqueue simulation message to non-simulation conversation {conversation_id}."
+            f"Simulation: Attempt to enqueue to non-simulation conversation {conversation_id}."
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Esta operação só é permitida em conversas de simulação.",
+            detail="Operação permitida apenas em conversas de simulação.",
         )
-
-    # Ensure related objects needed for the payload are loaded
     if not conversation.contact_inbox or not conversation.contact_inbox.contact_id:
-        logger.error(
-            f"Failed to load contact details (contact_inbox or contact_id) for simulation conversation {conversation_id}."
-        )
-        # Refresh might help if lazy loading failed, but indicates an issue
         await db.refresh(conversation, attribute_names=["contact_inbox"])
         if not conversation.contact_inbox or not conversation.contact_inbox.contact_id:
+            logger.error(
+                f"Simulation: Failed to load contact details for conversation {conversation_id}."
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Falha ao carregar detalhes do contato/inbox da simulação.",
+                detail="Falha ao carregar detalhes do contato da simulação.",
             )
 
-    # --- Prepare Message Data for Queue  ---
-    source_id = f"sim_ui_{uuid4()}"
-    message_create_data = {
-        "account_id": conversation.account_id,
-        "inbox_id": conversation.inbox_id,
-        "conversation_id": conversation.id,
-        "contact_id": conversation.contact_inbox.contact_id,
-        "source_id": source_id,
-        "direction": "in",
-        "status": "pending",
-        "message_timestamp": datetime.now(timezone.utc).isoformat(),
-        "content": message_payload.content,
-        "content_type": "text",
-        "is_simulation": True,
-        "content_attributes": {
-            "source": "frontend_simulation",
-            "channel_type": (
-                conversation.inbox.channel_type if conversation.inbox else "simulation"
-            ),
+    # --- Preparar Dados para o InternalIncomingMessageDTO (parcialmente) ---
+    simulated_external_id = f"sim_{uuid4().hex}"
+    message_timestamp_now = datetime.now(timezone.utc)
+
+    # Dados que irão para o campo 'internal_dto_partial_data' do IncomingMessagePayload
+    # Estes campos devem espelhar o InternalIncomingMessageDTO
+    internal_dto_data_for_arq = {
+        "account_id": str(conversation.account_id),
+        "inbox_id": str(conversation.inbox_id),
+        "contact_id": str(conversation.contact_inbox.contact_id),
+        "conversation_id": str(conversation.id),
+        "external_message_id": simulated_external_id,
+        "sender_identifier": (
+            conversation.contact_inbox.contact.identifier
+            if conversation.contact_inbox.contact
+            else f"sim_contact_{conversation.contact_inbox.contact_id}"
+        ),
+        "message_content": message_payload.content,
+        "internal_content_type": "text",
+        "message_timestamp": message_timestamp_now.isoformat(),
+        "raw_message_attributes": {
+            "simulation_source": "api_simulation_endpoint",
+            "original_simulation_payload": message_payload.model_dump(),
         },
+        "source_api": "simulation",
     }
 
-    # --- Enqueue the Data ---
+    # --- Montar Payload para ARQ ---
+    arq_task_payload = IncomingMessagePayload(
+        source_api="simulation",
+        business_identifier=str(conversation.inbox_id),
+        external_raw_message=None,
+        internal_dto_partial_data=internal_dto_data_for_arq,
+    )
+
+    # --- Enfileirar para ARQ ---
     try:
-        queue: IQueue = RedisQueue(queue_name=MESSAGE_QUEUE_NAME)
-        await queue.enqueue(message_create_data)
+        arq_client: Optional[ArqRedis] = await get_arq_pool()
+        if not arq_client:
+            logger.critical("Simulation: ARQ client (pool) is not available.")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Serviço de processamento de mensagens indisponível.",
+            )
+
+        await arq_client.enqueue_job(
+            "process_incoming_message_task",  # Mesmo nome de tarefa
+            arq_payload_dict=arq_task_payload.model_dump(
+                exclude_none=True
+            ),  # Passar o dict
+            _queue_name=settings.MESSAGE_QUEUE_NAME,
+        )
         logger.info(
-            f"Enqueued simulation message data with source_id {source_id} for conversation {conversation_id}."
+            f"Enqueued simulation message (external_id: {simulated_external_id}) for conversation {conversation_id} to ARQ."
         )
 
-        debounce_service = get_message_debounce_service()
-
-        base_payload_for_debounce = {
-            "account_id": account_id,  # UUID
-            "conversation_id": conversation.id,
-        }
-
-        await debounce_service.handle_incoming_message(
-            conversation_id=conversation.id,
-            current_message_content=message_payload.content,
-            base_payload_for_task=base_payload_for_debounce,
-            task_enqueuer_func=enqueue_ai_processing_task,
-        )
-
-        logger.info(
-            f"[simulation] Message content for conv {conversation_id} handed to debounce service."
-        )
-        # --- Return Confirmation ---
-        # Return the confirmation dictionary matching the response_model
         return SimulationMessageEnqueueResponse(
-            status="message enqueued",
-            source_id=source_id,
+            status="message enqueued for ARQ processing",
+            source_id=simulated_external_id,  # Usar o ID gerado para a mensagem simulada
             conversation_id=str(conversation_id),
         )
 
     except Exception as e:
         logger.exception(
-            f"Error enqueuing simulation message for conversation {conversation_id}: {e}"
+            f"Error enqueuing simulation message for conversation {conversation_id} to ARQ: {e}"
         )
-        # No rollback needed as no DB changes were made here
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Falha ao enfileirar a mensagem de simulação para processamento.",
+            detail="Falha ao enfileirar a mensagem de simulação para processamento ARQ.",
         ) from e
 
 

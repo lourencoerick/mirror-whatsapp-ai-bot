@@ -26,6 +26,8 @@ from app.services.parser.message_webhook_parser import (
 # Lógica de Serviço Principal
 from app.services.parser.message_processing import process_incoming_message_logic
 
+from app.services.debounce.message_debounce import MessageDebounceService
+
 
 async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
     """
@@ -62,6 +64,14 @@ async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
             "ARQ Worker Misconfiguration: Database session factory not available."
         )
 
+    debounce_service: Optional[MessageDebounceService] = ctx.get(
+        "message_debounce_service_instance"
+    )
+    if not debounce_service:
+        logger.warning(
+            f"{log_prefix} MessageDebounceService instance not found in ARQ context. Debounce functionality will be skipped."
+        )
+
     async with db_session_factory() as db:  # Nova sessão de DB para esta tarefa
         processed_dtos_count = 0
         try:
@@ -70,12 +80,12 @@ async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
                 arq_payload = IncomingMessagePayload.model_validate(arq_payload_dict)
             except ValidationError as e_val_arq:
                 logger.error(
-                    f"{log_prefix} Invalid ArqIncomingMessagePayload structure: {e_val_arq.errors()}. Payload: {arq_payload_dict}"
+                    f"{log_prefix} Invalid IncomingMessagePayload structure: {e_val_arq.errors()}. Payload: {arq_payload_dict}"
                 )
                 return  # Erro de payload, não retentar
 
             logger.debug(
-                f"{log_prefix} Validated ArqIncomingMessagePayload. Source: {arq_payload.source_api}"
+                f"{log_prefix} Validated IncomingMessagePayload. Source: {arq_payload.source_api}"
             )
 
             # external_raw_message é o objeto 'value' da Meta (como um dict) ou o payload da Evolution
@@ -83,7 +93,27 @@ async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
 
             internal_dto_list: List[InternalIncomingMessageDTO] = []
 
-            if arq_payload.source_api == "whatsapp_cloud":
+            if arq_payload.source_api == "simulation":
+                if arq_payload.internal_dto_partial_data:
+                    try:
+                        internal_dto = InternalIncomingMessageDTO.model_validate(
+                            arq_payload.internal_dto_partial_data
+                        )
+                        logger.info(
+                            f"{log_prefix} Successfully created InternalIncomingMessageDTO from simulation override data."
+                        )
+                        internal_dto_list.append(internal_dto)
+                    except ValidationError as e_val_dto:
+                        logger.error(
+                            f"{log_prefix} Invalid internal_dto_partial_data for simulation: {e_val_dto.errors()}. Payload: {arq_payload.internal_dto_partial_data}"
+                        )
+                        return  # Erro de payload, não retentar
+                else:
+                    logger.error(
+                        f"{log_prefix} 'internal_dto_partial_data' missing for source_api='simulation'."
+                    )
+                    return
+            elif arq_payload.source_api == "whatsapp_cloud":
                 try:
                     # Validar o external_value_or_message_dict para o schema WhatsAppValue
                     # Este 'value' object contém as listas 'messages' e 'contacts'
@@ -138,8 +168,8 @@ async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
                 # Se Evolution também agrupar mensagens ou tiver informações de contato separadas, ajuste aqui.
                 transformed_dto = await transform_evolution_api_to_internal_dto(
                     db=db,
-                    instance_name=arq_payload.business_identifier,
-                    raw_evolution_message_dict=external_value_or_message_dict,  # Assumindo que é a mensagem individual
+                    internal_evolution_instance_uuid=arq_payload.business_identifier,
+                    raw_evolution_webhook_payload_dict=external_value_or_message_dict,  # Assumindo que é a mensagem individual
                 )
                 if transformed_dto:
                     internal_dto_list.append(transformed_dto)
@@ -171,7 +201,9 @@ async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
                         f"{log_prefix} Processing transformed DTO for external_id: {internal_dto_item.external_message_id}"
                     )
                     await process_incoming_message_logic(
-                        db=db, internal_message=internal_dto_item
+                        db=db,
+                        internal_message=internal_dto_item,
+                        debounce_service=debounce_service,
                     )
                     processed_dtos_count += 1
                 except Exception as e_logic:

@@ -35,10 +35,9 @@ from app.core.dependencies.auth import get_auth_context, AuthContext
 from app.services.realtime.redis_pubsub import RedisPubSubBridge
 from app.config import get_settings
 
-from app.services.debounce.message_debounce import init_message_debounce_service
 
 # Import functions from arq_manager
-from app.core.arq_manager import init_arq_pool, close_arq_pool, get_arq_pool
+from app.core.arq_manager import init_arq_pool, close_arq_pool
 from arq.connections import ArqRedis
 
 from dotenv import load_dotenv
@@ -60,21 +59,6 @@ logger.info(f"Evolution URL: {settings.EVOLUTION_API_SHARED_URL}")
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 
 
-async def get_redis_client_from_app_state() -> Optional[aioredis.Redis]:
-    # Esta função será chamada pelo MessageDebounceService.
-    # Ela precisa acessar a instância 'app' do FastAPI.
-    # Como não estamos em um contexto de request aqui, não podemos usar Depends(get_app_instance).
-    # Uma forma é o MessageDebounceService receber a própria instância 'app' ou
-    # esta função ser definida onde 'app' é acessível.
-    # Por enquanto, vamos assumir que 'app' (a instância global do FastAPI) é acessível.
-    if hasattr(app.state, "redis_client_general") and app.state.redis_client_general:
-        return app.state.redis_client_general
-    logger.warning(
-        "Attempted to get redis_client_general from app.state, but it was not found or None."
-    )
-    return None
-
-
 @asynccontextmanager
 async def lifespan_manager(app: FastAPI):
     """
@@ -92,30 +76,6 @@ async def lifespan_manager(app: FastAPI):
     logger.info("Starting Redis PubSub Bridge...")
     pubsub_task = asyncio.create_task(pubsub_bridge.start())
     # You might want to add error handling or checks for pubsub_task startup
-
-    # Initialize dedicated aioredis client
-    redis_db_for_general_use = getattr(settings, "REDIS_DB_DEBOUNCE", settings.REDIS_DB)
-    logger.info(
-        f"Initializing dedicated aioredis client for general use (DB {redis_db_for_general_use})..."
-    )
-    try:
-        redis_url = f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/{redis_db_for_general_use}"
-        # Armazenar diretamente em current_app.state
-        app.state.redis_client_general = await aioredis.from_url(redis_url)
-        await app.state.redis_client_general.ping()
-        logger.success(
-            f"Dedicated aioredis client connected to DB {redis_db_for_general_use} and stored in app.state."
-        )
-    except Exception as e:
-        logger.exception(
-            f"Failed to initialize dedicated aioredis client (DB {redis_db_for_general_use})."
-        )
-        app.state.redis_client_general = None
-
-    init_message_debounce_service(
-        redis_client_getter=get_redis_client_from_app_state  # Passa a função definida no PASSO 2
-    )
-    logger.info("MessageDebounceService global instance configured with getter.")
 
     try:
         yield
@@ -135,14 +95,6 @@ async def lifespan_manager(app: FastAPI):
             # except asyncio.CancelledError:
             #     logger.info("PubSub bridge task cancelled.")
             pass
-
-        if (
-            hasattr(app.state, "redis_client_general")
-            and app.state.redis_client_general
-        ):
-            logger.info("Closing dedicated aioredis client from app.state...")
-            await app.state.redis_client_general.close()
-            logger.info("Dedicated aioredis client closed.")
 
         # Close ARQ Redis pool
         logger.info("Closing ARQ Redis pool...")

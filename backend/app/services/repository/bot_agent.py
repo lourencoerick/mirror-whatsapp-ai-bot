@@ -298,7 +298,11 @@ async def get_inboxes_for_bot_agent(
         select(Inbox)
         .join(BotAgentInbox, Inbox.id == BotAgentInbox.inbox_id)
         .where(BotAgentInbox.bot_agent_id == bot_agent_id)
-        .options(joinedload(Inbox.account))
+        .options(
+            joinedload(Inbox.account),
+            selectinload(Inbox.evolution_instance),
+            selectinload(Inbox.whatsapp_cloud_config),
+        )
     )
     result = await db.execute(stmt)
     inboxes = result.scalars().all()
