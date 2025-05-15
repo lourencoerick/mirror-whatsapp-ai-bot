@@ -184,7 +184,7 @@ async def handle_message(
         await arq_pool.enqueue_job(
             "process_incoming_message_task",  # Name of the ARQ task function
             arq_payload_dict=arq_task_payload.model_dump(),
-            _queue_name=settings.MESSAGE_PROCESSING_ARQ_QUEUE_NAME,
+            _queue_name=settings.MESSAGE_QUEUE_NAME,
         )
 
         logger.info(

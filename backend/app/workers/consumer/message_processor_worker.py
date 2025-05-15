@@ -228,7 +228,7 @@ class WorkerSettings:
     keep_alive = 60  # seconds
     """Time a worker process will stay alive after processing its last job before exiting."""
 
-    queue_name = settings.MESSAGE_PROCESSING_ARQ_QUEUE_NAME
+    queue_name = settings.MESSAGE_QUEUE_NAME
 
     redis_settings = RedisSettings(
         host=settings.REDIS_HOST,

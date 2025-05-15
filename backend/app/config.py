@@ -68,7 +68,6 @@ class Settings(BaseSettings):
     RESPONSE_SENDER_QUEUE_NAME: str = "response_queue"
     AI_REPLY_QUEUE_NAME: str = "ai_reply_queue"
     MESSAGE_QUEUE_NAME: str = "message_queue"
-    MESSAGE_PROCESSING_ARQ_QUEUE_NAME: str = "message_queue2"
     BATCH_ARQ_QUEUE_NAME: str = "batch_queue"
 
     RESPONSE_SENDER_WORKER_INTERNAL_URL: Optional[str] = (

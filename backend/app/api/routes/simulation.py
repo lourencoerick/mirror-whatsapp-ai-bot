@@ -162,7 +162,7 @@ async def _enqueue_simulation_message(
             arq_payload_dict=arq_task_payload.model_dump(
                 exclude_none=True
             ),  # Passar o dict
-            _queue_name=settings.MESSAGE_PROCESSING_ARQ_QUEUE_NAME,
+            _queue_name=settings.MESSAGE_QUEUE_NAME,
         )
         logger.info(
             f"Enqueued simulation message (external_id: {simulated_external_id}) for conversation {conversation_id} to ARQ."
