@@ -39,9 +39,6 @@ test-e2e: ## Run integration tests
 onboarding: ## Run onboarding setup
 	PYTHONPATH=$(APP_DIR) $(PYTHON) scripts/setup_onboarding.py
 
-worker-consumer: ## Run Consumer
-	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/consumer/message_consumer.py 
-
 worker-response: ## Run Response sender
 	PYTHONPATH=$(APP_DIR) $(PYTHON) app/workers/response_sender/response_sender.py
 
@@ -59,6 +56,9 @@ worker-ingester: ## Run Knowledge Ingester
 
 worker-batch: ## Run Knowledge Ingester
 	PYTHONPATH=$(APP_DIR) arq app.workers.batch.worker_settings.WorkerSettings
+
+worker-consumer: ## Run Arq Consumer 
+	PYTHONPATH=$(APP_DIR) arq app.workers.consumer.message_processor_worker.WorkerSettings
 
 
 

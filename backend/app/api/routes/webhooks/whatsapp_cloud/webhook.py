@@ -27,6 +27,7 @@ from app.core.arq_manager import get_arq_pool
 from app.database import get_db
 from app.config import get_settings, Settings
 
+from app.core.wake_workers import wake_worker
 
 settings: Settings = get_settings()
 
@@ -160,6 +161,7 @@ async def handle_whatsapp_cloud_webhook(
                                 f"Enqueuing the 'value' object for processing. Business ID: {business_identifier_from_path}"
                             )
                             try:
+
                                 arq_task_payload = IncomingMessagePayload(
                                     source_api="whatsapp_cloud",
                                     business_identifier=business_identifier_from_path,
@@ -175,6 +177,13 @@ async def handle_whatsapp_cloud_webhook(
                                 )
                                 logger.info(
                                     f"Enqueued 'value' object (containing messages) for processing. Business ID: {business_identifier_from_path}"
+                                )
+                                await wake_worker(
+                                    settings.MESSAGE_CONSUMER_WORKER_INTERNAL_URL
+                                )
+                                await wake_worker(settings.AI_REPLIER_INTERNAL_URL)
+                                await wake_worker(
+                                    settings.RESPONSE_SENDER_WORKER_INTERNAL_URL
                                 )
                             except Exception as e_enqueue:
                                 logger.error(
