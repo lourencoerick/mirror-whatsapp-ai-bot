@@ -91,17 +91,18 @@ async def parse_webhook_to_message(
     # Step 5 - Finalize message DTO
     message_create = MessageCreate(
         account_id=account_id,
-        content=parsed["content"],
-        direction=parsed["direction"],
-        source_id=parsed["source_id"],
-        content_type=parsed["content_type"],
-        status="received",
-        message_timestamp=parsed["message_timestamp"],
-        content_attributes=parsed.get("content_attributes", {}),
-        private=False,
         inbox_id=inbox.id,
         contact_id=contact.id,
         conversation_id=conversation.id,
+        source_id=parsed["source_id"],
+        user_id=None,
+        direction=parsed["direction"],
+        status="received",
+        message_timestamp=parsed["message_timestamp"],
+        content=parsed["content"],
+        content_type=parsed["content_type"],
+        content_attributes=parsed.get("content_attributes", {}),
+        private=False,
     )
 
     logger.debug(f"[parser] Message DTO ready for enqueue: {message_create}")

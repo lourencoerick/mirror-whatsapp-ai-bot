@@ -1,6 +1,6 @@
 from uuid import UUID
 from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, Any
 from datetime import datetime
 
 
@@ -26,8 +26,11 @@ class MessageCreate(BaseModel):
     content_type: Literal["text", "image", "audio", "file", "video", "conversation"] = (
         "text"
     )
-    content_attributes: Optional[dict] = {}
+    content_attributes: Optional[Dict[str, Any]] = Field(default_factory=dict)
     triggering_message_id: Optional[UUID] = None
+
+    class Config:
+        from_attributes = True
 
 
 class MessageResponse(BaseModel):

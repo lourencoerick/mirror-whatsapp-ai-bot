@@ -5,8 +5,12 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.services.queue.redis_queue import RedisQueue
-from app.services.sender.evolution import send_message as evolution_send_message
+from app.services.sender import evolution as evolution_sender
+from app.services.sender import whatsapp_cloud as whatsapp_cloud_sender
+from app.models.channels.channel_types import ChannelTypeEnum
 from app.services.repository import message as message_repo
+from app.services.repository import inbox as inbox_repo
+
 from app.services.repository import evolution_instance as evolution_instance_repo
 from app.services.helper.checkpoint import reset_checkpoint
 from app.services.repository.message import (
@@ -155,21 +159,34 @@ class ResponseSender:
                     message_content + " Ativado! Deleção do histórico feito!"
                 )
 
-            evolution_instance = (
-                await evolution_instance_repo.get_evolution_instance_by_id(
-                    db=db,
-                    instance_id=message.inbox.evolution_instance_id,
-                    account_id=message.account_id,
-                )
-            )
-            response = await evolution_send_message(
-                message_content=message_content,
-                phone_number=phone_number,
-                evolution_instance=evolution_instance,
+            inbox_with_config = await inbox_repo.find_inbox_by_id_and_account(
+                db=db,
+                inbox_id=message.inbox.id,
+                account_id=message.account_id,
             )
 
-            external_id = response.get("key", {}).get("id")
-            status_from_provider = response.get("status", "pending").lower()
+            status_from_provider: str = "pending"
+            external_id: str = None
+            if inbox_with_config.channel_type == ChannelTypeEnum.WHATSAPP_EVOLUTION:
+                api_response_data = await evolution_sender.send_message(
+                    message_content=message_content,
+                    phone_number=phone_number,
+                    evolution_instance=inbox_with_config.evolution_instance,
+                )
+
+                external_id = api_response_data.get("key", {}).get("id")
+                status_from_provider = api_response_data.get(
+                    "status", "pending"
+                ).lower()
+
+            elif inbox_with_config.channel_type == ChannelTypeEnum.WHATSAPP_CLOUD:
+                api_response_data = await whatsapp_cloud_sender.send_text_message(
+                    message_content=message_content,
+                    recipient_phone_number=phone_number,
+                    config=inbox_with_config.whatsapp_cloud_config,
+                )
+
+                external_id = api_response_data.get("messages", [])[0].get("id")
 
             if external_id:
                 logger.info(
