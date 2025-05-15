@@ -15,6 +15,7 @@ from app.api.schemas.webhooks.evolution import (
 )
 
 from app.api.schemas.queue_payload import IncomingMessagePayload
+from app.services.helper.websocket import publish_to_instance_ws
 
 
 from app.core.arq_manager import get_arq_pool
