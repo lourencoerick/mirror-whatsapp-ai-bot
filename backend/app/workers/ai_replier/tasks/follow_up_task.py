@@ -48,7 +48,8 @@ try:
 
     settings = get_settings()
     # AsyncSessionLocal might be needed if checkpointer requires db session factory directly
-    # from app.database import AsyncSessionLocal
+    from app.database import AsyncSessionLocal
+
     PROJECT_IMPORTS_AVAILABLE = True
     logger.info("FollowUpTask: Successfully imported project dependencies.")
 except ImportError as e:
@@ -64,6 +65,8 @@ except ImportError as e:
             "AI_REPLY_QUEUE_NAME": "ai_reply_queue",
         },
     )()
+from app.services.repository import conversation as conversation_repo
+from app.models.conversation import ConversationStatusEnum
 
 
 async def schedule_conversation_follow_up(
@@ -123,6 +126,17 @@ async def schedule_conversation_follow_up(
         db_conn_string_pg = str(settings.DATABASE_URL).replace(
             "postgresql+asyncpg://", "postgresql://"
         )
+
+        async with AsyncSessionLocal() as db:
+            conversation = await conversation_repo.find_conversation_by_id(
+                db=db, account_id=account_id, conversation_id=conversation_id
+            )
+            logger.debug(f"{log_prefix} Checking status of the conversation.")
+            if conversation.status != ConversationStatusEnum.BOT:
+                logger.debug(
+                    f"{log_prefix} Converation is not on the BOT status. Aborting follow-up."
+                )
+                return
 
         async with AsyncPostgresSaver.from_conn_string(
             db_conn_string_pg, serde=serializer
