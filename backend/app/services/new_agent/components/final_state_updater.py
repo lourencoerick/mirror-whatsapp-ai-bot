@@ -16,6 +16,7 @@ from ..state_definition import (
     IdentifiedObjectionEntry,
     CustomerQuestionEntry,
     CustomerQuestionStatusType,
+    AgentGoal,
 )
 
 
@@ -290,7 +291,18 @@ async def finalize_turn_state_node(
                     updated_state_delta["follow_up_attempt_count"] = 0  # Reset
                     updated_state_delta["last_message_from_agent_timestamp"] = None
 
-    # --- 4. Limpar Campos Temporários do Turno ---
+    # --- 4. Resetar Goal se Farewell foi Gerado ---
+    if action_command_executed == "GENERATE_FAREWELL":
+        logger.info(f"[{node_name}] Farewell generated. Resetting agent goal to IDLE.")
+        updated_state_delta["current_agent_goal"] = AgentGoal(
+            goal_type="IDLE", goal_details={}, previous_goal_if_interrupted=None
+        )
+        # Também garantir que o follow-up seja desativado após um farewell
+        updated_state_delta["follow_up_scheduled"] = False
+        updated_state_delta["follow_up_attempt_count"] = 0
+        updated_state_delta["last_message_from_agent_timestamp"] = None
+
+    # --- 5. Limpar Campos Temporários do Turno ---
     updated_state_delta["next_agent_action_command"] = None
     updated_state_delta["action_parameters"] = {}
     updated_state_delta["retrieved_knowledge_for_next_action"] = None

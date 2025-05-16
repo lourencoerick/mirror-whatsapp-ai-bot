@@ -993,7 +993,11 @@ async def goal_and_action_planner_node(
                 "spin_questions_asked_this_cycle": 0,
                 "last_spin_type_asked": None,
             }
-        elif not last_agent_action:  # True IDLE or start of conversation
+        elif (
+            not last_agent_action
+            or last_agent_action
+            and last_agent_action.get("action_type") == "GENERATE_FAREWELL"
+        ):  # True IDLE or start of conversation or customer come back (TODO: consider pass to the PROACTIVE_DECIDER_STEP)
             logger.info(
                 f"[{node_name}] Goal is IDLE or GREETING (initial). Planning GREETING."
             )
