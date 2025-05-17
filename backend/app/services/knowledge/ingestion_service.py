@@ -195,7 +195,9 @@ class KnowledgeIngestionService:
             chunk_overlap=chunk_overlap,
         )
 
-        self.semantic_text_splitter = SemanticChunker(langchain_embbedings)
+        self.semantic_text_splitter = SemanticChunker(
+            langchain_embbedings, breakpoint_threshold_type="gradient"
+        )
 
         logger.info(
             f"KnowledgeIngestionService initialized (Chunk Size: {chunk_size}, Overlap: {chunk_overlap})."
