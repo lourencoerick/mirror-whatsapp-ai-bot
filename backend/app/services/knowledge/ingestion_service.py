@@ -1,14 +1,11 @@
 # backend/app/services/knowledge/ingestion_service.py
-import nltk
-
-nltk.download("averaged_perceptron_tagger_eng")
-from .custom_web_loader import CustomWebLoader
 import asyncio
 from typing import Any, Dict, List, Optional, Tuple, Union, Literal
 from uuid import UUID
 
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from .custom_web_loader import CustomWebLoader
 
 
 # --- LangChain Imports ---
