@@ -1,11 +1,12 @@
 # backend/app/services/knowledge/ingestion_service.py
-
 import asyncio
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Literal
 from uuid import UUID
 
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from .custom_web_loader import CustomWebLoader
+
 
 # --- LangChain Imports ---
 # Attempt to import necessary LangChain components
@@ -15,9 +16,11 @@ try:
         TextLoader,
         UnstructuredFileLoader,  # Keep if used, remove if not
         WebBaseLoader,
+        UnstructuredURLLoader,
     )
     from langchain_core.documents import Document
     from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_experimental.text_splitter import SemanticChunker
 
     LANGCHAIN_LOADERS_AVAILABLE = True
 except ImportError as e:
@@ -66,7 +69,7 @@ except ImportError as e:
 
 # Embedding Client
 try:
-    from app.core.embedding_utils import get_embeddings_batch
+    from app.core.embedding_utils import get_embeddings_batch, langchain_embbedings
 
     EMBEDDING_AVAILABLE = True
 except ImportError:
@@ -191,6 +194,11 @@ class KnowledgeIngestionService:
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
         )
+
+        self.semantic_text_splitter = SemanticChunker(
+            langchain_embbedings, breakpoint_threshold_type="gradient"
+        )
+
         logger.info(
             f"KnowledgeIngestionService initialized (Chunk Size: {chunk_size}, Overlap: {chunk_overlap})."
         )
@@ -276,9 +284,7 @@ class KnowledgeIngestionService:
             elif source_type == "url":
                 logger.debug("Using WebBaseLoader...")
                 # WebBaseLoader expects a list of URLs
-                loader = WebBaseLoader(
-                    [source_uri], header_template=DEFAULT_REQUEST_HEADERS
-                )
+                loader = CustomWebLoader(source_uri)
                 if hasattr(loader, "alazy_load"):
                     logger.debug("Attempting asynchronous loading (alazy_load)...")
                     documents = [doc async for doc in loader.alazy_load()]
@@ -416,6 +422,7 @@ class KnowledgeIngestionService:
         source_uri: str,
         source_identifier: str,
         document_id: Optional[UUID] = None,
+        text_splitter_type: Optional[Literal["semantic", "recursive"]] = "recursive",
     ) -> bool:
         """
         Processes a single source: loads, splits, embeds, and saves chunks.
@@ -474,7 +481,13 @@ class KnowledgeIngestionService:
 
             # --- Step 2: Split into Chunks ---
             logger.debug(f"Splitting {len(documents)} documents into chunks...")
-            chunks: List[Document] = self.text_splitter.split_documents(documents)
+
+            chunks: List[Document] = None
+            if text_splitter_type == "semantic":
+                chunks = self.semantic_text_splitter.split_documents(documents)
+            else:
+                chunks = self.text_splitter.split_documents(documents)
+
             logger.info(f"Split into {len(chunks)} chunks.")
             if not chunks:
                 logger.warning(

@@ -37,7 +37,7 @@ if EMBEDDING_PROVIDER == "local":
 
 elif EMBEDDING_PROVIDER == "openai":
     try:
-
+        from langchain_openai import AzureOpenAIEmbeddings
         from openai import (
             APIConnectionError,
             RateLimitError,
@@ -66,6 +66,13 @@ elif EMBEDDING_PROVIDER == "openai":
             api_version="2025-01-01-preview",
             azure_endpoint=AZURE_OPENAI_ENDPOINT,
             api_key=AZURE_OPENAI_API_KEY,
+        )
+
+        langchain_embbedings = AzureOpenAIEmbeddings(
+            model=settings.AZURE_OPENAI_EMBEDDING_MODEL,
+            azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+            api_key=settings.AZURE_OPENAI_API_KEY,
+            api_version="2025-01-01-preview",
         )
 
         logger.info("AsyncAzureOpenAI client initialized.")
