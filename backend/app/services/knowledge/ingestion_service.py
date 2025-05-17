@@ -10,6 +10,7 @@ from uuid import UUID
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+
 # --- LangChain Imports ---
 # Attempt to import necessary LangChain components
 try:
@@ -284,12 +285,6 @@ class KnowledgeIngestionService:
             elif source_type == "url":
                 logger.debug("Using WebBaseLoader...")
                 # WebBaseLoader expects a list of URLs
-                loader = WebBaseLoader(
-                    [source_uri],
-                    header_template=DEFAULT_REQUEST_HEADERS,
-                    bs_get_text_kwargs={"separator": "\n"},
-                )
-                loader = UnstructuredURLLoader([source_uri])
                 loader = CustomWebLoader(source_uri)
                 if hasattr(loader, "alazy_load"):
                     logger.debug("Attempting asynchronous loading (alazy_load)...")

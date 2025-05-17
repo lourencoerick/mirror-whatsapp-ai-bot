@@ -46,11 +46,12 @@ langchain==0.3.24
 langchain-openai==0.3.14
 langgraph==0.3.32
 langchain_community==0.3.22
+langchain-experimental==0.3.4
 sentence-transformers==4.1.0
 trustcall==0.0.39
 tavily-python==0.6.0
 langgraph-checkpoint-postgres==2.0.21
-
+html2text==2025.4.15
 # === Google Cloud Storage ===
 google-cloud-storage
 
