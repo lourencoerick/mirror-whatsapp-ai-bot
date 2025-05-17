@@ -700,7 +700,7 @@ async def handle_ai_reply_request(
                     computed_follow_up_delay = calculate_follow_up_delay(
                         attempt_number=(next_follow_up_attempt + 1),
                         base_delay_seconds=60,
-                        factor=1,
+                        factor=11,
                     )
 
                     await arq_pool.enqueue_job(
