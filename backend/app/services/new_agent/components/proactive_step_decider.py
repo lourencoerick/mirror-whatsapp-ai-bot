@@ -83,13 +83,13 @@ Com base no contexto acima, decida a melhor iniciativa. Preencha o JSON `Proacti
             *   `suggested_next_goal_details`: `{{"spin_questions_asked_this_cycle": 0, "last_spin_type_asked": null, "spin_type_to_ask_next": "Situation"}}` (ou o próximo tipo SPIN lógico).
             *   Justificativa: "Retomando investigação de necessidades para reengajar e descobrir mais."
         *   `PRESENTING_SOLUTION`: Se o cliente parece pronto para uma solução, mas não pediu explicitamente.
-            *   `suggested_next_goal_details`: `{}` (O Planner selecionará o produto/benefício).
+            *   `suggested_next_goal_details`: `{{}}` (O Planner selecionará o produto/benefício).
             *   Justificativa: "Proativamente movendo para apresentação de solução com base no contexto."
         *   `ATTEMPTING_CLOSE`: Se o cliente deu sinais de compra sutis e o fechamento não foi tentado.
             *   `suggested_next_goal_details`: `{{"closing_step": "initial_attempt"}}`
             *   Justificativa: "Sinais de compra detectados, sugerindo tentativa de fechamento."
         *   `IDLE` ou `GREETING`: Se a conversa precisa ser completamente reiniciada de forma amigável (raro).
-            *   `suggested_next_goal_details`: `{}`
+            *   `suggested_next_goal_details`: `{{}}`
             *   Justificativa: "Sugerindo um reinício suave da conversa."
 
 *   **Justificativa (OBRIGATÓRIO):** Forneça uma `justification` clara para sua escolha (seja ação direta ou sugestão de goal).
