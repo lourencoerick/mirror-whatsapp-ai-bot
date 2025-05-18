@@ -70,6 +70,7 @@ AgentActionType = Literal[
     # "HANDLE_IMPASSE",
     "DECIDE_PROACTIVE_STEP",
     "SEND_FOLLOW_UP_MESSAGE",
+    "REPLAN_WITH_SUGGESTED_GOAL",
 ]
 """Defines the specific low-level actions the agent can plan and execute."""
 
@@ -148,7 +149,7 @@ class AgentActionDetails(TypedDict, total=False):
     certainty_focus: Optional[CertaintyFocusType]
     objection_text_to_address: Optional[str]
     question_to_answer_text: Optional[str]
-    question_to_answer_status: Optional[str]
+    question_to_answer_status: Optional[CustomerQuestionStatusType]
     proposed_product_name: Optional[str]
     # Closing related
     product_name: Optional[str]
@@ -167,6 +168,7 @@ class AgentActionDetails(TypedDict, total=False):
     # Follow-up
     trigger_source: Optional[TriggerEventType]
     current_follow_up_attempts: Optional[int]
+    max_follow_up_attempts_total: Optional[int]
 
 
 class PendingAgentAction(TypedDict):
@@ -310,6 +312,7 @@ class ProposedSolution(TypedDict):
     """Details of a solution/offer proposed to the customer."""
 
     product_name: str
+    product_url: Optional[str]
     quantity: Optional[int]
     price: Optional[float]
     price_info: Optional[str]  # E.g., "per month", "one-time"
@@ -374,7 +377,7 @@ class RichConversationState(TypedDict):
 
     # --- Conversation History & Current Input ---
     messages: Annotated[List[BaseMessage], add_messages]
-    current_user_input_text: str
+    current_user_input_text: Optional[str]  # Can be None if triggered by timeout
     current_turn_number: int
 
     # --- Agent's Internal State & Strategy ---
@@ -389,7 +392,9 @@ class RichConversationState(TypedDict):
 
     # --- Customer Question Tracking ---
     customer_question_log: List[CustomerQuestionEntry]
-    current_turn_extracted_questions: List[CustomerQuestionEntry]  # Temp field
+    current_turn_extracted_questions: Optional[
+        List[CustomerQuestionEntry]
+    ]  # Temp field
 
     # --- Sales Process Specific State ---
     active_proposal: Optional[ProposedSolution]
@@ -406,6 +411,9 @@ class RichConversationState(TypedDict):
 
     # --- Temporary fields for inter-node communication ---
     user_input_analysis_result: Optional[Dict[str, Any]]  # Output of InputProcessor
+    # --- For Proactive Goal Suggestion ---
+    suggested_goal_type: Optional[AgentGoalType]
+    suggested_goal_details: Optional[Dict[str, Any]]
 
     # --- Follow-up ---
     follow_up_scheduled: Optional[bool]  # True se um follow-up está "armado"

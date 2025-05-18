@@ -3,25 +3,22 @@
 from typing import Dict, Any, Optional, List
 from loguru import logger
 import json
-import time  # Para current_datetime
+import time
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 
-# Schemas e Definições de Estado
 from ..state_definition import (
     RichConversationState,
     AgentGoal,
     AgentActionType,
     AgentActionDetails,
+    AgentGoalType,  # Added
 )
-
 from .planner import MAX_REBUTTAL_ATTEMPTS_PER_OBJECTION, MAX_SPIN_QUESTIONS_PER_CYCLE
 from ..schemas.proactive_step_output import ProactiveStepDecision
 
-# Helpers
 try:
-    # Tentativa de importar a função auxiliar do input_processor
     from .input_processor import _format_recent_chat_history, _call_structured_llm
 
     logger.info("Successfully imported helper functions from input_processor.")
@@ -30,7 +27,6 @@ except ImportError:
         "Failed to import helper functions from input_processor. Using fallbacks."
     )
 
-    # Fallbacks simples para permitir que o arquivo seja analisado, mas os testes/execução falharão.
     def _format_recent_chat_history(*args, **kwargs) -> str:
         return "Histórico indisponível (fallback)."
 
@@ -47,136 +43,70 @@ PROMPT_DETERMINE_PROACTIVE_STEP = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """Você é um Estrategista de Vendas IA Sênior e Proativo. Sua tarefa é analisar o ESTADO ATUAL DA CONVERSA e determinar a PRÓXIMA MELHOR AÇÃO PROATIVA que o agente de vendas deve tomar para manter a conversa engajada, produtiva e guiá-la em direção a um resultado positivo (venda, qualificação, etc.). A conversa parece ter estagnado ou o usuário deu uma resposta mínima, então uma iniciativa é necessária.
+            """Você é um Estrategista de Vendas IA Sênior e Proativo. Sua tarefa é analisar o ESTADO ATUAL DA CONVERSA e determinar a MELHOR INICIATIVA para o agente de vendas.
+Você pode:
+1.  Comandar uma AÇÃO PROATIVA DIRETA (simples e autocontida).
+2.  Sugerir um NOVO GOAL para o Planner principal, se a iniciativa for complexa.
 
 **ESTADO ATUAL DA CONVERSA (Contexto para sua decisão):**
-
-1.  **Gatilho para esta Decisão Proativa:** '{trigger_source}'
-    (Valores possíveis: 'user_response_or_stagnation', 'follow_up_timeout')
-
-2.  **Se Gatilho foi 'follow_up_timeout':**
-    - Número da Tentativa Atual de Follow-up (começa em 0 para a 1ª tentativa): {current_follow_up_attempts}
-    - Máximo de Tentativas de Follow-up Permitidas: {max_follow_up_attempts_total}
-    
-
-3.  **Turno Atual da Conversa:** {current_turn_number}
-4.  **Goal Atual do Agente (Goal que o Planner principal definiu antes de decidir por esta iniciativa):**
-    - Tipo: {current_goal_type_before_initiative}
-    - Detalhes do Goal: {current_goal_details_before_initiative_json}
-
-5.  **Última Ação Realizada pelo Agente (no turno anterior):**
-    - Tipo: {last_agent_action_type}
-    - Detalhes da Ação: {last_agent_action_details_json}
-    - Texto Gerado pelo Agente: "{last_agent_action_text}"
-
-6.  **Última Mensagem do Usuário (que levou a esta necessidade de iniciativa):**
-    - Texto: "{last_user_message_text}"
-    - Intenção Discernida (pelo InputProcessor): {last_discerned_intent}
-    - Análise da Resposta à Ação do Agente (pelo InputProcessor): {user_response_to_agent_action_analysis}
-
-7.  **Fila de Interrupções Pendentes do Usuário (o Planner principal já as considerou; geralmente vazia aqui):**
-    {interruptions_queue_formatted}
-
-8.  **Perfil Dinâmico do Cliente (Resumido):**
-    - Objeções Ativas: {active_objections_summary}
-    - Objeções Resolvidas Recentemente: {resolved_objections_summary}
-    - Necessidades Confirmadas: {confirmed_needs_summary}
-    - Status do Processo de Fechamento: {closing_process_status}
-
-9.  **Histórico Recente da Conversa (últimas ~5 trocas):**
-    {chat_history}
-
-10.  **Data e Hora Atuais:** {current_datetime}
+{formatted_state_context}
 
 **SUA TAREFA:**
-
-Com base no contexto acima, decida qual `AgentActionType` e `AgentActionDetails` (parâmetros) o agente deve executar proativamente.
+Com base no contexto acima, decida a melhor iniciativa. Preencha o JSON `ProactiveStepDecision`.
 
 **Diretrizes para Decisão:**
-*   **Se `trigger_source` == 'follow_up_timeout':**
-    *   Se `current_follow_up_attempts` < `max_follow_up_attempts_total`:
-        *   **Ação:** `SEND_FOLLOW_UP_MESSAGE`.
-        *   **Parâmetros (`proactive_action_parameters`):**
-            *   `"current_follow_up_attempts": {current_follow_up_attempts}` (passe o valor recebido)
-            *   `"max_follow_up_attempts_total": {max_follow_up_attempts_total}` (passe o valor recebido)
-            *   (Opcional, mas útil para o prompt de follow-up) `"context_goal_type": "{current_goal_type_before_initiative}"`
-            *   (Opcional, mas útil) `"context_last_agent_message": "{last_agent_action_text}"`
-        *   **Justificativa:** "Usuário inativo. Enviando follow-up [N+1] de [M]."
-    *   Se `current_follow_up_attempts` >= `max_follow_up_attempts_total`:
-        *   Ação: `GENERATE_FAREWELL`. Parâmetros: {{"reason": "Inatividade do usuário após múltiplas tentativas de follow-up."}}
-        *   Justificativa: "Limite de follow-ups atingido."
 
-*   **Se `trigger_source` == 'user_response_or_stagnation':**
-    *   **Objetivo Principal:** Manter o engajamento e progredir a conversa. Se o usuário deu uma resposta mínima (ex: "ok", "entendi") ou a conversa pausou, sua ação deve reengajar e guiar.
-    *   **Relevância do Goal:** Sua ação proativa deve, idealmente, ajudar a progredir o `{current_goal_type_before_initiative}` ou transicionar para um novo goal lógico se o atual estiver bloqueado ou concluído.
-    *   **Exemplos de Iniciativas (NÃO se limite a estes, seja criativo e estratégico):**
-        *   Se o goal era `INVESTIGATING_NEEDS` e o ciclo SPIN não está completo (perguntas < {MAX_SPIN_QUESTIONS_PER_CYCLE}): Sugira a próxima pergunta SPIN (`ASK_SPIN_QUESTION` com o `spin_type` apropriado, ex: se `last_spin_type_asked` foi 'Problem', sugira 'Implication').
-        *   Se uma solução foi apresentada (`PRESENTING_SOLUTION`) e o usuário está hesitante/silencioso/respondeu minimamente: Faça uma pergunta para descobrir a causa da hesitação (`ASK_CLARIFYING_QUESTION` focada na proposta) ou reforce um benefício chave e verifique o interesse (`PRESENT_SOLUTION_OFFER` com foco específico, talvez um benefício diferente).
-        *   Se uma objeção foi recentemente resolvida (ver `resolved_objections_summary`) e o goal anterior era `ATTEMPTING_CLOSE`: Sugira retomar o fechamento (ex: `CONFIRM_ORDER_DETAILS` se `closing_process_status` era `attempt_made`).
-        *   Se o cliente parece pronto (necessidades confirmadas, objeções resolvidas) e o fechamento não foi iniciado: Considere `INITIATE_CLOSING`.
-        *   Se o usuário está silencioso por muito tempo (assuma que esta chamada é devido a um timeout se `last_user_message_text` for antigo ou "N/A" e `user_response_to_agent_action_analysis` indicar ausência de resposta): Envie uma mensagem de reengajamento (pode ser um `ASK_CLARIFYING_QUESTION` genérico como "Olá, {company_name} aqui. Você gostaria de continuar nossa conversa?" ou "Precisa de mais um momento para pensar sobre [último tópico]?").
-    *   **Evite Repetição Imediata:** Não sugira EXATAMENTE a mesma ação que o `last_agent_action_type` se a resposta do usuário foi apenas um "ok". Tente uma variação ou um próximo passo lógico.
-    *   **Se Nenhuma Ação Proativa Clara:** Se, após analisar tudo, nenhuma ação proativa parecer genuinamente útil ou apropriada (ex: o usuário pediu explicitamente para encerrar, ou a conversa está realmente num impasse intransponível), retorne `null` para `proactive_action_command`.
+*   **Opção 1: Comandar AÇÃO PROATIVA DIRETA (para ações simples)**
+    *   Use `proactive_action_command` e `proactive_action_parameters`.
+    *   Deixe `suggested_next_goal_type` e `suggested_next_goal_details` como `null` ou vazios.
+    *   **Ações Simples Permitidas para Comando Direto:**
+        *   `SEND_FOLLOW_UP_MESSAGE`: Se `trigger_source` == 'follow_up_timeout' E `current_follow_up_attempts` < `max_follow_up_attempts_total`.
+            *   Parâmetros: `{{"current_follow_up_attempts": {current_follow_up_attempts}, "max_follow_up_attempts_total": {max_follow_up_attempts_total}, "context_goal_type": "{current_goal_type_before_initiative}", "context_last_agent_message": "{last_agent_action_text}"}}`
+            *   Justificativa: "Usuário inativo. Enviando follow-up [N+1] de [M]."
+        *   `GENERATE_FAREWELL`:
+            *   Se `trigger_source` == 'follow_up_timeout' E `current_follow_up_attempts` >= `max_follow_up_attempts_total`.
+                *   Parâmetros: `{{"reason": "Inatividade do usuário após múltiplas tentativas de follow-up."}}`
+                *   Justificativa: "Limite de follow-ups atingido."
+            *   Se a conversa estagnou e um adeus amigável é a melhor opção.
+                *   Parâmetros: `{{"reason": "Conversa estagnada ou sem progresso claro."}}`
+                *   Justificativa: "Encerrando proativamente devido à estagnação."
+        *   `ASK_CLARIFYING_QUESTION`: Se uma pergunta genérica de reengajamento for apropriada (ex: "Precisa de mais um momento para pensar sobre [último tópico]?").
+            *   Parâmetros: `{{"context": "Reengajamento suave"}}` (O ResponseGenerator usará isso).
+            *   Justificativa: "Tentando reengajar o usuário com uma pergunta aberta."
+
+*   **Opção 2: Sugerir NOVO GOAL para o Planner (para iniciativas complexas)**
+    *   Use `suggested_next_goal_type` e `suggested_next_goal_details`.
+    *   Deixe `proactive_action_command` e `proactive_action_parameters` como `null` ou vazios.
+    *   **Quando Usar:** Se a melhor iniciativa envolve lógica que o Planner principal já possui (ex: seleção de produto, gerenciamento de ciclo SPIN, início de fechamento complexo).
+    *   **Exemplos de Goals a Sugerir (NÃO se limite a estes, seja estratégico):**
+        *   `INVESTIGATING_NEEDS`: Se a conversa estagnou e mais investigação de necessidades é necessária.
+            *   `suggested_next_goal_details`: `{{"spin_questions_asked_this_cycle": 0, "last_spin_type_asked": null, "spin_type_to_ask_next": "Situation"}}` (ou o próximo tipo SPIN lógico).
+            *   Justificativa: "Retomando investigação de necessidades para reengajar e descobrir mais."
+        *   `PRESENTING_SOLUTION`: Se o cliente parece pronto para uma solução, mas não pediu explicitamente.
+            *   `suggested_next_goal_details`: `{}` (O Planner selecionará o produto/benefício).
+            *   Justificativa: "Proativamente movendo para apresentação de solução com base no contexto."
+        *   `ATTEMPTING_CLOSE`: Se o cliente deu sinais de compra sutis e o fechamento não foi tentado.
+            *   `suggested_next_goal_details`: `{{"closing_step": "initial_attempt"}}`
+            *   Justificativa: "Sinais de compra detectados, sugerindo tentativa de fechamento."
+        *   `IDLE` ou `GREETING`: Se a conversa precisa ser completamente reiniciada de forma amigável (raro).
+            *   `suggested_next_goal_details`: `{}`
+            *   Justificativa: "Sugerindo um reinício suave da conversa."
+
+*   **Justificativa (OBRIGATÓRIO):** Forneça uma `justification` clara para sua escolha (seja ação direta ou sugestão de goal).
+
+*   **Se Nenhuma Iniciativa Apropriada:** Se nenhuma ação direta ou sugestão de goal parecer útil, retorne `proactive_action_command: null` e `suggested_next_goal_type: null`, com uma justificativa explicando o porquê (ex: "Usuário pediu explicitamente para encerrar, nenhuma iniciativa necessária.").
 
 **FORMATO DE SAÍDA ESPERADO (JSON - Schema `ProactiveStepDecision`):**
-Você DEVE responder APENAS com um objeto JSON que corresponda ao schema `ProactiveStepDecision`.
-O objeto deve conter:
-- `proactive_action_command`: A string do `AgentActionType` (ex: "ASK_SPIN_QUESTION") ou `null`.
-- `proactive_action_parameters`: Um objeto com os parâmetros para a ação (ex: {{"spin_type": "NeedPayoff"}}), ou um objeto vazio.
-- `justification`: Uma breve explicação da sua escolha (ex: "Usuário respondeu 'ok' à pergunta de Implicação. Próximo passo é NeedPayoff para solidificar o valor.").
-
-Analise o estado e as diretrizes CUIDADOSAMENTE e forneça sua decisão no formato JSON especificado.
+Responda APENAS com um objeto JSON que corresponda ao schema `ProactiveStepDecision`.
 """,
         ),
     ]
 )
 
 
-async def proactive_step_decider_node(
-    state: RichConversationState, config: Dict[str, Any]
-) -> Dict[str, Any]:
-    """
-    Decides the next proactive step for the agent using an LLM.
-
-    This node is invoked when the main planner determines that the agent
-    should take initiative. It uses an LLM to analyze the current conversation
-    state and decide on the best proactive action and its parameters.
-    The output of this node (next_agent_action_command, action_parameters)
-    will then be used by the main graph's `route_action` function.
-
-    Args:
-        state: The current RichConversationState.
-        config: The graph configuration, expected to contain an LLM instance
-                for this decision, ideally under 'llm_strategy_instance',
-                or falling back to 'llm_primary_instance'.
-
-    Returns:
-        A dictionary with updates for 'next_agent_action_command' and
-        'action_parameters' based on the LLM's decision.
-        If no proactive action is decided, these will be None/empty.
-        The 'current_agent_goal' is NOT modified by this node.
-    """
-    node_name = "proactive_step_decider_node"
+def _format_state_for_proactive_prompt(state: RichConversationState) -> str:
+    """Formats relevant parts of the state for the proactive decider prompt."""
     current_turn = state.get("current_turn_number", 0)
-    logger.info(f"--- Starting Node: {node_name} (Turn: {current_turn}) ---")
-
-    llm_strategist = config.get("configurable", {}).get(
-        "llm_strategy_instance"
-    ) or config.get("configurable", {}).get("llm_primary_instance")
-
-    if not llm_strategist or not callable(
-        _call_structured_llm
-    ):  # Check if helper is callable
-        logger.error(
-            f"[{node_name}] No suitable LLM instance or _call_structured_llm helper found."
-        )
-        return {
-            "next_agent_action_command": None,
-            "action_parameters": {},
-            "last_processing_error": "LLM/helper for proactive step decision unavailable.",
-        }
-
-    # --- 1. Formatar o Estado Atual para o Prompt do LLM ---
     current_goal_before_initiative = state.get(
         "current_agent_goal",
         AgentGoal(goal_type="IDLE", goal_details={}, previous_goal_if_interrupted=None),
@@ -191,7 +121,7 @@ async def proactive_step_decider_node(
             user_response_analysis_text = analysis_detail.get(
                 "user_response_to_agent_action", "Não analisado"
             )
-        elif isinstance(analysis_detail, str):
+        elif isinstance(analysis_detail, str):  # Should be a dict by now
             user_response_analysis_text = analysis_detail
 
     def to_json_safe(data: Any, indent: Optional[int] = None) -> str:
@@ -229,11 +159,10 @@ async def proactive_step_decider_node(
         if n.get("status") == "confirmed_by_user"
     ]
 
-    # Followup trigger
-    action_params_from_planner = state.get(
-        "action_parameters", {}
-    )  # Parâmetros passados pelo Planner
-    trigger_source = action_params_from_planner.get("trigger_source", "unknown")
+    action_params_from_planner = state.get("action_parameters", {})
+    trigger_source = action_params_from_planner.get(
+        "trigger_source", "user_response_or_stagnation"
+    )
     current_follow_up_attempts = action_params_from_planner.get(
         "current_follow_up_attempts", 0
     )
@@ -243,120 +172,164 @@ async def proactive_step_decider_node(
     )
     max_follow_up_attempts_total = agent_config_dict.get("max_follow_up_attempts", 3)
 
-    # -- Prompt Values --
-    prompt_values = {  # Renamed from prompt_context to prompt_values for clarity with _call_structured_llm
-        "trigger_source": trigger_source,
-        "current_follow_up_attempts": current_follow_up_attempts,
-        "max_follow_up_attempts_total": max_follow_up_attempts_total,
-        "current_turn_number": current_turn,
+    # Constructing the context string
+    context_lines = [
+        f"1.  **Gatilho para esta Decisão Proativa:** '{trigger_source}'",
+        f"    - (Se 'follow_up_timeout': Tentativa Atual: {current_follow_up_attempts}, Máximo Permitido: {max_follow_up_attempts_total})",
+        f"2.  **Turno Atual da Conversa:** {current_turn}",
+        f"3.  **Goal Atual do Agente (Antes da Iniciativa):**",
+        f"    - Tipo: {current_goal_before_initiative.get('goal_type')}",
+        f"    - Detalhes: {to_json_safe(current_goal_before_initiative.get('goal_details'))}",
+        f"4.  **Última Ação Realizada pelo Agente:**",
+        f"    - Tipo: {last_agent_action.get('action_type', 'N/A') if last_agent_action else 'N/A'}",
+        f"    - Detalhes: {to_json_safe(last_agent_action.get('details')) if last_agent_action else '{}'}",
+        f"    - Texto Gerado: \"{last_agent_action.get('action_generation_text', 'N/A') if last_agent_action else 'N/A'}\"",
+        f"5.  **Última Mensagem do Usuário:**",
+        f"    - Texto: \"{state.get('current_user_input_text', 'N/A (Possivelmente timeout)')}\"",
+        f"    - Intenção Discernida: {profile_dynamic.get('last_discerned_intent', 'N/A')}",
+        f"    - Análise da Resposta à Ação do Agente: {user_response_analysis_text}",
+        f"6.  **Fila de Interrupções Pendentes:** {interruptions_formatted}",
+        f"7.  **Perfil Dinâmico do Cliente (Resumido):**",
+        f"    - Objeções Ativas: {to_json_safe(active_objections) if active_objections else 'Nenhuma.'}",
+        f"    - Objeções Resolvidas: {to_json_safe(resolved_objections) if resolved_objections else 'Nenhuma.'}",
+        f"    - Necessidades Confirmadas: {to_json_safe(confirmed_needs) if confirmed_needs else 'Nenhuma.'}",
+        f"    - Status do Processo de Fechamento: {state.get('closing_process_status', 'not_started')}",
+        f"8.  **Histórico Recente da Conversa:**\n    {_format_recent_chat_history(state.get('messages', []))}",
+        f"9.  **Data e Hora Atuais:** {time.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+        f"10. **Constantes de Referência (para sua informação):**",
+        f"    - MAX_REBUTTAL_ATTEMPTS_PER_OBJECTION: {MAX_REBUTTAL_ATTEMPTS_PER_OBJECTION}",
+        f"    - MAX_SPIN_QUESTIONS_PER_CYCLE: {MAX_SPIN_QUESTIONS_PER_CYCLE}",
+        f"    - Nome da Empresa: {state.get('company_profile', {}).get('company_name', 'nossa empresa')}",
+    ]
+    return "\n".join(context_lines)
+
+
+async def proactive_step_decider_node(
+    state: RichConversationState, config: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Decides the next proactive step or suggests a new goal using an LLM.
+    """
+    node_name = "proactive_step_decider_node"
+    current_turn = state.get("current_turn_number", 0)
+    logger.info(f"--- Starting Node: {node_name} (Turn: {current_turn}) ---")
+
+    llm_strategist = config.get("configurable", {}).get(
+        "llm_strategy_instance"
+    ) or config.get("configurable", {}).get("llm_primary_instance")
+
+    if not llm_strategist or not callable(_call_structured_llm):
+        logger.error(f"[{node_name}] No suitable LLM or _call_structured_llm helper.")
+        return {
+            "next_agent_action_command": None,
+            "action_parameters": {},
+            "suggested_goal_type": None,
+            "suggested_goal_details": {},
+            "last_processing_error": "LLM/helper for proactive step decision unavailable.",
+        }
+
+    formatted_state_context = _format_state_for_proactive_prompt(state)
+    action_params_from_planner = state.get(
+        "action_parameters", {}
+    )  # For follow-up context
+    current_goal_before_initiative = state.get(
+        "current_agent_goal",
+        AgentGoal(goal_type="IDLE", goal_details={}, previous_goal_if_interrupted=None),
+    )
+    last_agent_action = state.get("last_agent_action")
+
+    prompt_values = {
+        "formatted_state_context": formatted_state_context,
+        # Pass individual values needed by the prompt template string directly if they are used in the main system message
+        "trigger_source": action_params_from_planner.get(
+            "trigger_source", "user_response_or_stagnation"
+        ),
+        "current_follow_up_attempts": action_params_from_planner.get(
+            "current_follow_up_attempts", 0
+        ),
+        "max_follow_up_attempts_total": state.get("agent_config", {}).get(
+            "max_follow_up_attempts", 3
+        ),
         "current_goal_type_before_initiative": current_goal_before_initiative.get(
             "goal_type"
-        ),
-        "current_goal_details_before_initiative_json": to_json_safe(
-            current_goal_before_initiative.get("goal_details")
-        ),
-        "last_agent_action_type": (
-            last_agent_action.get("action_type", "N/A") if last_agent_action else "N/A"
-        ),
-        "last_agent_action_details_json": (
-            to_json_safe(last_agent_action.get("details"))
-            if last_agent_action
-            else "{}"
         ),
         "last_agent_action_text": (
             last_agent_action.get("action_generation_text", "N/A")
             if last_agent_action
             else "N/A"
         ),
-        "last_user_message_text": state.get(
-            "current_user_input_text", "N/A (Possivelmente timeout)"
-        ),
-        "last_discerned_intent": profile_dynamic.get("last_discerned_intent", "N/A"),
-        "user_response_to_agent_action_analysis": user_response_analysis_text,
-        "interruptions_queue_formatted": interruptions_formatted,
-        "active_objections_summary": (
-            to_json_safe(active_objections) if active_objections else "Nenhuma."
-        ),
-        "resolved_objections_summary": (
-            to_json_safe(resolved_objections) if resolved_objections else "Nenhuma."
-        ),
-        "confirmed_needs_summary": (
-            to_json_safe(confirmed_needs) if confirmed_needs else "Nenhuma."
-        ),
-        "closing_process_status": state.get("closing_process_status", "not_started"),
-        "chat_history": _format_recent_chat_history(state.get("messages", [])),
-        "current_datetime": time.strftime("%Y-%m-%d %H:%M:%S %Z"),
-        "MAX_REBUTTAL_ATTEMPTS_PER_OBJECTION": MAX_REBUTTAL_ATTEMPTS_PER_OBJECTION,
-        "MAX_SPIN_QUESTIONS_PER_CYCLE": MAX_SPIN_QUESTIONS_PER_CYCLE,
-        # Adicionar quaisquer outras variáveis que o prompt possa usar
-        "company_name": state.get("company_profile", {}).get(
-            "company_name", "nossa empresa"
-        ),
     }
 
-    # --- 2. Chamar o LLM usando a função helper _call_structured_llm ---
     llm_decision: Optional[ProactiveStepDecision] = await _call_structured_llm(
         llm=llm_strategist,
-        prompt_template_str=PROMPT_DETERMINE_PROACTIVE_STEP.messages[
-            0
-        ].prompt.template,  # Acessa o template string do system message
+        prompt_template_str=PROMPT_DETERMINE_PROACTIVE_STEP.messages[0].prompt.template,
         prompt_values=prompt_values,
         output_schema=ProactiveStepDecision,
         node_name_for_logging=node_name,
     )
 
-    next_action_command: Optional[AgentActionType] = None
-    action_params: AgentActionDetails = {}
-    processing_error: Optional[str] = None
+    updated_state_delta: Dict[str, Any] = {
+        "next_agent_action_command": None,
+        "action_parameters": {},
+        "suggested_goal_type": None,
+        "suggested_goal_details": {},
+        "last_processing_error": None,
+    }
 
     if llm_decision:
         logger.info(
             f"[{node_name}] LLM proactive decision: {llm_decision.model_dump_json(indent=2)}"
         )
-        if llm_decision.justification:
+        logger.info(f"[{node_name}] LLM Justification: {llm_decision.justification}")
+
+        if llm_decision.proactive_action_command:
             logger.info(
-                f"[{node_name}] LLM Justification: {llm_decision.justification}"
+                f"[{node_name}] LLM decided on DIRECT ACTION: {llm_decision.proactive_action_command}"
             )
+            updated_state_delta["next_agent_action_command"] = (
+                llm_decision.proactive_action_command
+            )
+            updated_state_delta["action_parameters"] = (
+                llm_decision.proactive_action_parameters or {}
+            )
+            # Ensure follow-up context is passed if the action is SEND_FOLLOW_UP_MESSAGE
+            if llm_decision.proactive_action_command == "SEND_FOLLOW_UP_MESSAGE":
+                updated_state_delta["action_parameters"][
+                    "current_follow_up_attempts"
+                ] = prompt_values["current_follow_up_attempts"]
+                updated_state_delta["action_parameters"][
+                    "max_follow_up_attempts_total"
+                ] = prompt_values["max_follow_up_attempts_total"]
 
-        next_action_command = llm_decision.proactive_action_command
-        action_params = llm_decision.proactive_action_parameters or {}
-
-        # add follow-up attempts to action params
-        action_params["current_follow_up_attempts"] = current_follow_up_attempts
-        action_params["max_follow_up_attempts_total"] = max_follow_up_attempts_total
-        # Se a chamada LLM foi bem-sucedida, mesmo que não retorne ação, não é um erro de processamento do nó.
-        processing_error = None
+        elif llm_decision.suggested_next_goal_type:
+            logger.info(
+                f"[{node_name}] LLM decided on SUGGESTED GOAL: {llm_decision.suggested_next_goal_type}"
+            )
+            updated_state_delta["next_agent_action_command"] = (
+                "REPLAN_WITH_SUGGESTED_GOAL"
+            )
+            updated_state_delta["suggested_goal_type"] = (
+                llm_decision.suggested_next_goal_type
+            )
+            updated_state_delta["suggested_goal_details"] = (
+                llm_decision.suggested_next_goal_details or {}
+            )
+            # Action parameters might be empty or minimal here, planner will fill them
+            updated_state_delta["action_parameters"] = {}
+        else:
+            logger.info(
+                f"[{node_name}] LLM decided no proactive action or goal suggestion is appropriate."
+            )
+            # No action, no goal suggestion. Planner will likely end the turn.
+            updated_state_delta["last_processing_error"] = (
+                None  # Not an error, a valid decisions
+            )
     else:
         logger.warning(
-            f"[{node_name}] LLM for proactive step returned None or failed. Defaulting to no action."
+            f"[{node_name}] LLM for proactive step returned None or failed. Defaulting to no action/suggestion."
         )
-        processing_error = "LLM proactive step decision failed or was unparsable."
-
-    # --- 3. Preparar o delta do estado ---
-    updated_state_delta: Dict[str, Any] = {
-        "next_agent_action_command": next_action_command,
-        "action_parameters": action_params,
-        "last_processing_error": processing_error,
-    }
-    # Se o LLM falhou completamente (llm_decision foi None antes do default), o erro já estaria em last_processing_error
-    # Se o _call_structured_llm falhou, ele retorna None, e o log já foi feito lá.
-    # Aqui, se llm_decision.proactive_action_command for None, é uma decisão válida do LLM de não agir.
-
-    if next_action_command:
-        logger.info(
-            f"[{node_name}] Proactive action decided: {next_action_command} with params {action_params}"
+        updated_state_delta["last_processing_error"] = (
+            "LLM proactive step decision failed or was unparsable."
         )
-    else:
-        logger.info(
-            f"[{node_name}] LLM decided no proactive action is appropriate at this time. Agent will wait or end turn."
-        )
-        # Se o LLM explicitamente não retorna ação, não é um erro de processamento, mas uma decisão.
-        # Poderíamos limpar o last_processing_error se a chamada LLM foi bem-sucedida mas não retornou ação.
-        if state.get(
-            "last_processing_error"
-        ) and "LLM proactive decider returned no action." not in state.get(
-            "last_processing_error", ""
-        ):
-            updated_state_delta["last_processing_error"] = None
 
     return updated_state_delta
