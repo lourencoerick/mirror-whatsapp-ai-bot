@@ -259,7 +259,7 @@ async def update_conversation_state_node(
                 entry_data = IdentifiedNeedEntry(
                     text=np.text,
                     status="active",
-                    priority=None,
+                    priority=0,
                     source_turn=next_turn_number,
                 )
                 needs_added += 1
@@ -601,7 +601,6 @@ async def update_conversation_state_node(
         )
 
     updated_state_delta["last_interaction_timestamp"] = time.time()
-    updated_state_delta["user_input_analysis_result"] = None  # Clear analysis result
     updated_state_delta["last_processing_error"] = None  # Clear previous errors
 
     logger.info(f"[{node_name}] State update complete for Turn {next_turn_number}.")
