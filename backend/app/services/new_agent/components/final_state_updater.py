@@ -17,6 +17,7 @@ from ..state_definition import (
     CustomerQuestionEntry,
     CustomerQuestionStatusType,
     AgentGoal,
+    ProposedSolution,
 )
 
 
@@ -203,6 +204,72 @@ async def finalize_turn_state_node(
                     logger.warning(
                         f"[{node_name}] Could not find 'newly_asked' question in log matching answered text: '{question_answered_text[:50]}...'"
                     )
+
+        elif action_command_executed == "PRESENT_SOLUTION_OFFER":
+            product_name = action_params_executed.get("product_name_to_present")
+            key_benefit = action_params_executed.get("key_benefit_to_highlight")
+
+            if product_name:
+                logger.info(
+                    f"[{node_name}] Action was PRESENT_SOLUTION_OFFER for product: {product_name}."
+                )
+                # Try to get price and URL from company_profile if available
+                # This requires company_profile and offering_overview to be structured
+                price: Optional[float] = None
+                price_info_str: Optional[str] = None
+                product_url: Optional[str] = None
+
+                company_profile = state.get("company_profile")
+                if company_profile and isinstance(company_profile, dict):
+                    offerings = company_profile.get("offering_overview", [])
+                    for offer in offerings:
+                        if (
+                            isinstance(offer, dict)
+                            and offer.get("name") == product_name
+                        ):
+                            # Attempt to parse price if it's a string like "R$99,90"
+                            price_str_from_profile = offer.get("price_info")
+                            if price_str_from_profile:
+                                try:
+                                    # Basic parsing, might need to be more robust
+                                    cleaned_price_str = (
+                                        price_str_from_profile.replace("R$", "")
+                                        .replace(",", ".")
+                                        .strip()
+                                    )
+                                    price = float(cleaned_price_str)
+                                    price_info_str = price_str_from_profile  # Keep original string for display
+                                except ValueError:
+                                    logger.warning(
+                                        f"Could not parse price '{price_str_from_profile}' for {product_name}. Using original string."
+                                    )
+                                    price_info_str = price_str_from_profile  # Store the unparsed string
+                                    price = None  # Explicitly set price to None if parsing fails
+
+                            product_url = offer.get("link")
+                            break
+
+                new_proposal = ProposedSolution(
+                    product_name=product_name,
+                    product_url=product_url,  # Can be None
+                    quantity=None,  # Default, can be updated later
+                    price=price,  # Can be None if not found/parsed
+                    price_info=price_info_str,  # Can be None
+                    key_benefits_highlighted=[key_benefit] if key_benefit else [],
+                    turn_proposed=int(current_turn),  # current_turn should be int
+                    status="proposed",
+                )
+                updated_state_delta["active_proposal"] = new_proposal
+                # Also update closing_process_status to indicate a proposal has been made,
+                # but not yet fully initiated for closing.
+                # 'not_started' might still be appropriate until user confirms interest in this proposal.
+                # Or a new status like 'proposal_made'. For now, let's assume it doesn't change closing_process_status yet.
+                logger.info(f"[{node_name}] Set active_proposal: {new_proposal}")
+            else:
+                logger.warning(
+                    f"[{node_name}] PRESENT_SOLUTION_OFFER executed but no product_name found in action_parameters."
+                )
+
     elif (
         action_command_executed and not text_for_action_record
     ):  # Ação planejada, mas sem texto
