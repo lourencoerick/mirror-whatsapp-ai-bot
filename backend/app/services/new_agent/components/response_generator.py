@@ -19,6 +19,7 @@ from ..state_definition import (
     SpinQuestionType,  # Para type hint
     AgentGoal,  # Para obter detalhes do goal se necessário
     CustomerQuestionStatusType,
+    ProposedSolution,
 )
 
 # Importar utils de prompt
@@ -75,7 +76,12 @@ Descrição: {business_description}
 Ofertas: {offering_summary}
 {company_address_info}
 {opening_hours_info}
+
+Opções de Entrega/Retirada:
+{delivery_options_info}
+
 Diretrizes: {communication_guidelines}
+
 --- Fim das Informações do Perfil ---
 
 **Instruções Cruciais:**
@@ -282,29 +288,41 @@ Gere a mensagem de confirmação dos detalhes.""",
     ]
 )
 
-
 PROMPT_PROCESS_ORDER_CONFIRMATION = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """Você é um Assistente de Vendas IA confirmando o sucesso do pedido.
-Sua tarefa é informar ao cliente que o pedido foi processado com sucesso (ou que os próximos passos foram iniciados).
+            """Você é um Assistente de Vendas IA da '{company_name}'.
+O cliente acaba de confirmar o pedido do '{product_name}'.
+Sua tarefa é:
+1. Agradecer ao cliente pela confiança e pela compra do *{product_name}*.
+2. Confirmar que o pedido foi recebido/processado com sucesso.
+3. Fornecer o link para que o cliente possa prosseguir com o pagamento ou finalizar a compra.
+4. Manter a mensagem positiva, concisa e clara.
 
 **Contexto:**
-Tom de Vendas: {sales_tone}
-Idioma: {language}
-Produto Confirmado: {product_name}
+- Tom de Vendas: {sales_tone}
+- Idioma: {language}
+- Produto Confirmado: *{product_name}*
+- Link para Pagamento/Finalização: {product_link_or_fallback} 
+  (Este link DEVE ser o destino para o cliente completar a compra. Se for um link geral do site, adapte a chamada para ação.)
 
-**Instruções:**
-1.  Confirme que o pedido do *{product_name}* foi recebido/processado com sucesso.
-2.  Mencione brevemente os próximos passos, se houver (ex: "Você receberá um email de confirmação em breve.", "Nossa equipe entrará em contato para agendar."). Se não houver próximos passos claros, apenas confirme o sucesso.
-3.  Agradeça ao cliente pela compra.
-4.  Use formatação WhatsApp sutil: {formatting_instructions}
+**Instruções Específicas:**
+- **Agradecimento e Confirmação:** Comece com um agradecimento caloroso e confirme o pedido. Ex: "Excelente! Seu pedido do *{product_name}* foi confirmado com sucesso. Agradecemos muito pela sua confiança!"
+- **Chamada para Ação com Link:**
+    - Se `{product_link_or_fallback}` parecer um link direto de produto/checkout (ex: contendo o nome do produto ou palavras como 'checkout', 'pagamento', 'carrinho'):
+      "Para finalizar sua compra e efetuar o pagamento, por favor, acesse o link: {product_link_or_fallback}"
+    - Se `{product_link_or_fallback}` parecer um link mais geral do site (ex: apenas o domínio principal):
+      "Você pode completar seu pedido e prosseguir para o pagamento através do nosso site: {product_link_or_fallback}"
+    - **Importante:** Apresente o link de forma clara.
+- **Próximos Passos (Mínimo):** A menos que haja um próximo passo MUITO específico e crucial que NÃO seja o link (o que é raro neste momento), não adicione informações sobre "nossa equipe entrará em contato" ou "aguarde X". O foco é levar o cliente ao link. Se o link é tudo, termine após fornecer o link e talvez um "Até breve!" ou "Qualquer dúvida no processo, é só chamar!".
+- **Formatação:** Use formatação WhatsApp sutil e eficaz ({formatting_instructions}).
 
-HISTÓRICO RECENTE:
+HISTÓRICO RECENTE (para seu contexto):
 {chat_history}
+--- Fim do Histórico ---
 
-Gere a mensagem de confirmação do pedido.""",
+Gere APENAS a mensagem de confirmação do pedido e o link para finalização da compra do *{product_name}*.""",
         ),
     ]
 )
@@ -458,6 +476,13 @@ def _prepare_common_prompt_context(state: RichConversationState) -> Dict[str, An
     key_selling_points = getattr(profile, "key_selling_points", [])
     key_points = _format_list_items(key_selling_points) or "N/A"
 
+    delivery_options_info = (
+        (
+            _format_list_items(profile.delivery_options)
+            if profile.delivery_options
+            else "Opções de delivery/pickup não especificadas."
+        ),
+    )
     brasilia_tz = pytz.timezone("America/Sao_Paulo")
     current_time_str = datetime.now(brasilia_tz).strftime("%Y-%m-%d %H:%M:%S %Z")
 
@@ -468,6 +493,7 @@ def _prepare_common_prompt_context(state: RichConversationState) -> Dict[str, An
         "business_description": getattr(profile, "business_description", "N/A"),
         "offering_summary": offering_summary,
         "key_selling_points": key_points,
+        "delivery_options_info": delivery_options_info,
         "company_address_info": (
             f"Endereço: {profile.address}" if getattr(profile, "address", None) else ""
         ),
@@ -675,6 +701,22 @@ async def response_generator_node(
         elif action_command == "PROCESS_ORDER_CONFIRMATION":
             specific_values["product_name"] = action_params.get(
                 "product_name", "seu pedido"
+            )
+
+            product_link = None
+            active_proposal: Optional[ProposedSolution] = state.get("active_proposal")  # type: ignore
+            if active_proposal and isinstance(
+                active_proposal, dict
+            ):  # Checar se é dict
+                product_link = active_proposal.get("product_url")
+
+            # Usar o link do produto se disponível, senão o fallback_text (que é o company_main_link_fallback)
+            specific_values["product_link_or_fallback"] = (
+                product_link
+                or common_context.get("company_main_link_fallback", "nosso site.")
+            )
+            logger.debug(
+                f"[{node_name}] For PROCESS_ORDER_CONFIRMATION, product_link_or_fallback set to: {specific_values['product_link_or_fallback']}"
             )
 
         elif action_command == "HANDLE_CLOSING_CORRECTION":
