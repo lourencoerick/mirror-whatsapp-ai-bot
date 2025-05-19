@@ -4,7 +4,7 @@ from urllib.parse import urljoin, urlparse
 import html2text
 from loguru import logger
 import sys
-import cloudscraper
+import httpx
 
 # Import LinkInfo schema from graph_state or define it here
 try:
@@ -19,18 +19,15 @@ except ImportError:
 
 # --- Dependencies ---
 try:
-    import requests
+    import httpx
     from bs4 import BeautifulSoup
 
     BEAUTIFULSOUP_AVAILABLE = True
 except ImportError:
-    logger.error("Required libraries 'requests' or 'beautifulsoup4' not found.")
+    logger.error("Required libraries 'httpx' or 'beautifulsoup4' not found.")
     BEAUTIFULSOUP_AVAILABLE = False
 
     class BeautifulSoup:
-        pass
-
-    class requests:
         pass
 
 
@@ -158,34 +155,24 @@ def _extract_text_and_links_simple(
     return text, links
 
 
-def _fetch_page_content_sync(
+async def _fetch_page_content_async(
     url: str, headers: Dict[str, str], timeout: int
 ) -> Optional[str]:
     try:
-        response = requests.get(
-            url, headers=headers, timeout=timeout, allow_redirects=True
-        )
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
-        if e.response is not None and e.response.status_code == 403:
-            scraper = cloudscraper.create_scraper()
-            response = scraper.get(url, headers=headers, timeout=timeout)
-            try:
-                response.raise_for_status()
-            except requests.exceptions.HTTPError as se:
-                logger.warning(f"cloudscraper também falhou em {url}: {se}")
-                return None
-        else:
-            logger.warning(
-                f"Failed fetch {url} (Status: {e.response.status_code}): {e}"
-            )
-            return None
-    except requests.exceptions.Timeout:
+        logger.info(f"Fetching HTML from URL: {url}")
+        async with httpx.AsyncClient(
+            timeout=30.0,
+            follow_redirects=True,
+            headers=headers,
+        ) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+
+    except httpx.TimeoutException:
         logger.warning(f"Timeout fetching {url} after {timeout}s")
         return None
-    except requests.exceptions.RequestException as e:
-        status_code = getattr(e.response, "status_code", "N/A")
-        logger.warning(f"Failed fetch {url} (Status: {status_code}): {e}")
+    except httpx.RequestError as e:
+        logger.error(f"HTTP request failed for URL {url}: {e}")
         return None
     except Exception as e:
         logger.error(f"Unexpected error fetching {url}: {e}")
@@ -253,10 +240,7 @@ async def fetch_and_extract_text_and_links(
 
     try:
 
-        html_content = await asyncio.wait_for(
-            asyncio.to_thread(_fetch_page_content_sync, url, headers, request_timeout),
-            timeout=float(request_timeout + 5),
-        )
+        html_content = await _fetch_page_content_async(url, headers, request_timeout)
 
         if html_content:
 
@@ -331,7 +315,7 @@ if __name__ == "__main__":
         logger.error("asyncio.to_thread is required (Python 3.9+).")
     else:
         try:
-            import loguru, requests, lxml
+            import loguru, httpx, lxml
 
             asyncio.run(main_test())
         except ImportError as e:
