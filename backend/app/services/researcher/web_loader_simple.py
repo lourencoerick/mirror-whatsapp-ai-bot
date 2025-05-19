@@ -4,6 +4,7 @@ from urllib.parse import urljoin, urlparse
 import html2text
 from loguru import logger
 import sys
+import cloudscraper
 
 # Import LinkInfo schema from graph_state or define it here
 try:
@@ -165,17 +166,20 @@ def _fetch_page_content_sync(
             url, headers=headers, timeout=timeout, allow_redirects=True
         )
         response.raise_for_status()
-        content_type = response.headers.get("content-type", "").lower()
-        if "html" not in content_type:
-            logger.debug(f"Skipping non-HTML content at {url} (type: {content_type})")
-            return None
-        try:
-            return response.content.decode("utf-8")
-        except UnicodeDecodeError:
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 403:
+            scraper = cloudscraper.create_scraper()
+            response = scraper.get(url, headers=headers, timeout=timeout)
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError as se:
+                logger.warning(f"cloudscraper também falhou em {url}: {se}")
+                return None
+        else:
             logger.warning(
-                f"UTF-8 decode failed for {url}, using apparent: {response.apparent_encoding}"
+                f"Failed fetch {url} (Status: {e.response.status_code}): {e}"
             )
-            return response.text
+            return None
     except requests.exceptions.Timeout:
         logger.warning(f"Timeout fetching {url} after {timeout}s")
         return None
@@ -186,6 +190,19 @@ def _fetch_page_content_sync(
     except Exception as e:
         logger.error(f"Unexpected error fetching {url}: {e}")
         return None
+
+    content_type = response.headers.get("content-type", "").lower()
+    if "html" not in content_type:
+        logger.debug(f"Skipping non-HTML content at {url} (type: {content_type})")
+        return None
+
+    try:
+        return response.content.decode("utf-8")
+    except UnicodeDecodeError:
+        logger.warning(
+            f"UTF-8 decode failed for {url}, using apparent: {response.apparent_encoding}"
+        )
+        return response.text
 
 
 # --- Core Function  ---
@@ -215,9 +232,19 @@ async def fetch_and_extract_text_and_links(
     if not _validate_url(url):
         return None, []
 
-    headers = (
-        request_headers if request_headers is not None else DEFAULT_REQUEST_HEADERS
+    default_headers = DEFAULT_REQUEST_HEADERS.copy()
+    default_headers.update(
+        {
+            "Referer": url,
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-User": "?1",
+            "Sec-Fetch-Dest": "document",
+        }
     )
+
+    headers = request_headers if request_headers is not None else default_headers
     logger.info(f"Attempting to fetch/extract text & links from URL: {url}")
 
     html_content: Optional[str] = None
