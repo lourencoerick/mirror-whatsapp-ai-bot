@@ -35,9 +35,6 @@ except ImportError:
 DEFAULT_SINGLE_PAGE_TIMEOUT = 20
 DEFAULT_REQUEST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Connection": "keep-alive",
 }
 
 
@@ -220,16 +217,6 @@ async def fetch_and_extract_text_and_links(
         return None, []
 
     default_headers = DEFAULT_REQUEST_HEADERS.copy()
-    default_headers.update(
-        {
-            "Referer": url,
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Fetch-Site": "same-origin",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-User": "?1",
-            "Sec-Fetch-Dest": "document",
-        }
-    )
 
     headers = request_headers if request_headers is not None else default_headers
     logger.info(f"Attempting to fetch/extract text & links from URL: {url}")
