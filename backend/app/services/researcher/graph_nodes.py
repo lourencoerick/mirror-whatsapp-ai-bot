@@ -722,7 +722,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
                 for link in intial_url_found_links[:30]
             ]
         )
-        initial_url_links_summary = f"Potential URLs found in the last scraping cycle (limit 30):\n{links_list_str}"
+        initial_url_links_summary = f"Potential URLs found in the first target URL (limit 30):\n{links_list_str}"
         if len(intial_url_found_links) > 30:
             initial_url_links_summary += "\n..."
     logger.debug(f"{initial_url_links_summary}")
@@ -763,6 +763,8 @@ You are an automated research planner AI. Your objective is to strategically dec
 *   Analysis of Missing Information: {missing_info}
 *   {history_log}
 *   {links_summary}
+
+Before decide to 'finish', make sure that in the 'History of Recent Actions Attempted', there are at least two Sucessful Scrape Actions. And if it makes sense, explore a bit more the links found on the target url.
 
 **Instructions:** Choose the *single best next action* from the options below.
 
