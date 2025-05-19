@@ -1,7 +1,7 @@
 import asyncio
 from typing import Optional, Dict, Tuple, List
 from urllib.parse import urljoin, urlparse
-
+import html2text
 from loguru import logger
 import sys
 
@@ -136,6 +136,19 @@ def _extract_text_and_links_simple(
                 links.append(LinkInfo(url=cleaned_link, anchor_text=anchor_text))
                 processed_urls.add(cleaned_link)
 
+        h2t = html2text.HTML2Text()
+        h2t.body_width = 0  # No automatic line wrapping
+        h2t.ignore_images = True  # Usually good for RAG
+        h2t.ignore_links = False  # Keep links by default, can be changed
+        h2t.ignore_emphasis = False  # Keep bold/italic
+        h2t.unicode_snob = True
+        h2t.mark_code = True
+        h2t.header_style = 1  # Use #, ## for headers (ATX style)
+        h2t.use_automatic_links = True
+        h2t.skip_internal_links = True
+        h2t.include_doc_title = False  # Don't use <title> tag as H1 for the whole doc
+        # override the text using html2text
+        text = h2t.handle(html_content)
     except Exception as e:
         logger.error(f"Error during BeautifulSoup parsing or link extraction: {e}")
         # Return whatever was extracted so far, or empty if error was early
