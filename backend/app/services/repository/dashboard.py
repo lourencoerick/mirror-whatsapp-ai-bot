@@ -137,26 +137,37 @@ async def get_dashboard_stats(
     # --- 2. Message Stats ---
     message_counts_stmt = (
         select(
-            func.sum(case((Message.direction == "in", 1), else_=0)).label(
-                "received_count"
-            ),
-            func.sum(
-                case(
-                    (
-                        and_(
-                            Message.direction == "out",
-                            Message.bot_agent_id.is_not(None),
+            func.coalesce(
+                func.sum(case((Message.direction == "in", 1), else_=0)), 0
+            ).label("received_count"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                Message.direction == "out",
+                                Message.bot_agent_id.is_not(None),
+                            ),
+                            1,
                         ),
-                        1,
-                    ),
-                    else_=0,
-                )
+                        else_=0,
+                    )
+                ),
+                0,
             ).label("sent_by_bot_count"),
-            func.sum(
-                case(
-                    (and_(Message.direction == "out", Message.user_id.is_not(None)), 1),
-                    else_=0,
-                )
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                Message.direction == "out", Message.user_id.is_not(None)
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
             ).label("sent_by_human_count"),
         )
         .select_from(Message)  # Explicitly select from Message table
@@ -234,35 +245,46 @@ async def get_dashboard_message_volume(
     stmt = (
         select(
             time_group_func.label("timestamp_group"),
-            func.sum(case((Message.direction == "in", 1), else_=0)).label(
-                "received_count"
-            ),
-            func.sum(
-                case(
-                    (
-                        and_(
-                            Message.direction == "out",
-                            Message.bot_agent_id.is_not(None),
+            func.coalesce(
+                func.sum(case((Message.direction == "in", 1), else_=0)), 0
+            ).label("received_count"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                Message.direction == "out",
+                                Message.bot_agent_id.is_not(None),
+                            ),
+                            1,
                         ),
-                        1,
-                    ),
-                    else_=0,
-                )
+                        else_=0,
+                    )
+                ),
+                0,
             ).label("sent_by_bot_count"),
-            func.sum(
-                case(
-                    (and_(Message.direction == "out", Message.user_id.is_not(None)), 1),
-                    else_=0,
-                )
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                Message.direction == "out", Message.user_id.is_not(None)
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
             ).label("sent_by_human_count"),
         )
-        .select_from(Message)  # Explicitly select from Message table
+        .select_from(Message)
         .where(
             Message.account_id == account_id,
             Message.created_at.between(period_start_dt, period_end_dt),
         )
         .group_by("timestamp_group")
-        .order_by(text("timestamp_group asc"))  # Use text() for dynamic label ordering
+        .order_by(text("timestamp_group asc"))
     )
 
     if inbox_id:
