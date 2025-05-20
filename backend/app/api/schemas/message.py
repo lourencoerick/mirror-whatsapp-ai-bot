@@ -37,6 +37,5 @@ class MessageResponse(BaseModel):
     id: UUID
     content: Optional[str]
     direction: str
-    message_type: str
     content_type: Optional[str]
     sent_at: Optional[datetime]

@@ -4,5636 +4,5698 @@
  */
 
 export interface paths {
-    "/api/v1/auth/protected": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Example protected route
-         * @description An example route protected by Clerk authentication.
-         *
-         *     Requires a valid Bearer token in the Authorization header.
-         *     The verified token payload is injected into the 'payload' argument.
-         *
-         *     Args:
-         *         payload (Dict[str, Any], optional): The verified token payload. Defaults to Depends(verify_clerk_token).
-         *
-         *     Returns:
-         *         Dict[str, Any]: A message and the token payload.
-         */
-        get: operations["protected_route_api_v1_auth_protected_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  "/api/v1/auth/protected": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/auth/public": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Example public route
-         * @description An example route that does not require authentication.
-         *
-         *     Returns:
-         *         Dict[str, Any]: A message.
-         */
-        get: operations["public_route_api_v1_auth_public_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Example protected route
+     * @description An example route protected by Clerk authentication.
+     *
+     *     Requires a valid Bearer token in the Authorization header.
+     *     The verified token payload is injected into the 'payload' argument.
+     *
+     *     Args:
+     *         payload (Dict[str, Any], optional): The verified token payload. Defaults to Depends(verify_clerk_token).
+     *
+     *     Returns:
+     *         Dict[str, Any]: A message and the token payload.
+     */
+    get: operations["protected_route_api_v1_auth_protected_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/auth/public": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/conversations/{conversation_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Find Conversation
-         * @description Handles listing and searching conversations based on the presence of the 'q' query parameter.
-         */
-        get: operations["get_conversation_api_v1_conversations__conversation_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Example public route
+     * @description An example route that does not require authentication.
+     *
+     *     Returns:
+     *         Dict[str, Any]: A message.
+     */
+    get: operations["public_route_api_v1_auth_public_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/conversations/{conversation_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/conversations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List or Search Conversations
-         * @description Retrieve a list of conversations. Use the 'q' parameter to search by contact name, phone number, or message content.
-         */
-        get: operations["search_or_list_conversations_api_v1_conversations_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Find Conversation
+     * @description Handles listing and searching conversations based on the presence of the 'q' query parameter.
+     */
+    get: operations["get_conversation_api_v1_conversations__conversation_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/conversations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/inboxes/{inbox_id}/conversations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Inbox Conversations
-         * @description Return all conversations for a specific inbox.
-         *
-         *     Args:
-         *         inbox_id (UUID): The ID of the inbox.
-         *         limit (int, optional): The number of conversations to return. Defaults to 20.
-         *         offset (int, optional): The number of conversations to skip. Defaults to 0.
-         *         db (AsyncSession, optional): The database session. Defaults to Depends(get_db).
-         *         auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
-         *
-         *     Returns:
-         *         List[ConversationSearchResult]: A list of conversations.
-         */
-        get: operations["get_inbox_conversations_api_v1_inboxes__inbox_id__conversations_get"];
-        put?: never;
-        /**
-         * Start Conversation
-         * @description Start a new conversation in a specific inbox.
-         *
-         *     Args:
-         *         inbox_id (UUID): The ID of the inbox.
-         *         payload (StartConversationRequest): The data for the new conversation.
-         *         db (AsyncSession, optional): The database session. Defaults to Depends(get_db).
-         *         auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
-         *
-         *     Returns:
-         *         StartConversationResponse: The ID of the new conversation.
-         *     Raises:
-         *         HTTPException: If the inbox is not found or the user is not authorized.
-         */
-        post: operations["start_conversation_api_v1_inboxes__inbox_id__conversations_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * List or Search Conversations
+     * @description Retrieve a list of conversations. Use the 'q' parameter to search by contact name, phone number, or message content.
+     */
+    get: operations["search_or_list_conversations_api_v1_conversations_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/inboxes/{inbox_id}/conversations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/conversations/{conversation_id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Conversation Status
-         * @description Updates the status of a specific conversation. If setting status to CLOSED, also resets the unread count.
-         */
-        put: operations["update_conversation_status_endpoint_api_v1_conversations__conversation_id__status_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Inbox Conversations
+     * @description Return all conversations for a specific inbox.
+     *
+     *     Args:
+     *         inbox_id (UUID): The ID of the inbox.
+     *         limit (int, optional): The number of conversations to return. Defaults to 20.
+     *         offset (int, optional): The number of conversations to skip. Defaults to 0.
+     *         db (AsyncSession, optional): The database session. Defaults to Depends(get_db).
+     *         auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
+     *
+     *     Returns:
+     *         List[ConversationSearchResult]: A list of conversations.
+     */
+    get: operations["get_inbox_conversations_api_v1_inboxes__inbox_id__conversations_get"];
+    put?: never;
+    /**
+     * Start Conversation
+     * @description Start a new conversation in a specific inbox.
+     *
+     *     Args:
+     *         inbox_id (UUID): The ID of the inbox.
+     *         payload (StartConversationRequest): The data for the new conversation.
+     *         db (AsyncSession, optional): The database session. Defaults to Depends(get_db).
+     *         auth_context (AuthContext, optional): The authentication context. Defaults to Depends(get_auth_context).
+     *
+     *     Returns:
+     *         StartConversationResponse: The ID of the new conversation.
+     *     Raises:
+     *         HTTPException: If the inbox is not found or the user is not authorized.
+     */
+    post: operations["start_conversation_api_v1_inboxes__inbox_id__conversations_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/conversations/{conversation_id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/conversations/{conversation_id}/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Conversation Messages (Paginated)
-         * @description Retrieves a paginated list of messages for a specific conversation, supporting cursor-based pagination. The messages are ordered chronologically (oldest first).
-         */
-        get: operations["get_conversation_messages_paginated_api_v1_conversations__conversation_id__messages_get"];
-        put?: never;
-        /**
-         * Create Outgoing Message
-         * @description Creates and sends an outgoing message linked to a conversation. The endpoint validates the conversation, persists a new outgoing message, resets the conversation's unread count, potentially updates its status to HUMAN_ACTIVE, updates the last message snapshot, and enqueues the message for delivery.
-         */
-        post: operations["create_outgoing_message_api_v1_conversations__conversation_id__messages_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * Update Conversation Status
+     * @description Updates the status of a specific conversation. If setting status to CLOSED, also resets the unread count.
+     */
+    put: operations["update_conversation_status_endpoint_api_v1_conversations__conversation_id__status_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/conversations/{conversation_id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/conversations/{conversation_id}/messages/context/{message_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Message Context
-         * @description Retrieves a target message and a specified number of surrounding messages within its conversation. The context is ordered chronologically.
-         */
-        get: operations["get_message_context_endpoint_api_v1_conversations__conversation_id__messages_context__message_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Conversation Messages (Paginated)
+     * @description Retrieves a paginated list of messages for a specific conversation, supporting cursor-based pagination. The messages are ordered chronologically (oldest first).
+     */
+    get: operations["get_conversation_messages_paginated_api_v1_conversations__conversation_id__messages_get"];
+    put?: never;
+    /**
+     * Create Outgoing Message
+     * @description Creates and sends an outgoing message linked to a conversation. The endpoint validates the conversation, persists a new outgoing message, resets the conversation's unread count, potentially updates its status to HUMAN_ACTIVE, updates the last message snapshot, and enqueues the message for delivery.
+     */
+    post: operations["create_outgoing_message_api_v1_conversations__conversation_id__messages_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/conversations/{conversation_id}/messages/context/{message_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/inboxes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Account Inboxes
-         * @description Retrieve all inboxes associated with the authenticated user's account.
-         *
-         *     Args:
-         *         auth_context (AuthContext): Authentication context containing user and account details.
-         *         db (AsyncSession): Asynchronous database session.
-         *         limit (int): Maximum number of inboxes to return.
-         *         offset (int): Number of inboxes to skip.
-         *
-         *     Returns:
-         *         List[InboxRead]: A list of inboxes for the authenticated account.
-         */
-        get: operations["list_account_inboxes_api_v1_inboxes_get"];
-        put?: never;
-        /**
-         * Create New Inbox
-         * @description Create a new inbox for the authenticated user's account.
-         *
-         *     Args:
-         *         inbox_data (InboxCreate): Data for creating a new inbox.
-         *         auth_context (AuthContext): Authentication context containing user and account details.
-         *         db (AsyncSession): Asynchronous database session.
-         *
-         *     Returns:
-         *         InboxRead: The newly created inbox.
-         *
-         *     Raises:
-         *         HTTPException: If the inbox creation fails.
-         */
-        post: operations["create_new_inbox_api_v1_inboxes_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Message Context
+     * @description Retrieves a target message and a specified number of surrounding messages within its conversation. The context is ordered chronologically.
+     */
+    get: operations["get_message_context_endpoint_api_v1_conversations__conversation_id__messages_context__message_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/inboxes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/inboxes/{inbox_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Single Inbox
-         * @description Retrieve a specific inbox by ID, ensuring it belongs to the authenticated account.
-         *
-         *     Args:
-         *         inbox_id (UUID): The ID of the inbox to retrieve.
-         *         auth_context (AuthContext): Authentication context containing user and account details.
-         *         db (AsyncSession): Asynchronous database session.
-         *
-         *     Returns:
-         *         InboxRead: The requested inbox.
-         *
-         *     Raises:
-         *         HTTPException: 404 if the inbox is not found or not accessible.
-         */
-        get: operations["get_single_inbox_api_v1_inboxes__inbox_id__get"];
-        /**
-         * Update Existing Inbox
-         * @description Update an existing inbox, ensuring it belongs to the authenticated account.
-         *
-         *     Args:
-         *         inbox_id (UUID): The ID of the inbox to update.
-         *         update_data (InboxUpdate): Data for updating the inbox.
-         *         auth_context (AuthContext): Authentication context containing user and account details.
-         *         db (AsyncSession): Asynchronous database session.
-         *
-         *     Returns:
-         *         InboxRead: The updated inbox.
-         *
-         *     Raises:
-         *         HTTPException: 404 if the inbox is not found or not accessible.
-         *         HTTPException: 500 if the inbox update fails.
-         */
-        put: operations["update_existing_inbox_api_v1_inboxes__inbox_id__put"];
-        post?: never;
-        /**
-         * Delete Existing Inbox
-         * @description Delete an existing inbox, ensuring it belongs to the authenticated account.
-         *
-         *     Args:
-         *         inbox_id (UUID): The ID of the inbox to delete.
-         *         auth_context (AuthContext): Authentication context containing user and account details.
-         *         db (AsyncSession): Asynchronous database session.
-         *
-         *     Returns:
-         *         None
-         *
-         *     Raises:
-         *         HTTPException: 404 if the inbox is not found or not accessible.
-         *         HTTPException: 500 if the inbox deletion fails.
-         */
-        delete: operations["delete_existing_inbox_api_v1_inboxes__inbox_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * List Account Inboxes
+     * @description Retrieve all inboxes associated with the authenticated user's account.
+     *
+     *     Args:
+     *         auth_context (AuthContext): Authentication context containing user and account details.
+     *         db (AsyncSession): Asynchronous database session.
+     *         limit (int): Maximum number of inboxes to return.
+     *         offset (int): Number of inboxes to skip.
+     *
+     *     Returns:
+     *         List[InboxRead]: A list of inboxes for the authenticated account.
+     */
+    get: operations["list_account_inboxes_api_v1_inboxes_get"];
+    put?: never;
+    /**
+     * Create New Inbox
+     * @description Create a new inbox for the authenticated user's account.
+     *
+     *     Args:
+     *         inbox_data (InboxCreate): Data for creating a new inbox.
+     *         auth_context (AuthContext): Authentication context containing user and account details.
+     *         db (AsyncSession): Asynchronous database session.
+     *
+     *     Returns:
+     *         InboxRead: The newly created inbox.
+     *
+     *     Raises:
+     *         HTTPException: If the inbox creation fails.
+     */
+    post: operations["create_new_inbox_api_v1_inboxes_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/inboxes/{inbox_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/contacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List contacts
-         * @description Retrieves a paginated, searchable, and sortable list of contacts for the current account. Filtering is possible by name, email, or phone number.
-         */
-        get: operations["list_contacts_api_v1_contacts_get"];
-        put?: never;
-        /**
-         * Create a new contact
-         * @description Creates a new contact for the current account after normalizing the phone number. Checks for existing contacts with the same normalized phone number and stores the normalized number in both the `identifier` and `phone_number` fields.
-         */
-        post: operations["create_new_contact_api_v1_contacts_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Single Inbox
+     * @description Retrieve a specific inbox by ID, ensuring it belongs to the authenticated account.
+     *
+     *     Args:
+     *         inbox_id (UUID): The ID of the inbox to retrieve.
+     *         auth_context (AuthContext): Authentication context containing user and account details.
+     *         db (AsyncSession): Asynchronous database session.
+     *
+     *     Returns:
+     *         InboxRead: The requested inbox.
+     *
+     *     Raises:
+     *         HTTPException: 404 if the inbox is not found or not accessible.
+     */
+    get: operations["get_single_inbox_api_v1_inboxes__inbox_id__get"];
+    /**
+     * Update Existing Inbox
+     * @description Update an existing inbox, ensuring it belongs to the authenticated account.
+     *
+     *     Args:
+     *         inbox_id (UUID): The ID of the inbox to update.
+     *         update_data (InboxUpdate): Data for updating the inbox.
+     *         auth_context (AuthContext): Authentication context containing user and account details.
+     *         db (AsyncSession): Asynchronous database session.
+     *
+     *     Returns:
+     *         InboxRead: The updated inbox.
+     *
+     *     Raises:
+     *         HTTPException: 404 if the inbox is not found or not accessible.
+     *         HTTPException: 500 if the inbox update fails.
+     */
+    put: operations["update_existing_inbox_api_v1_inboxes__inbox_id__put"];
+    post?: never;
+    /**
+     * Delete Existing Inbox
+     * @description Delete an existing inbox, ensuring it belongs to the authenticated account.
+     *
+     *     Args:
+     *         inbox_id (UUID): The ID of the inbox to delete.
+     *         auth_context (AuthContext): Authentication context containing user and account details.
+     *         db (AsyncSession): Asynchronous database session.
+     *
+     *     Returns:
+     *         None
+     *
+     *     Raises:
+     *         HTTPException: 404 if the inbox is not found or not accessible.
+     *         HTTPException: 500 if the inbox deletion fails.
+     */
+    delete: operations["delete_existing_inbox_api_v1_inboxes__inbox_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/contacts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/contacts/{contact_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get a specific contact
-         * @description Retrieves the details of a specific contact by its ID.
-         */
-        get: operations["get_contact_details_api_v1_contacts__contact_id__get"];
-        /**
-         * Update a contact
-         * @description Updates the details of an existing contact.
-         */
-        put: operations["update_existing_contact_api_v1_contacts__contact_id__put"];
-        post?: never;
-        /**
-         * Delete a contact
-         * @description Deletes a specific contact by its ID.
-         */
-        delete: operations["delete_existing_contact_api_v1_contacts__contact_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * List contacts
+     * @description Retrieves a paginated, searchable, and sortable list of contacts for the current account. Filtering is possible by name, email, or phone number.
+     */
+    get: operations["list_contacts_api_v1_contacts_get"];
+    put?: never;
+    /**
+     * Create a new contact
+     * @description Creates a new contact for the current account after normalizing the phone number. Checks for existing contacts with the same normalized phone number and stores the normalized number in both the `identifier` and `phone_number` fields.
+     */
+    post: operations["create_new_contact_api_v1_contacts_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/contacts/{contact_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/simulation/details": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Primary Simulation Environment Details
-         * @description Retrieves the IDs for the user's primary simulation inbox, contact, and conversation, stored on their account.
-         */
-        get: operations["get_simulation_details_api_v1_simulation_details_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get a specific contact
+     * @description Retrieves the details of a specific contact by its ID.
+     */
+    get: operations["get_contact_details_api_v1_contacts__contact_id__get"];
+    /**
+     * Update a contact
+     * @description Updates the details of an existing contact.
+     */
+    put: operations["update_existing_contact_api_v1_contacts__contact_id__put"];
+    post?: never;
+    /**
+     * Delete a contact
+     * @description Deletes a specific contact by its ID.
+     */
+    delete: operations["delete_existing_contact_api_v1_contacts__contact_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/simulation/details": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/simulation/conversations/{conversation_id}/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Enqueue a Simulated Incoming Message
-         * @description Accepts a message as if sent by the simulated contact, validates it, and enqueues it for processing by the message consumer (which will save it and trigger AI).
-         */
-        post: operations["enqueue_simulation_message_api_v1_simulation_conversations__conversation_id__messages_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Primary Simulation Environment Details
+     * @description Retrieves the IDs for the user's primary simulation inbox, contact, and conversation, stored on their account.
+     */
+    get: operations["get_simulation_details_api_v1_simulation_details_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/simulation/conversations/{conversation_id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/simulation/conversations/{conversation_id}/checkpoint": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Reset Simulation State (Delete Checkpoint & Messages)
-         * @description Deletes the persisted LangGraph state (checkpoint) AND associated messages for the specified simulation conversation.
-         */
-        delete: operations["reset_simulation_state_api_v1_simulation_conversations__conversation_id__checkpoint_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Enqueue a Simulated Incoming Message
+     * @description Accepts a message as if sent by the simulated contact, validates it, and enqueues it for processing by the message consumer (which will save it and trigger AI).
+     */
+    post: operations["enqueue_simulation_message_api_v1_simulation_conversations__conversation_id__messages_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/simulation/conversations/{conversation_id}/checkpoint": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/simulation/personas": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read Personas
-         * @description Retrieve a list of personas with pagination.
-         */
-        get: operations["read_personas_api_v1_simulation_personas_get"];
-        put?: never;
-        /**
-         * Create Persona
-         * @description Create a new Persona linked to an existing Contact.
-         */
-        post: operations["create_new_persona_api_v1_simulation_personas_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Reset Simulation State (Delete Checkpoint & Messages)
+     * @description Deletes the persisted LangGraph state (checkpoint) AND associated messages for the specified simulation conversation.
+     */
+    delete: operations["reset_simulation_state_api_v1_simulation_conversations__conversation_id__checkpoint_delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/simulation/personas": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/simlation/personas/{persona_db_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read Persona by DB ID
-         * @description Get a specific persona by its database UUID.
-         */
-        get: operations["read_persona_by_id_api_v1_simlation_personas__persona_db_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Read Personas
+     * @description Retrieve a list of personas with pagination.
+     */
+    get: operations["read_personas_api_v1_simulation_personas_get"];
+    put?: never;
+    /**
+     * Create Persona
+     * @description Create a new Persona linked to an existing Contact.
+     */
+    post: operations["create_new_persona_api_v1_simulation_personas_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/simlation/personas/{persona_db_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/by_persona_id/{persona_id_str}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read Persona by Persona ID
-         * @description Get a specific persona by its unique string identifier (persona_id).
-         */
-        get: operations["read_persona_by_persona_id_str_api_v1_by_persona_id__persona_id_str__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Read Persona by DB ID
+     * @description Get a specific persona by its database UUID.
+     */
+    get: operations["read_persona_by_id_api_v1_simlation_personas__persona_db_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/by_persona_id/{persona_id_str}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/simulation/personas/by_contact_id/{contact_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read Persona by Contact ID
-         * @description Get the persona associated with a specific Contact UUID.
-         */
-        get: operations["read_persona_by_contact_id_uuid_api_v1_simulation_personas_by_contact_id__contact_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Read Persona by Persona ID
+     * @description Get a specific persona by its unique string identifier (persona_id).
+     */
+    get: operations["read_persona_by_persona_id_str_api_v1_by_persona_id__persona_id_str__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/simulation/personas/by_contact_id/{contact_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/simulation/personas/by_identifier/{identifier}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Read Persona by Simulation Identifier
-         * @description Get a persona by its simulation contact identifier (e.g., phone number).
-         */
-        get: operations["read_persona_by_identifier_str_api_v1_simulation_personas_by_identifier__identifier__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Read Persona by Contact ID
+     * @description Get the persona associated with a specific Contact UUID.
+     */
+    get: operations["read_persona_by_contact_id_uuid_api_v1_simulation_personas_by_contact_id__contact_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/simulation/personas/by_identifier/{identifier}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/simulation/personas/{persona_db_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Persona
-         * @description Update an existing persona's details. Cannot change persona_id or linked contact.
-         */
-        put: operations["update_existing_persona_api_v1_simulation_personas__persona_db_id__put"];
-        post?: never;
-        /**
-         * Delete Persona
-         * @description Delete a persona by its database UUID.
-         */
-        delete: operations["delete_existing_persona_api_v1_simulation_personas__persona_db_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Read Persona by Simulation Identifier
+     * @description Get a persona by its simulation contact identifier (e.g., phone number).
+     */
+    get: operations["read_persona_by_identifier_str_api_v1_simulation_personas_by_identifier__identifier__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/simulation/personas/{persona_db_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Company Profile
-         * @description Retrieves the company profile associated with the authenticated user's active account.
-         */
-        get: operations["get_company_profile_api_v1_profile_get"];
-        /**
-         * Create or Update Company Profile
-         * @description Creates (if doesn't exist) or fully updates the company profile associated with the authenticated user's active account.
-         */
-        put: operations["create_or_update_company_profile_api_v1_profile_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    /**
+     * Update Persona
+     * @description Update an existing persona's details. Cannot change persona_id or linked contact.
+     */
+    put: operations["update_existing_persona_api_v1_simulation_personas__persona_db_id__put"];
+    post?: never;
+    /**
+     * Delete Persona
+     * @description Delete a persona by its database UUID.
+     */
+    delete: operations["delete_existing_persona_api_v1_simulation_personas__persona_db_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/profile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/bot-agents/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Bot Agents for Account
-         * @description Retrieves Bot Agents associated with the authenticated user's active account. Currently, it's expected that an account has at most one Bot Agent.
-         */
-        get: operations["list_bot_agents_api_v1_bot_agents__get"];
-        put?: never;
-        /**
-         * Create Bot Agent
-         * @description Creates a new Bot Agent for the authenticated user's account. An account can only have one Bot Agent.
-         */
-        post: operations["create_bot_agent_api_v1_bot_agents__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Company Profile
+     * @description Retrieves the company profile associated with the authenticated user's active account.
+     */
+    get: operations["get_company_profile_api_v1_profile_get"];
+    /**
+     * Create or Update Company Profile
+     * @description Creates (if doesn't exist) or fully updates the company profile associated with the authenticated user's active account.
+     */
+    put: operations["create_or_update_company_profile_api_v1_profile_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bot-agents/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/bot-agents/{bot_agent_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Bot Agent Details
-         * @description Retrieves details for a specific Bot Agent by its ID, ensuring it belongs to the user's account.
-         */
-        get: operations["get_bot_agent_details_api_v1_bot_agents__bot_agent_id__get"];
-        /**
-         * Update Bot Agent
-         * @description Updates the configuration of a specific Bot Agent.
-         */
-        put: operations["update_bot_agent_api_v1_bot_agents__bot_agent_id__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * List Bot Agents for Account
+     * @description Retrieves Bot Agents associated with the authenticated user's active account. Currently, it's expected that an account has at most one Bot Agent.
+     */
+    get: operations["list_bot_agents_api_v1_bot_agents__get"];
+    put?: never;
+    /**
+     * Create Bot Agent
+     * @description Creates a new Bot Agent for the authenticated user's account. An account can only have one Bot Agent.
+     */
+    post: operations["create_bot_agent_api_v1_bot_agents__post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bot-agents/{bot_agent_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/bot-agents/{bot_agent_id}/inboxes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Associated Inboxes
-         * @description Retrieves the list of Inboxes currently associated with the specified Bot Agent.
-         */
-        get: operations["get_agent_associated_inboxes_api_v1_bot_agents__bot_agent_id__inboxes_get"];
-        /**
-         * Set Associated Inboxes
-         * @description Sets the complete list of Inboxes associated with the Bot Agent. Replaces any existing associations.
-         */
-        put: operations["set_agent_associated_inboxes_api_v1_bot_agents__bot_agent_id__inboxes_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Bot Agent Details
+     * @description Retrieves details for a specific Bot Agent by its ID, ensuring it belongs to the user's account.
+     */
+    get: operations["get_bot_agent_details_api_v1_bot_agents__bot_agent_id__get"];
+    /**
+     * Update Bot Agent
+     * @description Updates the configuration of a specific Bot Agent.
+     */
+    put: operations["update_bot_agent_api_v1_bot_agents__bot_agent_id__put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/bot-agents/{bot_agent_id}/inboxes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/me/inboxes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get My Inboxes
-         * @description Returns all inboxes the CURRENT authenticated user is a member of
-         *     within their active account.
-         */
-        get: operations["get_my_inboxes_api_v1_me_inboxes_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * List Associated Inboxes
+     * @description Retrieves the list of Inboxes currently associated with the specified Bot Agent.
+     */
+    get: operations["get_agent_associated_inboxes_api_v1_bot_agents__bot_agent_id__inboxes_get"];
+    /**
+     * Set Associated Inboxes
+     * @description Sets the complete list of Inboxes associated with the Bot Agent. Replaces any existing associations.
+     */
+    put: operations["set_agent_associated_inboxes_api_v1_bot_agents__bot_agent_id__inboxes_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/me/inboxes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/contacts/batch/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Initiate Contact Batch Import via File Upload
-         * @description Upload a CSV file with contact data. The file will be processed in the background. Returns a job ID to track the import status.
-         */
-        post: operations["initiate_contact_import_api_v1_contacts_batch_import_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get My Inboxes
+     * @description Returns all inboxes the CURRENT authenticated user is a member of
+     *     within their active account.
+     */
+    get: operations["get_my_inboxes_api_v1_me_inboxes_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/contacts/batch/import": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/contacts/batch/import/status/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Contact Batch Import Job Status
-         * @description Retrieves the current status and results (if available) for a specific contact import job.
-         */
-        get: operations["get_contact_import_status_api_v1_contacts_batch_import_status__job_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Initiate Contact Batch Import via File Upload
+     * @description Upload a CSV file with contact data. The file will be processed in the background. Returns a job ID to track the import status.
+     */
+    post: operations["initiate_contact_import_api_v1_contacts_batch_import_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/contacts/batch/import/status/{job_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/contacts/batch/import/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Contact Import Jobs
-         * @description Retrieves a paginated list of contact import jobs initiated by the user.
-         */
-        get: operations["list_contact_import_jobs_api_v1_contacts_batch_import_jobs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Contact Batch Import Job Status
+     * @description Retrieves the current status and results (if available) for a specific contact import job.
+     */
+    get: operations["get_contact_import_status_api_v1_contacts_batch_import_status__job_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/contacts/batch/import/jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/dashboard/stats": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Dashboard Aggregated Statistics
-         * @description Retrieves key performance indicators (KPIs) and aggregated counts for conversations and messages within a specified date range for the authenticated account.
-         */
-        get: operations["read_dashboard_stats_api_v1_dashboard_stats_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * List Contact Import Jobs
+     * @description Retrieves a paginated list of contact import jobs initiated by the user.
+     */
+    get: operations["list_contact_import_jobs_api_v1_contacts_batch_import_jobs_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/dashboard/stats": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/dashboard/message-volume": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Message Volume Time Series
-         * @description Retrieves time series data for message volume (received, sent by bot, sent by human) for the authenticated account, within a specified date range and granularity.
-         */
-        get: operations["read_dashboard_message_volume_api_v1_dashboard_message_volume_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Dashboard Aggregated Statistics
+     * @description Retrieves key performance indicators (KPIs) and aggregated counts for conversations and messages within a specified date range for the authenticated account.
+     */
+    get: operations["read_dashboard_stats_api_v1_dashboard_stats_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/dashboard/message-volume": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/research/start": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Start Company Profile Research
-         * @description Enqueues a background task to research a company website URL and generate/update its profile.
-         */
-        post: operations["start_research_task_api_v1_research_start_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Message Volume Time Series
+     * @description Retrieves time series data for message volume (received, sent by bot, sent by human) for the authenticated account, within a specified date range and granularity.
+     */
+    get: operations["read_dashboard_message_volume_api_v1_dashboard_message_volume_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/research/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/research/status/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Research Job Status
-         * @description Checks the status of a previously enqueued research background job.
-         */
-        get: operations["get_research_job_status_api_v1_research_status__job_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Start Company Profile Research
+     * @description Enqueues a background task to research a company website URL and generate/update its profile.
+     */
+    post: operations["start_research_task_api_v1_research_start_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/research/status/{job_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge/upload-file": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload Knowledge File
-         * @description Uploads a file (PDF, TXT, DOCX) to the knowledge base for processing.
-         */
-        post: operations["upload_knowledge_file_api_v1_knowledge_upload_file_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Research Job Status
+     * @description Checks the status of a previously enqueued research background job.
+     */
+    get: operations["get_research_job_status_api_v1_research_status__job_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge/upload-file": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge/add-url": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Knowledge URL
-         * @description Adds a URL to the knowledge base for scraping and ingestion.
-         */
-        post: operations["add_knowledge_url_api_v1_knowledge_add_url_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Upload Knowledge File
+     * @description Uploads a file (PDF, TXT, DOCX) to the knowledge base for processing.
+     */
+    post: operations["upload_knowledge_file_api_v1_knowledge_upload_file_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge/add-url": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge/add-text": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Knowledge Text
-         * @description Adds raw text content to the knowledge base for processing.
-         */
-        post: operations["add_knowledge_text_api_v1_knowledge_add_text_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Add Knowledge URL
+     * @description Adds a URL to the knowledge base for scraping and ingestion.
+     */
+    post: operations["add_knowledge_url_api_v1_knowledge_add_url_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge/add-text": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge/status/{job_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Knowledge Job Status
-         * @description Checks the status of a previously enqueued Knowledge background job.
-         */
-        get: operations["get_knowledge_job_status_api_v1_knowledge_status__job_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Add Knowledge Text
+     * @description Adds raw text content to the knowledge base for processing.
+     */
+    post: operations["add_knowledge_text_api_v1_knowledge_add_text_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge/status/{job_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge/documents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Knowledge Documents
-         * @description Retrieves a list of knowledge base documents for the authenticated account.
-         */
-        get: operations["list_knowledge_documents_api_v1_knowledge_documents_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Knowledge Job Status
+     * @description Checks the status of a previously enqueued Knowledge background job.
+     */
+    get: operations["get_knowledge_job_status_api_v1_knowledge_status__job_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge/documents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/knowledge/documents/{document_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Delete Knowledge Document
-         * @description Deletes a specific knowledge document and all its associated chunks.
-         */
-        delete: operations["delete_knowledge_document_api_v1_knowledge_documents__document_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * List Knowledge Documents
+     * @description Retrieves a list of knowledge base documents for the authenticated account.
+     */
+    get: operations["list_knowledge_documents_api_v1_knowledge_documents_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/knowledge/documents/{document_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/instances/evolution": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Create Evolution Instance
-         * @description Handles the request to create a logical Evolution API instance associated with the authenticated account.
-         *
-         *     Args:
-         *         db (AsyncSession): The database session dependency.
-         *         auth_context (AuthContext): The authentication context containing account information.
-         *
-         *     Returns:
-         *         EvolutionInstance: The created EvolutionInstance object with its final status.
-         *
-         *     Raises:
-         *         HTTPException:
-         *             - 500: If token encryption fails.
-         *             - 500: If the external Evolution API instance creation fails.
-         */
-        post: operations["create_evolution_instance_api_v1_instances_evolution_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Knowledge Document
+     * @description Deletes a specific knowledge document and all its associated chunks.
+     */
+    delete: operations["delete_knowledge_document_api_v1_knowledge_documents__document_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/instances/evolution": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/instances/evolution/{platform_instance_id}/qrcode": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Evolution Instance Qrcode
-         * @description Retrieves the QR code (if available) for pairing a specific Evolution API instance,
-         *     ensuring the instance belongs to the authenticated account.
-         *
-         *     Args:
-         *         platform_instance_id (UUID): The unique identifier of the Evolution instance.
-         *         db (AsyncSession): The database session dependency.
-         *         auth_context (AuthContext): The authentication context containing account information.
-         *
-         *     Returns:
-         *         EvolutionInstanceQRCodeResponse: An object containing the instance ID and the
-         *                                          base64 encoded QR code string.
-         *
-         *     Raises:
-         *         HTTPException:
-         *             - 404: If the instance is not found for the given ID and account.
-         *             - 500: If fetching the QR code from the external Evolution API service fails.
-         *             - 500: If the QR code data is missing or malformed in the service response.
-         */
-        get: operations["get_evolution_instance_qrcode_api_v1_instances_evolution__platform_instance_id__qrcode_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Create Evolution Instance
+     * @description Handles the request to create a logical Evolution API instance associated with the authenticated account.
+     *
+     *     Args:
+     *         db (AsyncSession): The database session dependency.
+     *         auth_context (AuthContext): The authentication context containing account information.
+     *
+     *     Returns:
+     *         EvolutionInstance: The created EvolutionInstance object with its final status.
+     *
+     *     Raises:
+     *         HTTPException:
+     *             - 500: If token encryption fails.
+     *             - 500: If the external Evolution API instance creation fails.
+     */
+    post: operations["create_evolution_instance_api_v1_instances_evolution_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/instances/evolution/{platform_instance_id}/qrcode": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/instances/evolution/{instance_id}/sync-contacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Initiate WhatsApp Contact Synchronization
-         * @description Triggers a background task to fetch contacts from the specified WhatsApp instance (via Evolution API) and sync them with the platform's database.
-         */
-        post: operations["trigger_whatsapp_contact_sync_api_v1_instances_evolution__instance_id__sync_contacts_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Get Evolution Instance Qrcode
+     * @description Retrieves the QR code (if available) for pairing a specific Evolution API instance,
+     *     ensuring the instance belongs to the authenticated account.
+     *
+     *     Args:
+     *         platform_instance_id (UUID): The unique identifier of the Evolution instance.
+     *         db (AsyncSession): The database session dependency.
+     *         auth_context (AuthContext): The authentication context containing account information.
+     *
+     *     Returns:
+     *         EvolutionInstanceQRCodeResponse: An object containing the instance ID and the
+     *                                          base64 encoded QR code string.
+     *
+     *     Raises:
+     *         HTTPException:
+     *             - 404: If the instance is not found for the given ID and account.
+     *             - 500: If fetching the QR code from the external Evolution API service fails.
+     *             - 500: If the QR code data is missing or malformed in the service response.
+     */
+    get: operations["get_evolution_instance_qrcode_api_v1_instances_evolution__platform_instance_id__qrcode_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/instances/evolution/{instance_id}/sync-contacts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/instances/evolution/{instance_id}/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Synchronize and Get Evolution Instance Status
-         * @description Fetches the current connection status from the specified Evolution API instance, updates the corresponding Evolution Instance record, and returns the updated instance details.
-         */
-        get: operations["sync_and_get_instance_status_api_v1_instances_evolution__instance_id__status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Initiate WhatsApp Contact Synchronization
+     * @description Triggers a background task to fetch contacts from the specified WhatsApp instance (via Evolution API) and sync them with the platform's database.
+     */
+    post: operations["trigger_whatsapp_contact_sync_api_v1_instances_evolution__instance_id__sync_contacts_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/instances/evolution/{instance_id}/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/webhooks/evolution/{platform_instance_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Handle Evolution Webhook
-         * @description Handles incoming webhook events from the Evolution API server.
-         *     Dispatches events to the appropriate handler function based on the event type.
-         */
-        post: operations["handle_evolution_webhook_webhooks_evolution__platform_instance_id__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Synchronize and Get Evolution Instance Status
+     * @description Fetches the current connection status from the specified Evolution API instance, updates the corresponding Evolution Instance record, and returns the updated instance details.
+     */
+    get: operations["sync_and_get_instance_status_api_v1_instances_evolution__instance_id__status_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/webhooks/evolution/{platform_instance_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/webhooks/whatsapp/cloud/{phone_number_id_str}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Verify Whatsapp Cloud Webhook
-         * @description Handles GET requests from Meta to verify the webhook endpoint.
-         *     Compares the 'hub.verify_token' from the query parameters with the
-         *     one stored in the database for the given phone_number_id.
-         */
-        get: operations["verify_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__get"];
-        put?: never;
-        /**
-         * Handle Whatsapp Cloud Webhook
-         * @description Handles incoming POST requests from WhatsApp Cloud API webhooks.
-         *     Verifies the signature, validates the payload, and enqueues messages/events
-         *     for asynchronous processing via ARQ.
-         */
-        post: operations["handle_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /**
+     * Handle Evolution Webhook
+     * @description Handles incoming webhook events from the Evolution API server.
+     *     Dispatches events to the appropriate handler function based on the event type.
+     */
+    post: operations["handle_evolution_webhook_webhooks_evolution__platform_instance_id__post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/webhooks/whatsapp/cloud/{phone_number_id_str}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Home */
-        get: operations["home__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Verify Whatsapp Cloud Webhook
+     * @description Handles GET requests from Meta to verify the webhook endpoint.
+     *     Compares the 'hub.verify_token' from the query parameters with the
+     *     one stored in the database for the given phone_number_id.
+     */
+    get: operations["verify_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__get"];
+    put?: never;
+    /**
+     * Handle Whatsapp Cloud Webhook
+     * @description Handles incoming POST requests from WhatsApp Cloud API webhooks.
+     *     Verifies the signature, validates the payload, and enqueues messages/events
+     *     for asynchronous processing via ARQ.
+     */
+    post: operations["handle_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health Check
-         * @description Health check endpoint.
-         */
-        get: operations["health_check_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Home */
+    get: operations["home__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/v1/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Authenticated User Context
-         * @description Returns information about the authenticated user and their active context
-         *     (internal user ID, active account ID, etc.).
-         */
-        get: operations["get_authenticated_user_context_api_v1_me_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * Health Check
+     * @description Health check endpoint.
+     */
+    get: operations["health_check_health_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/me": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    /**
+     * Get Authenticated User Context
+     * @description Returns information about the authenticated user and their active context
+     *     (internal user ID, active account ID, etc.).
+     */
+    get: operations["get_authenticated_user_context_api_v1_me_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /** AddTextRequest */
-        AddTextRequest: {
-            /**
-             * Content
-             * @description The text content to be ingested.
-             */
-            content: string;
-            /**
-             * Title
-             * @description A short description for this text source.
-             */
-            title: string;
-        };
-        /** AddUrlRequest */
-        AddUrlRequest: {
-            /**
-             * Url
-             * Format: uri
-             * @description The URL to ingest content from.
-             */
-            url: string;
-        };
-        /**
-         * AgentInboxAssociationUpdate
-         * @description Schema for defining the list of Inboxes associated with an Agent.
-         * @example {
-         *       "inbox_ids": [
-         *         "11111111-1111-1111-1111-111111111111",
-         *         "22222222-2222-2222-2222-222222222222"
-         *       ]
-         *     }
-         */
-        AgentInboxAssociationUpdate: {
-            /**
-             * Inbox Ids
-             * @description Complete list of Inbox IDs that should be associated with this agent.
-             */
-            inbox_ids?: string[];
-        };
-        /** Body_initiate_contact_import_api_v1_contacts_batch_import_post */
-        Body_initiate_contact_import_api_v1_contacts_batch_import_post: {
-            /**
-             * File
-             * Format: binary
-             * @description CSV file containing contacts. Required columns: 'name', 'phone_number'. Optional: 'email'.
-             */
-            file: string;
-        };
-        /** Body_upload_knowledge_file_api_v1_knowledge_upload_file_post */
-        Body_upload_knowledge_file_api_v1_knowledge_upload_file_post: {
-            /**
-             * File
-             * Format: binary
-             * @description The knowledge file to upload.
-             */
-            file: string;
-        };
-        /**
-         * BotAgentCreate
-         * @description Schema for updating an existing BotAgent.
-         *     All fields are optional on update.
-         * @example {
-         *       "first_message": "Hello! I'm the virtual assistant for [Company Name]. How can I help you today?",
-         *       "name": "Primary Sales Assistant",
-         *       "use_rag": false
-         *     }
-         */
-        BotAgentCreate: {
-            /**
-             * Name
-             * @description Descriptive name for the AI agent.
-             * @default Assistente Principal
-             */
-            name: string | null;
-            /**
-             * First Message
-             * @description Initial message the bot sends to start the conversation (if empty, waits for the user).
-             */
-            first_message?: string | null;
-            /**
-             * Use Rag
-             * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
-             * @default true
-             */
-            use_rag: boolean | null;
-        };
-        /**
-         * BotAgentRead
-         * @description Schema for returning BotAgent data, including its ID.
-         * @example {
-         *       "account_id": "f0e9d8c7-b6a5-4321-fedc-ba9876543210",
-         *       "first_message": "Hi! How can I help?",
-         *       "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-         *       "is_active": true,
-         *       "name": "Primary Assistant",
-         *       "use_rag": false
-         *     }
-         */
-        BotAgentRead: {
-            /**
-             * Name
-             * @description Descriptive name for the AI agent.
-             * @default Assistente Principal
-             */
-            name: string | null;
-            /**
-             * First Message
-             * @description Initial message the bot sends to start the conversation (if empty, waits for the user).
-             */
-            first_message?: string | null;
-            /**
-             * Use Rag
-             * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
-             * @default true
-             */
-            use_rag: boolean | null;
-            /**
-             * Id
-             * Format: uuid
-             * @description Unique identifier for the BotAgent.
-             */
-            id: string;
-            /**
-             * Account Id
-             * Format: uuid
-             * @description ID of the account the agent belongs to.
-             */
-            account_id: string;
-        };
-        /**
-         * BotAgentUpdate
-         * @description Schema for updating an existing BotAgent.
-         *     All fields are optional on update.
-         * @example {
-         *       "first_message": "Hello! I'm the virtual assistant for [Company Name]. How can I help you today?",
-         *       "name": "Primary Sales Assistant",
-         *       "use_rag": false
-         *     }
-         */
-        BotAgentUpdate: {
-            /**
-             * Name
-             * @description Descriptive name for the AI agent.
-             * @default Assistente Principal
-             */
-            name: string | null;
-            /**
-             * First Message
-             * @description Initial message the bot sends to start the conversation (if empty, waits for the user).
-             */
-            first_message?: string | null;
-            /**
-             * Use Rag
-             * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
-             * @default true
-             */
-            use_rag: boolean | null;
-        };
-        /**
-         * ChannelTypeEnum
-         * @description Enum for the types of communication channels supported by an Inbox.
-         * @enum {string}
-         */
-        ChannelTypeEnum: "whatsapp_evolution" | "whatsapp_cloud" | "simulation";
-        /**
-         * CompanyProfileSchema
-         * @description Pydantic schema defining the configuration and knowledge base for the AI seller,
-         *     aligned with the CompanyProfile SQLAlchemy model.
-         * @example {
-         *       "address": "Rua das Flores, 123 - Bairro Central",
-         *       "ai_objective": "vender produtos diretamente pelo WhatsApp",
-         *       "business_description": "Padaria de bairro especializada em pães artesanais e bolos caseiros.",
-         *       "communication_guidelines": [
-         *         "DO use emoji with moderation",
-         *         "DON'T offer discounts unless explicitly configured"
-         *       ],
-         *       "company_name": "Padaria Central",
-         *       "delivery_options": [
-         *         "Retirada na loja",
-         *         "Delivery no bairro Central"
-         *       ],
-         *       "fallback_contact_info": "Para mais detalhes, ligue (11) 99999-9999.",
-         *       "key_selling_points": [
-         *         "Pães assados na hora",
-         *         "Ingredientes naturais"
-         *       ],
-         *       "language": "pt-BR",
-         *       "offering_overview": [
-         *         {
-         *           "key_features": [
-         *             "Assado no dia",
-         *             "Sem aditivos"
-         *           ],
-         *           "link": "https://padariacentral.com.br/produtos/pao-frances",
-         *           "name": "Pão Francês",
-         *           "price_info": "R$ 0,80/unidade",
-         *           "short_description": "Crocante por fora, macio por dentro."
-         *         },
-         *         {
-         *           "bonus_items": [
-         *             "dois pães francês"
-         *           ],
-         *           "key_features": [
-         *             "Serve até 10 pessoas"
-         *           ],
-         *           "name": "Bolo de Cenoura com Chocolate",
-         *           "price_info": "R$ 30,00",
-         *           "short_description": "Clássico da casa, com cobertura cremosa."
-         *         }
-         *       ],
-         *       "opening_hours": "Seg-Sáb 8h às 18h (Horário de Brasília)",
-         *       "profile_version": 1,
-         *       "sales_tone": "descontraído, simpático e acolhedor",
-         *       "target_audience": "Moradores da região, pessoas que valorizam produtos frescos e de qualidade.",
-         *       "website": "https://padariacentral.com.br/"
-         *     }
-         */
-        "CompanyProfileSchema-Input": {
-            /**
-             * Id
-             * @description Unique identifier for the company profile. Auto-generated.
-             */
-            id?: string | null;
-            /**
-             * Company Name
-             * @description Official name of the company.
-             */
-            company_name: string;
-            /**
-             * Website
-             * @description Company's primary website URL.
-             */
-            website?: string | null;
-            /**
-             * Address
-             * @description Physical store address, if applicable and should be shared.
-             */
-            address?: string | null;
-            /**
-             * Business Description
-             * @description What the company does, its industry, and its main value proposition.
-             */
-            business_description: string;
-            /**
-             * Target Audience
-             * @description Brief description of the ideal customer (e.g., 'Small business owners', 'Marketing professionals').
-             */
-            target_audience?: string | null;
-            /**
-             * Sales Tone
-             * @description Adjectives describing the desired communication style.
-             * @default amigável, prestativo, and profissional
-             */
-            sales_tone: string;
-            /**
-             * Language
-             * @description Primary language the AI should use (e.g., 'en-US', 'pt-BR').
-             * @default pt-BR
-             */
-            language: string;
-            /**
-             * Communication Guidelines
-             * @description Specific DOs and DON'Ts for the AI (e.g., 'BUSQUE sempre fazer perguntas esclarecedoras', 'EVITE invente informações que não foram fornecidas').
-             */
-            communication_guidelines?: string[];
-            /**
-             * Ai Objective
-             * @description Main goal of the AI (e.g., close sales, qualify leads, provide product info).
-             * @default Engaje os clientes, responda perguntas sobre as ofertas e oriente-os para uma compra ou próximo passo.
-             */
-            ai_objective: string;
-            /**
-             * Key Selling Points
-             * @description Unique selling propositions (USPs) or differentiators.
-             */
-            key_selling_points?: string[];
-            /**
-             * Offering Overview
-             * @description List of key products/services with short details.
-             */
-            offering_overview?: components["schemas"]["OfferingInfo"][];
-            /**
-             * Delivery Options
-             * @description List of available delivery/pickup options for the company (e.g., 'Delivery in X area', 'In-store pickup').
-             */
-            delivery_options?: string[];
-            /**
-             * Opening Hours
-             * @description Company opening hours, including timezone if possible (e.g., 'Seg-Sex 9h-18h BRT', 'Todos os dias 8h-20h').
-             */
-            opening_hours?: string | null;
-            /**
-             * Fallback Contact Info
-             * @description What the AI should say when it cannot help (e.g., email, phone number, faq page etc...). It is very helpful to have a reliable contact informaiton like a email, phone number and/or faq page
-             */
-            fallback_contact_info?: string | null;
-            /**
-             * Profile Version
-             * @description Version number of the profile schema.
-             * @default 1
-             */
-            profile_version: number;
-        };
-        /**
-         * CompanyProfileSchema
-         * @description Pydantic schema defining the configuration and knowledge base for the AI seller,
-         *     aligned with the CompanyProfile SQLAlchemy model.
-         * @example {
-         *       "address": "Rua das Flores, 123 - Bairro Central",
-         *       "ai_objective": "vender produtos diretamente pelo WhatsApp",
-         *       "business_description": "Padaria de bairro especializada em pães artesanais e bolos caseiros.",
-         *       "communication_guidelines": [
-         *         "DO use emoji with moderation",
-         *         "DON'T offer discounts unless explicitly configured"
-         *       ],
-         *       "company_name": "Padaria Central",
-         *       "delivery_options": [
-         *         "Retirada na loja",
-         *         "Delivery no bairro Central"
-         *       ],
-         *       "fallback_contact_info": "Para mais detalhes, ligue (11) 99999-9999.",
-         *       "key_selling_points": [
-         *         "Pães assados na hora",
-         *         "Ingredientes naturais"
-         *       ],
-         *       "language": "pt-BR",
-         *       "offering_overview": [
-         *         {
-         *           "key_features": [
-         *             "Assado no dia",
-         *             "Sem aditivos"
-         *           ],
-         *           "link": "https://padariacentral.com.br/produtos/pao-frances",
-         *           "name": "Pão Francês",
-         *           "price_info": "R$ 0,80/unidade",
-         *           "short_description": "Crocante por fora, macio por dentro."
-         *         },
-         *         {
-         *           "bonus_items": [
-         *             "dois pães francês"
-         *           ],
-         *           "key_features": [
-         *             "Serve até 10 pessoas"
-         *           ],
-         *           "name": "Bolo de Cenoura com Chocolate",
-         *           "price_info": "R$ 30,00",
-         *           "short_description": "Clássico da casa, com cobertura cremosa."
-         *         }
-         *       ],
-         *       "opening_hours": "Seg-Sáb 8h às 18h (Horário de Brasília)",
-         *       "profile_version": 1,
-         *       "sales_tone": "descontraído, simpático e acolhedor",
-         *       "target_audience": "Moradores da região, pessoas que valorizam produtos frescos e de qualidade.",
-         *       "website": "https://padariacentral.com.br/"
-         *     }
-         */
-        "CompanyProfileSchema-Output": {
-            /**
-             * Company Name
-             * @description Official name of the company.
-             */
-            company_name: string;
-            /**
-             * Website
-             * @description Company's primary website URL.
-             */
-            website?: string | null;
-            /**
-             * Address
-             * @description Physical store address, if applicable and should be shared.
-             */
-            address?: string | null;
-            /**
-             * Business Description
-             * @description What the company does, its industry, and its main value proposition.
-             */
-            business_description: string;
-            /**
-             * Target Audience
-             * @description Brief description of the ideal customer (e.g., 'Small business owners', 'Marketing professionals').
-             */
-            target_audience?: string | null;
-            /**
-             * Sales Tone
-             * @description Adjectives describing the desired communication style.
-             * @default amigável, prestativo, and profissional
-             */
-            sales_tone: string;
-            /**
-             * Language
-             * @description Primary language the AI should use (e.g., 'en-US', 'pt-BR').
-             * @default pt-BR
-             */
-            language: string;
-            /**
-             * Communication Guidelines
-             * @description Specific DOs and DON'Ts for the AI (e.g., 'BUSQUE sempre fazer perguntas esclarecedoras', 'EVITE invente informações que não foram fornecidas').
-             */
-            communication_guidelines?: string[];
-            /**
-             * Ai Objective
-             * @description Main goal of the AI (e.g., close sales, qualify leads, provide product info).
-             * @default Engaje os clientes, responda perguntas sobre as ofertas e oriente-os para uma compra ou próximo passo.
-             */
-            ai_objective: string;
-            /**
-             * Key Selling Points
-             * @description Unique selling propositions (USPs) or differentiators.
-             */
-            key_selling_points?: string[];
-            /**
-             * Offering Overview
-             * @description List of key products/services with short details.
-             */
-            offering_overview?: components["schemas"]["OfferingInfo"][];
-            /**
-             * Delivery Options
-             * @description List of available delivery/pickup options for the company (e.g., 'Delivery in X area', 'In-store pickup').
-             */
-            delivery_options?: string[];
-            /**
-             * Opening Hours
-             * @description Company opening hours, including timezone if possible (e.g., 'Seg-Sex 9h-18h BRT', 'Todos os dias 8h-20h').
-             */
-            opening_hours?: string | null;
-            /**
-             * Fallback Contact Info
-             * @description What the AI should say when it cannot help (e.g., email, phone number, faq page etc...). It is very helpful to have a reliable contact informaiton like a email, phone number and/or faq page
-             */
-            fallback_contact_info?: string | null;
-            /**
-             * Profile Version
-             * @description Version number of the profile schema.
-             * @default 1
-             */
-            profile_version: number;
-        };
-        /** ConnectionUpdateData */
-        ConnectionUpdateData: {
-            /** Instance */
-            instance: string;
-            /** State */
-            state: string;
-            /** Statusreason */
-            statusReason?: number | null;
-            /** Wuid */
-            wuid?: string | null;
-            /** Profilepictureurl */
-            profilePictureUrl?: string | null;
-        };
-        /**
-         * ContactBase
-         * @description Base schema for contact attributes.
-         */
-        ContactBase: {
-            /**
-             * Id
-             * @description Unique identifier for the contact (UUID)
-             */
-            id?: string | null;
-            /**
-             * Name
-             * @description Contact's full name
-             */
-            name?: string | null;
-            /**
-             * Email
-             * @description Contact's email address (must be unique within the account)
-             */
-            email?: string | null;
-            /**
-             * Phone Number
-             * @description Contact's primary phone number (required)
-             */
-            phone_number: string;
-            /**
-             * Identifier
-             * @description Internal identifier (e.g., normalized phone or WhatsApp ID)
-             */
-            identifier?: string | null;
-            /**
-             * Profile Picture Url
-             * @description URL of the contact's profile picture
-             */
-            profile_picture_url?: string | null;
-            /**
-             * Is Simulation
-             * @description Flag indicating if the contact is set for simulation
-             * @default false
-             */
-            is_simulation: boolean | null;
-            /**
-             * Additional Attributes
-             * @description Additional custom key-value attributes
-             */
-            additional_attributes?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * ContactCreate
-         * @description Schema used for creating a new contact via the API.
-         */
-        ContactCreate: {
-            /**
-             * Id
-             * @description Unique identifier for the contact (UUID)
-             */
-            id?: string | null;
-            /**
-             * Name
-             * @description Contact's full name
-             */
-            name?: string | null;
-            /**
-             * Email
-             * @description Contact's email address (must be unique within the account)
-             */
-            email?: string | null;
-            /**
-             * Phone Number
-             * @description Contact's primary phone number (required)
-             */
-            phone_number: string;
-            /**
-             * Identifier
-             * @description Internal identifier (e.g., normalized phone or WhatsApp ID)
-             */
-            identifier?: string | null;
-            /**
-             * Profile Picture Url
-             * @description URL of the contact's profile picture
-             */
-            profile_picture_url?: string | null;
-            /**
-             * Is Simulation
-             * @description Flag indicating if the contact is set for simulation
-             * @default false
-             */
-            is_simulation: boolean | null;
-            /**
-             * Additional Attributes
-             * @description Additional custom key-value attributes
-             */
-            additional_attributes?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * ContactImportError
-         * @description Details about an error encountered for a specific row during import.
-         */
-        ContactImportError: {
-            /**
-             * Row Number
-             * @description The row number in the CSV file (starting from 2)
-             */
-            row_number: number;
-            /**
-             * Reason
-             * @description Description of the error
-             */
-            reason: string;
-            /**
-             * Data
-             * @description The data from the row that caused the error
-             */
-            data: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * ContactImportJobStartResponse
-         * @description Response returned when a contact import job is successfully initiated.
-         */
-        ContactImportJobStartResponse: {
-            /**
-             * Id
-             * Format: uuid
-             * @description The unique identifier for the background import job.
-             */
-            id: string;
-            /**
-             * Status
-             * @description Initial status of the job.
-             * @default Pending
-             */
-            status: string;
-        };
-        /**
-         * ContactImportJobStatusResponse
-         * @description Detailed status and results of a contact import job.
-         */
-        ContactImportJobStatusResponse: {
-            /**
-             * Id
-             * Format: uuid
-             * @description The unique identifier for the import job.
-             */
-            id: string;
-            /**
-             * Status
-             * @description Current status of the job (e.g., PENDING, PROCESSING, COMPLETE, FAILED).
-             */
-            status: string;
-            /**
-             * File Key
-             * @description Identifier for the uploaded file in storage (e.g., GCS blob name).
-             */
-            file_key?: string | null;
-            /**
-             * Original Filename
-             * @description Original name of the uploaded file.
-             */
-            original_filename?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             * @description Timestamp when the job was created.
-             */
-            created_at: string;
-            /**
-             * Finished At
-             * @description Timestamp when the job finished processing (null if not finished).
-             */
-            finished_at?: string | null;
-            /** @description Summary of import results (available when status is COMPLETE or FAILED with partial results). */
-            result_summary?: components["schemas"]["ContactImportSummary"] | null;
-        };
-        /**
-         * ContactImportSummary
-         * @description Summary of the results after a contact import job is completed.
-         */
-        ContactImportSummary: {
-            /**
-             * Total Rows Processed
-             * @description Total number of data rows processed in the CSV
-             */
-            total_rows_processed: number;
-            /**
-             * Successful Imports
-             * @description Number of contacts successfully created or updated
-             */
-            successful_imports: number;
-            /**
-             * Failed Imports
-             * @description Number of rows that failed during import
-             */
-            failed_imports: number;
-            /**
-             * Errors
-             * @description List of specific errors encountered
-             * @default []
-             */
-            errors: components["schemas"]["ContactImportError"][];
-        };
-        /**
-         * ContactRead
-         * @description Schema used for returning contact data via the API.
-         */
-        ContactRead: {
-            /**
-             * Id
-             * Format: uuid
-             * @description Unique identifier for the contact
-             */
-            id: string;
-            /**
-             * Name
-             * @description Contact's full name
-             */
-            name?: string | null;
-            /**
-             * Email
-             * @description Contact's email address (must be unique within the account)
-             */
-            email?: string | null;
-            /**
-             * Phone Number
-             * @description Contact's primary phone number (required)
-             */
-            phone_number: string;
-            /**
-             * Identifier
-             * @description Internal identifier (e.g., normalized phone or WhatsApp ID)
-             */
-            identifier?: string | null;
-            /**
-             * Profile Picture Url
-             * @description URL of the contact's profile picture
-             */
-            profile_picture_url?: string | null;
-            /**
-             * Is Simulation
-             * @description Flag indicating if the contact is set for simulation
-             * @default false
-             */
-            is_simulation: boolean | null;
-            /**
-             * Additional Attributes
-             * @description Additional custom key-value attributes
-             */
-            additional_attributes?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Account Id
-             * Format: uuid
-             * @description Identifier of the account this contact belongs to
-             */
-            account_id: string;
-            /**
-             * Source Id
-             * @description Identifier for the source system where the contact originated
-             */
-            source_id?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             * @description Timestamp when the contact was created
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             * @description Timestamp when the contact was last updated
-             */
-            updated_at: string;
-        };
-        /**
-         * ContactUpdate
-         * @description Schema used for updating an existing contact via the API. All fields are optional.
-         */
-        ContactUpdate: {
-            /**
-             * Name
-             * @description Contact's full name
-             */
-            name?: string | null;
-            /**
-             * Email
-             * @description Contact's email address (must be unique within the account)
-             */
-            email?: string | null;
-            /**
-             * Phone Number
-             * @description Contact's primary phone number
-             */
-            phone_number?: string | null;
-            /**
-             * Profile Picture Url
-             * @description URL of the contact's profile picture
-             */
-            profile_picture_url?: string | null;
-            /**
-             * Additional Attributes
-             * @description Additional custom key-value attributes (will merge with existing)
-             */
-            additional_attributes?: {
-                [key: string]: unknown;
-            } | null;
-        };
-        /**
-         * ConversationSearchResult
-         * @example {
-         *       "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
-         *       "contact_id": "...",
-         *       "created_at": "2023-11-10T10:00:00Z",
-         *       "id": "e8a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9f",
-         *       "inbox_id": "...",
-         *       "status": "HUMAN_ACTIVE",
-         *       "unread_agent_count": 3,
-         *       "updated_at": "2023-11-15T11:30:00Z"
-         *     }
-         */
-        ConversationSearchResult: {
-            /**
-             * Id
-             * Format: uuid
-             * @description Unique identifier for the conversation
-             */
-            id: string;
-            /** @description Current status of the conversation regarding human interaction */
-            status?: components["schemas"]["ConversationStatusEnum"] | null;
-            /**
-             * Unread Agent Count
-             * @description Number of unread messages for the agent
-             */
-            unread_agent_count?: number | null;
-            /**
-             * Is Bot Active
-             * @description Flag indicating if the bot is active
-             */
-            is_bot_active?: boolean | null;
-            /** @description Contact's information */
-            contact: components["schemas"]["ContactBase"] | null;
-            /**
-             * Last Message At
-             * @description Timestamp of the last message in the conversation
-             */
-            last_message_at?: string | null;
-            /** @description Snippet of the actual latest message in the conversation */
-            last_message?: components["schemas"]["MessageSnippet"] | null;
-            /** @description Snippet of the most recent message content that matched the search query (if the match was in a message) */
-            matching_message?: components["schemas"]["MessageSnippet"] | null;
-            /**
-             * Updated At
-             * Format: date-time
-             * @description Timestamp of the last relevant activity
-             */
-            updated_at: string;
-        };
-        /**
-         * ConversationStatusEnum
-         * @enum {string}
-         */
-        ConversationStatusEnum: "PENDING" | "HUMAN_ACTIVE" | "CLOSED" | "OPEN" | "BOT";
-        /**
-         * ConversationUpdateStatus
-         * @example {
-         *       "status": "closed"
-         *     }
-         */
-        ConversationUpdateStatus: {
-            /** @description The new status to set for the conversation. */
-            status: components["schemas"]["ConversationStatusEnum"];
-        };
-        /**
-         * DashboardConversationStats
-         * @description Statistics related to conversations for the dashboard.
-         */
-        DashboardConversationStats: {
-            /**
-             * Pending Count
-             * @description Current number of conversations with PENDING status.
-             */
-            pending_count: number;
-            /**
-             * Bot Active Count
-             * @description Current number of conversations actively handled by the BOT.
-             */
-            bot_active_count: number;
-            /**
-             * Human Active Count
-             * @description Current number of conversations actively handled by a HUMAN agent (status HUMAN_ACTIVE).
-             */
-            human_active_count: number;
-            /**
-             * Open Active Count
-             * @description Current number of conversations with OPEN status (could be transitioning or waiting).
-             */
-            open_active_count: number;
-            /**
-             * Total Active Count
-             * @description Total current number of active conversations (BOT + HUMAN_ACTIVE + OPEN).
-             */
-            total_active_count: number;
-            /**
-             * New In Period Count
-             * @description Number of new conversations created within the selected period.
-             */
-            new_in_period_count: number;
-            /**
-             * Closed In Period Count
-             * @description Number of conversations closed within the selected period.
-             */
-            closed_in_period_count: number;
-            /**
-             * Closed By Bot In Period Count
-             * @description Number of conversations closed by the bot within the selected period. (Requires specific tracking)
-             */
-            closed_by_bot_in_period_count: number;
-            /**
-             * Closed By Human In Period Count
-             * @description Number of conversations closed by a human agent within the selected period. (Requires specific tracking)
-             */
-            closed_by_human_in_period_count: number;
-        };
-        /**
-         * DashboardMessageStats
-         * @description Statistics related to messages for the dashboard.
-         */
-        DashboardMessageStats: {
-            /**
-             * Received In Period Count
-             * @description Total number of messages received (direction 'in') within the selected period.
-             */
-            received_in_period_count: number;
-            /**
-             * Sent Total In Period Count
-             * @description Total number of messages sent (direction 'out') within the selected period.
-             */
-            sent_total_in_period_count: number;
-            /**
-             * Sent By Bot In Period Count
-             * @description Number of outgoing messages sent by the bot within the selected period.
-             */
-            sent_by_bot_in_period_count: number;
-            /**
-             * Sent By Human In Period Count
-             * @description Number of outgoing messages sent by human agents within the selected period.
-             */
-            sent_by_human_in_period_count: number;
-        };
-        /**
-         * DashboardMessageVolumeResponse
-         * @description Time series data for message volume over a period.
-         */
-        DashboardMessageVolumeResponse: {
-            /**
-             * Period Start
-             * Format: date
-             * @description The start date of the reporting period.
-             */
-            period_start: string;
-            /**
-             * Period End
-             * Format: date
-             * @description The end date of the reporting period.
-             */
-            period_end: string;
-            /**
-             * Filtered Inbox Id
-             * @description ID of the inbox if the volume is filtered by a specific inbox, otherwise null.
-             */
-            filtered_inbox_id?: string | null;
-            /**
-             * Granularity
-             * @description The granularity of the time series data (e.g., 'day', 'hour').
-             */
-            granularity: string;
-            /**
-             * Time Series
-             * @description A list of data points representing message volume over time.
-             */
-            time_series: components["schemas"]["MessageVolumeDatapoint"][];
-        };
-        /**
-         * DashboardStatsResponse
-         * @description Overall statistics for the dashboard for a given period.
-         */
-        DashboardStatsResponse: {
-            /**
-             * Period Start
-             * Format: date
-             * @description The start date of the reporting period.
-             */
-            period_start: string;
-            /**
-             * Period End
-             * Format: date
-             * @description The end date of the reporting period.
-             */
-            period_end: string;
-            /**
-             * Filtered Inbox Id
-             * @description ID of the inbox if the stats are filtered by a specific inbox, otherwise null.
-             */
-            filtered_inbox_id?: string | null;
-            /** @description Aggregated statistics about conversations. */
-            conversation_stats: components["schemas"]["DashboardConversationStats"];
-            /** @description Aggregated statistics about messages. */
-            message_stats: components["schemas"]["DashboardMessageStats"];
-            /**
-             * Active Inboxes Count
-             * @description Total number of currently active inboxes for the account.
-             */
-            active_inboxes_count: number;
-        };
-        /**
-         * DocumentStatus
-         * @enum {string}
-         */
-        DocumentStatus: "pending" | "processing" | "completed" | "failed";
-        /**
-         * EvolutionButtonsResponseMessage
-         * @description Content for 'buttonsResponseMessage' (user clicked a button).
-         */
-        EvolutionButtonsResponseMessage: {
-            /** Selectedbuttonid */
-            selectedButtonId: string;
-            /** Selecteddisplaytext */
-            selectedDisplayText: string;
-            /** Type */
-            type?: number | null;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionChannelDetailsInput
-         * @description Schema representing the channel-specific details needed when creating an Inbox
-         *     of type 'whatsapp_evolution_api'. Contains OUR platform ID.
-         */
-        EvolutionChannelDetailsInput: {
-            /**
-             * Platform Instance Id
-             * Format: uuid
-             * @description The platform's unique ID for the configured Evolution instance.
-             */
-            platform_instance_id: string;
-        };
-        /**
-         * EvolutionContextInfo
-         * @description Represents the contextInfo object, often for replies.
-         */
-        EvolutionContextInfo: {
-            /** Participant */
-            participant?: string | null;
-            /** Stanzaid */
-            stanzaId?: string | null;
-            /** Remotejid */
-            remoteJid?: string | null;
-            /** Mentionedjid */
-            mentionedJid?: string[] | null;
-        };
-        /**
-         * EvolutionInstanceQRCodeResponse
-         * @description Schema for the response of the GET .../qrcode endpoint.
-         *     Contains status and QR code data fetched from the shared Evolution server.
-         */
-        EvolutionInstanceQRCodeResponse: {
-            /**
-             * Instance Id
-             * Format: uuid
-             * @description Platform's unique identifier for context.
-             */
-            instance_id: string;
-            /**
-             * Connection Status
-             * @description Connection state reported by Evolution API (e.g., 'open', 'connecting', 'close').
-             */
-            connection_status?: string | null;
-            /**
-             * Qrcode
-             * @description QR code string, if available and not connected.
-             */
-            qrcode?: string | null;
-            /**
-             * Qrcode Base64
-             * @description Base64 encoded QR code string, if available and not connected.
-             */
-            qrcode_base64?: string | null;
-            /**
-             * Detail
-             * @description Additional detail or context message (e.g., 'Already connected').
-             */
-            detail?: string | null;
-        };
-        /**
-         * EvolutionInstanceRead
-         * @description Schema for response when creating/retrieving basic Evolution Instance info.
-         *     This is what our platform returns, containing OUR identifiers.
-         */
-        EvolutionInstanceRead: {
-            /**
-             * Id
-             * Format: uuid
-             * @description Platform's unique identifier for this logical instance.
-             */
-            id: string;
-            /**
-             * Instance Name
-             * @description Unique name identifier used on the shared Evolution API server.
-             */
-            instance_name: string;
-            /**
-             * Shared Api Url
-             * Format: uri
-             * @description Base URL of the shared Evolution API server.
-             */
-            shared_api_url: string;
-            /**
-             * Logical Token Encrypted
-             * @description Encrypted API key
-             */
-            logical_token_encrypted: string;
-            /**
-             * Webhook Url
-             * Format: uri
-             * @description Webhook URL configured to receive events for this instance.
-             */
-            webhook_url: string;
-            /** @description Current status tracked by the platform. */
-            status: components["schemas"]["EvolutionInstanceStatus"];
-            /**
-             * Account Id
-             * Format: uuid
-             * @description Owning account ID within the platform.
-             */
-            account_id: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-        };
-        /**
-         * EvolutionInstanceStatus
-         * @description Possible statuses for the Evolution Instance lifecycle within the platform.
-         * @enum {string}
-         */
-        EvolutionInstanceStatus: "PENDING" | "CREATED" | "CONNECTED" | "DISCONNECTED" | "ERROR" | "UNKNOWN" | "CONNECTING" | "API_ERROR";
-        /**
-         * EvolutionListResponseMessage
-         * @description Content for 'listResponseMessage' (user selected from a list).
-         */
-        EvolutionListResponseMessage: {
-            /** Title */
-            title: string;
-            /** Description */
-            description?: string | null;
-            singleSelectReply: components["schemas"]["EvolutionListResponseSingleSelectReply"];
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /** EvolutionListResponseSingleSelectReply */
-        EvolutionListResponseSingleSelectReply: {
-            /** Selectedrowid */
-            selectedRowId: string;
-        };
-        /**
-         * EvolutionMessageContent_Audio
-         * @description Content for 'audioMessage'.
-         */
-        EvolutionMessageContent_Audio: {
-            /** Url */
-            url?: string | null;
-            /** Mimetype */
-            mimetype: string;
-            /** Filelength */
-            fileLength?: string | null;
-            /** Seconds */
-            seconds?: number | null;
-            /**
-             * Ptt
-             * @default false
-             */
-            ptt: boolean | null;
-            /** Mediakey */
-            mediaKey?: string | null;
-            /** Directpath */
-            directPath?: string | null;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionMessageContent_Document
-         * @description Content for 'documentMessage' or 'documentWithCaptionMessage'.
-         */
-        EvolutionMessageContent_Document: {
-            /** Url */
-            url?: string | null;
-            /** Mimetype */
-            mimetype: string;
-            /** Title */
-            title?: string | null;
-            /** Filelength */
-            fileLength?: string | null;
-            /** Pagecount */
-            pageCount?: number | null;
-            /** Filename */
-            fileName?: string | null;
-            /** Caption */
-            caption?: string | null;
-            /** Mediakey */
-            mediaKey?: string | null;
-            /** Directpath */
-            directPath?: string | null;
-            /** Jpegthumbnail */
-            jpegThumbnail?: string | null;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionMessageContent_Image
-         * @description Content for 'imageMessage'.
-         */
-        EvolutionMessageContent_Image: {
-            /** Url */
-            url?: string | null;
-            /** Mimetype */
-            mimetype: string;
-            /** Caption */
-            caption?: string | null;
-            /** Filelength */
-            fileLength?: string | null;
-            /** Height */
-            height?: number | null;
-            /** Width */
-            width?: number | null;
-            /** Mediakey */
-            mediaKey?: string | null;
-            /** Directpath */
-            directPath?: string | null;
-            /** Jpegthumbnail */
-            jpegThumbnail?: string | null;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionMessageContent_Location
-         * @description Content for 'locationMessage'.
-         */
-        EvolutionMessageContent_Location: {
-            /** Degreeslatitude */
-            degreesLatitude: number;
-            /** Degreeslongitude */
-            degreesLongitude: number;
-            /** Name */
-            name?: string | null;
-            /** Address */
-            address?: string | null;
-            /** Jpegthumbnail */
-            jpegThumbnail?: string | null;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionMessageContent_Sticker
-         * @description Content for 'stickerMessage'.
-         */
-        EvolutionMessageContent_Sticker: {
-            /** Url */
-            url?: string | null;
-            /** Mimetype */
-            mimetype: string;
-            /** Height */
-            height?: number | null;
-            /** Width */
-            width?: number | null;
-            /** Isanimated */
-            isAnimated?: boolean | null;
-            /** Mediakey */
-            mediaKey?: string | null;
-            /** Directpath */
-            directPath?: string | null;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionMessageContent_Text
-         * @description Content for 'conversation' or 'extendedTextMessage'.
-         */
-        EvolutionMessageContent_Text: {
-            /** Text */
-            text: string;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionMessageContent_Video
-         * @description Content for 'videoMessage'.
-         */
-        EvolutionMessageContent_Video: {
-            /** Url */
-            url?: string | null;
-            /** Mimetype */
-            mimetype: string;
-            /** Caption */
-            caption?: string | null;
-            /** Filelength */
-            fileLength?: string | null;
-            /** Seconds */
-            seconds?: number | null;
-            /** Mediakey */
-            mediaKey?: string | null;
-            /** Directpath */
-            directPath?: string | null;
-            /** Jpegthumbnail */
-            jpegThumbnail?: string | null;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionMessageObject
-         * @description Represents the 'message' field in the webhook data.
-         *     It dynamically holds the specific message type content.
-         */
-        EvolutionMessageObject: {
-            /** Conversation */
-            conversation?: string | null;
-            extendedTextMessage?: components["schemas"]["EvolutionMessageContent_Text"] | null;
-            imageMessage?: components["schemas"]["EvolutionMessageContent_Image"] | null;
-            videoMessage?: components["schemas"]["EvolutionMessageContent_Video"] | null;
-            audioMessage?: components["schemas"]["EvolutionMessageContent_Audio"] | null;
-            documentMessage?: components["schemas"]["EvolutionMessageContent_Document"] | null;
-            documentWithCaptionMessage?: components["schemas"]["EvolutionMessageContent_Document"] | null;
-            stickerMessage?: components["schemas"]["EvolutionMessageContent_Sticker"] | null;
-            locationMessage?: components["schemas"]["EvolutionMessageContent_Location"] | null;
-            buttonsResponseMessage?: components["schemas"]["EvolutionButtonsResponseMessage"] | null;
-            listResponseMessage?: components["schemas"]["EvolutionListResponseMessage"] | null;
-            templateButtonReplyMessage?: components["schemas"]["EvolutionTemplateButtonReplyMessage"] | null;
-            reactionMessage?: components["schemas"]["EvolutionReactionMessage"] | null;
-        };
-        /**
-         * EvolutionReactionMessage
-         * @description Content for 'reactionMessage'.
-         */
-        EvolutionReactionMessage: {
-            /** Text */
-            text: string;
-            /** Key */
-            key: {
-                [key: string]: unknown;
-            };
-        };
-        /**
-         * EvolutionTemplateButtonReplyMessage
-         * @description Content for 'templateButtonReplyMessage' (user clicked a template quick reply).
-         */
-        EvolutionTemplateButtonReplyMessage: {
-            /** Selectedid */
-            selectedId: string;
-            /** Selectedindex */
-            selectedIndex: number;
-            /** Selecteddisplaytext */
-            selectedDisplayText?: string | null;
-            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
-        };
-        /**
-         * EvolutionWebhookKey
-         * @description Represents the 'key' data often nested in webhook payloads.
-         */
-        EvolutionWebhookKey: {
-            /** Remotejid */
-            remoteJid: string;
-            /** Fromme */
-            fromMe: boolean;
-            /** Id */
-            id: string;
-            /** Participant */
-            participant?: string | null;
-        };
-        /**
-         * EvolutionWebhookMessageData
-         * @description Represents the 'data' field for message events like 'messages.upsert' or 'messages.update'.
-         */
-        EvolutionWebhookMessageData: {
-            key: components["schemas"]["EvolutionWebhookKey"];
-            /** Pushname */
-            pushName?: string | null;
-            message?: components["schemas"]["EvolutionMessageObject"] | null;
-            /** Messagetype */
-            messageType?: string | null;
-            /** Messagetimestamp */
-            messageTimestamp?: number | null;
-            /** Instanceid */
-            instanceId: string;
-            /** Source */
-            source: string;
-            /** Messagestubtype */
-            messageStubType?: string | null;
-            /** Messagestubparameters */
-            messageStubParameters?: string[] | null;
-        };
-        /** EvolutionWebhookPayload */
-        EvolutionWebhookPayload: {
-            /** Event */
-            event: string;
-            /** Instance */
-            instance: string;
-            /** Data */
-            data: components["schemas"]["ConnectionUpdateData"] | components["schemas"]["EvolutionWebhookMessageData"] | {
-                [key: string]: unknown;
-            };
-            /** Destination */
-            destination: string;
-            /**
-             * Date Time
-             * Format: date-time
-             */
-            date_time: string;
-            /** Server Url */
-            server_url: string;
-            /** Apikey */
-            apikey: string;
-        };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
-        /**
-         * ImportJobListItem
-         * @description Data for a single import job item in a list.
-         */
-        ImportJobListItem: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            status: components["schemas"]["ImportJobStatus"];
-            /** Original Filename */
-            original_filename?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Finished At */
-            finished_at?: string | null;
-        };
-        /**
-         * ImportJobStatus
-         * @enum {string}
-         */
-        ImportJobStatus: "PENDING" | "PROCESSING" | "COMPLETE" | "FAILED";
-        /**
-         * InboxCreate
-         * @description Schema for creating a new Inbox.
-         *     Includes common inbox fields and specific configurations for the chosen channel type.
-         * @example {
-         *       "channel_details": {
-         *         "ui_hint": "Use blue theme"
-         *       },
-         *       "channel_type": "whatsapp_cloud",
-         *       "enable_auto_assignment": true,
-         *       "initial_conversation_status": "OPEN",
-         *       "name": "Sales WhatsApp"
-         *     }
-         */
-        InboxCreate: {
-            /**
-             * Id
-             * @description Unique identifier for the inbox (UUID).
-             */
-            id?: string | null;
-            /**
-             * Name
-             * @description Name of the inbox.
-             */
-            name: string;
-            /** @description Type of the communication channel. */
-            channel_type: components["schemas"]["ChannelTypeEnum"];
-            /**
-             * Channel Details
-             * @description Legacy or UI-specific channel configuration details (JSON).
-             */
-            channel_details?: {
-                [key: string]: unknown;
-            } | null;
-            /** @description Default status for new conversations (e.g., OPEN, PENDING, BOT). */
-            initial_conversation_status?: components["schemas"]["ConversationStatusEnum"] | null;
-            /**
-             * Enable Auto Assignment
-             * @description Enable automatic assignment of conversations for this inbox.
-             * @default true
-             */
-            enable_auto_assignment: boolean | null;
-            /** @description Configuration for linking an existing Evolution API instance. */
-            evolution_instance_to_link?: components["schemas"]["EvolutionChannelDetailsInput"] | null;
-            /** @description Configuration for creating a new WhatsApp Cloud API setup. */
-            whatsapp_cloud_config_to_create?: components["schemas"]["WhatsAppCloudConfigCreateInput"] | null;
-        };
-        /**
-         * InboxRead
-         * @description Schema for representing an Inbox in API responses.
-         *     Includes common fields and populated channel-specific configuration.
-         * @example {
-         *       "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
-         *       "channel_details": {
-         *         "ui_hint": "Use blue theme"
-         *       },
-         *       "channel_id": "15551234567",
-         *       "channel_type": "whatsapp_cloud",
-         *       "created_at": "2023-10-27T10:00:00Z",
-         *       "enable_auto_assignment": true,
-         *       "id": "e8a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9f",
-         *       "initial_conversation_status": "OPEN",
-         *       "name": "Sales WhatsApp Cloud",
-         *       "updated_at": "2023-10-27T11:00:00Z",
-         *       "whatsapp_cloud_config": {
-         *         "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
-         *         "app_id": "app_id_example",
-         *         "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-         *         "phone_number_id": "15551234567",
-         *         "waba_id": "waba_id_example",
-         *         "webhook_verify_token": "your_verify_token_here"
-         *       }
-         *     }
-         */
-        InboxRead: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Name
-             * @description Name of the inbox.
-             */
-            name: string;
-            /** @description Type of the communication channel. */
-            channel_type: components["schemas"]["ChannelTypeEnum"];
-            /**
-             * Channel Details
-             * @description Legacy or UI-specific channel configuration details (JSON).
-             */
-            channel_details?: {
-                [key: string]: unknown;
-            } | null;
-            /** @description Default status for new conversations (e.g., OPEN, PENDING, BOT). */
-            initial_conversation_status?: components["schemas"]["ConversationStatusEnum"] | null;
-            /**
-             * Enable Auto Assignment
-             * @description Enable automatic assignment of conversations for this inbox.
-             * @default true
-             */
-            enable_auto_assignment: boolean | null;
-            /**
-             * Account Id
-             * Format: uuid
-             * @description Identifier of the account this inbox belongs to.
-             */
-            account_id: string;
-            /**
-             * Channel Id
-             * @description Identifier used by the channel provider (e.g., Evolution instance_name, WhatsApp phone_number_id).
-             */
-            channel_id?: string | null;
-            /**
-             * Associated Bot Agent Id
-             * @description ID of the BotAgent currently associated with this inbox, if any.
-             */
-            associated_bot_agent_id?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             * @description Timestamp when the inbox was created.
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             * @description Timestamp when the inbox was last updated.
-             */
-            updated_at: string;
-            /** @description Details of the linked Evolution API instance, if applicable. */
-            evolution_instance?: components["schemas"]["EvolutionInstanceRead"] | null;
-            /** @description Details of the linked WhatsApp Cloud API configuration, if applicable. */
-            whatsapp_cloud_config?: components["schemas"]["WhatsAppCloudConfigRead"] | null;
-        };
-        /**
-         * InboxUpdate
-         * @description Schema for updating an existing Inbox.
-         *     Allows partial updates to common inbox fields.
-         * @example {
-         *       "enable_auto_assignment": false,
-         *       "initial_conversation_status": "PENDING",
-         *       "name": "Support WhatsApp Renamed"
-         *     }
-         */
-        InboxUpdate: {
-            /**
-             * Name
-             * @description New name for the inbox.
-             */
-            name?: string | null;
-            /**
-             * Channel Details
-             * @description Updated legacy or UI-specific channel configuration.
-             */
-            channel_details?: {
-                [key: string]: unknown;
-            } | null;
-            /** @description New default status for new conversations. */
-            initial_conversation_status?: components["schemas"]["ConversationStatusEnum"] | null;
-            /**
-             * Enable Auto Assignment
-             * @description Update auto assignment setting for this inbox.
-             */
-            enable_auto_assignment?: boolean | null;
-        };
-        /**
-         * IngestResponse
-         * @description Response after successfully queueing any ingestion task.
-         */
-        IngestResponse: {
-            /**
-             * Document Id
-             * Format: uuid
-             */
-            document_id: string;
-            /** Job Id */
-            job_id: string | null;
-            /** Message */
-            message: string;
-        };
-        /**
-         * JobStatusEnum
-         * @description Possible statuses for an Arq job.
-         * @enum {string}
-         */
-        JobStatusEnum: "queued" | "in_progress" | "complete" | "not_found" | "failed";
-        /**
-         * JobStatusResponse
-         * @description Schema for the response when checking the status of a background job.
-         */
-        JobStatusResponse: {
-            /**
-             * Job Id
-             * @description The ID of the job being checked.
-             */
-            job_id: string;
-            /** @description The current status of the job. */
-            status: components["schemas"]["JobStatusEnum"];
-            /**
-             * Detail
-             * @description Additional details, like an error message if the job failed.
-             */
-            detail?: string | null;
-        };
-        /** KnowledgeDocumentRead */
-        KnowledgeDocumentRead: {
-            /**
-             * Source Type
-             * @description Type of the source ('file', 'url', 'text').
-             */
-            source_type: string;
-            /**
-             * Source Uri
-             * @description URI identifying the source (e.g., GCS path, web URL, text description).
-             */
-            source_uri: string;
-            /**
-             * Original Filename
-             * @description Original filename if source_type is 'file'.
-             */
-            original_filename?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             * @description Unique identifier for the knowledge document.
-             */
-            id: string;
-            /**
-             * Account Id
-             * Format: uuid
-             * @description The account this document belongs to.
-             */
-            account_id: string;
-            /** @description Processing status of the document. */
-            status: components["schemas"]["DocumentStatus"];
-            /**
-             * Error Message
-             * @description Error message if processing failed.
-             */
-            error_message?: string | null;
-            /**
-             * Chunk Count
-             * @description Number of chunks generated from this document.
-             */
-            chunk_count?: number | null;
-            /**
-             * Created At
-             * Format: date-time
-             * @description Timestamp when the document record was created.
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             * @description Timestamp when the document record was last updated.
-             */
-            updated_at: string;
-        };
-        /** MessageCreatePayload */
-        MessageCreatePayload: {
-            /**
-             * Content
-             * @example Olá, tudo bem?
-             */
-            content: string;
-        };
-        /** MessageResponse */
-        MessageResponse: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Content */
-            content: string | null;
-            /** Direction */
-            direction: string;
-            /** Message Type */
-            message_type: string;
-            /** Content Type */
-            content_type: string | null;
-            /** Sent At */
-            sent_at: string | null;
-        };
-        /** MessageSnippet */
-        MessageSnippet: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Content */
-            content: string;
-            /** Sent At */
-            sent_at: string | null;
-        };
-        /**
-         * MessageVolumeDatapoint
-         * @description A single data point in a time series for message volume.
-         */
-        MessageVolumeDatapoint: {
-            /**
-             * Timestamp
-             * Format: date-time
-             * @description The specific timestamp (start of the day or hour) for this data point.
-             */
-            timestamp: string;
-            /**
-             * Received Count
-             * @description Number of messages received during this time interval.
-             */
-            received_count: number;
-            /**
-             * Sent By Bot Count
-             * @description Number of messages sent by the bot during this time interval.
-             */
-            sent_by_bot_count: number;
-            /**
-             * Sent By Human Count
-             * @description Number of messages sent by human agents during this time interval.
-             */
-            sent_by_human_count: number;
-        };
-        /**
-         * OfferingInfo
-         * @description Brief information about a key product or service offering.
-         */
-        OfferingInfo: {
-            /**
-             * Name
-             * @description Name of the product or service.
-             */
-            name: string;
-            /**
-             * Short Description
-             * @description A concise description (1-2 sentences).
-             */
-            short_description: string;
-            /**
-             * Key Features
-             * @description Bullet points of key features, benefits, or components.
-             */
-            key_features?: string[];
-            /**
-             * Price Info
-             * @description Brief pricing information (e.g., 'Starts at $X', 'Contact for quote').
-             */
-            price_info?: string | null;
-            /**
-             * Link
-             * @description Direct link to the product/service page, if available.
-             */
-            link?: string | null;
-            /**
-             * Bonus Items
-             * @description List of additional bonus items or services included for free when purchasing the main offering. These may include templates, e-books, consultations, etc.
-             */
-            bonus_items?: string[];
-        };
-        /**
-         * PaginatedContactRead
-         * @description Schema for returning a paginated list of contacts.
-         */
-        PaginatedContactRead: {
-            /**
-             * Total
-             * @description Total number of contacts matching the query
-             */
-            total: number;
-            /**
-             * Items
-             * @description List of contacts for the current page
-             */
-            items: components["schemas"]["ContactRead"][];
-        };
-        /**
-         * PaginatedImportJobListResponse
-         * @description Response model for paginated list of import jobs.
-         */
-        PaginatedImportJobListResponse: {
-            /** Total Items */
-            total_items: number;
-            /** Total Pages */
-            total_pages: number;
-            /** Page */
-            page: number;
-            /** Size */
-            size: number;
-            /** Items */
-            items: components["schemas"]["ImportJobListItem"][];
-        };
-        /** PaginatedKnowledgeDocumentRead */
-        PaginatedKnowledgeDocumentRead: {
-            /**
-             * Total
-             * @description Total number of documents found for the account.
-             */
-            total: number;
-            /**
-             * Items
-             * @description List of documents for the current page.
-             */
-            items: components["schemas"]["KnowledgeDocumentRead"][];
-        };
-        /**
-         * PersonaBase
-         * @description Base Pydantic schema for Persona data, including dynamic behaviors.
-         * @example {
-         *       "behavior_hints": [
-         *         "price_sensitive",
-         *         "impatient",
-         *         "results_oriented"
-         *       ],
-         *       "description": "Cliente interessado no Vendedor IA, mas sensível a preço e um pouco impaciente.",
-         *       "failure_criteria": [
-         *         "event:ai_fallback_detected",
-         *         "turn_count > 8"
-         *       ],
-         *       "information_needed": [
-         *         {
-         *           "attribute": "pricing_model",
-         *           "entity": "Vendedor IA"
-         *         },
-         *         {
-         *           "attribute": "main_benefit",
-         *           "entity": "Vendedor IA"
-         *         }
-         *       ],
-         *       "initial_message": "Olá, esse Vendedor IA parece interessante. Como funciona?",
-         *       "objective": "Entender os benefícios principais do Vendedor IA, ter uma ideia de preço e decidir se vale a pena.",
-         *       "off_topic_questions": [
-         *         "Isso integra com meu sistema de CRM atual?",
-         *         "Vocês oferecem algum outro serviço de automação?"
-         *       ],
-         *       "persona_id": "cliente_dinamico_v2",
-         *       "potential_objections": [
-         *         {
-         *           "objection_text": "Entendi, mas qual o valor exato? Preciso ver se cabe no orçamento.",
-         *           "trigger_keyword": "preço"
-         *         },
-         *         {
-         *           "objection_text": "Ok, mas ainda preciso de um tempo para analisar internamente.",
-         *           "trigger_stage": "Closing"
-         *         }
-         *       ],
-         *       "success_criteria": []
-         *     }
-         */
-        PersonaBase: {
-            /**
-             * Persona Id
-             * @description Unique, human-readable snake_case identifier.
-             */
-            persona_id: string;
-            /**
-             * Description
-             * @description Concise description of the persona.
-             */
-            description: string;
-            /**
-             * Initial Message
-             * @description The first message this persona sends.
-             */
-            initial_message: string;
-            /**
-             * Objective
-             * @description The specific goal the persona wants to achieve.
-             */
-            objective: string;
-            /**
-             * Information Needed
-             * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
-             */
-            information_needed?: {
-                [key: string]: string;
-            }[];
-            /**
-             * Potential Objections
-             * @description List of potential objections the persona might raise based on triggers.
-             */
-            potential_objections?: components["schemas"]["PotentialObjection"][];
-            /**
-             * Off Topic Questions
-             * @description List of potential off-topic questions the persona might ask to interrupt.
-             */
-            off_topic_questions?: string[];
-            /**
-             * Behavior Hints
-             * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
-             */
-            behavior_hints?: string[];
-            /**
-             * Success Criteria
-             * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
-             */
-            success_criteria?: string[];
-            /**
-             * Failure Criteria
-             * @description List of criteria defining simulation failure.
-             * @default [
-             *       "event:ai_fallback_detected",
-             *       "turn_count > 10"
-             *     ]
-             */
-            failure_criteria: string[];
-        };
-        /**
-         * PersonaCreate
-         * @description Schema for creating a new Persona.
-         * @example {
-         *       "behavior_hints": [
-         *         "busy",
-         *         "interested",
-         *         "implementation_focused"
-         *       ],
-         *       "contact_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-         *       "description": "Lead que entende o valor, mas tem objeção sobre tempo de implementação.",
-         *       "failure_criteria": [
-         *         "turn_count > 6"
-         *       ],
-         *       "information_needed": [
-         *         {
-         *           "attribute": "implementation_time",
-         *           "entity": "Vendedor IA"
-         *         }
-         *       ],
-         *       "initial_message": "Gostei da ideia da qualificação automática.",
-         *       "objective": "Superar a objeção sobre implementação e avançar para teste.",
-         *       "off_topic_questions": [],
-         *       "persona_id": "lead_qualificado_objecao",
-         *       "potential_objections": [
-         *         {
-         *           "objection_text": "Parece bom, mas quanto tempo leva pra implementar tudo isso?",
-         *           "trigger_keyword": "implementação"
-         *         }
-         *       ],
-         *       "success_criteria": []
-         *     }
-         */
-        PersonaCreate: {
-            /**
-             * Persona Id
-             * @description Unique, human-readable snake_case identifier.
-             */
-            persona_id: string;
-            /**
-             * Description
-             * @description Concise description of the persona.
-             */
-            description: string;
-            /**
-             * Initial Message
-             * @description The first message this persona sends.
-             */
-            initial_message: string;
-            /**
-             * Objective
-             * @description The specific goal the persona wants to achieve.
-             */
-            objective: string;
-            /**
-             * Information Needed
-             * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
-             */
-            information_needed?: {
-                [key: string]: string;
-            }[];
-            /**
-             * Potential Objections
-             * @description List of potential objections the persona might raise based on triggers.
-             */
-            potential_objections?: components["schemas"]["PotentialObjection"][];
-            /**
-             * Off Topic Questions
-             * @description List of potential off-topic questions the persona might ask to interrupt.
-             */
-            off_topic_questions?: string[];
-            /**
-             * Behavior Hints
-             * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
-             */
-            behavior_hints?: string[];
-            /**
-             * Success Criteria
-             * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
-             */
-            success_criteria?: string[];
-            /**
-             * Failure Criteria
-             * @description List of criteria defining simulation failure.
-             * @default [
-             *       "event:ai_fallback_detected",
-             *       "turn_count > 10"
-             *     ]
-             */
-            failure_criteria: string[];
-            /**
-             * Contact Id
-             * Format: uuid
-             */
-            contact_id: string;
-        };
-        /**
-         * PersonaRead
-         * @description Schema for reading Persona data.
-         * @example {
-         *       "behavior_hints": [
-         *         "price_sensitive",
-         *         "impatient",
-         *         "results_oriented"
-         *       ],
-         *       "description": "Cliente interessado no Vendedor IA, mas sensível a preço e um pouco impaciente.",
-         *       "failure_criteria": [
-         *         "event:ai_fallback_detected",
-         *         "turn_count > 8"
-         *       ],
-         *       "information_needed": [
-         *         {
-         *           "attribute": "pricing_model",
-         *           "entity": "Vendedor IA"
-         *         },
-         *         {
-         *           "attribute": "main_benefit",
-         *           "entity": "Vendedor IA"
-         *         }
-         *       ],
-         *       "initial_message": "Olá, esse Vendedor IA parece interessante. Como funciona?",
-         *       "objective": "Entender os benefícios principais do Vendedor IA, ter uma ideia de preço e decidir se vale a pena.",
-         *       "off_topic_questions": [
-         *         "Isso integra com meu sistema de CRM atual?",
-         *         "Vocês oferecem algum outro serviço de automação?"
-         *       ],
-         *       "persona_id": "cliente_dinamico_v2",
-         *       "potential_objections": [
-         *         {
-         *           "objection_text": "Entendi, mas qual o valor exato? Preciso ver se cabe no orçamento.",
-         *           "trigger_keyword": "preço"
-         *         },
-         *         {
-         *           "objection_text": "Ok, mas ainda preciso de um tempo para analisar internamente.",
-         *           "trigger_stage": "Closing"
-         *         }
-         *       ],
-         *       "success_criteria": []
-         *     }
-         */
-        PersonaRead: {
-            /**
-             * Persona Id
-             * @description Unique, human-readable snake_case identifier.
-             */
-            persona_id: string;
-            /**
-             * Description
-             * @description Concise description of the persona.
-             */
-            description: string;
-            /**
-             * Initial Message
-             * @description The first message this persona sends.
-             */
-            initial_message: string;
-            /**
-             * Objective
-             * @description The specific goal the persona wants to achieve.
-             */
-            objective: string;
-            /**
-             * Information Needed
-             * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
-             */
-            information_needed?: {
-                [key: string]: string;
-            }[];
-            /**
-             * Potential Objections
-             * @description List of potential objections the persona might raise based on triggers.
-             */
-            potential_objections?: components["schemas"]["PotentialObjection"][];
-            /**
-             * Off Topic Questions
-             * @description List of potential off-topic questions the persona might ask to interrupt.
-             */
-            off_topic_questions?: string[];
-            /**
-             * Behavior Hints
-             * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
-             */
-            behavior_hints?: string[];
-            /**
-             * Success Criteria
-             * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
-             */
-            success_criteria?: string[];
-            /**
-             * Failure Criteria
-             * @description List of criteria defining simulation failure.
-             * @default [
-             *       "event:ai_fallback_detected",
-             *       "turn_count > 10"
-             *     ]
-             */
-            failure_criteria: string[];
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Contact Id
-             * Format: uuid
-             */
-            contact_id: string;
-            /** Simulation Contact Identifier */
-            simulation_contact_identifier: string;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
-        };
-        /**
-         * PotentialObjection
-         * @description Defines a potential objection and its trigger.
-         * @example {
-         *       "objection_text": "Esse preço está um pouco acima do que eu esperava.",
-         *       "trigger_keyword": "preço",
-         *       "trigger_stage": "Presentation"
-         *     }
-         */
-        PotentialObjection: {
-            /**
-             * Trigger Keyword
-             * @description A keyword in the AI's response that might trigger this objection (lowercase).
-             */
-            trigger_keyword?: string | null;
-            /**
-             * Trigger Stage
-             * @description A sales stage where this objection is likely to occur (e.g., 'Presentation', 'Closing').
-             */
-            trigger_stage?: string | null;
-            /**
-             * Objection Text
-             * @description The text of the objection the persona would raise.
-             */
-            objection_text: string;
-        };
-        /**
-         * ResearchJobStatusEnum
-         * @description Possible statuses for an Arq job.
-         * @enum {string}
-         */
-        ResearchJobStatusEnum: "queued" | "in_progress" | "complete" | "not_found" | "failed";
-        /**
-         * ResearchJobStatusResponse
-         * @description Schema for the response when checking the status of a background job.
-         */
-        ResearchJobStatusResponse: {
-            /**
-             * Job Id
-             * @description The ID of the job being checked.
-             */
-            job_id: string;
-            /** @description The current status of the job. */
-            status: components["schemas"]["ResearchJobStatusEnum"];
-            /**
-             * Detail
-             * @description Additional details, like an error message if the job failed.
-             */
-            detail?: string | null;
-        };
-        /**
-         * ResearchRequest
-         * @description Schema for requesting a new company profile research task.
-         *     Account ID is derived from the authenticated user context.
-         * @example {
-         *       "url": "https://www.padariadobairro.com.br"
-         *     }
-         */
-        ResearchRequest: {
-            /**
-             * Url
-             * Format: uri
-             * @description The URL of the company website to research.
-             */
-            url: string;
-        };
-        /**
-         * ResearchResponse
-         * @description Schema for the response after successfully enqueueing a research task.
-         * @example {
-         *       "job_id": "arq:job:e4r5t6y7-u8i9-0o1p-q2w3-e4r5t6y7u8i9",
-         *       "message": "Company profile research task successfully queued."
-         *     }
-         */
-        ResearchResponse: {
-            /**
-             * Job Id
-             * @description The unique ID assigned to the background job.
-             */
-            job_id?: string | null;
-            /**
-             * Message
-             * @description Status message indicating the task was queued.
-             */
-            message: string;
-        };
-        /**
-         * SimulationDetailsResponse
-         * @description Schema for returning the UUIDs of the primary simulation entities
-         *     associated with a user's account.
-         */
-        SimulationDetailsResponse: {
-            /**
-             * Inbox Id
-             * Format: uuid
-             * @description The UUID of the primary simulation inbox.
-             */
-            inbox_id: string;
-            /**
-             * Contact Id
-             * Format: uuid
-             * @description The UUID of the primary simulation contact ('Simulador').
-             */
-            contact_id: string;
-            /**
-             * Conversation Id
-             * Format: uuid
-             * @description The UUID of the primary simulation conversation between the inbox and the contact.
-             */
-            conversation_id: string;
-        };
-        /**
-         * SimulationMessageCreate
-         * @description Schema for creating a message sent *by* the simulated contact.
-         */
-        SimulationMessageCreate: {
-            /**
-             * Content
-             * @description The text content of the message being simulated.
-             */
-            content: string;
-        };
-        /**
-         * SimulationMessageEnqueueResponse
-         * @description Schema for the response after successfully enqueueing a simulation message.
-         */
-        SimulationMessageEnqueueResponse: {
-            /**
-             * Status
-             * @example message enqueued
-             */
-            status: string;
-            /**
-             * Source Id
-             * @description A unique identifier generated for this simulated message attempt.
-             * @example sim_ui_...
-             */
-            source_id: string;
-            /**
-             * Conversation Id
-             * @description The string representation of the target conversation UUID.
-             */
-            conversation_id: string;
-        };
-        /** StartConversationRequest */
-        StartConversationRequest: {
-            /**
-             * Phone Number
-             * @example 5511988880000
-             */
-            phone_number: string;
-        };
-        /** StartConversationResponse */
-        StartConversationResponse: {
-            /**
-             * Conversation Id
-             * Format: uuid
-             */
-            conversation_id: string;
-        };
-        /**
-         * SyncInitiatedResponse
-         * @description Response model indicating successful initiation of a background task.
-         */
-        SyncInitiatedResponse: {
-            /**
-             * Message
-             * @default Synchronization initiated.
-             */
-            message: string;
-            /** Id */
-            id?: string | null;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-        };
-        /**
-         * WhatsAppCloudConfigCreateInput
-         * @description Schema for providing data to create a WhatsApp Cloud API Configuration.
-         */
-        WhatsAppCloudConfigCreateInput: {
-            /**
-             * Phone Number Id
-             * @description WhatsApp Cloud API Phone Number ID.
-             */
-            phone_number_id: string;
-            /**
-             * Waba Id
-             * @description WhatsApp Business Account ID.
-             */
-            waba_id: string;
-            /**
-             * Webhook Verify Token
-             * @description Verify token for Meta webhook setup.
-             */
-            webhook_verify_token: string;
-            /**
-             * App Id
-             * @description Meta App ID, if applicable.
-             */
-            app_id?: string | null;
-            /**
-             * Access Token
-             * @description Raw System User Access Token for WhatsApp Cloud API.
-             */
-            access_token: string;
-        };
-        /**
-         * WhatsAppCloudConfigRead
-         * @description Schema for reading/returning a WhatsApp Cloud API Configuration.
-         */
-        WhatsAppCloudConfigRead: {
-            /**
-             * Phone Number Id
-             * @description WhatsApp Cloud API Phone Number ID.
-             */
-            phone_number_id: string;
-            /**
-             * Waba Id
-             * @description WhatsApp Business Account ID.
-             */
-            waba_id: string;
-            /**
-             * Webhook Verify Token
-             * @description Verify token for Meta webhook setup.
-             */
-            webhook_verify_token: string;
-            /**
-             * App Id
-             * @description Meta App ID, if applicable.
-             */
-            app_id?: string | null;
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * Account Id
-             * Format: uuid
-             */
-            account_id: string;
-        };
+  schemas: {
+    /** AddTextRequest */
+    AddTextRequest: {
+      /**
+       * Content
+       * @description The text content to be ingested.
+       */
+      content: string;
+      /**
+       * Title
+       * @description A short description for this text source.
+       */
+      title: string;
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** AddUrlRequest */
+    AddUrlRequest: {
+      /**
+       * Url
+       * Format: uri
+       * @description The URL to ingest content from.
+       */
+      url: string;
+    };
+    /**
+     * AgentInboxAssociationUpdate
+     * @description Schema for defining the list of Inboxes associated with an Agent.
+     * @example {
+     *       "inbox_ids": [
+     *         "11111111-1111-1111-1111-111111111111",
+     *         "22222222-2222-2222-2222-222222222222"
+     *       ]
+     *     }
+     */
+    AgentInboxAssociationUpdate: {
+      /**
+       * Inbox Ids
+       * @description Complete list of Inbox IDs that should be associated with this agent.
+       */
+      inbox_ids?: string[];
+    };
+    /** Body_initiate_contact_import_api_v1_contacts_batch_import_post */
+    Body_initiate_contact_import_api_v1_contacts_batch_import_post: {
+      /**
+       * File
+       * Format: binary
+       * @description CSV file containing contacts. Required columns: 'name', 'phone_number'. Optional: 'email'.
+       */
+      file: string;
+    };
+    /** Body_upload_knowledge_file_api_v1_knowledge_upload_file_post */
+    Body_upload_knowledge_file_api_v1_knowledge_upload_file_post: {
+      /**
+       * File
+       * Format: binary
+       * @description The knowledge file to upload.
+       */
+      file: string;
+    };
+    /**
+     * BotAgentCreate
+     * @description Schema for updating an existing BotAgent.
+     *     All fields are optional on update.
+     * @example {
+     *       "first_message": "Hello! I'm the virtual assistant for [Company Name]. How can I help you today?",
+     *       "name": "Primary Sales Assistant",
+     *       "use_rag": false
+     *     }
+     */
+    BotAgentCreate: {
+      /**
+       * Name
+       * @description Descriptive name for the AI agent.
+       * @default Assistente Principal
+       */
+      name: string | null;
+      /**
+       * First Message
+       * @description Initial message the bot sends to start the conversation (if empty, waits for the user).
+       */
+      first_message?: string | null;
+      /**
+       * Use Rag
+       * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
+       * @default true
+       */
+      use_rag: boolean | null;
+    };
+    /**
+     * BotAgentRead
+     * @description Schema for returning BotAgent data, including its ID.
+     * @example {
+     *       "account_id": "f0e9d8c7-b6a5-4321-fedc-ba9876543210",
+     *       "first_message": "Hi! How can I help?",
+     *       "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+     *       "is_active": true,
+     *       "name": "Primary Assistant",
+     *       "use_rag": false
+     *     }
+     */
+    BotAgentRead: {
+      /**
+       * Name
+       * @description Descriptive name for the AI agent.
+       * @default Assistente Principal
+       */
+      name: string | null;
+      /**
+       * First Message
+       * @description Initial message the bot sends to start the conversation (if empty, waits for the user).
+       */
+      first_message?: string | null;
+      /**
+       * Use Rag
+       * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
+       * @default true
+       */
+      use_rag: boolean | null;
+      /**
+       * Id
+       * Format: uuid
+       * @description Unique identifier for the BotAgent.
+       */
+      id: string;
+      /**
+       * Account Id
+       * Format: uuid
+       * @description ID of the account the agent belongs to.
+       */
+      account_id: string;
+    };
+    /**
+     * BotAgentUpdate
+     * @description Schema for updating an existing BotAgent.
+     *     All fields are optional on update.
+     * @example {
+     *       "first_message": "Hello! I'm the virtual assistant for [Company Name]. How can I help you today?",
+     *       "name": "Primary Sales Assistant",
+     *       "use_rag": false
+     *     }
+     */
+    BotAgentUpdate: {
+      /**
+       * Name
+       * @description Descriptive name for the AI agent.
+       * @default Assistente Principal
+       */
+      name: string | null;
+      /**
+       * First Message
+       * @description Initial message the bot sends to start the conversation (if empty, waits for the user).
+       */
+      first_message?: string | null;
+      /**
+       * Use Rag
+       * @description Indicates if the agent should use the Knowledge Base (RAG) to generate responses.
+       * @default true
+       */
+      use_rag: boolean | null;
+    };
+    /**
+     * ChannelTypeEnum
+     * @description Enum for the types of communication channels supported by an Inbox.
+     * @enum {string}
+     */
+    ChannelTypeEnum: "whatsapp_evolution" | "whatsapp_cloud" | "simulation";
+    /**
+     * CompanyProfileSchema
+     * @description Pydantic schema defining the configuration and knowledge base for the AI seller,
+     *     aligned with the CompanyProfile SQLAlchemy model.
+     * @example {
+     *       "address": "Rua das Flores, 123 - Bairro Central",
+     *       "ai_objective": "vender produtos diretamente pelo WhatsApp",
+     *       "business_description": "Padaria de bairro especializada em pães artesanais e bolos caseiros.",
+     *       "communication_guidelines": [
+     *         "DO use emoji with moderation",
+     *         "DON'T offer discounts unless explicitly configured"
+     *       ],
+     *       "company_name": "Padaria Central",
+     *       "delivery_options": [
+     *         "Retirada na loja",
+     *         "Delivery no bairro Central"
+     *       ],
+     *       "fallback_contact_info": "Para mais detalhes, ligue (11) 99999-9999.",
+     *       "key_selling_points": [
+     *         "Pães assados na hora",
+     *         "Ingredientes naturais"
+     *       ],
+     *       "language": "pt-BR",
+     *       "offering_overview": [
+     *         {
+     *           "key_features": [
+     *             "Assado no dia",
+     *             "Sem aditivos"
+     *           ],
+     *           "link": "https://padariacentral.com.br/produtos/pao-frances",
+     *           "name": "Pão Francês",
+     *           "price_info": "R$ 0,80/unidade",
+     *           "short_description": "Crocante por fora, macio por dentro."
+     *         },
+     *         {
+     *           "bonus_items": [
+     *             "dois pães francês"
+     *           ],
+     *           "key_features": [
+     *             "Serve até 10 pessoas"
+     *           ],
+     *           "name": "Bolo de Cenoura com Chocolate",
+     *           "price_info": "R$ 30,00",
+     *           "short_description": "Clássico da casa, com cobertura cremosa."
+     *         }
+     *       ],
+     *       "opening_hours": "Seg-Sáb 8h às 18h (Horário de Brasília)",
+     *       "profile_version": 1,
+     *       "sales_tone": "descontraído, simpático e acolhedor",
+     *       "target_audience": "Moradores da região, pessoas que valorizam produtos frescos e de qualidade.",
+     *       "website": "https://padariacentral.com.br/"
+     *     }
+     */
+    "CompanyProfileSchema-Input": {
+      /**
+       * Id
+       * @description Unique identifier for the company profile. Auto-generated.
+       */
+      id?: string | null;
+      /**
+       * Company Name
+       * @description Official name of the company.
+       */
+      company_name: string;
+      /**
+       * Website
+       * @description Company's primary website URL.
+       */
+      website?: string | null;
+      /**
+       * Address
+       * @description Physical store address, if applicable and should be shared.
+       */
+      address?: string | null;
+      /**
+       * Business Description
+       * @description What the company does, its industry, and its main value proposition.
+       */
+      business_description: string;
+      /**
+       * Target Audience
+       * @description Brief description of the ideal customer (e.g., 'Small business owners', 'Marketing professionals').
+       */
+      target_audience?: string | null;
+      /**
+       * Sales Tone
+       * @description Adjectives describing the desired communication style.
+       * @default amigável, prestativo, and profissional
+       */
+      sales_tone: string;
+      /**
+       * Language
+       * @description Primary language the AI should use (e.g., 'en-US', 'pt-BR').
+       * @default pt-BR
+       */
+      language: string;
+      /**
+       * Communication Guidelines
+       * @description Specific DOs and DON'Ts for the AI (e.g., 'BUSQUE sempre fazer perguntas esclarecedoras', 'EVITE invente informações que não foram fornecidas').
+       */
+      communication_guidelines?: string[];
+      /**
+       * Ai Objective
+       * @description Main goal of the AI (e.g., close sales, qualify leads, provide product info).
+       * @default Engaje os clientes, responda perguntas sobre as ofertas e oriente-os para uma compra ou próximo passo.
+       */
+      ai_objective: string;
+      /**
+       * Key Selling Points
+       * @description Unique selling propositions (USPs) or differentiators.
+       */
+      key_selling_points?: string[];
+      /**
+       * Offering Overview
+       * @description List of key products/services with short details.
+       */
+      offering_overview?: components["schemas"]["OfferingInfo"][];
+      /**
+       * Delivery Options
+       * @description List of available delivery/pickup options for the company (e.g., 'Delivery in X area', 'In-store pickup').
+       */
+      delivery_options?: string[];
+      /**
+       * Opening Hours
+       * @description Company opening hours, including timezone if possible (e.g., 'Seg-Sex 9h-18h BRT', 'Todos os dias 8h-20h').
+       */
+      opening_hours?: string | null;
+      /**
+       * Fallback Contact Info
+       * @description What the AI should say when it cannot help (e.g., email, phone number, faq page etc...). It is very helpful to have a reliable contact informaiton like a email, phone number and/or faq page
+       */
+      fallback_contact_info?: string | null;
+      /**
+       * Profile Version
+       * @description Version number of the profile schema.
+       * @default 1
+       */
+      profile_version: number;
+    };
+    /**
+     * CompanyProfileSchema
+     * @description Pydantic schema defining the configuration and knowledge base for the AI seller,
+     *     aligned with the CompanyProfile SQLAlchemy model.
+     * @example {
+     *       "address": "Rua das Flores, 123 - Bairro Central",
+     *       "ai_objective": "vender produtos diretamente pelo WhatsApp",
+     *       "business_description": "Padaria de bairro especializada em pães artesanais e bolos caseiros.",
+     *       "communication_guidelines": [
+     *         "DO use emoji with moderation",
+     *         "DON'T offer discounts unless explicitly configured"
+     *       ],
+     *       "company_name": "Padaria Central",
+     *       "delivery_options": [
+     *         "Retirada na loja",
+     *         "Delivery no bairro Central"
+     *       ],
+     *       "fallback_contact_info": "Para mais detalhes, ligue (11) 99999-9999.",
+     *       "key_selling_points": [
+     *         "Pães assados na hora",
+     *         "Ingredientes naturais"
+     *       ],
+     *       "language": "pt-BR",
+     *       "offering_overview": [
+     *         {
+     *           "key_features": [
+     *             "Assado no dia",
+     *             "Sem aditivos"
+     *           ],
+     *           "link": "https://padariacentral.com.br/produtos/pao-frances",
+     *           "name": "Pão Francês",
+     *           "price_info": "R$ 0,80/unidade",
+     *           "short_description": "Crocante por fora, macio por dentro."
+     *         },
+     *         {
+     *           "bonus_items": [
+     *             "dois pães francês"
+     *           ],
+     *           "key_features": [
+     *             "Serve até 10 pessoas"
+     *           ],
+     *           "name": "Bolo de Cenoura com Chocolate",
+     *           "price_info": "R$ 30,00",
+     *           "short_description": "Clássico da casa, com cobertura cremosa."
+     *         }
+     *       ],
+     *       "opening_hours": "Seg-Sáb 8h às 18h (Horário de Brasília)",
+     *       "profile_version": 1,
+     *       "sales_tone": "descontraído, simpático e acolhedor",
+     *       "target_audience": "Moradores da região, pessoas que valorizam produtos frescos e de qualidade.",
+     *       "website": "https://padariacentral.com.br/"
+     *     }
+     */
+    "CompanyProfileSchema-Output": {
+      /**
+       * Company Name
+       * @description Official name of the company.
+       */
+      company_name: string;
+      /**
+       * Website
+       * @description Company's primary website URL.
+       */
+      website?: string | null;
+      /**
+       * Address
+       * @description Physical store address, if applicable and should be shared.
+       */
+      address?: string | null;
+      /**
+       * Business Description
+       * @description What the company does, its industry, and its main value proposition.
+       */
+      business_description: string;
+      /**
+       * Target Audience
+       * @description Brief description of the ideal customer (e.g., 'Small business owners', 'Marketing professionals').
+       */
+      target_audience?: string | null;
+      /**
+       * Sales Tone
+       * @description Adjectives describing the desired communication style.
+       * @default amigável, prestativo, and profissional
+       */
+      sales_tone: string;
+      /**
+       * Language
+       * @description Primary language the AI should use (e.g., 'en-US', 'pt-BR').
+       * @default pt-BR
+       */
+      language: string;
+      /**
+       * Communication Guidelines
+       * @description Specific DOs and DON'Ts for the AI (e.g., 'BUSQUE sempre fazer perguntas esclarecedoras', 'EVITE invente informações que não foram fornecidas').
+       */
+      communication_guidelines?: string[];
+      /**
+       * Ai Objective
+       * @description Main goal of the AI (e.g., close sales, qualify leads, provide product info).
+       * @default Engaje os clientes, responda perguntas sobre as ofertas e oriente-os para uma compra ou próximo passo.
+       */
+      ai_objective: string;
+      /**
+       * Key Selling Points
+       * @description Unique selling propositions (USPs) or differentiators.
+       */
+      key_selling_points?: string[];
+      /**
+       * Offering Overview
+       * @description List of key products/services with short details.
+       */
+      offering_overview?: components["schemas"]["OfferingInfo"][];
+      /**
+       * Delivery Options
+       * @description List of available delivery/pickup options for the company (e.g., 'Delivery in X area', 'In-store pickup').
+       */
+      delivery_options?: string[];
+      /**
+       * Opening Hours
+       * @description Company opening hours, including timezone if possible (e.g., 'Seg-Sex 9h-18h BRT', 'Todos os dias 8h-20h').
+       */
+      opening_hours?: string | null;
+      /**
+       * Fallback Contact Info
+       * @description What the AI should say when it cannot help (e.g., email, phone number, faq page etc...). It is very helpful to have a reliable contact informaiton like a email, phone number and/or faq page
+       */
+      fallback_contact_info?: string | null;
+      /**
+       * Profile Version
+       * @description Version number of the profile schema.
+       * @default 1
+       */
+      profile_version: number;
+    };
+    /** ConnectionUpdateData */
+    ConnectionUpdateData: {
+      /** Instance */
+      instance: string;
+      /** State */
+      state: string;
+      /** Statusreason */
+      statusReason?: number | null;
+      /** Wuid */
+      wuid?: string | null;
+      /** Profilepictureurl */
+      profilePictureUrl?: string | null;
+    };
+    /**
+     * ContactBase
+     * @description Base schema for contact attributes.
+     */
+    ContactBase: {
+      /**
+       * Id
+       * @description Unique identifier for the contact (UUID)
+       */
+      id?: string | null;
+      /**
+       * Name
+       * @description Contact's full name
+       */
+      name?: string | null;
+      /**
+       * Email
+       * @description Contact's email address (must be unique within the account)
+       */
+      email?: string | null;
+      /**
+       * Phone Number
+       * @description Contact's primary phone number (required)
+       */
+      phone_number: string;
+      /**
+       * Identifier
+       * @description Internal identifier (e.g., normalized phone or WhatsApp ID)
+       */
+      identifier?: string | null;
+      /**
+       * Profile Picture Url
+       * @description URL of the contact's profile picture
+       */
+      profile_picture_url?: string | null;
+      /**
+       * Is Simulation
+       * @description Flag indicating if the contact is set for simulation
+       * @default false
+       */
+      is_simulation: boolean | null;
+      /**
+       * Additional Attributes
+       * @description Additional custom key-value attributes
+       */
+      additional_attributes?: {
+        [key: string]: unknown;
+      } | null;
+    };
+    /**
+     * ContactCreate
+     * @description Schema used for creating a new contact via the API.
+     */
+    ContactCreate: {
+      /**
+       * Id
+       * @description Unique identifier for the contact (UUID)
+       */
+      id?: string | null;
+      /**
+       * Name
+       * @description Contact's full name
+       */
+      name?: string | null;
+      /**
+       * Email
+       * @description Contact's email address (must be unique within the account)
+       */
+      email?: string | null;
+      /**
+       * Phone Number
+       * @description Contact's primary phone number (required)
+       */
+      phone_number: string;
+      /**
+       * Identifier
+       * @description Internal identifier (e.g., normalized phone or WhatsApp ID)
+       */
+      identifier?: string | null;
+      /**
+       * Profile Picture Url
+       * @description URL of the contact's profile picture
+       */
+      profile_picture_url?: string | null;
+      /**
+       * Is Simulation
+       * @description Flag indicating if the contact is set for simulation
+       * @default false
+       */
+      is_simulation: boolean | null;
+      /**
+       * Additional Attributes
+       * @description Additional custom key-value attributes
+       */
+      additional_attributes?: {
+        [key: string]: unknown;
+      } | null;
+    };
+    /**
+     * ContactImportError
+     * @description Details about an error encountered for a specific row during import.
+     */
+    ContactImportError: {
+      /**
+       * Row Number
+       * @description The row number in the CSV file (starting from 2)
+       */
+      row_number: number;
+      /**
+       * Reason
+       * @description Description of the error
+       */
+      reason: string;
+      /**
+       * Data
+       * @description The data from the row that caused the error
+       */
+      data: {
+        [key: string]: unknown;
+      };
+    };
+    /**
+     * ContactImportJobStartResponse
+     * @description Response returned when a contact import job is successfully initiated.
+     */
+    ContactImportJobStartResponse: {
+      /**
+       * Id
+       * Format: uuid
+       * @description The unique identifier for the background import job.
+       */
+      id: string;
+      /**
+       * Status
+       * @description Initial status of the job.
+       * @default Pending
+       */
+      status: string;
+    };
+    /**
+     * ContactImportJobStatusResponse
+     * @description Detailed status and results of a contact import job.
+     */
+    ContactImportJobStatusResponse: {
+      /**
+       * Id
+       * Format: uuid
+       * @description The unique identifier for the import job.
+       */
+      id: string;
+      /**
+       * Status
+       * @description Current status of the job (e.g., PENDING, PROCESSING, COMPLETE, FAILED).
+       */
+      status: string;
+      /**
+       * File Key
+       * @description Identifier for the uploaded file in storage (e.g., GCS blob name).
+       */
+      file_key?: string | null;
+      /**
+       * Original Filename
+       * @description Original name of the uploaded file.
+       */
+      original_filename?: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       * @description Timestamp when the job was created.
+       */
+      created_at: string;
+      /**
+       * Finished At
+       * @description Timestamp when the job finished processing (null if not finished).
+       */
+      finished_at?: string | null;
+      /** @description Summary of import results (available when status is COMPLETE or FAILED with partial results). */
+      result_summary?: components["schemas"]["ContactImportSummary"] | null;
+    };
+    /**
+     * ContactImportSummary
+     * @description Summary of the results after a contact import job is completed.
+     */
+    ContactImportSummary: {
+      /**
+       * Total Rows Processed
+       * @description Total number of data rows processed in the CSV
+       */
+      total_rows_processed: number;
+      /**
+       * Successful Imports
+       * @description Number of contacts successfully created or updated
+       */
+      successful_imports: number;
+      /**
+       * Failed Imports
+       * @description Number of rows that failed during import
+       */
+      failed_imports: number;
+      /**
+       * Errors
+       * @description List of specific errors encountered
+       * @default []
+       */
+      errors: components["schemas"]["ContactImportError"][];
+    };
+    /**
+     * ContactRead
+     * @description Schema used for returning contact data via the API.
+     */
+    ContactRead: {
+      /**
+       * Id
+       * Format: uuid
+       * @description Unique identifier for the contact
+       */
+      id: string;
+      /**
+       * Name
+       * @description Contact's full name
+       */
+      name?: string | null;
+      /**
+       * Email
+       * @description Contact's email address (must be unique within the account)
+       */
+      email?: string | null;
+      /**
+       * Phone Number
+       * @description Contact's primary phone number (required)
+       */
+      phone_number: string;
+      /**
+       * Identifier
+       * @description Internal identifier (e.g., normalized phone or WhatsApp ID)
+       */
+      identifier?: string | null;
+      /**
+       * Profile Picture Url
+       * @description URL of the contact's profile picture
+       */
+      profile_picture_url?: string | null;
+      /**
+       * Is Simulation
+       * @description Flag indicating if the contact is set for simulation
+       * @default false
+       */
+      is_simulation: boolean | null;
+      /**
+       * Additional Attributes
+       * @description Additional custom key-value attributes
+       */
+      additional_attributes?: {
+        [key: string]: unknown;
+      } | null;
+      /**
+       * Account Id
+       * Format: uuid
+       * @description Identifier of the account this contact belongs to
+       */
+      account_id: string;
+      /**
+       * Source Id
+       * @description Identifier for the source system where the contact originated
+       */
+      source_id?: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       * @description Timestamp when the contact was created
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       * @description Timestamp when the contact was last updated
+       */
+      updated_at: string;
+    };
+    /**
+     * ContactUpdate
+     * @description Schema used for updating an existing contact via the API. All fields are optional.
+     */
+    ContactUpdate: {
+      /**
+       * Name
+       * @description Contact's full name
+       */
+      name?: string | null;
+      /**
+       * Email
+       * @description Contact's email address (must be unique within the account)
+       */
+      email?: string | null;
+      /**
+       * Phone Number
+       * @description Contact's primary phone number
+       */
+      phone_number?: string | null;
+      /**
+       * Profile Picture Url
+       * @description URL of the contact's profile picture
+       */
+      profile_picture_url?: string | null;
+      /**
+       * Additional Attributes
+       * @description Additional custom key-value attributes (will merge with existing)
+       */
+      additional_attributes?: {
+        [key: string]: unknown;
+      } | null;
+    };
+    /**
+     * ConversationSearchResult
+     * @example {
+     *       "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
+     *       "contact_id": "...",
+     *       "created_at": "2023-11-10T10:00:00Z",
+     *       "id": "e8a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9f",
+     *       "inbox_id": "...",
+     *       "status": "HUMAN_ACTIVE",
+     *       "unread_agent_count": 3,
+     *       "updated_at": "2023-11-15T11:30:00Z"
+     *     }
+     */
+    ConversationSearchResult: {
+      /**
+       * Id
+       * Format: uuid
+       * @description Unique identifier for the conversation
+       */
+      id: string;
+      /** @description Current status of the conversation regarding human interaction */
+      status?: components["schemas"]["ConversationStatusEnum"] | null;
+      /**
+       * Unread Agent Count
+       * @description Number of unread messages for the agent
+       */
+      unread_agent_count?: number | null;
+      /**
+       * Is Bot Active
+       * @description Flag indicating if the bot is active
+       */
+      is_bot_active?: boolean | null;
+      /** @description Contact's information */
+      contact: components["schemas"]["ContactBase"] | null;
+      /**
+       * Last Message At
+       * @description Timestamp of the last message in the conversation
+       */
+      last_message_at?: string | null;
+      /** @description Snippet of the actual latest message in the conversation */
+      last_message?: components["schemas"]["MessageSnippet"] | null;
+      /** @description Snippet of the most recent message content that matched the search query (if the match was in a message) */
+      matching_message?: components["schemas"]["MessageSnippet"] | null;
+      /**
+       * Updated At
+       * Format: date-time
+       * @description Timestamp of the last relevant activity
+       */
+      updated_at: string;
+    };
+    /**
+     * ConversationStatusEnum
+     * @enum {string}
+     */
+    ConversationStatusEnum:
+      | "PENDING"
+      | "HUMAN_ACTIVE"
+      | "CLOSED"
+      | "OPEN"
+      | "BOT";
+    /**
+     * ConversationUpdateStatus
+     * @example {
+     *       "status": "closed"
+     *     }
+     */
+    ConversationUpdateStatus: {
+      /** @description The new status to set for the conversation. */
+      status: components["schemas"]["ConversationStatusEnum"];
+    };
+    /**
+     * DashboardConversationStats
+     * @description Statistics related to conversations for the dashboard.
+     */
+    DashboardConversationStats: {
+      /**
+       * Pending Count
+       * @description Current number of conversations with PENDING status.
+       */
+      pending_count: number;
+      /**
+       * Bot Active Count
+       * @description Current number of conversations actively handled by the BOT.
+       */
+      bot_active_count: number;
+      /**
+       * Human Active Count
+       * @description Current number of conversations actively handled by a HUMAN agent (status HUMAN_ACTIVE).
+       */
+      human_active_count: number;
+      /**
+       * Open Active Count
+       * @description Current number of conversations with OPEN status (could be transitioning or waiting).
+       */
+      open_active_count: number;
+      /**
+       * Total Active Count
+       * @description Total current number of active conversations (BOT + HUMAN_ACTIVE + OPEN).
+       */
+      total_active_count: number;
+      /**
+       * New In Period Count
+       * @description Number of new conversations created within the selected period.
+       */
+      new_in_period_count: number;
+      /**
+       * Closed In Period Count
+       * @description Number of conversations closed within the selected period.
+       */
+      closed_in_period_count: number;
+      /**
+       * Closed By Bot In Period Count
+       * @description Number of conversations closed by the bot within the selected period. (Requires specific tracking)
+       */
+      closed_by_bot_in_period_count: number;
+      /**
+       * Closed By Human In Period Count
+       * @description Number of conversations closed by a human agent within the selected period. (Requires specific tracking)
+       */
+      closed_by_human_in_period_count: number;
+    };
+    /**
+     * DashboardMessageStats
+     * @description Statistics related to messages for the dashboard.
+     */
+    DashboardMessageStats: {
+      /**
+       * Received In Period Count
+       * @description Total number of messages received (direction 'in') within the selected period.
+       */
+      received_in_period_count: number;
+      /**
+       * Sent Total In Period Count
+       * @description Total number of messages sent (direction 'out') within the selected period.
+       */
+      sent_total_in_period_count: number;
+      /**
+       * Sent By Bot In Period Count
+       * @description Number of outgoing messages sent by the bot within the selected period.
+       */
+      sent_by_bot_in_period_count: number;
+      /**
+       * Sent By Human In Period Count
+       * @description Number of outgoing messages sent by human agents within the selected period.
+       */
+      sent_by_human_in_period_count: number;
+    };
+    /**
+     * DashboardMessageVolumeResponse
+     * @description Time series data for message volume over a period.
+     */
+    DashboardMessageVolumeResponse: {
+      /**
+       * Period Start
+       * Format: date
+       * @description The start date of the reporting period.
+       */
+      period_start: string;
+      /**
+       * Period End
+       * Format: date
+       * @description The end date of the reporting period.
+       */
+      period_end: string;
+      /**
+       * Filtered Inbox Id
+       * @description ID of the inbox if the volume is filtered by a specific inbox, otherwise null.
+       */
+      filtered_inbox_id?: string | null;
+      /**
+       * Granularity
+       * @description The granularity of the time series data (e.g., 'day', 'hour').
+       */
+      granularity: string;
+      /**
+       * Time Series
+       * @description A list of data points representing message volume over time.
+       */
+      time_series: components["schemas"]["MessageVolumeDatapoint"][];
+    };
+    /**
+     * DashboardStatsResponse
+     * @description Overall statistics for the dashboard for a given period.
+     */
+    DashboardStatsResponse: {
+      /**
+       * Period Start
+       * Format: date
+       * @description The start date of the reporting period.
+       */
+      period_start: string;
+      /**
+       * Period End
+       * Format: date
+       * @description The end date of the reporting period.
+       */
+      period_end: string;
+      /**
+       * Filtered Inbox Id
+       * @description ID of the inbox if the stats are filtered by a specific inbox, otherwise null.
+       */
+      filtered_inbox_id?: string | null;
+      /** @description Aggregated statistics about conversations. */
+      conversation_stats: components["schemas"]["DashboardConversationStats"];
+      /** @description Aggregated statistics about messages. */
+      message_stats: components["schemas"]["DashboardMessageStats"];
+      /**
+       * Active Inboxes Count
+       * @description Total number of currently active inboxes for the account.
+       */
+      active_inboxes_count: number;
+    };
+    /**
+     * DocumentStatus
+     * @enum {string}
+     */
+    DocumentStatus: "pending" | "processing" | "completed" | "failed";
+    /**
+     * EvolutionButtonsResponseMessage
+     * @description Content for 'buttonsResponseMessage' (user clicked a button).
+     */
+    EvolutionButtonsResponseMessage: {
+      /** Selectedbuttonid */
+      selectedButtonId: string;
+      /** Selecteddisplaytext */
+      selectedDisplayText: string;
+      /** Type */
+      type?: number | null;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionChannelDetailsInput
+     * @description Schema representing the channel-specific details needed when creating an Inbox
+     *     of type 'whatsapp_evolution_api'. Contains OUR platform ID.
+     */
+    EvolutionChannelDetailsInput: {
+      /**
+       * Platform Instance Id
+       * Format: uuid
+       * @description The platform's unique ID for the configured Evolution instance.
+       */
+      platform_instance_id: string;
+    };
+    /**
+     * EvolutionContextInfo
+     * @description Represents the contextInfo object, often for replies.
+     */
+    EvolutionContextInfo: {
+      /** Participant */
+      participant?: string | null;
+      /** Stanzaid */
+      stanzaId?: string | null;
+      /** Remotejid */
+      remoteJid?: string | null;
+      /** Mentionedjid */
+      mentionedJid?: string[] | null;
+    };
+    /**
+     * EvolutionInstanceQRCodeResponse
+     * @description Schema for the response of the GET .../qrcode endpoint.
+     *     Contains status and QR code data fetched from the shared Evolution server.
+     */
+    EvolutionInstanceQRCodeResponse: {
+      /**
+       * Instance Id
+       * Format: uuid
+       * @description Platform's unique identifier for context.
+       */
+      instance_id: string;
+      /**
+       * Connection Status
+       * @description Connection state reported by Evolution API (e.g., 'open', 'connecting', 'close').
+       */
+      connection_status?: string | null;
+      /**
+       * Qrcode
+       * @description QR code string, if available and not connected.
+       */
+      qrcode?: string | null;
+      /**
+       * Qrcode Base64
+       * @description Base64 encoded QR code string, if available and not connected.
+       */
+      qrcode_base64?: string | null;
+      /**
+       * Detail
+       * @description Additional detail or context message (e.g., 'Already connected').
+       */
+      detail?: string | null;
+    };
+    /**
+     * EvolutionInstanceRead
+     * @description Schema for response when creating/retrieving basic Evolution Instance info.
+     *     This is what our platform returns, containing OUR identifiers.
+     */
+    EvolutionInstanceRead: {
+      /**
+       * Id
+       * Format: uuid
+       * @description Platform's unique identifier for this logical instance.
+       */
+      id: string;
+      /**
+       * Instance Name
+       * @description Unique name identifier used on the shared Evolution API server.
+       */
+      instance_name: string;
+      /**
+       * Shared Api Url
+       * Format: uri
+       * @description Base URL of the shared Evolution API server.
+       */
+      shared_api_url: string;
+      /**
+       * Logical Token Encrypted
+       * @description Encrypted API key
+       */
+      logical_token_encrypted: string;
+      /**
+       * Webhook Url
+       * Format: uri
+       * @description Webhook URL configured to receive events for this instance.
+       */
+      webhook_url: string;
+      /** @description Current status tracked by the platform. */
+      status: components["schemas"]["EvolutionInstanceStatus"];
+      /**
+       * Account Id
+       * Format: uuid
+       * @description Owning account ID within the platform.
+       */
+      account_id: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /**
+     * EvolutionInstanceStatus
+     * @description Possible statuses for the Evolution Instance lifecycle within the platform.
+     * @enum {string}
+     */
+    EvolutionInstanceStatus:
+      | "PENDING"
+      | "CREATED"
+      | "CONNECTED"
+      | "DISCONNECTED"
+      | "ERROR"
+      | "UNKNOWN"
+      | "CONNECTING"
+      | "API_ERROR";
+    /**
+     * EvolutionListResponseMessage
+     * @description Content for 'listResponseMessage' (user selected from a list).
+     */
+    EvolutionListResponseMessage: {
+      /** Title */
+      title: string;
+      /** Description */
+      description?: string | null;
+      singleSelectReply: components["schemas"]["EvolutionListResponseSingleSelectReply"];
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /** EvolutionListResponseSingleSelectReply */
+    EvolutionListResponseSingleSelectReply: {
+      /** Selectedrowid */
+      selectedRowId: string;
+    };
+    /**
+     * EvolutionMessageContent_Audio
+     * @description Content for 'audioMessage'.
+     */
+    EvolutionMessageContent_Audio: {
+      /** Url */
+      url?: string | null;
+      /** Mimetype */
+      mimetype: string;
+      /** Filelength */
+      fileLength?: string | null;
+      /** Seconds */
+      seconds?: number | null;
+      /**
+       * Ptt
+       * @default false
+       */
+      ptt: boolean | null;
+      /** Mediakey */
+      mediaKey?: string | null;
+      /** Directpath */
+      directPath?: string | null;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionMessageContent_Document
+     * @description Content for 'documentMessage' or 'documentWithCaptionMessage'.
+     */
+    EvolutionMessageContent_Document: {
+      /** Url */
+      url?: string | null;
+      /** Mimetype */
+      mimetype: string;
+      /** Title */
+      title?: string | null;
+      /** Filelength */
+      fileLength?: string | null;
+      /** Pagecount */
+      pageCount?: number | null;
+      /** Filename */
+      fileName?: string | null;
+      /** Caption */
+      caption?: string | null;
+      /** Mediakey */
+      mediaKey?: string | null;
+      /** Directpath */
+      directPath?: string | null;
+      /** Jpegthumbnail */
+      jpegThumbnail?: string | null;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionMessageContent_Image
+     * @description Content for 'imageMessage'.
+     */
+    EvolutionMessageContent_Image: {
+      /** Url */
+      url?: string | null;
+      /** Mimetype */
+      mimetype: string;
+      /** Caption */
+      caption?: string | null;
+      /** Filelength */
+      fileLength?: string | null;
+      /** Height */
+      height?: number | null;
+      /** Width */
+      width?: number | null;
+      /** Mediakey */
+      mediaKey?: string | null;
+      /** Directpath */
+      directPath?: string | null;
+      /** Jpegthumbnail */
+      jpegThumbnail?: string | null;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionMessageContent_Location
+     * @description Content for 'locationMessage'.
+     */
+    EvolutionMessageContent_Location: {
+      /** Degreeslatitude */
+      degreesLatitude: number;
+      /** Degreeslongitude */
+      degreesLongitude: number;
+      /** Name */
+      name?: string | null;
+      /** Address */
+      address?: string | null;
+      /** Jpegthumbnail */
+      jpegThumbnail?: string | null;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionMessageContent_Sticker
+     * @description Content for 'stickerMessage'.
+     */
+    EvolutionMessageContent_Sticker: {
+      /** Url */
+      url?: string | null;
+      /** Mimetype */
+      mimetype: string;
+      /** Height */
+      height?: number | null;
+      /** Width */
+      width?: number | null;
+      /** Isanimated */
+      isAnimated?: boolean | null;
+      /** Mediakey */
+      mediaKey?: string | null;
+      /** Directpath */
+      directPath?: string | null;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionMessageContent_Text
+     * @description Content for 'conversation' or 'extendedTextMessage'.
+     */
+    EvolutionMessageContent_Text: {
+      /** Text */
+      text: string;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionMessageContent_Video
+     * @description Content for 'videoMessage'.
+     */
+    EvolutionMessageContent_Video: {
+      /** Url */
+      url?: string | null;
+      /** Mimetype */
+      mimetype: string;
+      /** Caption */
+      caption?: string | null;
+      /** Filelength */
+      fileLength?: string | null;
+      /** Seconds */
+      seconds?: number | null;
+      /** Mediakey */
+      mediaKey?: string | null;
+      /** Directpath */
+      directPath?: string | null;
+      /** Jpegthumbnail */
+      jpegThumbnail?: string | null;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionMessageObject
+     * @description Represents the 'message' field in the webhook data.
+     *     It dynamically holds the specific message type content.
+     */
+    EvolutionMessageObject: {
+      /** Conversation */
+      conversation?: string | null;
+      extendedTextMessage?:
+        | components["schemas"]["EvolutionMessageContent_Text"]
+        | null;
+      imageMessage?:
+        | components["schemas"]["EvolutionMessageContent_Image"]
+        | null;
+      videoMessage?:
+        | components["schemas"]["EvolutionMessageContent_Video"]
+        | null;
+      audioMessage?:
+        | components["schemas"]["EvolutionMessageContent_Audio"]
+        | null;
+      documentMessage?:
+        | components["schemas"]["EvolutionMessageContent_Document"]
+        | null;
+      documentWithCaptionMessage?:
+        | components["schemas"]["EvolutionMessageContent_Document"]
+        | null;
+      stickerMessage?:
+        | components["schemas"]["EvolutionMessageContent_Sticker"]
+        | null;
+      locationMessage?:
+        | components["schemas"]["EvolutionMessageContent_Location"]
+        | null;
+      buttonsResponseMessage?:
+        | components["schemas"]["EvolutionButtonsResponseMessage"]
+        | null;
+      listResponseMessage?:
+        | components["schemas"]["EvolutionListResponseMessage"]
+        | null;
+      templateButtonReplyMessage?:
+        | components["schemas"]["EvolutionTemplateButtonReplyMessage"]
+        | null;
+      reactionMessage?:
+        | components["schemas"]["EvolutionReactionMessage"]
+        | null;
+    };
+    /**
+     * EvolutionReactionMessage
+     * @description Content for 'reactionMessage'.
+     */
+    EvolutionReactionMessage: {
+      /** Text */
+      text: string;
+      /** Key */
+      key: {
+        [key: string]: unknown;
+      };
+    };
+    /**
+     * EvolutionTemplateButtonReplyMessage
+     * @description Content for 'templateButtonReplyMessage' (user clicked a template quick reply).
+     */
+    EvolutionTemplateButtonReplyMessage: {
+      /** Selectedid */
+      selectedId: string;
+      /** Selectedindex */
+      selectedIndex: number;
+      /** Selecteddisplaytext */
+      selectedDisplayText?: string | null;
+      contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+    };
+    /**
+     * EvolutionWebhookKey
+     * @description Represents the 'key' data often nested in webhook payloads.
+     */
+    EvolutionWebhookKey: {
+      /** Remotejid */
+      remoteJid: string;
+      /** Fromme */
+      fromMe: boolean;
+      /** Id */
+      id: string;
+      /** Participant */
+      participant?: string | null;
+    };
+    /**
+     * EvolutionWebhookMessageData
+     * @description Represents the 'data' field for message events like 'messages.upsert' or 'messages.update'.
+     */
+    EvolutionWebhookMessageData: {
+      key: components["schemas"]["EvolutionWebhookKey"];
+      /** Pushname */
+      pushName?: string | null;
+      message?: components["schemas"]["EvolutionMessageObject"] | null;
+      /** Messagetype */
+      messageType?: string | null;
+      /** Messagetimestamp */
+      messageTimestamp?: number | null;
+      /** Instanceid */
+      instanceId: string;
+      /** Source */
+      source: string;
+      /** Messagestubtype */
+      messageStubType?: string | null;
+      /** Messagestubparameters */
+      messageStubParameters?: string[] | null;
+    };
+    /** EvolutionWebhookPayload */
+    EvolutionWebhookPayload: {
+      /** Event */
+      event: string;
+      /** Instance */
+      instance: string;
+      /** Data */
+      data:
+        | components["schemas"]["ConnectionUpdateData"]
+        | components["schemas"]["EvolutionWebhookMessageData"]
+        | {
+            [key: string]: unknown;
+          };
+      /** Destination */
+      destination: string;
+      /**
+       * Date Time
+       * Format: date-time
+       */
+      date_time: string;
+      /** Server Url */
+      server_url: string;
+      /** Apikey */
+      apikey: string;
+    };
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components["schemas"]["ValidationError"][];
+    };
+    /**
+     * ImportJobListItem
+     * @description Data for a single import job item in a list.
+     */
+    ImportJobListItem: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      status: components["schemas"]["ImportJobStatus"];
+      /** Original Filename */
+      original_filename?: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Finished At */
+      finished_at?: string | null;
+    };
+    /**
+     * ImportJobStatus
+     * @enum {string}
+     */
+    ImportJobStatus: "PENDING" | "PROCESSING" | "COMPLETE" | "FAILED";
+    /**
+     * InboxCreate
+     * @description Schema for creating a new Inbox.
+     *     Includes common inbox fields and specific configurations for the chosen channel type.
+     * @example {
+     *       "channel_details": {
+     *         "ui_hint": "Use blue theme"
+     *       },
+     *       "channel_type": "whatsapp_cloud",
+     *       "enable_auto_assignment": true,
+     *       "initial_conversation_status": "OPEN",
+     *       "name": "Sales WhatsApp"
+     *     }
+     */
+    InboxCreate: {
+      /**
+       * Id
+       * @description Unique identifier for the inbox (UUID).
+       */
+      id?: string | null;
+      /**
+       * Name
+       * @description Name of the inbox.
+       */
+      name: string;
+      /** @description Type of the communication channel. */
+      channel_type: components["schemas"]["ChannelTypeEnum"];
+      /**
+       * Channel Details
+       * @description Legacy or UI-specific channel configuration details (JSON).
+       */
+      channel_details?: {
+        [key: string]: unknown;
+      } | null;
+      /** @description Default status for new conversations (e.g., OPEN, PENDING, BOT). */
+      initial_conversation_status?:
+        | components["schemas"]["ConversationStatusEnum"]
+        | null;
+      /**
+       * Enable Auto Assignment
+       * @description Enable automatic assignment of conversations for this inbox.
+       * @default true
+       */
+      enable_auto_assignment: boolean | null;
+      /** @description Configuration for linking an existing Evolution API instance. */
+      evolution_instance_to_link?:
+        | components["schemas"]["EvolutionChannelDetailsInput"]
+        | null;
+      /** @description Configuration for creating a new WhatsApp Cloud API setup. */
+      whatsapp_cloud_config_to_create?:
+        | components["schemas"]["WhatsAppCloudConfigCreateInput"]
+        | null;
+    };
+    /**
+     * InboxRead
+     * @description Schema for representing an Inbox in API responses.
+     *     Includes common fields and populated channel-specific configuration.
+     * @example {
+     *       "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
+     *       "channel_details": {
+     *         "ui_hint": "Use blue theme"
+     *       },
+     *       "channel_id": "15551234567",
+     *       "channel_type": "whatsapp_cloud",
+     *       "created_at": "2023-10-27T10:00:00Z",
+     *       "enable_auto_assignment": true,
+     *       "id": "e8a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9f",
+     *       "initial_conversation_status": "OPEN",
+     *       "name": "Sales WhatsApp Cloud",
+     *       "updated_at": "2023-10-27T11:00:00Z",
+     *       "whatsapp_cloud_config": {
+     *         "account_id": "f0a4f7a0-1b3c-4a8e-8d0a-3f1e9b6c2e9a",
+     *         "app_id": "app_id_example",
+     *         "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+     *         "phone_number_id": "15551234567",
+     *         "waba_id": "waba_id_example",
+     *         "webhook_verify_token": "your_verify_token_here"
+     *       }
+     *     }
+     */
+    InboxRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Name
+       * @description Name of the inbox.
+       */
+      name: string;
+      /** @description Type of the communication channel. */
+      channel_type: components["schemas"]["ChannelTypeEnum"];
+      /**
+       * Channel Details
+       * @description Legacy or UI-specific channel configuration details (JSON).
+       */
+      channel_details?: {
+        [key: string]: unknown;
+      } | null;
+      /** @description Default status for new conversations (e.g., OPEN, PENDING, BOT). */
+      initial_conversation_status?:
+        | components["schemas"]["ConversationStatusEnum"]
+        | null;
+      /**
+       * Enable Auto Assignment
+       * @description Enable automatic assignment of conversations for this inbox.
+       * @default true
+       */
+      enable_auto_assignment: boolean | null;
+      /**
+       * Account Id
+       * Format: uuid
+       * @description Identifier of the account this inbox belongs to.
+       */
+      account_id: string;
+      /**
+       * Channel Id
+       * @description Identifier used by the channel provider (e.g., Evolution instance_name, WhatsApp phone_number_id).
+       */
+      channel_id?: string | null;
+      /**
+       * Associated Bot Agent Id
+       * @description ID of the BotAgent currently associated with this inbox, if any.
+       */
+      associated_bot_agent_id?: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       * @description Timestamp when the inbox was created.
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       * @description Timestamp when the inbox was last updated.
+       */
+      updated_at: string;
+      /** @description Details of the linked Evolution API instance, if applicable. */
+      evolution_instance?:
+        | components["schemas"]["EvolutionInstanceRead"]
+        | null;
+      /** @description Details of the linked WhatsApp Cloud API configuration, if applicable. */
+      whatsapp_cloud_config?:
+        | components["schemas"]["WhatsAppCloudConfigRead"]
+        | null;
+    };
+    /**
+     * InboxUpdate
+     * @description Schema for updating an existing Inbox.
+     *     Allows partial updates to common inbox fields.
+     * @example {
+     *       "enable_auto_assignment": false,
+     *       "initial_conversation_status": "PENDING",
+     *       "name": "Support WhatsApp Renamed"
+     *     }
+     */
+    InboxUpdate: {
+      /**
+       * Name
+       * @description New name for the inbox.
+       */
+      name?: string | null;
+      /**
+       * Channel Details
+       * @description Updated legacy or UI-specific channel configuration.
+       */
+      channel_details?: {
+        [key: string]: unknown;
+      } | null;
+      /** @description New default status for new conversations. */
+      initial_conversation_status?:
+        | components["schemas"]["ConversationStatusEnum"]
+        | null;
+      /**
+       * Enable Auto Assignment
+       * @description Update auto assignment setting for this inbox.
+       */
+      enable_auto_assignment?: boolean | null;
+    };
+    /**
+     * IngestResponse
+     * @description Response after successfully queueing any ingestion task.
+     */
+    IngestResponse: {
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string;
+      /** Job Id */
+      job_id: string | null;
+      /** Message */
+      message: string;
+    };
+    /**
+     * JobStatusEnum
+     * @description Possible statuses for an Arq job.
+     * @enum {string}
+     */
+    JobStatusEnum:
+      | "queued"
+      | "in_progress"
+      | "complete"
+      | "not_found"
+      | "failed";
+    /**
+     * JobStatusResponse
+     * @description Schema for the response when checking the status of a background job.
+     */
+    JobStatusResponse: {
+      /**
+       * Job Id
+       * @description The ID of the job being checked.
+       */
+      job_id: string;
+      /** @description The current status of the job. */
+      status: components["schemas"]["JobStatusEnum"];
+      /**
+       * Detail
+       * @description Additional details, like an error message if the job failed.
+       */
+      detail?: string | null;
+    };
+    /** KnowledgeDocumentRead */
+    KnowledgeDocumentRead: {
+      /**
+       * Source Type
+       * @description Type of the source ('file', 'url', 'text').
+       */
+      source_type: string;
+      /**
+       * Source Uri
+       * @description URI identifying the source (e.g., GCS path, web URL, text description).
+       */
+      source_uri: string;
+      /**
+       * Original Filename
+       * @description Original filename if source_type is 'file'.
+       */
+      original_filename?: string | null;
+      /**
+       * Id
+       * Format: uuid
+       * @description Unique identifier for the knowledge document.
+       */
+      id: string;
+      /**
+       * Account Id
+       * Format: uuid
+       * @description The account this document belongs to.
+       */
+      account_id: string;
+      /** @description Processing status of the document. */
+      status: components["schemas"]["DocumentStatus"];
+      /**
+       * Error Message
+       * @description Error message if processing failed.
+       */
+      error_message?: string | null;
+      /**
+       * Chunk Count
+       * @description Number of chunks generated from this document.
+       */
+      chunk_count?: number | null;
+      /**
+       * Created At
+       * Format: date-time
+       * @description Timestamp when the document record was created.
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       * @description Timestamp when the document record was last updated.
+       */
+      updated_at: string;
+    };
+    /** MessageCreatePayload */
+    MessageCreatePayload: {
+      /**
+       * Content
+       * @example Olá, tudo bem?
+       */
+      content: string;
+    };
+    /** MessageResponse */
+    MessageResponse: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Content */
+      content: string | null;
+      /** Direction */
+      direction: string;
+      /** Content Type */
+      content_type: string | null;
+      /** Sent At */
+      sent_at: string | null;
+    };
+    /** MessageSnippet */
+    MessageSnippet: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Content */
+      content: string;
+      /** Sent At */
+      sent_at: string | null;
+    };
+    /**
+     * MessageVolumeDatapoint
+     * @description A single data point in a time series for message volume.
+     */
+    MessageVolumeDatapoint: {
+      /**
+       * Timestamp
+       * Format: date-time
+       * @description The specific timestamp (start of the day or hour) for this data point.
+       */
+      timestamp: string;
+      /**
+       * Received Count
+       * @description Number of messages received during this time interval.
+       */
+      received_count: number;
+      /**
+       * Sent By Bot Count
+       * @description Number of messages sent by the bot during this time interval.
+       */
+      sent_by_bot_count: number;
+      /**
+       * Sent By Human Count
+       * @description Number of messages sent by human agents during this time interval.
+       */
+      sent_by_human_count: number;
+    };
+    /**
+     * OfferingInfo
+     * @description Brief information about a key product or service offering.
+     */
+    OfferingInfo: {
+      /**
+       * Name
+       * @description Name of the product or service.
+       */
+      name: string;
+      /**
+       * Short Description
+       * @description A concise description (1-2 sentences).
+       */
+      short_description: string;
+      /**
+       * Key Features
+       * @description Bullet points of key features, benefits, or components.
+       */
+      key_features?: string[];
+      /**
+       * Price Info
+       * @description Brief pricing information (e.g., 'Starts at $X', 'Contact for quote').
+       */
+      price_info?: string | null;
+      /**
+       * Link
+       * @description Direct link to the product/service page, if available.
+       */
+      link?: string | null;
+      /**
+       * Bonus Items
+       * @description List of additional bonus items or services included for free when purchasing the main offering. These may include templates, e-books, consultations, etc.
+       */
+      bonus_items?: string[];
+    };
+    /**
+     * PaginatedContactRead
+     * @description Schema for returning a paginated list of contacts.
+     */
+    PaginatedContactRead: {
+      /**
+       * Total
+       * @description Total number of contacts matching the query
+       */
+      total: number;
+      /**
+       * Items
+       * @description List of contacts for the current page
+       */
+      items: components["schemas"]["ContactRead"][];
+    };
+    /**
+     * PaginatedImportJobListResponse
+     * @description Response model for paginated list of import jobs.
+     */
+    PaginatedImportJobListResponse: {
+      /** Total Items */
+      total_items: number;
+      /** Total Pages */
+      total_pages: number;
+      /** Page */
+      page: number;
+      /** Size */
+      size: number;
+      /** Items */
+      items: components["schemas"]["ImportJobListItem"][];
+    };
+    /** PaginatedKnowledgeDocumentRead */
+    PaginatedKnowledgeDocumentRead: {
+      /**
+       * Total
+       * @description Total number of documents found for the account.
+       */
+      total: number;
+      /**
+       * Items
+       * @description List of documents for the current page.
+       */
+      items: components["schemas"]["KnowledgeDocumentRead"][];
+    };
+    /**
+     * PersonaBase
+     * @description Base Pydantic schema for Persona data, including dynamic behaviors.
+     * @example {
+     *       "behavior_hints": [
+     *         "price_sensitive",
+     *         "impatient",
+     *         "results_oriented"
+     *       ],
+     *       "description": "Cliente interessado no Vendedor IA, mas sensível a preço e um pouco impaciente.",
+     *       "failure_criteria": [
+     *         "event:ai_fallback_detected",
+     *         "turn_count > 8"
+     *       ],
+     *       "information_needed": [
+     *         {
+     *           "attribute": "pricing_model",
+     *           "entity": "Vendedor IA"
+     *         },
+     *         {
+     *           "attribute": "main_benefit",
+     *           "entity": "Vendedor IA"
+     *         }
+     *       ],
+     *       "initial_message": "Olá, esse Vendedor IA parece interessante. Como funciona?",
+     *       "objective": "Entender os benefícios principais do Vendedor IA, ter uma ideia de preço e decidir se vale a pena.",
+     *       "off_topic_questions": [
+     *         "Isso integra com meu sistema de CRM atual?",
+     *         "Vocês oferecem algum outro serviço de automação?"
+     *       ],
+     *       "persona_id": "cliente_dinamico_v2",
+     *       "potential_objections": [
+     *         {
+     *           "objection_text": "Entendi, mas qual o valor exato? Preciso ver se cabe no orçamento.",
+     *           "trigger_keyword": "preço"
+     *         },
+     *         {
+     *           "objection_text": "Ok, mas ainda preciso de um tempo para analisar internamente.",
+     *           "trigger_stage": "Closing"
+     *         }
+     *       ],
+     *       "success_criteria": []
+     *     }
+     */
+    PersonaBase: {
+      /**
+       * Persona Id
+       * @description Unique, human-readable snake_case identifier.
+       */
+      persona_id: string;
+      /**
+       * Description
+       * @description Concise description of the persona.
+       */
+      description: string;
+      /**
+       * Initial Message
+       * @description The first message this persona sends.
+       */
+      initial_message: string;
+      /**
+       * Objective
+       * @description The specific goal the persona wants to achieve.
+       */
+      objective: string;
+      /**
+       * Information Needed
+       * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
+       */
+      information_needed?: {
+        [key: string]: string;
+      }[];
+      /**
+       * Potential Objections
+       * @description List of potential objections the persona might raise based on triggers.
+       */
+      potential_objections?: components["schemas"]["PotentialObjection"][];
+      /**
+       * Off Topic Questions
+       * @description List of potential off-topic questions the persona might ask to interrupt.
+       */
+      off_topic_questions?: string[];
+      /**
+       * Behavior Hints
+       * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
+       */
+      behavior_hints?: string[];
+      /**
+       * Success Criteria
+       * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
+       */
+      success_criteria?: string[];
+      /**
+       * Failure Criteria
+       * @description List of criteria defining simulation failure.
+       * @default [
+       *       "event:ai_fallback_detected",
+       *       "turn_count > 10"
+       *     ]
+       */
+      failure_criteria: string[];
+    };
+    /**
+     * PersonaCreate
+     * @description Schema for creating a new Persona.
+     * @example {
+     *       "behavior_hints": [
+     *         "busy",
+     *         "interested",
+     *         "implementation_focused"
+     *       ],
+     *       "contact_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+     *       "description": "Lead que entende o valor, mas tem objeção sobre tempo de implementação.",
+     *       "failure_criteria": [
+     *         "turn_count > 6"
+     *       ],
+     *       "information_needed": [
+     *         {
+     *           "attribute": "implementation_time",
+     *           "entity": "Vendedor IA"
+     *         }
+     *       ],
+     *       "initial_message": "Gostei da ideia da qualificação automática.",
+     *       "objective": "Superar a objeção sobre implementação e avançar para teste.",
+     *       "off_topic_questions": [],
+     *       "persona_id": "lead_qualificado_objecao",
+     *       "potential_objections": [
+     *         {
+     *           "objection_text": "Parece bom, mas quanto tempo leva pra implementar tudo isso?",
+     *           "trigger_keyword": "implementação"
+     *         }
+     *       ],
+     *       "success_criteria": []
+     *     }
+     */
+    PersonaCreate: {
+      /**
+       * Persona Id
+       * @description Unique, human-readable snake_case identifier.
+       */
+      persona_id: string;
+      /**
+       * Description
+       * @description Concise description of the persona.
+       */
+      description: string;
+      /**
+       * Initial Message
+       * @description The first message this persona sends.
+       */
+      initial_message: string;
+      /**
+       * Objective
+       * @description The specific goal the persona wants to achieve.
+       */
+      objective: string;
+      /**
+       * Information Needed
+       * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
+       */
+      information_needed?: {
+        [key: string]: string;
+      }[];
+      /**
+       * Potential Objections
+       * @description List of potential objections the persona might raise based on triggers.
+       */
+      potential_objections?: components["schemas"]["PotentialObjection"][];
+      /**
+       * Off Topic Questions
+       * @description List of potential off-topic questions the persona might ask to interrupt.
+       */
+      off_topic_questions?: string[];
+      /**
+       * Behavior Hints
+       * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
+       */
+      behavior_hints?: string[];
+      /**
+       * Success Criteria
+       * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
+       */
+      success_criteria?: string[];
+      /**
+       * Failure Criteria
+       * @description List of criteria defining simulation failure.
+       * @default [
+       *       "event:ai_fallback_detected",
+       *       "turn_count > 10"
+       *     ]
+       */
+      failure_criteria: string[];
+      /**
+       * Contact Id
+       * Format: uuid
+       */
+      contact_id: string;
+    };
+    /**
+     * PersonaRead
+     * @description Schema for reading Persona data.
+     * @example {
+     *       "behavior_hints": [
+     *         "price_sensitive",
+     *         "impatient",
+     *         "results_oriented"
+     *       ],
+     *       "description": "Cliente interessado no Vendedor IA, mas sensível a preço e um pouco impaciente.",
+     *       "failure_criteria": [
+     *         "event:ai_fallback_detected",
+     *         "turn_count > 8"
+     *       ],
+     *       "information_needed": [
+     *         {
+     *           "attribute": "pricing_model",
+     *           "entity": "Vendedor IA"
+     *         },
+     *         {
+     *           "attribute": "main_benefit",
+     *           "entity": "Vendedor IA"
+     *         }
+     *       ],
+     *       "initial_message": "Olá, esse Vendedor IA parece interessante. Como funciona?",
+     *       "objective": "Entender os benefícios principais do Vendedor IA, ter uma ideia de preço e decidir se vale a pena.",
+     *       "off_topic_questions": [
+     *         "Isso integra com meu sistema de CRM atual?",
+     *         "Vocês oferecem algum outro serviço de automação?"
+     *       ],
+     *       "persona_id": "cliente_dinamico_v2",
+     *       "potential_objections": [
+     *         {
+     *           "objection_text": "Entendi, mas qual o valor exato? Preciso ver se cabe no orçamento.",
+     *           "trigger_keyword": "preço"
+     *         },
+     *         {
+     *           "objection_text": "Ok, mas ainda preciso de um tempo para analisar internamente.",
+     *           "trigger_stage": "Closing"
+     *         }
+     *       ],
+     *       "success_criteria": []
+     *     }
+     */
+    PersonaRead: {
+      /**
+       * Persona Id
+       * @description Unique, human-readable snake_case identifier.
+       */
+      persona_id: string;
+      /**
+       * Description
+       * @description Concise description of the persona.
+       */
+      description: string;
+      /**
+       * Initial Message
+       * @description The first message this persona sends.
+       */
+      initial_message: string;
+      /**
+       * Objective
+       * @description The specific goal the persona wants to achieve.
+       */
+      objective: string;
+      /**
+       * Information Needed
+       * @description List of facts the persona is interested in (used as context) [{'entity': 'X', 'attribute': 'Y'},...].
+       */
+      information_needed?: {
+        [key: string]: string;
+      }[];
+      /**
+       * Potential Objections
+       * @description List of potential objections the persona might raise based on triggers.
+       */
+      potential_objections?: components["schemas"]["PotentialObjection"][];
+      /**
+       * Off Topic Questions
+       * @description List of potential off-topic questions the persona might ask to interrupt.
+       */
+      off_topic_questions?: string[];
+      /**
+       * Behavior Hints
+       * @description List of keywords describing persona behavior (e.g., 'impatient', 'detailed', 'friendly', 'skeptical').
+       */
+      behavior_hints?: string[];
+      /**
+       * Success Criteria
+       * @description List of criteria defining simulation success (e.g., ['objective_met_via_llm', 'reached_stage:Closing']). Default is empty.
+       */
+      success_criteria?: string[];
+      /**
+       * Failure Criteria
+       * @description List of criteria defining simulation failure.
+       * @default [
+       *       "event:ai_fallback_detected",
+       *       "turn_count > 10"
+       *     ]
+       */
+      failure_criteria: string[];
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Contact Id
+       * Format: uuid
+       */
+      contact_id: string;
+      /** Simulation Contact Identifier */
+      simulation_contact_identifier: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /**
+     * PotentialObjection
+     * @description Defines a potential objection and its trigger.
+     * @example {
+     *       "objection_text": "Esse preço está um pouco acima do que eu esperava.",
+     *       "trigger_keyword": "preço",
+     *       "trigger_stage": "Presentation"
+     *     }
+     */
+    PotentialObjection: {
+      /**
+       * Trigger Keyword
+       * @description A keyword in the AI's response that might trigger this objection (lowercase).
+       */
+      trigger_keyword?: string | null;
+      /**
+       * Trigger Stage
+       * @description A sales stage where this objection is likely to occur (e.g., 'Presentation', 'Closing').
+       */
+      trigger_stage?: string | null;
+      /**
+       * Objection Text
+       * @description The text of the objection the persona would raise.
+       */
+      objection_text: string;
+    };
+    /**
+     * ResearchJobStatusEnum
+     * @description Possible statuses for an Arq job.
+     * @enum {string}
+     */
+    ResearchJobStatusEnum:
+      | "queued"
+      | "in_progress"
+      | "complete"
+      | "not_found"
+      | "failed";
+    /**
+     * ResearchJobStatusResponse
+     * @description Schema for the response when checking the status of a background job.
+     */
+    ResearchJobStatusResponse: {
+      /**
+       * Job Id
+       * @description The ID of the job being checked.
+       */
+      job_id: string;
+      /** @description The current status of the job. */
+      status: components["schemas"]["ResearchJobStatusEnum"];
+      /**
+       * Detail
+       * @description Additional details, like an error message if the job failed.
+       */
+      detail?: string | null;
+    };
+    /**
+     * ResearchRequest
+     * @description Schema for requesting a new company profile research task.
+     *     Account ID is derived from the authenticated user context.
+     * @example {
+     *       "url": "https://www.padariadobairro.com.br"
+     *     }
+     */
+    ResearchRequest: {
+      /**
+       * Url
+       * Format: uri
+       * @description The URL of the company website to research.
+       */
+      url: string;
+    };
+    /**
+     * ResearchResponse
+     * @description Schema for the response after successfully enqueueing a research task.
+     * @example {
+     *       "job_id": "arq:job:e4r5t6y7-u8i9-0o1p-q2w3-e4r5t6y7u8i9",
+     *       "message": "Company profile research task successfully queued."
+     *     }
+     */
+    ResearchResponse: {
+      /**
+       * Job Id
+       * @description The unique ID assigned to the background job.
+       */
+      job_id?: string | null;
+      /**
+       * Message
+       * @description Status message indicating the task was queued.
+       */
+      message: string;
+    };
+    /**
+     * SimulationDetailsResponse
+     * @description Schema for returning the UUIDs of the primary simulation entities
+     *     associated with a user's account.
+     */
+    SimulationDetailsResponse: {
+      /**
+       * Inbox Id
+       * Format: uuid
+       * @description The UUID of the primary simulation inbox.
+       */
+      inbox_id: string;
+      /**
+       * Contact Id
+       * Format: uuid
+       * @description The UUID of the primary simulation contact ('Simulador').
+       */
+      contact_id: string;
+      /**
+       * Conversation Id
+       * Format: uuid
+       * @description The UUID of the primary simulation conversation between the inbox and the contact.
+       */
+      conversation_id: string;
+    };
+    /**
+     * SimulationMessageCreate
+     * @description Schema for creating a message sent *by* the simulated contact.
+     */
+    SimulationMessageCreate: {
+      /**
+       * Content
+       * @description The text content of the message being simulated.
+       */
+      content: string;
+    };
+    /**
+     * SimulationMessageEnqueueResponse
+     * @description Schema for the response after successfully enqueueing a simulation message.
+     */
+    SimulationMessageEnqueueResponse: {
+      /**
+       * Status
+       * @example message enqueued
+       */
+      status: string;
+      /**
+       * Source Id
+       * @description A unique identifier generated for this simulated message attempt.
+       * @example sim_ui_...
+       */
+      source_id: string;
+      /**
+       * Conversation Id
+       * @description The string representation of the target conversation UUID.
+       */
+      conversation_id: string;
+    };
+    /** StartConversationRequest */
+    StartConversationRequest: {
+      /**
+       * Phone Number
+       * @example 5511988880000
+       */
+      phone_number: string;
+    };
+    /** StartConversationResponse */
+    StartConversationResponse: {
+      /**
+       * Conversation Id
+       * Format: uuid
+       */
+      conversation_id: string;
+    };
+    /**
+     * SyncInitiatedResponse
+     * @description Response model indicating successful initiation of a background task.
+     */
+    SyncInitiatedResponse: {
+      /**
+       * Message
+       * @default Synchronization initiated.
+       */
+      message: string;
+      /** Id */
+      id?: string | null;
+    };
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
+    };
+    /**
+     * WhatsAppCloudConfigCreateInput
+     * @description Schema for providing data to create a WhatsApp Cloud API Configuration.
+     */
+    WhatsAppCloudConfigCreateInput: {
+      /**
+       * Phone Number Id
+       * @description WhatsApp Cloud API Phone Number ID.
+       */
+      phone_number_id: string;
+      /**
+       * Waba Id
+       * @description WhatsApp Business Account ID.
+       */
+      waba_id: string;
+      /**
+       * Webhook Verify Token
+       * @description Verify token for Meta webhook setup.
+       */
+      webhook_verify_token: string;
+      /**
+       * App Id
+       * @description Meta App ID, if applicable.
+       */
+      app_id?: string | null;
+      /**
+       * Access Token
+       * @description Raw System User Access Token for WhatsApp Cloud API.
+       */
+      access_token: string;
+    };
+    /**
+     * WhatsAppCloudConfigRead
+     * @description Schema for reading/returning a WhatsApp Cloud API Configuration.
+     */
+    WhatsAppCloudConfigRead: {
+      /**
+       * Phone Number Id
+       * @description WhatsApp Cloud API Phone Number ID.
+       */
+      phone_number_id: string;
+      /**
+       * Waba Id
+       * @description WhatsApp Business Account ID.
+       */
+      waba_id: string;
+      /**
+       * Webhook Verify Token
+       * @description Verify token for Meta webhook setup.
+       */
+      webhook_verify_token: string;
+      /**
+       * App Id
+       * @description Meta App ID, if applicable.
+       */
+      app_id?: string | null;
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    protected_route_api_v1_auth_protected_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
+  protected_route_api_v1_auth_protected_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    public_route_api_v1_auth_public_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
+        content: {
+          "application/json": unknown;
         };
+      };
     };
-    get_conversation_api_v1_conversations__conversation_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Conversation ID */
-                conversation_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConversationSearchResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  public_route_api_v1_auth_public_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    search_or_list_conversations_api_v1_conversations_get: {
-        parameters: {
-            query?: {
-                /** @description Search term for contact name, phone number, or message content. If omitted, returns a list of all conversations. */
-                q?: string | null;
-                /** @description Number of records to skip for pagination */
-                offset?: number;
-                /** @description Maximum number of records to return */
-                limit?: number;
-                /** @description Status of the conversation (`PENDING`, `HUMAN_ACTIVE`, `CLOSED`... ) */
-                status?: components["schemas"]["ConversationStatusEnum"][] | null;
-                /** @description Flag indicating if there is unread messages */
-                has_unread?: boolean | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description A list of conversations matching the criteria */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConversationSearchResult"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": unknown;
         };
+      };
     };
-    get_inbox_conversations_api_v1_inboxes__inbox_id__conversations_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                inbox_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConversationSearchResult"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_conversation_api_v1_conversations__conversation_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description Conversation ID */
+        conversation_id: string;
+      };
+      cookie?: never;
     };
-    start_conversation_api_v1_inboxes__inbox_id__conversations_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                inbox_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["StartConversationRequest"];
-            };
+        content: {
+          "application/json": components["schemas"]["ConversationSearchResult"];
         };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StartConversationResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    update_conversation_status_endpoint_api_v1_conversations__conversation_id__status_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                conversation_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConversationUpdateStatus"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConversationSearchResult"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  search_or_list_conversations_api_v1_conversations_get: {
+    parameters: {
+      query?: {
+        /** @description Search term for contact name, phone number, or message content. If omitted, returns a list of all conversations. */
+        q?: string | null;
+        /** @description Number of records to skip for pagination */
+        offset?: number;
+        /** @description Maximum number of records to return */
+        limit?: number;
+        /** @description Status of the conversation (`PENDING`, `HUMAN_ACTIVE`, `CLOSED`... ) */
+        status?: components["schemas"]["ConversationStatusEnum"][] | null;
+        /** @description Flag indicating if there is unread messages */
+        has_unread?: boolean | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    get_conversation_messages_paginated_api_v1_conversations__conversation_id__messages_get: {
-        parameters: {
-            query?: {
-                /** @description Maximum number of messages to return */
-                limit?: number;
-                /** @description Fetch messages older than this message ID */
-                before_cursor?: string | null;
-                /** @description Fetch messages newer than this message ID */
-                after_cursor?: string | null;
-            };
-            header?: never;
-            path: {
-                /** @description The ID of the conversation */
-                conversation_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description A list of conversations matching the criteria */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description A list of messages. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessageResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["ConversationSearchResult"][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    create_outgoing_message_api_v1_conversations__conversation_id__messages_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The target conversation ID. */
-                conversation_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MessageCreatePayload"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessageResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_inbox_conversations_api_v1_inboxes__inbox_id__conversations_get: {
+    parameters: {
+      query?: {
+        limit?: number;
+        offset?: number;
+      };
+      header?: never;
+      path: {
+        inbox_id: string;
+      };
+      cookie?: never;
     };
-    get_message_context_endpoint_api_v1_conversations__conversation_id__messages_context__message_id__get: {
-        parameters: {
-            query?: {
-                /** @description Number of messages to retrieve before the target */
-                limit_before?: number;
-                /** @description Number of messages to retrieve after (and including) the target */
-                limit_after?: number;
-            };
-            header?: never;
-            path: {
-                /** @description The ID of the conversation to search within */
-                conversation_id: string;
-                /** @description The ID of the target message for context */
-                message_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description A list of messages representing the context. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessageResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["ConversationSearchResult"][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    list_account_inboxes_api_v1_inboxes_get: {
-        parameters: {
-            query?: {
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  start_conversation_api_v1_inboxes__inbox_id__conversations_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        inbox_id: string;
+      };
+      cookie?: never;
     };
-    create_new_inbox_api_v1_inboxes_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InboxCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StartConversationRequest"];
+      };
     };
-    get_single_inbox_api_v1_inboxes__inbox_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                inbox_id: string;
-            };
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["StartConversationResponse"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    update_existing_inbox_api_v1_inboxes__inbox_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                inbox_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InboxUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  update_conversation_status_endpoint_api_v1_conversations__conversation_id__status_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversation_id: string;
+      };
+      cookie?: never;
     };
-    delete_existing_inbox_api_v1_inboxes__inbox_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                inbox_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ConversationUpdateStatus"];
+      };
     };
-    list_contacts_api_v1_contacts_get: {
-        parameters: {
-            query?: {
-                /** @description Number of records to skip for pagination */
-                offset?: number;
-                /** @description Maximum number of records to return */
-                limit?: number;
-                /** @description Search term to filter contacts by name, email, or phone number. */
-                search?: string | null;
-                /** @description Field to sort contacts by (e.g., 'name', 'email', 'created_at'). */
-                sort_by?: string | null;
-                /** @description Sort direction: 'asc' (ascending) or 'desc' (descending). */
-                sort_direction?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaginatedContactRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["ConversationSearchResult"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    create_new_contact_api_v1_contacts_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ContactCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ContactRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_conversation_messages_paginated_api_v1_conversations__conversation_id__messages_get: {
+    parameters: {
+      query?: {
+        /** @description Maximum number of messages to return */
+        limit?: number;
+        /** @description Fetch messages older than this message ID */
+        before_cursor?: string | null;
+        /** @description Fetch messages newer than this message ID */
+        after_cursor?: string | null;
+      };
+      header?: never;
+      path: {
+        /** @description The ID of the conversation */
+        conversation_id: string;
+      };
+      cookie?: never;
     };
-    get_contact_details_api_v1_contacts__contact_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                contact_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description A list of messages. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ContactRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["MessageResponse"][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    update_existing_contact_api_v1_contacts__contact_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                contact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ContactUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ContactRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  create_outgoing_message_api_v1_conversations__conversation_id__messages_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The target conversation ID. */
+        conversation_id: string;
+      };
+      cookie?: never;
     };
-    delete_existing_contact_api_v1_contacts__contact_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                contact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MessageCreatePayload"];
+      };
     };
-    get_simulation_details_api_v1_simulation_details_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SimulationDetailsResponse"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["MessageResponse"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    enqueue_simulation_message_api_v1_simulation_conversations__conversation_id__messages_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                conversation_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SimulationMessageCreate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SimulationMessageEnqueueResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_message_context_endpoint_api_v1_conversations__conversation_id__messages_context__message_id__get: {
+    parameters: {
+      query?: {
+        /** @description Number of messages to retrieve before the target */
+        limit_before?: number;
+        /** @description Number of messages to retrieve after (and including) the target */
+        limit_after?: number;
+      };
+      header?: never;
+      path: {
+        /** @description The ID of the conversation to search within */
+        conversation_id: string;
+        /** @description The ID of the target message for context */
+        message_id: string;
+      };
+      cookie?: never;
     };
-    reset_simulation_state_api_v1_simulation_conversations__conversation_id__checkpoint_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                conversation_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description A list of messages representing the context. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["MessageResponse"][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    read_personas_api_v1_simulation_personas_get: {
-        parameters: {
-            query?: {
-                skip?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonaRead"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  list_account_inboxes_api_v1_inboxes_get: {
+    parameters: {
+      query?: {
+        limit?: number;
+        offset?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    create_new_persona_api_v1_simulation_personas_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PersonaCreate"];
-            };
+        content: {
+          "application/json": components["schemas"]["InboxRead"][];
         };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonaRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    read_persona_by_id_api_v1_simlation_personas__persona_db_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                persona_db_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonaRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  create_new_inbox_api_v1_inboxes_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    read_persona_by_persona_id_str_api_v1_by_persona_id__persona_id_str__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                persona_id_str: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonaRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InboxCreate"];
+      };
     };
-    read_persona_by_contact_id_uuid_api_v1_simulation_personas_by_contact_id__contact_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                contact_id: string;
-            };
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonaRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["InboxRead"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    read_persona_by_identifier_str_api_v1_simulation_personas_by_identifier__identifier__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                identifier: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonaRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_single_inbox_api_v1_inboxes__inbox_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        inbox_id: string;
+      };
+      cookie?: never;
     };
-    update_existing_persona_api_v1_simulation_personas__persona_db_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                persona_db_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PersonaBase"];
-            };
+        content: {
+          "application/json": components["schemas"]["InboxRead"];
         };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonaRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    delete_existing_persona_api_v1_simulation_personas__persona_db_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                persona_db_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  update_existing_inbox_api_v1_inboxes__inbox_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        inbox_id: string;
+      };
+      cookie?: never;
     };
-    get_company_profile_api_v1_profile_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CompanyProfileSchema-Output"];
-                };
-            };
-            /** @description Company Profile not found for this account */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InboxUpdate"];
+      };
     };
-    create_or_update_company_profile_api_v1_profile_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CompanyProfileSchema-Input"];
-            };
+        content: {
+          "application/json": components["schemas"]["InboxRead"];
         };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CompanyProfileSchema-Output"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    list_bot_agents_api_v1_bot_agents__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BotAgentRead"][];
-                };
-            };
-        };
+  };
+  delete_existing_inbox_api_v1_inboxes__inbox_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        inbox_id: string;
+      };
+      cookie?: never;
     };
-    create_bot_agent_api_v1_bot_agents__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BotAgentCreate"];
-            };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BotAgentRead"];
-                };
-            };
-            /** @description Bot Agent already exists for this account */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
     };
-    get_bot_agent_details_api_v1_bot_agents__bot_agent_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                bot_agent_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BotAgentRead"];
-                };
-            };
-            /** @description Bot Agent not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  list_contacts_api_v1_contacts_get: {
+    parameters: {
+      query?: {
+        /** @description Number of records to skip for pagination */
+        offset?: number;
+        /** @description Maximum number of records to return */
+        limit?: number;
+        /** @description Search term to filter contacts by name, email, or phone number. */
+        search?: string | null;
+        /** @description Field to sort contacts by (e.g., 'name', 'email', 'created_at'). */
+        sort_by?: string | null;
+        /** @description Sort direction: 'asc' (ascending) or 'desc' (descending). */
+        sort_direction?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    update_bot_agent_api_v1_bot_agents__bot_agent_id__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                bot_agent_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BotAgentUpdate"];
-            };
+        content: {
+          "application/json": components["schemas"]["PaginatedContactRead"];
         };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BotAgentRead"];
-                };
-            };
-            /** @description Bot Agent not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    get_agent_associated_inboxes_api_v1_bot_agents__bot_agent_id__inboxes_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                bot_agent_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxRead"][];
-                };
-            };
-            /** @description Bot Agent not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  create_new_contact_api_v1_contacts_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    set_agent_associated_inboxes_api_v1_bot_agents__bot_agent_id__inboxes_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                bot_agent_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AgentInboxAssociationUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description One or more Inbox IDs are invalid or do not belong to the account */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bot Agent not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ContactCreate"];
+      };
     };
-    get_my_inboxes_api_v1_me_inboxes_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["InboxRead"][];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["ContactRead"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    initiate_contact_import_api_v1_contacts_batch_import_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_initiate_contact_import_api_v1_contacts_batch_import_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ContactImportJobStartResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_contact_details_api_v1_contacts__contact_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        contact_id: string;
+      };
+      cookie?: never;
     };
-    get_contact_import_status_api_v1_contacts_batch_import_status__job_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The unique ID of the import job to query. */
-                job_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ContactImportJobStatusResponse"];
-                };
-            };
-            /** @description Import job not found or access denied. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["ContactRead"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    list_contact_import_jobs_api_v1_contacts_batch_import_jobs_get: {
-        parameters: {
-            query?: {
-                /** @description Page number starting from 1 */
-                page?: number;
-                /** @description Number of items per page */
-                size?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaginatedImportJobListResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  update_existing_contact_api_v1_contacts__contact_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        contact_id: string;
+      };
+      cookie?: never;
     };
-    read_dashboard_stats_api_v1_dashboard_stats_get: {
-        parameters: {
-            query: {
-                /** @description Start date for the period (YYYY-MM-DD). Example: 2023-01-01 */
-                start_date: string;
-                /** @description End date for the period (YYYY-MM-DD). Example: 2023-01-31 */
-                end_date: string;
-                /** @description Optional Inbox ID to filter statistics by. */
-                inbox_id?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DashboardStatsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ContactUpdate"];
+      };
     };
-    read_dashboard_message_volume_api_v1_dashboard_message_volume_get: {
-        parameters: {
-            query: {
-                /** @description Start date for the period (YYYY-MM-DD). Example: 2023-01-01 */
-                start_date: string;
-                /** @description End date for the period (YYYY-MM-DD). Example: 2023-01-31 */
-                end_date: string;
-                /** @description Optional Inbox ID to filter message volume by. */
-                inbox_id?: string | null;
-                /** @description Granularity of the time series data. Accepted values: 'day', 'hour'. */
-                granularity?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DashboardMessageVolumeResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["ContactRead"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    start_research_task_api_v1_research_start_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ResearchRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ResearchResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  delete_existing_contact_api_v1_contacts__contact_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        contact_id: string;
+      };
+      cookie?: never;
     };
-    get_research_job_status_api_v1_research_status__job_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                job_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ResearchJobStatusResponse"];
-                };
-            };
-            /** @description Job ID not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Task queue unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    upload_knowledge_file_api_v1_knowledge_upload_file_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_upload_knowledge_file_api_v1_knowledge_upload_file_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IngestResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  get_simulation_details_api_v1_simulation_details_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    add_knowledge_url_api_v1_knowledge_add_url_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddUrlRequest"];
-            };
+        content: {
+          "application/json": components["schemas"]["SimulationDetailsResponse"];
         };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IngestResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+      };
     };
-    add_knowledge_text_api_v1_knowledge_add_text_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AddTextRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IngestResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  enqueue_simulation_message_api_v1_simulation_conversations__conversation_id__messages_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversation_id: string;
+      };
+      cookie?: never;
     };
-    get_knowledge_job_status_api_v1_knowledge_status__job_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                job_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobStatusResponse"];
-                };
-            };
-            /** @description Job ID not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Task queue unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SimulationMessageCreate"];
+      };
     };
-    list_knowledge_documents_api_v1_knowledge_documents_get: {
-        parameters: {
-            query?: {
-                /** @description Number of documents to skip */
-                skip?: number;
-                /** @description Maximum number of documents to return */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaginatedKnowledgeDocumentRead"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["SimulationMessageEnqueueResponse"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    delete_knowledge_document_api_v1_knowledge_documents__document_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                document_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Permission denied to delete this document */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Document not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  reset_simulation_state_api_v1_simulation_conversations__conversation_id__checkpoint_delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversation_id: string;
+      };
+      cookie?: never;
     };
-    create_evolution_instance_api_v1_instances_evolution_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EvolutionInstanceRead"];
-                };
-            };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    get_evolution_instance_qrcode_api_v1_instances_evolution__platform_instance_id__qrcode_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                platform_instance_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EvolutionInstanceQRCodeResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  read_personas_api_v1_simulation_personas_get: {
+    parameters: {
+      query?: {
+        skip?: number;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    trigger_whatsapp_contact_sync_api_v1_instances_evolution__instance_id__sync_contacts_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The unique identifier of the WhatsApp instance. */
-                instance_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SyncInitiatedResponse"];
-                };
-            };
-            /** @description Instance not found or not accessible by the user. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Could not enqueue synchronization task (e.g., task queue unavailable). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+        content: {
+          "application/json": components["schemas"]["PersonaRead"][];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    sync_and_get_instance_status_api_v1_instances_evolution__instance_id__status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The unique identifier of the Evolution API instance record in our database. */
-                instance_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EvolutionInstanceRead"];
-                };
-            };
-            /** @description Instance missing configuration or other bad request. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Instance not found or not accessible. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Internal server error. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Failed to communicate with the upstream Evolution API. */
-            502: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Could not connect to the upstream Evolution API (Timeout). */
-            504: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
+  };
+  create_new_persona_api_v1_simulation_personas_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    handle_evolution_webhook_webhooks_evolution__platform_instance_id__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                platform_instance_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EvolutionWebhookPayload"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PersonaCreate"];
+      };
     };
-    verify_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                phone_number_id_str: string;
-            };
-            cookie?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["PersonaRead"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    handle_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                phone_number_id_str: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  read_persona_by_id_api_v1_simlation_personas__persona_db_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        persona_db_id: string;
+      };
+      cookie?: never;
     };
-    home__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["PersonaRead"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    health_check_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
+  };
+  read_persona_by_persona_id_str_api_v1_by_persona_id__persona_id_str__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        persona_id_str: string;
+      };
+      cookie?: never;
     };
-    get_authenticated_user_context_api_v1_me_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["PersonaRead"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
+  };
+  read_persona_by_contact_id_uuid_api_v1_simulation_personas_by_contact_id__contact_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        contact_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PersonaRead"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  read_persona_by_identifier_str_api_v1_simulation_personas_by_identifier__identifier__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        identifier: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PersonaRead"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_existing_persona_api_v1_simulation_personas__persona_db_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        persona_db_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PersonaBase"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PersonaRead"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_existing_persona_api_v1_simulation_personas__persona_db_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        persona_db_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_company_profile_api_v1_profile_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CompanyProfileSchema-Output"];
+        };
+      };
+      /** @description Company Profile not found for this account */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  create_or_update_company_profile_api_v1_profile_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CompanyProfileSchema-Input"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["CompanyProfileSchema-Output"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_bot_agents_api_v1_bot_agents__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BotAgentRead"][];
+        };
+      };
+    };
+  };
+  create_bot_agent_api_v1_bot_agents__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BotAgentCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BotAgentRead"];
+        };
+      };
+      /** @description Bot Agent already exists for this account */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_bot_agent_details_api_v1_bot_agents__bot_agent_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        bot_agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BotAgentRead"];
+        };
+      };
+      /** @description Bot Agent not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_bot_agent_api_v1_bot_agents__bot_agent_id__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        bot_agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BotAgentUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["BotAgentRead"];
+        };
+      };
+      /** @description Bot Agent not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_agent_associated_inboxes_api_v1_bot_agents__bot_agent_id__inboxes_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        bot_agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InboxRead"][];
+        };
+      };
+      /** @description Bot Agent not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  set_agent_associated_inboxes_api_v1_bot_agents__bot_agent_id__inboxes_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        bot_agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AgentInboxAssociationUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description One or more Inbox IDs are invalid or do not belong to the account */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bot Agent not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_my_inboxes_api_v1_me_inboxes_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InboxRead"][];
+        };
+      };
+    };
+  };
+  initiate_contact_import_api_v1_contacts_batch_import_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_initiate_contact_import_api_v1_contacts_batch_import_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ContactImportJobStartResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_contact_import_status_api_v1_contacts_batch_import_status__job_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The unique ID of the import job to query. */
+        job_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ContactImportJobStatusResponse"];
+        };
+      };
+      /** @description Import job not found or access denied. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_contact_import_jobs_api_v1_contacts_batch_import_jobs_get: {
+    parameters: {
+      query?: {
+        /** @description Page number starting from 1 */
+        page?: number;
+        /** @description Number of items per page */
+        size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaginatedImportJobListResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  read_dashboard_stats_api_v1_dashboard_stats_get: {
+    parameters: {
+      query: {
+        /** @description Start date for the period (YYYY-MM-DD). Example: 2023-01-01 */
+        start_date: string;
+        /** @description End date for the period (YYYY-MM-DD). Example: 2023-01-31 */
+        end_date: string;
+        /** @description Optional Inbox ID to filter statistics by. */
+        inbox_id?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DashboardStatsResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  read_dashboard_message_volume_api_v1_dashboard_message_volume_get: {
+    parameters: {
+      query: {
+        /** @description Start date for the period (YYYY-MM-DD). Example: 2023-01-01 */
+        start_date: string;
+        /** @description End date for the period (YYYY-MM-DD). Example: 2023-01-31 */
+        end_date: string;
+        /** @description Optional Inbox ID to filter message volume by. */
+        inbox_id?: string | null;
+        /** @description Granularity of the time series data. Accepted values: 'day', 'hour'. */
+        granularity?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DashboardMessageVolumeResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  start_research_task_api_v1_research_start_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ResearchRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ResearchResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_research_job_status_api_v1_research_status__job_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ResearchJobStatusResponse"];
+        };
+      };
+      /** @description Job ID not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Task queue unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  upload_knowledge_file_api_v1_knowledge_upload_file_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_upload_knowledge_file_api_v1_knowledge_upload_file_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IngestResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_knowledge_url_api_v1_knowledge_add_url_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AddUrlRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IngestResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  add_knowledge_text_api_v1_knowledge_add_text_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AddTextRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["IngestResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_knowledge_job_status_api_v1_knowledge_status__job_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        job_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["JobStatusResponse"];
+        };
+      };
+      /** @description Job ID not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Task queue unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  list_knowledge_documents_api_v1_knowledge_documents_get: {
+    parameters: {
+      query?: {
+        /** @description Number of documents to skip */
+        skip?: number;
+        /** @description Maximum number of documents to return */
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PaginatedKnowledgeDocumentRead"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_knowledge_document_api_v1_knowledge_documents__document_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        document_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Permission denied to delete this document */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Document not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_evolution_instance_api_v1_instances_evolution_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvolutionInstanceRead"];
+        };
+      };
+    };
+  };
+  get_evolution_instance_qrcode_api_v1_instances_evolution__platform_instance_id__qrcode_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        platform_instance_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvolutionInstanceQRCodeResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  trigger_whatsapp_contact_sync_api_v1_instances_evolution__instance_id__sync_contacts_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The unique identifier of the WhatsApp instance. */
+        instance_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SyncInitiatedResponse"];
+        };
+      };
+      /** @description Instance not found or not accessible by the user. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Could not enqueue synchronization task (e.g., task queue unavailable). */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  sync_and_get_instance_status_api_v1_instances_evolution__instance_id__status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The unique identifier of the Evolution API instance record in our database. */
+        instance_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EvolutionInstanceRead"];
+        };
+      };
+      /** @description Instance missing configuration or other bad request. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Instance not found or not accessible. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+      /** @description Internal server error. */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Failed to communicate with the upstream Evolution API. */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Could not connect to the upstream Evolution API (Timeout). */
+      504: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  handle_evolution_webhook_webhooks_evolution__platform_instance_id__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        platform_instance_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EvolutionWebhookPayload"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  verify_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        phone_number_id_str: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  handle_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        phone_number_id_str: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  home__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  health_check_health_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  get_authenticated_user_context_api_v1_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
 }
