@@ -730,6 +730,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboard/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Dashboard Aggregated Statistics
+         * @description Retrieves key performance indicators (KPIs) and aggregated counts for conversations and messages within a specified date range for the authenticated account.
+         */
+        get: operations["read_dashboard_stats_api_v1_dashboard_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard/message-volume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Message Volume Time Series
+         * @description Retrieves time series data for message volume (received, sent by bot, sent by human) for the authenticated account, within a specified date range and granularity.
+         */
+        get: operations["read_dashboard_message_volume_api_v1_dashboard_message_volume_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/research/start": {
         parameters: {
             query?: never;
@@ -1013,6 +1053,34 @@ export interface paths {
          *     Dispatches events to the appropriate handler function based on the event type.
          */
         post: operations["handle_evolution_webhook_webhooks_evolution__platform_instance_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhooks/whatsapp/cloud/{phone_number_id_str}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify Whatsapp Cloud Webhook
+         * @description Handles GET requests from Meta to verify the webhook endpoint.
+         *     Compares the 'hub.verify_token' from the query parameters with the
+         *     one stored in the database for the given phone_number_id.
+         */
+        get: operations["verify_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__get"];
+        put?: never;
+        /**
+         * Handle Whatsapp Cloud Webhook
+         * @description Handles incoming POST requests from WhatsApp Cloud API webhooks.
+         *     Verifies the signature, validates the payload, and enqueues messages/events
+         *     for asynchronous processing via ARQ.
+         */
+        post: operations["handle_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1332,7 +1400,7 @@ export interface components {
             /**
              * Sales Tone
              * @description Adjectives describing the desired communication style.
-             * @default friendly, helpful, and professional
+             * @default amigável, prestativo, and profissional
              */
             sales_tone: string;
             /**
@@ -1343,13 +1411,13 @@ export interface components {
             language: string;
             /**
              * Communication Guidelines
-             * @description Specific DOs and DON'Ts for the AI (e.g., 'DO always ask clarifying questions', 'DO NOT invent information not provided').
+             * @description Specific DOs and DON'Ts for the AI (e.g., 'BUSQUE sempre fazer perguntas esclarecedoras', 'EVITE invente informações que não foram fornecidas').
              */
             communication_guidelines?: string[];
             /**
              * Ai Objective
              * @description Main goal of the AI (e.g., close sales, qualify leads, provide product info).
-             * @default Engage customers, answer questions about offerings, and guide them towards a purchase or next step.
+             * @default Engaje os clientes, responda perguntas sobre as ofertas e oriente-os para uma compra ou próximo passo.
              */
             ai_objective: string;
             /**
@@ -1466,7 +1534,7 @@ export interface components {
             /**
              * Sales Tone
              * @description Adjectives describing the desired communication style.
-             * @default friendly, helpful, and professional
+             * @default amigável, prestativo, and profissional
              */
             sales_tone: string;
             /**
@@ -1477,13 +1545,13 @@ export interface components {
             language: string;
             /**
              * Communication Guidelines
-             * @description Specific DOs and DON'Ts for the AI (e.g., 'DO always ask clarifying questions', 'DO NOT invent information not provided').
+             * @description Specific DOs and DON'Ts for the AI (e.g., 'BUSQUE sempre fazer perguntas esclarecedoras', 'EVITE invente informações que não foram fornecidas').
              */
             communication_guidelines?: string[];
             /**
              * Ai Objective
              * @description Main goal of the AI (e.g., close sales, qualify leads, provide product info).
-             * @default Engage customers, answer questions about offerings, and guide them towards a purchase or next step.
+             * @default Engaje os clientes, responda perguntas sobre as ofertas e oriente-os para uma compra ou próximo passo.
              */
             ai_objective: string;
             /**
@@ -1909,10 +1977,165 @@ export interface components {
             status: components["schemas"]["ConversationStatusEnum"];
         };
         /**
+         * DashboardConversationStats
+         * @description Statistics related to conversations for the dashboard.
+         */
+        DashboardConversationStats: {
+            /**
+             * Pending Count
+             * @description Current number of conversations with PENDING status.
+             */
+            pending_count: number;
+            /**
+             * Bot Active Count
+             * @description Current number of conversations actively handled by the BOT.
+             */
+            bot_active_count: number;
+            /**
+             * Human Active Count
+             * @description Current number of conversations actively handled by a HUMAN agent (status HUMAN_ACTIVE).
+             */
+            human_active_count: number;
+            /**
+             * Open Active Count
+             * @description Current number of conversations with OPEN status (could be transitioning or waiting).
+             */
+            open_active_count: number;
+            /**
+             * Total Active Count
+             * @description Total current number of active conversations (BOT + HUMAN_ACTIVE + OPEN).
+             */
+            total_active_count: number;
+            /**
+             * New In Period Count
+             * @description Number of new conversations created within the selected period.
+             */
+            new_in_period_count: number;
+            /**
+             * Closed In Period Count
+             * @description Number of conversations closed within the selected period.
+             */
+            closed_in_period_count: number;
+            /**
+             * Closed By Bot In Period Count
+             * @description Number of conversations closed by the bot within the selected period. (Requires specific tracking)
+             */
+            closed_by_bot_in_period_count: number;
+            /**
+             * Closed By Human In Period Count
+             * @description Number of conversations closed by a human agent within the selected period. (Requires specific tracking)
+             */
+            closed_by_human_in_period_count: number;
+        };
+        /**
+         * DashboardMessageStats
+         * @description Statistics related to messages for the dashboard.
+         */
+        DashboardMessageStats: {
+            /**
+             * Received In Period Count
+             * @description Total number of messages received (direction 'in') within the selected period.
+             */
+            received_in_period_count: number;
+            /**
+             * Sent Total In Period Count
+             * @description Total number of messages sent (direction 'out') within the selected period.
+             */
+            sent_total_in_period_count: number;
+            /**
+             * Sent By Bot In Period Count
+             * @description Number of outgoing messages sent by the bot within the selected period.
+             */
+            sent_by_bot_in_period_count: number;
+            /**
+             * Sent By Human In Period Count
+             * @description Number of outgoing messages sent by human agents within the selected period.
+             */
+            sent_by_human_in_period_count: number;
+        };
+        /**
+         * DashboardMessageVolumeResponse
+         * @description Time series data for message volume over a period.
+         */
+        DashboardMessageVolumeResponse: {
+            /**
+             * Period Start
+             * Format: date
+             * @description The start date of the reporting period.
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             * @description The end date of the reporting period.
+             */
+            period_end: string;
+            /**
+             * Filtered Inbox Id
+             * @description ID of the inbox if the volume is filtered by a specific inbox, otherwise null.
+             */
+            filtered_inbox_id?: string | null;
+            /**
+             * Granularity
+             * @description The granularity of the time series data (e.g., 'day', 'hour').
+             */
+            granularity: string;
+            /**
+             * Time Series
+             * @description A list of data points representing message volume over time.
+             */
+            time_series: components["schemas"]["MessageVolumeDatapoint"][];
+        };
+        /**
+         * DashboardStatsResponse
+         * @description Overall statistics for the dashboard for a given period.
+         */
+        DashboardStatsResponse: {
+            /**
+             * Period Start
+             * Format: date
+             * @description The start date of the reporting period.
+             */
+            period_start: string;
+            /**
+             * Period End
+             * Format: date
+             * @description The end date of the reporting period.
+             */
+            period_end: string;
+            /**
+             * Filtered Inbox Id
+             * @description ID of the inbox if the stats are filtered by a specific inbox, otherwise null.
+             */
+            filtered_inbox_id?: string | null;
+            /** @description Aggregated statistics about conversations. */
+            conversation_stats: components["schemas"]["DashboardConversationStats"];
+            /** @description Aggregated statistics about messages. */
+            message_stats: components["schemas"]["DashboardMessageStats"];
+            /**
+             * Active Inboxes Count
+             * @description Total number of currently active inboxes for the account.
+             */
+            active_inboxes_count: number;
+        };
+        /**
          * DocumentStatus
          * @enum {string}
          */
         DocumentStatus: "pending" | "processing" | "completed" | "failed";
+        /**
+         * EvolutionButtonsResponseMessage
+         * @description Content for 'buttonsResponseMessage' (user clicked a button).
+         */
+        EvolutionButtonsResponseMessage: {
+            /** Selectedbuttonid */
+            selectedButtonId: string;
+            /** Selecteddisplaytext */
+            selectedDisplayText: string;
+            /** Type */
+            type?: number | null;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
         /**
          * EvolutionChannelDetailsInput
          * @description Schema representing the channel-specific details needed when creating an Inbox
@@ -1925,6 +2148,20 @@ export interface components {
              * @description The platform's unique ID for the configured Evolution instance.
              */
             platform_instance_id: string;
+        };
+        /**
+         * EvolutionContextInfo
+         * @description Represents the contextInfo object, often for replies.
+         */
+        EvolutionContextInfo: {
+            /** Participant */
+            participant?: string | null;
+            /** Stanzaid */
+            stanzaId?: string | null;
+            /** Remotejid */
+            remoteJid?: string | null;
+            /** Mentionedjid */
+            mentionedJid?: string[] | null;
         };
         /**
          * EvolutionInstanceQRCodeResponse
@@ -2019,25 +2256,213 @@ export interface components {
          */
         EvolutionInstanceStatus: "PENDING" | "CREATED" | "CONNECTED" | "DISCONNECTED" | "ERROR" | "UNKNOWN" | "CONNECTING" | "API_ERROR";
         /**
-         * EvolutionWebhookData
-         * @description Represents the 'data' data often nested in webhook payloads.
+         * EvolutionListResponseMessage
+         * @description Content for 'listResponseMessage' (user selected from a list).
          */
-        EvolutionWebhookData: {
-            key: components["schemas"]["EvolutionWebhookKey"];
-            /** Pushname */
-            pushName: string;
-            /** Message */
-            message: components["schemas"]["EvolutionWebhookMessage"] | {
+        EvolutionListResponseMessage: {
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            singleSelectReply: components["schemas"]["EvolutionListResponseSingleSelectReply"];
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
+        /** EvolutionListResponseSingleSelectReply */
+        EvolutionListResponseSingleSelectReply: {
+            /** Selectedrowid */
+            selectedRowId: string;
+        };
+        /**
+         * EvolutionMessageContent_Audio
+         * @description Content for 'audioMessage'.
+         */
+        EvolutionMessageContent_Audio: {
+            /** Url */
+            url?: string | null;
+            /** Mimetype */
+            mimetype: string;
+            /** Filelength */
+            fileLength?: string | null;
+            /** Seconds */
+            seconds?: number | null;
+            /**
+             * Ptt
+             * @default false
+             */
+            ptt: boolean | null;
+            /** Mediakey */
+            mediaKey?: string | null;
+            /** Directpath */
+            directPath?: string | null;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
+        /**
+         * EvolutionMessageContent_Document
+         * @description Content for 'documentMessage' or 'documentWithCaptionMessage'.
+         */
+        EvolutionMessageContent_Document: {
+            /** Url */
+            url?: string | null;
+            /** Mimetype */
+            mimetype: string;
+            /** Title */
+            title?: string | null;
+            /** Filelength */
+            fileLength?: string | null;
+            /** Pagecount */
+            pageCount?: number | null;
+            /** Filename */
+            fileName?: string | null;
+            /** Caption */
+            caption?: string | null;
+            /** Mediakey */
+            mediaKey?: string | null;
+            /** Directpath */
+            directPath?: string | null;
+            /** Jpegthumbnail */
+            jpegThumbnail?: string | null;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
+        /**
+         * EvolutionMessageContent_Image
+         * @description Content for 'imageMessage'.
+         */
+        EvolutionMessageContent_Image: {
+            /** Url */
+            url?: string | null;
+            /** Mimetype */
+            mimetype: string;
+            /** Caption */
+            caption?: string | null;
+            /** Filelength */
+            fileLength?: string | null;
+            /** Height */
+            height?: number | null;
+            /** Width */
+            width?: number | null;
+            /** Mediakey */
+            mediaKey?: string | null;
+            /** Directpath */
+            directPath?: string | null;
+            /** Jpegthumbnail */
+            jpegThumbnail?: string | null;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
+        /**
+         * EvolutionMessageContent_Location
+         * @description Content for 'locationMessage'.
+         */
+        EvolutionMessageContent_Location: {
+            /** Degreeslatitude */
+            degreesLatitude: number;
+            /** Degreeslongitude */
+            degreesLongitude: number;
+            /** Name */
+            name?: string | null;
+            /** Address */
+            address?: string | null;
+            /** Jpegthumbnail */
+            jpegThumbnail?: string | null;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
+        /**
+         * EvolutionMessageContent_Sticker
+         * @description Content for 'stickerMessage'.
+         */
+        EvolutionMessageContent_Sticker: {
+            /** Url */
+            url?: string | null;
+            /** Mimetype */
+            mimetype: string;
+            /** Height */
+            height?: number | null;
+            /** Width */
+            width?: number | null;
+            /** Isanimated */
+            isAnimated?: boolean | null;
+            /** Mediakey */
+            mediaKey?: string | null;
+            /** Directpath */
+            directPath?: string | null;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
+        /**
+         * EvolutionMessageContent_Text
+         * @description Content for 'conversation' or 'extendedTextMessage'.
+         */
+        EvolutionMessageContent_Text: {
+            /** Text */
+            text: string;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
+        /**
+         * EvolutionMessageContent_Video
+         * @description Content for 'videoMessage'.
+         */
+        EvolutionMessageContent_Video: {
+            /** Url */
+            url?: string | null;
+            /** Mimetype */
+            mimetype: string;
+            /** Caption */
+            caption?: string | null;
+            /** Filelength */
+            fileLength?: string | null;
+            /** Seconds */
+            seconds?: number | null;
+            /** Mediakey */
+            mediaKey?: string | null;
+            /** Directpath */
+            directPath?: string | null;
+            /** Jpegthumbnail */
+            jpegThumbnail?: string | null;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
+        };
+        /**
+         * EvolutionMessageObject
+         * @description Represents the 'message' field in the webhook data.
+         *     It dynamically holds the specific message type content.
+         */
+        EvolutionMessageObject: {
+            /** Conversation */
+            conversation?: string | null;
+            extendedTextMessage?: components["schemas"]["EvolutionMessageContent_Text"] | null;
+            imageMessage?: components["schemas"]["EvolutionMessageContent_Image"] | null;
+            videoMessage?: components["schemas"]["EvolutionMessageContent_Video"] | null;
+            audioMessage?: components["schemas"]["EvolutionMessageContent_Audio"] | null;
+            documentMessage?: components["schemas"]["EvolutionMessageContent_Document"] | null;
+            documentWithCaptionMessage?: components["schemas"]["EvolutionMessageContent_Document"] | null;
+            stickerMessage?: components["schemas"]["EvolutionMessageContent_Sticker"] | null;
+            locationMessage?: components["schemas"]["EvolutionMessageContent_Location"] | null;
+            buttonsResponseMessage?: components["schemas"]["EvolutionButtonsResponseMessage"] | null;
+            listResponseMessage?: components["schemas"]["EvolutionListResponseMessage"] | null;
+            templateButtonReplyMessage?: components["schemas"]["EvolutionTemplateButtonReplyMessage"] | null;
+            reactionMessage?: components["schemas"]["EvolutionReactionMessage"] | null;
+        };
+        /**
+         * EvolutionReactionMessage
+         * @description Content for 'reactionMessage'.
+         */
+        EvolutionReactionMessage: {
+            /** Text */
+            text: string;
+            /** Key */
+            key: {
                 [key: string]: unknown;
             };
-            /** Messagetype */
-            messageType: string;
-            /** Messagetimestamp */
-            messageTimestamp: number;
-            /** Instanceid */
-            instanceId: string;
-            /** Source */
-            source: string;
+        };
+        /**
+         * EvolutionTemplateButtonReplyMessage
+         * @description Content for 'templateButtonReplyMessage' (user clicked a template quick reply).
+         */
+        EvolutionTemplateButtonReplyMessage: {
+            /** Selectedid */
+            selectedId: string;
+            /** Selectedindex */
+            selectedIndex: number;
+            /** Selecteddisplaytext */
+            selectedDisplayText?: string | null;
+            contextInfo?: components["schemas"]["EvolutionContextInfo"] | null;
         };
         /**
          * EvolutionWebhookKey
@@ -2050,11 +2475,30 @@ export interface components {
             fromMe: boolean;
             /** Id */
             id: string;
+            /** Participant */
+            participant?: string | null;
         };
-        /** EvolutionWebhookMessage */
-        EvolutionWebhookMessage: {
-            /** Conversation */
-            conversation: string;
+        /**
+         * EvolutionWebhookMessageData
+         * @description Represents the 'data' field for message events like 'messages.upsert' or 'messages.update'.
+         */
+        EvolutionWebhookMessageData: {
+            key: components["schemas"]["EvolutionWebhookKey"];
+            /** Pushname */
+            pushName?: string | null;
+            message?: components["schemas"]["EvolutionMessageObject"] | null;
+            /** Messagetype */
+            messageType?: string | null;
+            /** Messagetimestamp */
+            messageTimestamp?: number | null;
+            /** Instanceid */
+            instanceId: string;
+            /** Source */
+            source: string;
+            /** Messagestubtype */
+            messageStubType?: string | null;
+            /** Messagestubparameters */
+            messageStubParameters?: string[] | null;
         };
         /** EvolutionWebhookPayload */
         EvolutionWebhookPayload: {
@@ -2063,7 +2507,7 @@ export interface components {
             /** Instance */
             instance: string;
             /** Data */
-            data: components["schemas"]["ConnectionUpdateData"] | components["schemas"]["EvolutionWebhookData"] | {
+            data: components["schemas"]["ConnectionUpdateData"] | components["schemas"]["EvolutionWebhookMessageData"] | {
                 [key: string]: unknown;
             };
             /** Destination */
@@ -2405,6 +2849,33 @@ export interface components {
             content: string;
             /** Sent At */
             sent_at: string | null;
+        };
+        /**
+         * MessageVolumeDatapoint
+         * @description A single data point in a time series for message volume.
+         */
+        MessageVolumeDatapoint: {
+            /**
+             * Timestamp
+             * Format: date-time
+             * @description The specific timestamp (start of the day or hour) for this data point.
+             */
+            timestamp: string;
+            /**
+             * Received Count
+             * @description Number of messages received during this time interval.
+             */
+            received_count: number;
+            /**
+             * Sent By Bot Count
+             * @description Number of messages sent by the bot during this time interval.
+             */
+            sent_by_bot_count: number;
+            /**
+             * Sent By Human Count
+             * @description Number of messages sent by human agents during this time interval.
+             */
+            sent_by_human_count: number;
         };
         /**
          * OfferingInfo
@@ -4473,6 +4944,80 @@ export interface operations {
             };
         };
     };
+    read_dashboard_stats_api_v1_dashboard_stats_get: {
+        parameters: {
+            query: {
+                /** @description Start date for the period (YYYY-MM-DD). Example: 2023-01-01 */
+                start_date: string;
+                /** @description End date for the period (YYYY-MM-DD). Example: 2023-01-31 */
+                end_date: string;
+                /** @description Optional Inbox ID to filter statistics by. */
+                inbox_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardStatsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_dashboard_message_volume_api_v1_dashboard_message_volume_get: {
+        parameters: {
+            query: {
+                /** @description Start date for the period (YYYY-MM-DD). Example: 2023-01-01 */
+                start_date: string;
+                /** @description End date for the period (YYYY-MM-DD). Example: 2023-01-31 */
+                end_date: string;
+                /** @description Optional Inbox ID to filter message volume by. */
+                inbox_id?: string | null;
+                /** @description Granularity of the time series data. Accepted values: 'day', 'hour'. */
+                granularity?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardMessageVolumeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     start_research_task_api_v1_research_start_post: {
         parameters: {
             query?: never;
@@ -4957,6 +5502,68 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phone_number_id_str: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    handle_whatsapp_cloud_webhook_webhooks_whatsapp_cloud__phone_number_id_str__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                phone_number_id_str: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {
