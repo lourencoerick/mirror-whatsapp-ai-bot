@@ -1,11 +1,11 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  Activity,
   BookOpen,
   Briefcase,
   CreditCard,
   FileText,
   Gamepad2,
+  Gauge,
   Home,
   Inbox,
   LifeBuoy,
@@ -148,10 +148,10 @@ export const sidebarNavItems: NavItem[] = [
     hidden: false,
   },
   {
-    name: "Desempenho",
-    href: "/dashboard/performance",
-    icon: Activity,
-    hidden: true,
+    name: "Métricas",
+    href: "/dashboard/overview",
+    icon: Gauge,
+    hidden: false,
   },
   {
     name: "Faturamento",
