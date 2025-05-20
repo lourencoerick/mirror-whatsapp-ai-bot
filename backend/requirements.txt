@@ -56,5 +56,6 @@ html2text==2025.4.15
 # === Google Cloud Storage ===
 google-cloud-storage
 
+
 # === Logging ===
 loguru>=0.5.3
