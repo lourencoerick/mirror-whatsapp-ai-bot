@@ -24,6 +24,8 @@ class BotAgent(BaseModel):
 
     account = relationship("Account", back_populates="bot_agent")
 
+    messages = relationship("Message", back_populates="bot_agent")
+
     bot_agent_inboxes = relationship(
         "BotAgentInbox", back_populates="bot_agent", cascade="all, delete-orphan"
     )

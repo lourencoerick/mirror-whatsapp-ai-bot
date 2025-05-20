@@ -24,6 +24,7 @@ class Message(BaseModel):
         Index("idx_messages_inbox_id_index", "inbox_id"),
         Index("idx_messages_conversation_id_index", "conversation_id"),
         Index("idx_messages_user_id_index", "user_id"),
+        Index("idx_messages_bot_agent_id_index", "bot_agent_id"),
         Index("idx_messages_source_id_index", "source_id"),
         Index("idx_messages_contact_id_index", "contact_id"),
         Index("idx_messages_sent_at_index", "sent_at"),
@@ -40,10 +41,14 @@ class Message(BaseModel):
     conversation_id = Column(
         UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=False
     )
-    message_type = Column(String(50), nullable=False)
     direction = Column(String(50), nullable=False)  # e.g., "in", "out"
     private = Column(Boolean, nullable=True)
+
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    bot_agent_id = Column(
+        UUID(as_uuid=True), ForeignKey("bot_agents.id"), nullable=True
+    )
+
     status = Column(String(50), nullable=True)  # e.g., "received", "processed"
     source_id = Column(String(255), nullable=True)
     content_type = Column(String(50), nullable=True)  # e.g., "text", "image"
@@ -61,5 +66,8 @@ class Message(BaseModel):
     account = relationship("Account", back_populates="messages")
     inbox = relationship("Inbox", back_populates="messages")
     conversation = relationship("Conversation", back_populates="messages")
-    user = relationship("User", back_populates="messages")
+    user = relationship("User", back_populates="messages", foreign_keys=[user_id])
+    bot_agent = relationship(
+        "BotAgent", back_populates="messages", foreign_keys=[bot_agent_id]
+    )
     contact = relationship("Contact", back_populates="messages")
