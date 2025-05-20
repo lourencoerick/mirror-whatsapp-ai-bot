@@ -270,6 +270,7 @@ async def _process_one_message(
         conversation_id=conversation.id,
         contact_id=contact_id,
         source_id=internal_source_id,
+        bot_agent_id=agent_config_db.id,
         direction="out",
         status="processing",
         message_timestamp=datetime.now(timezone.utc),
