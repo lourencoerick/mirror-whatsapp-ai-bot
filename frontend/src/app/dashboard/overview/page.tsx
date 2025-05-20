@@ -67,7 +67,7 @@ interface KPICardProps {
   title: string;
   value: string | number;
   icon?: React.ReactNode;
-  description?: string;
+  description?: React.ReactNode;
 }
 
 const KPICard: React.FC<KPICardProps> = ({

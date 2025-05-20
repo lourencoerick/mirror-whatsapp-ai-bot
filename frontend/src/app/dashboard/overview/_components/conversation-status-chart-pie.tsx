@@ -1,4 +1,4 @@
-// src/components/dashboard/charts/ConversationStatusPieChart.tsx
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import React from "react";
@@ -10,7 +10,7 @@ import {
   PieChart,
   ResponsiveContainer,
   Tooltip,
-} from "recharts"; // Adicionado Sector e Label
+} from "recharts";
 
 interface PieChartDataItem {
   name: string;
@@ -22,44 +22,52 @@ interface ConversationStatusPieChartProps {
   data: PieChartDataItem[];
 }
 
-// Função para renderizar um label customizado no centro (opcional, se quiser mostrar o total)
-const renderCustomizedLabel = ({
-  cx,
-  cy,
-  midAngle,
-  innerRadius,
-  outerRadius,
-  percent,
-  index,
-  value,
-  name,
-}) => {
-  // Exemplo: se quiser mostrar o nome e percentual em cada fatia
+interface CustomizedLabelProps {
+  cx: number;
+  cy: number;
+  midAngle: number;
+  innerRadius: number;
+  outerRadius: number;
+  percent: number;
+  index: number;
+  value: number;
+  name: string;
+}
+
+const renderCustomizedLabel = (props: CustomizedLabelProps) => {
+  const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;
+
   const RADIAN = Math.PI / 180;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.6;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  if (percent * 100 < 5) return null; // Não mostrar label para fatias muito pequenas
+
+  if (percent * 100 < 5) {
+    return null;
+  }
 
   return (
     <text
       x={x}
       y={y}
-      fill="white"
+      fill="#fff"
       textAnchor="middle"
       dominantBaseline="central"
-      fontSize="16px"
+      fontSize="12px"
+      fontWeight="bold"
     >
       {`${(percent * 100).toFixed(0)}%`}
     </text>
   );
 };
 
+// Definir o valor de innerRadius usado no <Pie> como uma constante ou variável
+const PIE_INNER_RADIUS = "40%"; // Ou o valor que você está usando, ex: 0 para pizza sólida
+
 const ConversationStatusPieChart: React.FC<ConversationStatusPieChartProps> = ({
   data,
 }) => {
   if (!data || data.length === 0) {
-    // Este fallback pode ser tratado na página pai também, mas é bom ter aqui.
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
         Sem dados para o gráfico.
@@ -67,8 +75,11 @@ const ConversationStatusPieChart: React.FC<ConversationStatusPieChartProps> = ({
     );
   }
 
-  // Calcular o total para exibir no centro, se desejado
   const totalValue = data.reduce((sum, entry) => sum + entry.value, 0);
+
+  // Determinar se é um Donut chart baseado no valor de PIE_INNER_RADIUS
+  // Convertendo para número para a comparação (ex: "40%" -> 40, "0%" -> 0, 0 -> 0)
+  const isDonutChart = parseFloat(String(PIE_INNER_RADIUS)) > 0;
 
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -78,44 +89,53 @@ const ConversationStatusPieChart: React.FC<ConversationStatusPieChartProps> = ({
           cx="50%"
           cy="50%"
           labelLine={false}
-          label={renderCustomizedLabel} // Ativar se quiser labels nas fatias
-          outerRadius="80%" // Usar percentual para melhor responsividade dentro do container
-          innerRadius="40%" // Para criar um gráfico de "Donut" (Rosca)
-          fill="#8884d8" // Cor padrão de fallback, será sobrescrita
+          label={renderCustomizedLabel}
+          outerRadius="80%"
+          innerRadius={PIE_INNER_RADIUS} // Usar a constante/variável aqui
+          fill="#8884d8"
           dataKey="value"
           nameKey="name"
-          paddingAngle={data.length > 1 ? 2 : 0} // Pequeno espaço entre fatias se houver mais de uma
+          paddingAngle={data.length > 1 ? 2 : 0}
         >
-          {data.map(
-            (
-              entry // Não precisa do index se a key for única (nome da entry)
-            ) => (
-              <Cell
-                key={`cell-${entry.name}`}
-                fill={entry.fill}
-                stroke={entry.fill}
-                strokeWidth={0.5}
-              /> // Adicionado stroke para melhor definição
-            )
-          )}
-          {/* Exemplo de Label no centro do Donut Chart (se innerRadius > 0) */}
-          {totalValue > 0 && (
-            <Label
-              value={`${totalValue} Total`}
-              position="center"
-              fill="#333" // Cor do texto do label central
-              fontSize="16px"
-              fontWeight="bold"
+          {data.map((entry) => (
+            <Cell
+              key={`cell-${entry.name}`}
+              fill={entry.fill}
+              stroke={entry.fill}
+              strokeWidth={0.5}
             />
-          )}
+          ))}
+          {/* Label central para o gráfico de Donut */}
+          {totalValue > 0 &&
+            isDonutChart && ( // << USAR isDonutChart AQUI
+              <Label
+                value={`${totalValue}`}
+                position="center"
+                fill="#333"
+                fontSize="20px"
+                fontWeight="bold"
+                dy={-10}
+              />
+            )}
+          {totalValue > 0 &&
+            isDonutChart && ( // << USAR isDonutChart AQUI
+              <Label
+                value="Total"
+                position="center"
+                fill="#666"
+                fontSize="12px"
+                dy={10}
+              />
+            )}
         </Pie>
         <Tooltip
           formatter={(value: number, name: string, props) => {
-            // props.payload contém o objeto de dados original, incluindo a cor
-            const percentage =
-              props.payload && props.payload.percent
-                ? `(${(props.payload.percent * 100).toFixed(1)}%)`
-                : "";
+            const itemPayload = props.payload as PieChartDataItem & {
+              percent?: number;
+            };
+            const percentage = itemPayload?.percent
+              ? `(${(itemPayload.percent * 100).toFixed(1)}%)`
+              : "";
             return [`${value} ${percentage}`, name];
           }}
           contentStyle={{

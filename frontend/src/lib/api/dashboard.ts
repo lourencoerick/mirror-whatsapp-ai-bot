@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/lib/api/dashboard.ts
 
 import { FetchFunction } from "@/hooks/use-authenticated-fetch"; // Adjust path as needed

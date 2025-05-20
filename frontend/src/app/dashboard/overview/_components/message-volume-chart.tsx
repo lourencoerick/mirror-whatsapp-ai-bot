@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/components/dashboard/charts/MessageVolumeLineChart.tsx
 "use client";
 
@@ -54,6 +55,7 @@ const MessageVolumeLineChart: React.FC<MessageVolumeLineChartProps> = ({
   }));
 
   // Custom Tooltip Content
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const dataPoint = payload[0].payload; // O objeto de dados original do ponto
