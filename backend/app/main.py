@@ -26,6 +26,7 @@ from app.api.routes import bot_agent as bot_agent_routes
 from app.api.routes import company_profile as profile_routes
 from app.api.routes import knowledge as knowledge_routes
 from app.api.routes import simulation as simulation_routes
+from app.api.routes import dashboard as dashboard_routes
 
 
 # Import Dependencies and Context
@@ -170,6 +171,14 @@ app.include_router(
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Contacts Batch Operations"],
 )
+
+
+app.include_router(
+    dashboard_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Dashboard Metrics"],
+)
+
 
 # --- Researcher Router ---
 logger.info("Including Researcher router")
