@@ -67,7 +67,7 @@ interface KPICardProps {
   title: string;
   value: string | number;
   icon?: React.ReactNode;
-  description?: React.ReactNode;
+  description?: string;
 }
 
 const KPICard: React.FC<KPICardProps> = ({
@@ -460,13 +460,7 @@ export default function DashboardOverviewPage() {
                 icon={
                   <InboxIconLucide className="h-4 w-4 text-muted-foreground" />
                 }
-                description={
-                  <>
-                    Total de canais configurados
-                    <br />
-                    (1 caixa de entrada é de simulação)
-                  </>
-                }
+                description="Total de canais configurados"
               />
             </div>
           </div>
