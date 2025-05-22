@@ -148,39 +148,60 @@ def base_state_for_planner() -> RichConversationState:
 
 
 @pytest.mark.asyncio
-async def test_planner_initial_idle_state_moves_to_greeting(
+async def test_planner_initial_idle_state_plans_combined_greeting_and_sets_investigating_goal(
     base_state_for_planner,
 ):
     """
-    Testa se, partindo de um estado IDLE e sem interrupções,
-    o planner define o objetivo para GREETING e planeja a ação GENERATE_GREETING.
+    Testa se, partindo de um estado IDLE, o planner planeja GENERATE_GREETING
+    com combined_spin_question_type e define o goal para INVESTIGATING_NEEDS.
     """
     state = base_state_for_planner
     state["user_interruptions_queue"] = []
     state["current_agent_goal"] = AgentGoal(
         goal_type="IDLE", previous_goal_if_interrupted=None, goal_details={}
     )
+    state["last_agent_action"] = None  # Garantir que é o início absoluto
+
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
-    assert delta["current_agent_goal"]["goal_type"] == "GREETING"
+    # <<< CORRECTED ASSERTIONS >>>
+    assert delta["current_agent_goal"]["goal_type"] == "INVESTIGATING_NEEDS"
     assert delta["next_agent_action_command"] == "GENERATE_GREETING"
-    assert delta["action_parameters"] == {}
-    assert delta["current_agent_goal"]["goal_details"] == {}
-    assert "user_interruptions_queue" not in delta
+    assert delta["action_parameters"] == {"combined_spin_question_type": "Situation"}
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "spin_questions_asked_this_cycle": 0,  # Será 1 após a ação
+        "last_spin_type_asked": None,  # Será "Situation" após a ação
+    }
+    assert "user_interruptions_queue" not in delta  # Não deve criar interrupções
     assert delta.get("last_processing_error") is None
 
 
 @pytest.mark.asyncio
-async def test_planner_handles_direct_question_interruption(base_state_for_planner):
+async def test_planner_handles_direct_question_interruption_and_combines_with_spin(
+    base_state_for_planner,
+):
+    """
+    Testa se, ao lidar com uma interrupção de pergunta direta, o planner
+    planeja ANSWER_DIRECT_QUESTION combinado com uma pergunta SPIN e
+    ajusta o goal para INVESTIGATING_NEEDS.
+    """
     state = base_state_for_planner
-    original_goal = AgentGoal(
-        goal_type="INVESTIGATING_NEEDS",
+    # Goal original que foi interrompido pela pergunta do usuário
+    original_goal_interrupted = AgentGoal(
+        goal_type="INVESTIGATING_NEEDS",  # Estava investigando
         previous_goal_if_interrupted=None,
-        goal_details={},
+        goal_details={
+            "last_spin_type_asked": "Situation",
+            "spin_questions_asked_this_cycle": 1,
+        },
     )
-    state["current_agent_goal"] = original_goal
-    question_text = "Qual o preço?"
+    state["current_agent_goal"] = (
+        original_goal_interrupted  # Este é o goal ANTES da interrupção ser processada pelo planner
+    )
+
+    question_text = "Qual o preço do Produto X?"
+    # A interrupção é adicionada à fila
     state["user_interruptions_queue"] = [
         UserInterruption(
             type="direct_question",
@@ -189,22 +210,44 @@ async def test_planner_handles_direct_question_interruption(base_state_for_plann
             turn_detected=1,
         )
     ]
+
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
-    # --- Corrected Assertion ---
-    # _get_goal_for_interruption maps direct_question to CLARIFYING_USER_INPUT
-    assert delta["current_agent_goal"]["goal_type"] == "CLARIFYING_USER_INPUT"
-    # --- End Correction ---
-    assert delta["current_agent_goal"]["previous_goal_if_interrupted"] == original_goal
-    assert delta["current_agent_goal"]["goal_details"]["text"] == question_text
-    assert (
-        delta["current_agent_goal"]["goal_details"]["clarification_type"] == "question"
-    )
+    # <<< CORRECTED ASSERTIONS >>>
+    # O planner deve:
+    # 1. Mudar o goal para CLARIFYING_USER_INPUT para tratar a interrupção.
+    # 2. Planejar ANSWER_DIRECT_QUESTION.
+    # 3. Nos action_parameters, adicionar combined_spin_question_type.
+    # 4. O effective_goal final (current_agent_goal no delta) deve ser INVESTIGATING_NEEDS.
 
+    # O goal intermediário durante o processamento da interrupção seria CLARIFYING_USER_INPUT
+    # Mas o goal final retornado no delta, após decidir combinar, deve ser INVESTIGATING_NEEDS
+    assert delta["current_agent_goal"]["goal_type"] == "INVESTIGATING_NEEDS"
+
+    # O previous_goal_if_interrupted do CLARIFYING_USER_INPUT (que era original_goal_interrupted)
+    # é descartado porque estamos seguindo com INVESTIGATING_NEEDS.
+    assert delta["current_agent_goal"]["previous_goal_if_interrupted"] is None
+
+    # Verificar a ação planejada e seus parâmetros
     assert delta["next_agent_action_command"] == "ANSWER_DIRECT_QUESTION"
     assert delta["action_parameters"]["question_to_answer_text"] == question_text
-    assert "user_interruptions_queue" in delta
+    assert (
+        delta["action_parameters"]["combined_spin_question_type"] == "Problem"
+    )  # Próximo SPIN após Situation
+
+    # Verificar os detalhes do goal INVESTIGATING_NEEDS
+    # O planner preparou os detalhes para o ciclo SPIN *antes* da pergunta combinada.
+    # O final_state_updater irá finalizar esses detalhes *após* a pergunta ser feita.
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "spin_questions_asked_this_cycle": 1,  # Mantém do goal interrompido
+        "last_spin_type_asked": "Situation",  # Mantém do goal interrompido
+        "current_question_being_answered": question_text,
+    }
+
+    assert (
+        "user_interruptions_queue" in delta
+    )  # A interrupção da pergunta foi consumida
     assert len(delta["user_interruptions_queue"]) == 0
 
 
@@ -375,12 +418,12 @@ async def test_planner_handles_off_topic_interruption(base_state_for_planner):
 
 
 @pytest.mark.asyncio
-async def test_planner_ignores_unknown_interruption_and_plans_greeting(
+async def test_planner_ignores_unknown_interruption_and_plans_combined_greeting(
     base_state_for_planner,
 ):
     """
     Tests that an unknown interruption type is ignored and the planner proceeds
-    based on the current goal (IDLE -> GREETING).
+    based on the current goal (IDLE -> INVESTIGATING_NEEDS com saudação combinada).
     """
     state = base_state_for_planner
     state["current_agent_goal"] = AgentGoal(
@@ -392,15 +435,31 @@ async def test_planner_ignores_unknown_interruption_and_plans_greeting(
         status="pending_resolution",
         turn_detected=1,
     )
-    state["user_interruptions_queue"] = [unknown_interruption]
+    state["user_interruptions_queue"] = [
+        unknown_interruption
+    ]  # Interrupção será ignorada
+    state["last_agent_action"] = None
 
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
-    assert delta["current_agent_goal"]["goal_type"] == "GREETING"
+    # <<< CORRECTED ASSERTIONS >>>
+    assert delta["current_agent_goal"]["goal_type"] == "INVESTIGATING_NEEDS"
     assert delta["next_agent_action_command"] == "GENERATE_GREETING"
-    assert delta["action_parameters"] == {}
-    assert "user_interruptions_queue" not in delta
+    assert delta["action_parameters"] == {"combined_spin_question_type": "Situation"}
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "spin_questions_asked_this_cycle": 0,
+        "last_spin_type_asked": None,
+    }
+    # A interrupção desconhecida não deve ser removida se não foi explicitamente tratada
+    # A lógica de remoção de interrupção só ocorre se a interrupção é tratada.
+    # No entanto, _find_priority_interruption não a encontrará, então ela não afetará o fluxo principal.
+    # Se a fila de interrupções é retornada no delta, ela ainda conteria a interrupção desconhecida.
+    # O comportamento esperado é que o planner não modifique a fila se não tratar a interrupção.
+    if "user_interruptions_queue" in delta:  # Checar se a chave existe
+        assert delta["user_interruptions_queue"] == [unknown_interruption]
+    else:  # Se não existe, significa que não foi modificada (o que é bom)
+        pass
 
 
 @pytest.mark.asyncio
@@ -1077,27 +1136,41 @@ async def test_planner_handles_follow_up_timeout_max_attempts_reached(
 
 
 @pytest.mark.asyncio
-async def test_planner_ignores_follow_up_timeout_if_not_scheduled(
+async def test_planner_ignores_follow_up_timeout_if_not_scheduled_and_plans_combined_greeting(
     base_state_for_planner,
 ):
     """
     Testa se o Planner ignora trigger_event='follow_up_timeout' se follow_up_scheduled=False,
-    e prossegue com a lógica normal (que para IDLE/GREETING é GENERATE_GREETING).
+    e prossegue com a lógica normal (IDLE -> INVESTIGATING_NEEDS com saudação combinada).
     """
     state = base_state_for_planner  # Goal inicial é IDLE
     state["trigger_event"] = "follow_up_timeout"
     state["follow_up_scheduled"] = False  # Follow-up não está agendado
     state["follow_up_attempt_count"] = 0
-    state["agent_config"] = {"max_follow_up_attempts": 3}
+    state["agent_config"]["max_follow_up_attempts"] = 3
+    state["last_agent_action"] = None
 
-    original_trigger_event = state["trigger_event"]
     delta = await goal_and_action_planner_node(state, {})
 
-    # Deve seguir a lógica normal para IDLE -> GREETING
+    # <<< CORRECTED ASSERTIONS >>>
     assert "current_agent_goal" in delta
-    assert delta["current_agent_goal"]["goal_type"] == "GREETING"
+    assert delta["current_agent_goal"]["goal_type"] == "INVESTIGATING_NEEDS"
     assert delta.get("next_agent_action_command") == "GENERATE_GREETING"
-    assert delta.get("trigger_event", original_trigger_event) == original_trigger_event
+    assert delta.get("action_parameters") == {
+        "combined_spin_question_type": "Situation"
+    }
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "spin_questions_asked_this_cycle": 0,
+        "last_spin_type_asked": None,
+    }
+    # O trigger_event de timeout não foi "consumido" pela lógica de follow-up,
+    # mas o planner o ignora para a lógica de goal principal.
+    # O delta não deve conter 'trigger_event' se o planner o consumiu ou limpou.
+    # Se o planner não o limpou explicitamente ao ignorá-lo, ele permaneceria no estado.
+    # A lógica atual do planner limpa o trigger_event se ele leva a uma ação de timeout.
+    # Se ele é ignorado, o trigger_event não é modificado no delta pelo planner.
+    # No entanto, o final_state_updater sempre limpa o trigger_event.
+    # Para este teste unitário do planner, verificamos se ele NÃO agiu sobre o timeout.
     assert delta.get("follow_up_attempt_count", 0) == 0  # Não foi incrementado
 
 

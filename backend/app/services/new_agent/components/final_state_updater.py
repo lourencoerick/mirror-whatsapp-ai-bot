@@ -104,6 +104,72 @@ async def finalize_turn_state_node(
             f"[{node_name}] Recorded last_agent_action: {action_command_executed}"
         )
 
+        current_goal_as_planned: Optional[AgentGoal] = state.get("current_agent_goal")
+        if action_command_executed in ["GENERATE_GREETING", "ANSWER_DIRECT_QUESTION"]:
+            # Verifica se a ação executada (que está em last_action.details) tinha um combined_spin_question_type
+            combined_spin_type_executed = last_action.get("details", {}).get("combined_spin_question_type")  # type: ignore
+
+            if combined_spin_type_executed:
+                logger.info(
+                    f"[{node_name}] Action '{action_command_executed}' was combined with SPIN type: {combined_spin_type_executed}."
+                )
+
+                # Se uma pergunta SPIN foi combinada, o Planner já deve ter ajustado
+                # o current_agent_goal para INVESTIGATING_NEEDS e preparado os goal_details.
+                # Aqui, nós finalizamos esses detalhes com base na pergunta SPIN que *efetivamente* foi feita.
+                if (
+                    current_goal_as_planned
+                    and current_goal_as_planned.get("goal_type")
+                    == "INVESTIGATING_NEEDS"
+                ):
+                    # Criar uma cópia do goal atual para modificação segura
+                    # Se updated_state_delta já tem current_agent_goal (ex: do planner), usamos essa cópia.
+                    # Caso contrário, pegamos do state e copiamos.
+                    if "current_agent_goal" in updated_state_delta:
+                        goal_to_update_details_for = updated_state_delta[
+                            "current_agent_goal"
+                        ]
+                    else:
+                        # É crucial que current_goal_as_planned seja uma cópia se for modificado
+                        updated_state_delta["current_agent_goal"] = copy.deepcopy(
+                            current_goal_as_planned
+                        )
+                        goal_to_update_details_for = updated_state_delta[
+                            "current_agent_goal"
+                        ]
+
+                    # Garantir que goal_details exista
+                    if goal_to_update_details_for.get("goal_details") is None:
+                        goal_to_update_details_for["goal_details"] = {}
+
+                    # O planner, ao planejar a ação combinada, já deve ter inicializado
+                    # spin_questions_asked_this_cycle e last_spin_type_asked nos goal_details
+                    # para o estado ANTES desta pergunta combinada.
+                    # Ex: se era para ser a primeira pergunta SPIN, spin_questions_asked_this_cycle = 0, last_spin_type_asked = None.
+
+                    current_spin_cycle_count = goal_to_update_details_for[
+                        "goal_details"
+                    ].get("spin_questions_asked_this_cycle", 0)
+
+                    goal_to_update_details_for["goal_details"][
+                        "last_spin_type_asked"
+                    ] = combined_spin_type_executed
+                    goal_to_update_details_for["goal_details"][
+                        "spin_questions_asked_this_cycle"
+                    ] = (current_spin_cycle_count + 1)
+
+                    logger.info(
+                        f"[{node_name}] Updated INVESTIGATING_NEEDS goal details after combined SPIN: "
+                        f"last_type='{combined_spin_type_executed}', "
+                        f"cycle_count={goal_to_update_details_for['goal_details']['spin_questions_asked_this_cycle']}"
+                    )
+                else:
+                    logger.warning(
+                        f"[{node_name}] Action '{action_command_executed}' had combined_spin_type '{combined_spin_type_executed}', "
+                        f"but current_agent_goal is not INVESTIGATING_NEEDS (it's '{current_goal_as_planned.get('goal_type') if current_goal_as_planned else 'None'}'). "
+                        "SPIN state might be inconsistent."
+                    )
+
         if action_command_executed == "GENERATE_REBUTTAL":
             # Só fazer deepcopy se realmente precisar modificar
             if dynamic_profile_data_copy is None:

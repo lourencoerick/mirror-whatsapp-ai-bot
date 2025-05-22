@@ -153,6 +153,7 @@ class AgentActionDetails(TypedDict, total=False):
     question_to_answer_text: Optional[str]
     question_to_answer_status: Optional[CustomerQuestionStatusType]
     proposed_product_name: Optional[str]
+    combined_spin_question_type: Optional[SpinQuestionType]
     # Closing related
     product_name: Optional[str]
     price: Optional[float]

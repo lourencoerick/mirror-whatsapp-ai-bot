@@ -3,6 +3,7 @@
 from typing import Dict, List, Optional, Any
 from loguru import logger
 
+
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage  # Para _format_recent_chat_history
 from langchain_core.prompts import ChatPromptTemplate
@@ -37,6 +38,8 @@ from ..state_definition import (
     PendingAgentAction,
 )
 
+
+from app.api.schemas.company_profile import CompanyProfileSchema
 
 # --- Constantes ---
 SIMILARITY_THRESHOLD = (
@@ -162,6 +165,53 @@ async def _call_structured_llm(
         return None
 
 
+def _format_offerings_for_prompt(company_profile: Optional[Dict[str, Any]]) -> str:
+    """
+    Formats a concise summary of the company's offerings for LLM prompts.
+
+    Includes company name, business description, and a list of offering names.
+
+    Args:
+        company_profile: The company profile dictionary from the state.
+
+    Returns:
+        A string summarizing the company's business and offerings, or a
+        placeholder if essential information is missing.
+    """
+    if not company_profile or not isinstance(company_profile, dict):
+        return "Perfil da empresa não fornecido."
+
+    company_name = company_profile.get("company_name", "Nossa empresa")
+    business_desc = company_profile.get("business_description", "Não especificada")
+
+    summary_parts = [
+        f"Nome da Empresa: {company_name}",
+        f"Descrição do Negócio: {business_desc}",
+    ]
+
+    offerings = company_profile.get("offering_overview", [])
+    if offerings and isinstance(offerings, list):
+        offering_names = [
+            offer.get("name")
+            for offer in offerings
+            if isinstance(offer, dict) and offer.get("name")
+        ]
+        if offering_names:
+            summary_parts.append(
+                f"Principais Ofertas/Produtos: {', '.join(offering_names)}"
+            )
+        else:
+            summary_parts.append(
+                "Principais Ofertas/Produtos: Nenhuma oferta específica com nome listada."
+            )
+    else:
+        summary_parts.append(
+            "Principais Ofertas/Produtos: Nenhuma lista de ofertas fornecida."
+        )
+
+    return "\n".join(summary_parts)
+
+
 # --- Sub-Etapa: Extração Inicial ---
 PROMPT_INITIAL_EXTRACTION = """
 Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. Sua tarefa é analisar a "ÚLTIMA MENSAGEM DO CLIENTE" no contexto do "HISTÓRICO DA CONVERSA", da "ÚLTIMA AÇÃO DO AGENTE" e do "TIPO DA ÚLTIMA AÇÃO DO AGENTE".
@@ -188,11 +238,25 @@ Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. S
     ```
     {recent_chat_history}
     ```
+    
+5.  **OFERTAS DA EMPRESA (Resumo do negócio e lista de produtos/serviços):** 
+    ```
+    {company_offerings_summary} 
+    ```    
+
+    
+**REGRA CRÍTICA E PRIORITÁRIA: OBJEÇÕES A ITENS NÃO OFERECIDOS OU QUESTÕES NÃO RELACIONADAS A EMPRESA E SEUS PRODUTOS / SERVIÇOS**
+Se a "ÚLTIMA MENSAGEM DO CLIENTE" contiver uma objeção (ex: sobre preço, qualidade, características) referente a um produto ou serviço que **NÃO** está explicitamente mencionado na lista de "Principais Ofertas/Produtos" fornecida em "OFERTAS DA EMPRESA" ou  questões sobre temas não relacinados a empresa, você **DEVE** seguir estas etapas:
+1.  Classifique o `overall_intent` como **`OffTopic`**.
+2.  Defina `is_primarily_off_topic` como **`true`**.
+3.  **NÃO** adicione esta objeção à lista `extracted_objections`.
+4.  **NÃO** adicione esta objeção à lista `initially_extracted_questions`.
+Esta regra se sobrepõe à tentativa de classificar como `ExpressingObjection` ou `Questioning` para itens não listados. O objetivo é identificar que o cliente está falando de algo fora do nosso escopo de vendas.
+
 
 **Sua Tarefa de Análise (Preencha o JSON `InitialUserInputAnalysis` com precisão):**
 
 1.   **`overall_intent`**: Classifique a intenção principal da "ÚLTIMA MENSAGEM DO CLIENTE".
-    Valores possíveis: "Greeting", "Farewell", "Questioning", "StatingInformationOrOpinion", "ExpressingObjection", "ExpressingNeedOrPain", "RespondingToAgent", "VagueOrUnclear", "OffTopic", "PositiveFeedback", "NegativeFeedback", "RequestingClarificationFromAgent", "PositiveFeedbackToProposal", "NegativeFeedbackToProposal", "RequestForNextStepInPurchase".
     *   **Sinais de Compra:** Se o cliente expressar um desejo claro de prosseguir com a compra, adquirir o produto/serviço, ou perguntar sobre os próximos passos para finalizar (ex: "Quero comprar!", "Como faço o pedido?", "Pode gerar o link de pagamento?", "Vamos fechar negócio!"), classifique como **"RequestForNextStepInPurchase"**.
     *   **Feedback à Proposta:** Se o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" foi "PRESENT_SOLUTION_OFFER":
         *   Se a reação for positiva e indicar acordo com a solução (ex: "Gostei!", "Parece perfeito!", "É isso que eu preciso!"), use **"PositiveFeedbackToProposal"**.
@@ -213,19 +277,27 @@ Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. S
         *   Se recusar/desistir: **"RejectingCloseAttempt"**.
         *   Outros casos: "ExpressingObjection", "Questioning", etc.       
 
- *     **Resposta à Solicitação de Correção:** Se o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" foi "HANDLE_CLOSING_CORRECTION":
+    *   **Resposta à Solicitação de Correção:** Se o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" foi "HANDLE_CLOSING_CORRECTION":
         *   Se o cliente fornecer os detalhes da correção (ex: "O CEP é 99999-000", "Mude a quantidade para 2"), classifique como **"ProvidingCorrectionDetails"**.
         *   Se ele disser que não precisa mais corrigir ou confirmar, use "ConfirmingCloseAttempt" ou "FinalOrderConfirmation".
         *   Se ele recusar, use "RejectingCloseAttempt".
-        *   Outros casos: "Questioning", "ExpressingObjection", etc.                
+        *   Outros casos: "Questioning", "ExpressingObjection", etc.   
+
+    *   **IMPORTANTE - Objeção Fora do Escopo:** Se o cliente expressar uma objeção ... sobre um item ou serviço que CLARAMENTE NÃO SE ENCAIXA na descrição do negócio ou NÃO ESTÁ listado em "Principais Ofertas/Produtos" dentro de "OFERTAS DA EMPRESA" ... classifique o `overall_intent` como **`OffTopic`**.
+             
         
-2.  **`initially_extracted_questions`**: (Como antes) Identifique TODAS as perguntas explícitas. `question_text`.
+2.  **`initially_extracted_questions`** (Lista de `InitiallyExtractedQuestion`):
+    *   Identifique TODAS as perguntas distintas e explícitas na "ÚLTIMA MENSAGEM DO CLIENTE".
+    *   Para CADA pergunta identificada:
+        *   `question_text`: O texto central e normalizado da pergunta. Remova frases introdutórias como "Eu gostaria de saber se..." e foque no núcleo da questão.
 
 3.  **`extracted_objections`**: Identifique quaisquer objeções claras na "ÚLTIMA MENSAGEM DO CLIENTE".
     *   Para cada objeção, forneça o `objection_text`.
     *   **IMPORTANTE**: Capture a frase ou sentenças que *melhor representam a preocupação central do cliente*. Se a objeção for expressa através de uma pergunta seguida de uma afirmação (ex: "Isso é muito caro? Não sei se consigo pagar."), capture a essência completa (ex: "Isso é muito caro? Não sei se consigo pagar." ou "Preço muito caro, não sei se consigo pagar."). Se for uma declaração direta (ex: "O prazo de entrega é muito longo."), capture essa declaração. Tente ser conciso, mas completo.
 
-4.  **`extracted_needs_or_pains`**: (Como antes) Identifique necessidades ou dores. `text` e `type`.
+4.  **`extracted_needs_or_pains`** (Lista de `ExtractedNeedOrPain`):
+    *   Identifique se o cliente descreve alguma necessidade explícita ou ponto de dor/problema.
+    *   Para cada um: `text` (o texto descritivo) e `type` ("need" ou "pain_point").
 
 5.  **`analysis_of_response_to_agent_action`** (Objeto `PendingAgentActionResponseAnalysis`):
     *   Avalie como a "ÚLTIMA MENSAGEM DO CLIENTE" se relaciona com a "ÚLTIMA AÇÃO DO AGENTE". **Foque em se o cliente abordou diretamente o ponto principal ou pergunta feita pelo agente.**
@@ -247,13 +319,16 @@ Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. S
     *   `status`: Avalie o status da objeção original após o rebuttal do agente. Valores: "appears_resolved", "still_persists", "new_objection_raised", "unclear_still_evaluating", "changed_topic".
     *   `new_objection_text`: Se `status` for "new_objection_raised", forneça o texto da nova objeção.
 
-8.  **`is_primarily_vague_statement`**: (Como antes)
-9.  **`is_primarily_off_topic`**: (Como antes)
+8.  **`is_primarily_vague_statement`**: A "ÚLTIMA MENSAGEM DO CLIENTE", em sua essência, é uma declaração vaga, expressa incerteza geral ou confusão, sem apresentar uma pergunta ou objeção específica e clara? (true/false). Defina como `false` a menos que seja claramente vago.
+
+9.  **`is_primarily_off_topic`**: Defina como `true` se o `overall_intent` foi `OffTopic` (especialmente devido à REGRA CRÍTICA sobre objeções a itens não oferecidos, ou se for um comentário genuinamente não relacionado). Caso contrário, `false`.
+
 10. **`correction_details_text`**: Se `overall_intent` for "ProvidingCorrectionDetails", extraia o texto específico que o usuário forneceu como correção. Caso contrário, deixe como `null`.
 
 **Instruções Cruciais:**
 *   Seja preciso. Se um campo de lista não tiver itens, retorne `[]`.
 *   Preencha `reaction_to_solution_presentation` e `objection_status_after_rebuttal` APENAS quando o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" for relevante.
+
 
 Responda APENAS com o objeto JSON formatado de acordo com o schema `InitialUserInputAnalysis`.
 """
@@ -265,6 +340,7 @@ async def initial_input_extraction_sub_step(
     last_agent_action_obj: Optional[PendingAgentAction],
     recent_chat_history_str: str,
     llm_fast: BaseChatModel,
+    company_profile: Optional[CompanyProfileSchema],
 ) -> Optional[InitialUserInputAnalysis]:
     """
     Performs the initial LLM call to extract structured information from user input.
@@ -303,12 +379,15 @@ async def initial_input_extraction_sub_step(
                 "details", {}
             ).get("objection_text_to_address", "N/A")
 
+    company_offerings_summary_str = _format_offerings_for_prompt(company_profile)
+
     prompt_values = {
         "last_user_message_text": last_user_message_text,
         "last_agent_action_text": last_agent_action_text,
         "last_agent_action_type": last_agent_action_type_str,  # NOVO
         "original_objection_text_if_rebuttal": original_objection_text_if_rebuttal_str,  # NOVO
         "recent_chat_history": recent_chat_history_str,
+        "company_offerings_summary": company_offerings_summary_str,
     }
 
     analysis_object = await _call_structured_llm(
@@ -573,12 +652,15 @@ async def process_user_input_node(
         raw_messages_history, limit=RECENT_HISTORY_LIMIT
     )
 
+    company_profile_data = state.get("company_profile")
+
     # 1. Extração Inicial
     initial_analysis = await initial_input_extraction_sub_step(
         last_user_message_text=last_user_message_text,
         last_agent_action_obj=last_agent_action_obj,  # Passar o objeto
         recent_chat_history_str=recent_chat_history_str,
         llm_fast=llm_fast,
+        company_profile=company_profile_data,
     )
 
     if not initial_analysis:

@@ -43,15 +43,24 @@ PROMPT_GENERATE_GREETING = ChatPromptTemplate.from_messages(
             "system",
             """Você é o Assistente de Vendas IA inicial da '{company_name}'.
 Sua tarefa é gerar uma mensagem de saudação curta, amigável e profissional para iniciar a conversa com o cliente.
-Use o tom de vendas '{sales_tone}' e o idioma '{language}'.
-Apresente-se brevemente e pergunte como pode ajudar o cliente hoje.
-Mantenha a mensagem concisa.
-Aplique formatação WhatsApp sutil: {formatting_instructions}
 
-Exemplo: "Olá! Sou o assistente virtual da *{company_name}*. Como posso te ajudar hoje?"
-         "Oi! Bem-vindo(a) à *{company_name}*. Em que posso ser útil?"
+**Instrução Adicional Importante:**
+*   Verifique o valor de '{combined_spin_question_type_for_prompt}'.
+*   **SE '{combined_spin_question_type_for_prompt}' for 'Situation' (ou qualquer outro tipo SPIN válido):**
+    Após a saudação, você DEVE adicionar uma pergunta aberta do tipo 'Situation' para entender o contexto inicial do cliente.
+    Exemplos de pergunta Situation para combinar com a saudação:
+    - "Para começarmos, poderia me contar um pouco sobre o que te traz aqui hoje ou qual desafio você está buscando resolver?"
+    - "Para que eu possa te direcionar melhor, qual o seu principal objetivo ao entrar em contato conosco?"
+*   **SE '{combined_spin_question_type_for_prompt}' for 'None' ou não for um tipo SPIN válido:**
+    APENAS gere a mensagem de saudação padrão, perguntando como pode ajudar de forma geral.
+    Exemplo de saudação padrão: "Olá! Sou o assistente virtual da *{company_name}*. Como posso te ajudar hoje?"
 
-Gere APENAS a mensagem de saudação.""",
+**Instruções Gerais:**
+*   Use o tom de vendas '{sales_tone}' e o idioma '{language}'.
+*   Mantenha a mensagem concisa, mesmo que combinada.
+*   Aplique formatação WhatsApp sutil: {formatting_instructions}
+
+Gere APENAS a mensagem de saudação (pura ou combinada com a pergunta Situation, conforme instruído).""",
         ),
     ]
 )
@@ -61,7 +70,8 @@ PROMPT_ANSWER_DIRECT_QUESTION = ChatPromptTemplate.from_messages(
         (
             "system",
             """Você é um Assistente de Vendas IA para '{company_name}'.
-Seu objetivo é responder à pergunta específica do cliente de forma precisa e completa, usando o 'Contexto Relevante' (se disponível) e o 'Perfil da Empresa'.
+Seu objetivo é responder à pergunta específica do cliente de forma precisa e completa, usando o 'Contexto Relevante' (se disponível) e o 'Perfil da Empresa'. OPCIONALMENTE, se instruído com um 'Tipo de Pergunta SPIN Combinada', você DEVE adicionar essa pergunta SPIN APÓS sua resposta principal, de forma fluida.
+
 Comunique-se em {language} com um tom {sales_tone}. A hora atual é {current_datetime}.
 
 **Pergunta Específica do Cliente:**
@@ -87,21 +97,32 @@ Diretrizes: {communication_guidelines}
 3.  **Seja Honesto sobre Limites de Conhecimento:**
     *   Se a informação para responder COMPLETAMENTE à '{question_to_answer}' NÃO estiver no RAG nem no Perfil da Empresa, use EXATAMENTE o seguinte texto de fallback: '{fallback_text}'.
     *   NÃO invente informações (preços, características, prazos, etc.).
-- 4.  **Foco na Pergunta:** Responda direta e exclusivamente à '{question_to_answer}'. NÃO adicione perguntas de acompanhamento (como 'Isso ajudou?', 'Posso ajudar com algo mais?') nem frases de encerramento genéricas. Termine a resposta logo após fornecer a informação.
-+ 4.  **Resposta Direta e Conclusiva:**
-+       a.  Responda direta e exclusivamente à '{question_to_answer}' usando as informações encontradas (RAG ou Perfil).
-+       b.  **Se você conseguiu encontrar informações e acredita que respondeu à pergunta satisfatoriamente com o conhecimento disponível, TERMINE SUA RESPOSTA IMEDIATAMENTE APÓS FORNECER ESSA INFORMAÇÃO.**
-+       c.  **NÃO adicione frases como "Para mais detalhes, visite nosso site", "Entre em contato conosco", ou qualquer outra forma de direcionar o cliente para outro canal SE você já forneceu uma resposta baseada no seu conhecimento.** A exceção é se a própria informação recuperada (RAG/Perfil) explicitamente instruir a fornecer um link específico como parte da resposta direta àquela pergunta.
-+       d.  NÃO adicione perguntas de acompanhamento genéricas (como 'Isso ajudou?', 'Posso ajudar com algo mais?') ou frases de encerramento genéricas.
+4.  **Resposta Direta e Conclusiva:**
+       a.  Responda direta e exclusivamente à '{question_to_answer}' usando as informações encontradas (RAG ou Perfil).
+       b.  **Se você conseguiu encontrar informações e acredita que respondeu à pergunta satisfatoriamente com o conhecimento disponível, TERMINE SUA RESPOSTA IMEDIATAMENTE APÓS FORNECER ESSA INFORMAÇÃO, caso '{combined_spin_question_type_for_prompt}' seja 'None'.**
+       c.  **NÃO adicione frases como "Para mais detalhes, visite nosso site", "Entre em contato conosco", ou qualquer outra forma de direcionar o cliente para outro canal SE você já forneceu uma resposta baseada no seu conhecimento.** A exceção é se a própria informação recuperada (RAG/Perfil) explicitamente instruir a fornecer um link específico como parte da resposta direta àquela pergunta.
+       d.  NÃO adicione perguntas de acompanhamento genéricas (como 'Isso ajudou?', 'Posso ajudar com algo mais?') ou frases de encerramento genéricas.
 5.  **Use o Histórico:** Consulte o 'Histórico Recente' abaixo para entender o contexto da conversa.
-6.  **Formatação:** Aplique a formatação WhatsApp ({formatting_instructions}) de forma clara e útil.
+
+6. **Instruções para a PERGUNTA SPIN COMBINADA (SE '{combined_spin_question_type_for_prompt}' for fornecido e não for 'None'):**
+*   Após fornecer a resposta principal à pergunta do cliente, adicione uma pergunta aberta do tipo SPIN: '{combined_spin_question_type_for_prompt}'.
+*   Faça a transição de forma natural. Ex: "Respondido isso, para entender melhor suas necessidades, [pergunta SPIN do tipo {combined_spin_question_type_for_prompt}]?"
+*   A pergunta SPIN deve ser relevante para o contexto geral da conversa e para o tipo '{combined_spin_question_type_for_prompt}'.
+    *   'Situation': Entender o contexto atual do cliente.
+    *   'Problem': Descobrir dores ou insatisfações.
+    *   'Implication': Explorar as consequências dos problemas.
+    *   'NeedPayoff': Focar nos benefícios de resolver o problema.
+
+7.  **Formatação:** Aplique a formatação WhatsApp ({formatting_instructions}) de forma clara e útil.
 {repetition_context_instructions}
+
 
 HISTÓRICO RECENTE (Contexto da Conversa):
 {chat_history}
 --- Fim do Histórico ---
 
-Responda APENAS à pergunta específica do cliente: '{question_to_answer}'.""",
+Responda APENAS à pergunta específica do cliente: '{question_to_answer}' e, se aplicável, adicione a pergunta SPIN combinada.
+Combine tudo em UMA ÚNICA mensagem.""",
         ),
     ]
 )
@@ -168,18 +189,22 @@ PROMPT_ASK_CLARIFYING_QUESTION = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """Você é um Assistente de Vendas IA empático. O cliente fez uma declaração vaga ou expressou dúvida não específica:
-**"{vague_statement_text}"**
+            """Você é um Assistente de Vendas IA empático e prestativo da '{company_name}'.
 
-Sua tarefa é fazer **UMA única pergunta aberta** para entender melhor o que o cliente quis dizer ou qual é a sua preocupação/dúvida principal. Mantenha um tom {sales_tone} e use o idioma {language}.
+Sua tarefa é fazer UMA única pergunta aberta e clara para obter o esclarecimento necessário do cliente.
+Mantenha um tom {sales_tone} e use o idioma {language}.
+CONTEXTO PARA SUA PERGUNTA (fornecido pelo sistema de planejamento):
+{clarification_context_from_planner}
 
-Use o contexto, caso esteja disponível, para te ajudar a formular uma pergunta mais personalizada: "{last_action_context}"
-
-**Exemplos:** "Para que eu possa te ajudar melhor, poderia me dizer um pouco mais sobre o que está pensando?", "O que especificamente sobre [tópico, se houver] te deixou com dúvidas?", "Pode elaborar um pouco mais?".
-
-Use formatação WhatsApp sutil: {formatting_instructions}
-
-Gere APENAS a pergunta clarificadora.""",
+Instruções:
+Use o Contexto: Baseie sua pergunta diretamente no 'CONTEXTO PARA SUA PERGUNTA' fornecido. Este contexto explica por que a clarificação é necessária e pode já conter uma sugestão de pergunta.
+Se o contexto já contiver uma pergunta clara (ex: nos casos de "product_or_need_for_purchase"), use essa pergunta ou uma variação muito próxima e natural.
+Se o contexto for uma declaração vaga do usuário (ex: "Não sei bem...", que estará em {clarification_context_from_planner}): Sua pergunta deve tentar fazer o cliente elaborar sobre essa declaração. Exemplos: "Para que eu possa te ajudar melhor, poderia me dizer um pouco mais sobre o que está pensando em relação a isso?", "Pode elaborar um pouco mais sobre essa dúvida?".
+Clareza e Concisão: A pergunta deve ser fácil de entender e ir direto ao ponto.
+Formato WhatsApp: Use formatação WhatsApp sutil ({formatting_instructions}).
+HISTÓRICO RECENTE (para seu contexto geral da conversa):
+{chat_history}
+Gere APENAS a pergunta clarificadora com base no 'CONTEXTO PARA SUA PERGUNTA'.""",
         ),
     ]
 )
@@ -188,20 +213,45 @@ PROMPT_ACKNOWLEDGE_AND_TRANSITION = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """Você é um Assistente de Vendas IA focado em manter a conversa produtiva. O cliente fez um comentário fora do tópico principal da conversa: "{off_topic_text}".
-Sua tarefa é:
-1. **Reconhecer Brevemente:** Faça um comentário curto e neutro sobre o que o cliente disse (Ex: "Entendido.", "Interessante ponto."). NÃO se aprofunde no tópico off-topic.
-2. **Transicionar de Volta:** Gentilmente redirecione a conversa para o objetivo anterior ou para o próximo passo lógico da venda. Use o 'Tópico do Objetivo Anterior' para contexto. (Ex: "Voltando ao que conversávamos sobre {previous_goal_topic}...", "Continuando de onde paramos...", "Para seguirmos, podemos falar sobre {previous_goal_topic}?").
-3. Mantenha o tom {sales_tone} e use o idioma {language}.
-4. Use formatação WhatsApp sutil: {formatting_instructions}
+            """Você é um Assistente de Vendas IA da '{company_name}', mestre em conduzir conversas de forma natural e produtiva.
+O cliente fez um comentário que parece desviar do fluxo principal da conversa:
+Cliente: "{off_topic_text}"
 
-Tópico do Objetivo Anterior: {previous_goal_topic}
+Seu objetivo é:
+1.  **Reconhecer Brevemente com Naturalidade:** Valide o comentário do cliente de forma curta, empática e que soe humana.
+    Exemplos: "Entendi.", "Interessante observação!", "Anotado.", "Hehe, boa!", "Certo."
+    Evite ser excessivamente formal ou robótico no reconhecimento.
 
-Gere APENAS a frase curta de reconhecimento e transição.""",
+2.  **Analisar o Histórico Recente (Mentalmente):** Revise o "HISTÓRICO RECENTE DA CONVERSA" abaixo, especialmente as últimas 2-3 trocas ANTES do comentário "{off_topic_text}".
+
+3.  **Decidir a Melhor Transição:**
+    *   **Cenário A (Ponto de Retorno Claro):** Se o AGENTE (você) fez uma pergunta clara ou estava no meio de uma explicação específica antes do desvio, tente retomar esse ponto diretamente, mas de forma suave.
+        Exemplo (Agente perguntou sobre desafios, cliente falou do pão de queijo):
+        Cliente: "O pão de queijo aqui perto está um absurdo de caro!"
+        Você: "Hehe, entendo a questão do pão de queijo! Mas voltando aos desafios que você mencionou sobre [desafio específico], poderia me contar mais?"
+
+    *   **Cenário B (Contexto Menos Definido ou Início de Conversa):** Se o desvio ocorreu muito no início, ou se o "assunto anterior" era muito geral (como uma saudação), ou se o ponto de retorno não é óbvio, faça uma transição mais aberta e convidativa para (re)engajar o cliente no propósito da conversa com a '{company_name}'.
+        Exemplo (Cliente comenta algo aleatório após a saudação inicial do agente):
+        Cliente: "Hoje o trânsito estava terrível."
+        Você: "Imagino! Coisas do dia a dia, né? Mas me diga, há algo específico sobre as soluções da *{company_name}* que você gostaria de explorar hoje?"
+        Outro Exemplo (Se o agente já tinha introduzido o tema da empresa):
+        Você: "Entendo. Mudando um pouco de assunto, mas ainda sobre como a *{company_name}* pode te ajudar, você já teve chance de pensar sobre [aspecto geral relacionado à empresa/produto]?"
+
+    *   **Dica:** O "Hint do Goal Interrompido" ({interrupted_goal_type_hint_text}) pode te dar uma pista sobre o tipo de conversa que estava acontecendo (ex: "INVESTIGATING_NEEDS", "PRESENTING_SOLUTION"). Use isso para guiar sua intuição sobre o melhor ponto de retorno.
+
+4.  **Evitar Frases Clichês:** Tente NÃO usar frases muito batidas como "Voltando ao assunto anterior..." ou "Continuando de onde paramos..." a menos que seja a forma mais natural e concisa. Prefira referenciar o conteúdo.
+
+5.  **Ser Conciso:** A resposta completa (reconhecimento + transição) deve ser curta e fluida.
+6.  **Tom e Formatação:** Use o tom de vendas '{sales_tone}', idioma '{language}', e aplique a formatação WhatsApp ({formatting_instructions}).
+
+**HISTÓRICO RECENTE DA CONVERSA (Analisar para transição):**
+{chat_history}
+--- Fim do Histórico ---
+
+Gere APENAS a frase de reconhecimento e transição, de forma natural e eficaz.""",
         ),
     ]
 )
-
 
 PROMPT_PRESENT_SOLUTION_OFFER = ChatPromptTemplate.from_messages(
     [
@@ -394,30 +444,54 @@ PROMPT_SEND_FOLLOW_UP_MESSAGE = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """Você é um Assistente de Vendas da '{company_name}'. O usuário não respondeu à sua última mensagem por um tempo.
-Sua tarefa é enviar uma mensagem de follow-up gentil para tentar reengajar o cliente.
+            """Você é um Assistente de Vendas IA da '{company_name}', atencioso e proativo. O cliente não respondeu à sua última mensagem por um tempo.
+Sua tarefa é enviar uma mensagem de follow-up gentil e contextualmente relevante para tentar reengajar o cliente, idealmente nos tópicos relacionados à '{company_name}'.
 
 **Contexto da Conversa:**
-- Última mensagem enviada pelo agente (você): "{last_agent_action_text_for_follow_up}"
-- Goal que o agente estava perseguindo antes da pausa: {goal_type_before_pause}
-- Esta é a tentativa de follow-up número: {current_follow_up_attempts_display} (de um total de {max_follow_up_attempts_total} tentativas).
+- Sua última mensagem enviada ao cliente foi: "{last_agent_action_text_for_follow_up}"
+- O objetivo principal que você (agente) estava perseguindo antes da pausa era relacionado a: '{goal_type_before_pause}'
+- Esta é a tentativa de follow-up número: {current_follow_up_attempts_display} de {max_follow_up_attempts_total} no total.
 - Idioma: {language}
-- Tom de Vendas: {sales_tone} (use um tom ainda mais suave e compreensivo para follow-up)
+- Tom de Vendas: {sales_tone} (use um tom ainda mais suave, compreensivo e menos insistente para follow-up)
 
-**Instruções para a Mensagem de Follow-up:**
-1.  **Reconheça a Pausa:** Comece de forma suave, ex: "Olá novamente!", "Só para checar...", "Notei que nossa conversa pausou...".
-2.  **Referencie o Contexto:** Mencione brevemente o tópico da sua última mensagem ou o objetivo da conversa para ajudar o cliente a se lembrar. (Use `{last_agent_action_text_for_follow_up}` e `{goal_type_before_pause}` como referência).
-3.  **Seja Convidativo, Não Insistente:**
-    *   **Primeiro Follow-up (tentativa 1 de {max_follow_up_attempts_total}):** "Gostaria de continuar de onde paramos sobre [tópico] ou talvez precise de mais um momento para pensar?"
-    *   **Follow-ups Intermediários:** "Só para checar se você teve chance de pensar sobre [tópico]. Alguma dúvida ou algo mais em que posso ajudar neste momento?"
-    *   **Último Follow-up (tentativa {max_follow_up_attempts_total} de {max_follow_up_attempts_total}):** "Ainda estou à disposição se precisar de algo referente a [tópico]. Caso contrário, sem problemas e agradeço seu tempo até aqui!" (Não faça uma pergunta se for a última tentativa antes de um possível farewell automático).
-4.  **Mantenha Curto e Amigável.**
-5.  **Formatação:** Aplique formatação WhatsApp sutil: {formatting_instructions}
+**Instruções Cruciais para a Mensagem de Follow-up:**
 
-HISTÓRICO RECENTE (para seu contexto, não necessariamente para repetir ao usuário):
+1.  **Reconhecimento Suave da Pausa:**
+    *   Comece de forma amigável (Varie, use o contexto e deixa o mais natural possível!)
+
+2.  **Referência Contextual Inteligente com Foco no Retorno ao Tema da Empresa:**
+    *   Consulte o "HISTÓRICO RECENTE".
+    *   **Se a sua última mensagem ("{last_agent_action_text_for_follow_up}") foi uma resposta de fallback (ex: "não tenho essa informação") a uma pergunta específica do cliente sobre um tema não diretamente relacionado à '{company_name}':**
+        *   **NÃO repita o fallback.**
+        *   Reconheça brevemente o tópico do cliente, mas rapidamente tente conectar com os objetivos da '{company_name}' ou o '{goal_type_before_pause}'.
+        *   Exemplo (Cliente perguntou sobre "mares serem pulmão do mundo", agente deu fallback, goal era "INVESTIGATING_NEEDS" sobre soluções da empresa):
+            "Olá! Notei que nossa conversa deu uma pausa após sua pergunta interessante sobre os mares. Retomando o que conversávamos sobre [necessidade do cliente relacionada à empresa OU como a {company_name} pode ajudar], você gostaria de continuar ou precisa de mais um tempo para pensar sobre isso?"
+            OU, se o tópico do cliente for muito distante:
+            "Olá! Notei que nossa conversa deu uma pausa. Se ainda tiver interesse em explorar como a *{company_name}* pode te ajudar com [objetivo geral da empresa ou {goal_type_before_pause}], estou à disposição. Ou, se preferir, podemos conversar sobre [tópico do cliente] um pouco mais, e depois vemos como seguir." (Oferecer o tema do cliente como segunda opção).
+    *   **Se a sua última mensagem foi uma pergunta ou afirmação sua que avançava um objetivo da '{company_name}' (relacionado a '{goal_type_before_pause}'):**
+        *   Relembre sutilmente esse tópico ou o objetivo da empresa.
+        *   Exemplo (Agente perguntou sobre necessidades, goal era INVESTIGATING_NEEDS):
+            "Só para checar... estávamos conversando sobre como a *{company_name}* poderia ajudar com [aspecto da necessidade do cliente]. Você teve alguma nova reflexão sobre isso ou gostaria de explorar de outra forma?"
+    *   **Se o contexto for muito inicial ou o ponto de retorno for vago:**
+        *   Use uma abordagem mais geral para reengajar sobre os serviços/produtos da '{company_name}'.
+        *   Exemplo: "Olá novamente! Só queria saber se há algo específico sobre as soluções da *{company_name}* em que posso te ajudar hoje, ou algum desafio que esteja enfrentando?"
+
+3.  **Convite ao Reengajamento (Priorizando o Tema da Empresa):**
+    *   **Primeiro Follow-up (tentativa 1 de {max_follow_up_attempts_total}):**
+        "[Referência Contextual Inteligente com foco na empresa]. Gostaria de continuar nossa conversa sobre isso ou talvez precise de mais um momento para pensar? Estou à disposição!"
+    *   **Follow-ups Intermediários (ex: tentativa 2 de 3):**
+        "[Referência Contextual Inteligente com foco na empresa]. Há algo mais em que posso ajudar referente a isso ou alguma dúvida que surgiu sobre as soluções da *{company_name}*?"
+    *   **Último Follow-up (tentativa {max_follow_up_attempts_total} de {max_follow_up_attempts_total}):**
+        "[Referência Contextual Inteligente com foco na empresa]. Ainda estou por aqui se precisar de algo. Caso contrário, sem problemas, e agradeço seu tempo até aqui! Tenha um ótimo dia."
+
+4.  **Naturalidade e Concisão:** Mantenha a mensagem curta, amigável e humana.
+5.  **Formatação:** Aplique formatação WhatsApp sutil ({formatting_instructions}).
+
+**HISTÓRICO RECENTE (para seu contexto de decisão, não para repetir ao usuário):**
 {chat_history}
+--- Fim do Histórico ---
 
-Gere APENAS a mensagem de follow-up.""",
+Gere APENAS a mensagem de follow-up, buscando reengajar o cliente nos tópicos relevantes para a '{company_name}'.""",
         ),
     ]
 )
@@ -618,8 +692,17 @@ async def response_generator_node(
 
     # Preencher valores específicos baseado na ação
     try:
+        if action_command == "GENERATE_GREETING":
+            combined_spin_type = action_params.get("combined_spin_question_type")
+            specific_values["combined_spin_question_type_for_prompt"] = (
+                combined_spin_type if combined_spin_type else "None"
+            )  # Passar "None" como string
+            if combined_spin_type:
+                logger.info(
+                    f"[{node_name}] GENERATE_GREETING will be combined with SPIN: {combined_spin_type}"
+                )
 
-        if action_command == "ANSWER_DIRECT_QUESTION":
+        elif action_command == "ANSWER_DIRECT_QUESTION":
             specific_values["question_to_answer"] = action_params.get(
                 "question_to_answer_text", "[Pergunta não especificada]"
             )
@@ -638,6 +721,10 @@ async def response_generator_node(
                     "satisfatoriamente. Reitere a resposta anterior de forma concisa ou pergunte se o cliente tem alguma dúvida adicional sobre ela."
                 )
             specific_values["repetition_context_instructions"] = repetition_instructions
+            combined_spin_type = action_params.get("combined_spin_question_type")
+            specific_values["combined_spin_question_type_for_prompt"] = (
+                (combined_spin_type) if combined_spin_type else "None"
+            )
 
         elif action_command == "ASK_SPIN_QUESTION":
             specific_values["spin_type"] = action_params.get("spin_type", "Situation")
@@ -672,14 +759,14 @@ async def response_generator_node(
             specific_values["last_action_context"] = last_action_context_for_prompt
 
         elif action_command == "ACKNOWLEDGE_AND_TRANSITION":
-
             specific_values["off_topic_text"] = action_params.get(
-                "off_topic_text", "[comentário anterior]"
-            )
-            specific_values["previous_goal_topic"] = action_params.get(
-                "previous_goal_topic", "o assunto anterior"
+                "off_topic_text", "[comentário não especificado]"
             )
 
+            specific_values["interrupted_goal_type_hint_text"] = action_params.get(
+                "interrupted_goal_type_hint",
+                "o fluxo normal da conversa",
+            )
         elif action_command == "PRESENT_SOLUTION_OFFER":
             selected_prompt = PROMPT_PRESENT_SOLUTION_OFFER
             specific_values["product_name_to_present"] = action_params.get(
