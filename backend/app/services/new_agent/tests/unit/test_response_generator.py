@@ -158,31 +158,33 @@ async def test_generator_selects_correct_prompt_for_answer_question(
     question_text = "Qual o horário?"
     params: AgentActionDetails = {
         "question_to_answer_text": question_text,
-        "question_to_answer_status": "newly_asked",  # Provide a status
+        "question_to_answer_status": "newly_asked",
+        "combined_spin_question_type": None,  # Explicitamente None para este teste
     }
     state["next_agent_action_command"] = action
     state["action_parameters"] = params
     state["retrieved_knowledge_for_next_action"] = "RAG Context: Abrimos às 9h."
 
-    # This is what _prepare_common_prompt_context would return
+    # Mocking _prepare_common_prompt_context output accurately
+    # Based on base_state_for_generator and _prepare_common_prompt_context logic
     common_context_mock = {
-        "company_name": "TestGen Co",  # From base_state_for_generator
+        "company_name": "TestGen Co",
         "language": "pt-br",
         "sales_tone": "amigável",
         "fallback_text": "Fallback default",
-        "business_description": "N/A",  # Assuming default from _prepare_common_prompt_context
-        "offering_summary": "N/A",
-        "key_selling_points": "N/A",
-        "delivery_options_info": "Opções de delivery/pickup não especificadas.",
-        "company_address_info": "",
-        "opening_hours_info": "",
-        "communication_guidelines": "N/A",
-        "company_main_link_fallback": "nosso site.",
-        "formatting_instructions": ANY,  # From prompt_utils
-        "chat_history": "Histórico indisponível.",  # Default from fallback if input_processor not fully mocked
-        "last_user_message": "Input",
-        "rag_context": "RAG Context: Abrimos às 9h.",  # This will be in common_context
-        "current_datetime": ANY,  # This will be set
+        "business_description": "N/A",  # Default from _prepare_common_prompt_context
+        "offering_summary": "N/A",  # Default
+        "key_selling_points": "N/A",  # Default
+        "delivery_options_info": "Opções de delivery/pickup não especificadas.",  # Default
+        "company_address_info": "",  # Default
+        "opening_hours_info": "",  # Default
+        "communication_guidelines": "N/A",  # Default
+        "company_main_link_fallback": "nosso site.",  # Default
+        "formatting_instructions": ANY,
+        "chat_history": "Histórico indisponível.",  # Assuming fallback if input_processor not fully mocked
+        "last_user_message": "Input",  # From base_state_for_generator
+        "rag_context": "RAG Context: Abrimos às 9h.",  # From state
+        "current_datetime": ANY,
     }
     mock_prepare_context.return_value = common_context_mock
     expected_llm_response = "Nosso horário é das 9h às 18h."
@@ -199,10 +201,10 @@ async def test_generator_selects_correct_prompt_for_answer_question(
     assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
     assert "'{question_to_answer}'" in call_kwargs["prompt"].messages[0].prompt.template
 
-    # These are the values specific to this action, added to common_context
     expected_specific_values = {
         "question_to_answer": question_text,
         "repetition_context_instructions": "",  # For newly_asked status
+        "combined_spin_question_type_for_prompt": "None",  # Explicitly "None" string
     }
     expected_prompt_values = {**common_context_mock, **expected_specific_values}
 
@@ -434,33 +436,40 @@ async def test_generator_selects_correct_prompt_for_ack_transition(
     state = base_state_for_generator
     action: AgentActionType = "ACKNOWLEDGE_AND_TRANSITION"
     off_topic_text = "Falando nisso, viu o jogo?"
-    previous_topic = "desafios atuais"
+    # O planner agora passa 'interrupted_goal_type_hint'
+    interrupted_goal_hint = "INVESTIGATING_NEEDS"
 
-    # --- FIX: Populate action_parameters like the Planner would ---
     params: AgentActionDetails = {
         "off_topic_text": off_topic_text,
-        "previous_goal_topic": previous_topic,
+        "interrupted_goal_type_hint": interrupted_goal_hint,  # Novo parâmetro
     }
     state["next_agent_action_command"] = action
-    state["action_parameters"] = params  # Set the parameters
-    # --- END FIX ---
+    state["action_parameters"] = params
 
-    # Setting current_agent_goal is less critical now for this specific test,
-    # but good for context if _prepare_common_prompt_context used it.
-    previous_goal = AgentGoal(
-        goal_type="INVESTIGATING_NEEDS",
-        goal_details={"topic": previous_topic},  # Keep for consistency
-        previous_goal_if_interrupted=None,
-    )
-    state["current_agent_goal"] = AgentGoal(
-        goal_type="ACKNOWLEDGE_AND_TRANSITION",  # The goal set by Planner
-        goal_details={"text": off_topic_text, "reason": "Handling off-topic"},
-        previous_goal_if_interrupted=previous_goal,
-    )
-
-    common_context_mock = {"company_name": "Test"}  # Example common context
+    # common_context_mock precisa ser mais completo para evitar mismatches
+    common_context_mock = {
+        "company_name": "TestGen Co",
+        "language": "pt-br",
+        "sales_tone": "amigável",
+        "fallback_text": "Fallback default",
+        "business_description": "N/A",
+        "offering_summary": "N/A",
+        "key_selling_points": "N/A",
+        "delivery_options_info": "Opções de delivery/pickup não especificadas.",
+        "company_address_info": "",
+        "opening_hours_info": "",
+        "communication_guidelines": "N/A",
+        "company_main_link_fallback": "nosso site.",
+        "formatting_instructions": ANY,
+        "chat_history": "Histórico indisponível.",
+        "last_user_message": "Input",
+        "rag_context": "Nenhum contexto adicional disponível.",
+        "current_datetime": ANY,
+    }
     mock_prepare_context.return_value = common_context_mock
-    expected_llm_response = "Entendido. Voltando aos desafios atuais que mencionou..."
+    expected_llm_response = (
+        "Entendido sobre o jogo. Retomando nossa conversa sobre suas necessidades..."
+    )
     mock_call_llm.return_value = expected_llm_response
 
     config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
@@ -473,14 +482,12 @@ async def test_generator_selects_correct_prompt_for_ack_transition(
 
     assert call_kwargs["prompt"] == PROMPT_ACKNOWLEDGE_AND_TRANSITION
 
-    # This assertion should now pass as the generator reads from action_parameters
-    expected_prompt_values = {
-        **common_context_mock,
-        **{
-            "off_topic_text": off_topic_text,
-            "previous_goal_topic": previous_topic,
-        },
+    # <<< CORRECTED expected_specific_values >>>
+    expected_specific_values = {
+        "off_topic_text": off_topic_text,
+        "interrupted_goal_type_hint_text": interrupted_goal_hint,  # Deve ser este agora
     }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
     assert call_kwargs["prompt_values"] == expected_prompt_values
     assert call_kwargs["llm"] == mock_llm_primary
 

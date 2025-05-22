@@ -564,6 +564,7 @@ async def goal_and_action_planner_node(
             "clarification_type"
         )
         text_to_clarify = effective_goal.get("goal_details", {}).get("text")
+
         if clarification_type == "question" and text_to_clarify:
             planned_action_command = "ANSWER_DIRECT_QUESTION"
             planned_action_parameters["question_to_answer_text"] = text_to_clarify
@@ -571,6 +572,113 @@ async def goal_and_action_planner_node(
                 customer_question_log, text_to_clarify
             )
             planned_action_parameters["question_to_answer_status"] = question_status
+
+            # --- Lógica para combinar com pergunta SPIN ---
+            # Decidir se queremos adicionar uma pergunta SPIN após responder.
+            # Condições:
+            # 1. O goal interrompido era INVESTIGATING_NEEDS, ou
+            # 2. As necessidades ainda não estão claras (ex: poucos needs confirmados), ou
+            # 3. Estamos no início da conversa e queremos guiar.
+
+            # Obter o goal que foi interrompido pela pergunta do usuário
+            interrupted_goal_obj = effective_goal.get("previous_goal_if_interrupted")
+            interrupted_goal_type: Optional[AgentGoalType] = None
+            interrupted_goal_details: Dict[str, Any] = {}
+
+            if interrupted_goal_obj and isinstance(interrupted_goal_obj, dict):
+                interrupted_goal_type = interrupted_goal_obj.get("goal_type")  # type: ignore
+                interrupted_goal_details = interrupted_goal_obj.get("goal_details", {})
+
+            # Heurística: Se estávamos investigando necessidades, ou se o goal interrompido não existe
+            # (significa que a pergunta do usuário foi uma das primeiras interações após a saudação),
+            # então é uma boa ideia tentar adicionar uma pergunta SPIN.
+            should_combine_with_spin = False
+            if interrupted_goal_type == "INVESTIGATING_NEEDS":
+                should_combine_with_spin = True
+            elif (
+                not interrupted_goal_type
+                and effective_goal.get("previous_goal_if_interrupted") is None
+            ):
+                # Se não há goal interrompido, significa que a pergunta veio cedo.
+                # Ex: User: Hi -> Agent: Hi, how can I help? -> User: What's price of X?
+                # Aqui, previous_goal_if_interrupted para CLARIFYING_USER_INPUT seria GREETING.
+                # Se o previous_goal_if_interrupted for GREETING ou IDLE, também é bom combinar.
+                prev_goal_of_clarification = effective_goal.get(
+                    "previous_goal_if_interrupted"
+                )
+                if prev_goal_of_clarification and prev_goal_of_clarification.get(
+                    "goal_type"
+                ) in ["GREETING", "IDLE"]:
+                    should_combine_with_spin = True
+
+            if should_combine_with_spin:
+                # Determinar qual tipo de pergunta SPIN fazer
+                # Se estávamos no meio de um ciclo SPIN, continuar de onde paramos.
+                # Se não, começar com "Problem" (já que "Situation" foi feita na saudação combinada ou seria a próxima).
+
+                last_spin_type_asked_in_interrupted_goal: Optional[SpinQuestionType] = (
+                    None
+                )
+                spin_questions_asked_this_cycle_in_interrupted_goal = 0
+
+                if interrupted_goal_type == "INVESTIGATING_NEEDS":
+                    last_spin_type_asked_in_interrupted_goal = (
+                        interrupted_goal_details.get("last_spin_type_asked")
+                    )
+                    spin_questions_asked_this_cycle_in_interrupted_goal = (
+                        interrupted_goal_details.get(
+                            "spin_questions_asked_this_cycle", 0
+                        )
+                    )
+
+                next_spin_to_combine = _get_next_spin_type(
+                    last_spin_type_asked_in_interrupted_goal
+                )
+
+                # Evitar perguntar "Situation" se já foi feita na saudação combinada.
+                # Se last_spin_type_asked_in_interrupted_goal é None (início do SPIN), _get_next_spin_type retorna "Situation".
+                # Se a saudação já foi combinada com Situation, a próxima deveria ser "Problem".
+                # Esta lógica pode precisar de refinamento para saber se a "Situation" da saudação já ocorreu.
+                # Por agora, vamos assumir que se não há histórico SPIN, "Problem" é um bom começo após responder uma pergunta.
+                if next_spin_to_combine == "Situation" and (
+                    last_agent_action
+                    and last_agent_action.get("action_type") == "GENERATE_GREETING"
+                    and last_agent_action.get("details", {}).get(
+                        "combined_spin_question_type"
+                    )
+                    == "Situation"
+                ):
+                    next_spin_to_combine = "Problem"
+                elif (
+                    next_spin_to_combine == "Situation"
+                    and not last_spin_type_asked_in_interrupted_goal
+                ):  # Se é o começo do SPIN, mas não após saudação combinada
+                    pass  # Situation é ok
+                elif (
+                    not last_spin_type_asked_in_interrupted_goal
+                ):  # Se não há histórico SPIN, e não é Situation, Problem é seguro.
+                    next_spin_to_combine = "Problem"
+
+                logger.info(
+                    f"[{node_name}] Combining ANSWER_DIRECT_QUESTION with SPIN type: {next_spin_to_combine}"
+                )
+                planned_action_parameters["combined_spin_question_type"] = (
+                    next_spin_to_combine
+                )
+
+                # Ajustar o goal efetivo para INVESTIGATING_NEEDS, pois estamos fazendo uma pergunta SPIN.
+                # O previous_goal_if_interrupted do CLARIFYING_USER_INPUT é descartado,
+                # pois estamos iniciando um novo fluxo de investigação (ou continuando um).
+                effective_goal["goal_type"] = "INVESTIGATING_NEEDS"
+                effective_goal["goal_details"] = {
+                    "spin_questions_asked_this_cycle": spin_questions_asked_this_cycle_in_interrupted_goal,  # Será incrementado pelo final_state_updater
+                    "last_spin_type_asked": last_spin_type_asked_in_interrupted_goal,  # Será atualizado pelo final_state_updater
+                    "current_question_being_answered": text_to_clarify,  # Contexto opcional
+                }
+                effective_goal["previous_goal_if_interrupted"] = (
+                    None  # Limpamos o goal interrompido original da pergunta
+                )
+
         elif clarification_type == "vague" and text_to_clarify:
             planned_action_command = "ASK_CLARIFYING_QUESTION"
         else:
@@ -581,20 +689,27 @@ async def goal_and_action_planner_node(
 
     elif effective_goal_type == "ACKNOWLEDGE_AND_TRANSITION":
         planned_action_command = "ACKNOWLEDGE_AND_TRANSITION"
-        planned_action_parameters["off_topic_text"] = effective_goal.get(
-            "goal_details", {}
-        ).get("text", "[comentário anterior]")
-        prev_goal_topic = "o assunto anterior"
+        # Pass the off-topic text itself. The LLM will use chat history for transition context.
+        off_topic_text = effective_goal.get("goal_details", {}).get(
+            "text", "[comentário anterior]"
+        )
+        planned_action_parameters["off_topic_text"] = off_topic_text
+
+        # We can optionally pass the type of the interrupted goal, if available,
+        # as a hint for the LLM, but it should primarily rely on chat history.
+        interrupted_goal_type_hint: Optional[AgentGoalType] = None
         prev_goal_obj = effective_goal.get("previous_goal_if_interrupted")
         if prev_goal_obj and isinstance(prev_goal_obj, dict):
-            prev_goal_type_stored = prev_goal_obj.get("goal_type")
-            if prev_goal_type_stored == "INVESTIGATING_NEEDS":
-                prev_goal_topic = "suas necessidades"
-            elif prev_goal_type_stored == "PRESENTING_SOLUTION":
-                prev_goal_topic = "nossa solução"
-            elif prev_goal_type_stored == "ATTEMPTING_CLOSE":
-                prev_goal_topic = "os próximos passos para o pedido"
-        planned_action_parameters["previous_goal_topic"] = prev_goal_topic
+            interrupted_goal_type_hint = prev_goal_obj.get("goal_type")  # type: ignore
+
+        if interrupted_goal_type_hint:
+            planned_action_parameters["interrupted_goal_type_hint"] = (
+                interrupted_goal_type_hint
+            )
+
+        logger.info(
+            f"[{node_name}] Planning ACKNOWLEDGE_AND_TRANSITION for text: '{off_topic_text[:50]}...'. Interrupted goal hint: {interrupted_goal_type_hint}"
+        )
 
     elif effective_goal_type == "INVESTIGATING_NEEDS":
 
@@ -929,12 +1044,42 @@ async def goal_and_action_planner_node(
             planned_action_command = None
 
     elif effective_goal_type == "IDLE" or effective_goal_type == "GREETING":
-        if (
+        # Caso 1: Início absoluto da conversa ou reinício após um farewell.
+        # Planejar uma saudação combinada com a primeira pergunta SPIN.
+        if not last_agent_action or (
             last_agent_action
-            and last_agent_action.get("action_type") == "GENERATE_GREETING"
+            and last_agent_action.get("action_type") == "GENERATE_FAREWELL"
         ):
             logger.info(
-                f"[{node_name}] Greeting sent. Transitioning to INVESTIGATING_NEEDS."
+                f"[{node_name}] Goal is {effective_goal_type} (initial/reset). Planning combined GREETING + SPIN Situation."
+            )
+            planned_action_command = "GENERATE_GREETING"  # Ação principal é saudar
+            planned_action_parameters = {
+                "combined_spin_question_type": "Situation"  # Parâmetro para combinar
+            }
+            # O goal efetivo após esta ação combinada será de investigação
+            effective_goal["goal_type"] = "INVESTIGATING_NEEDS"
+            effective_goal["goal_details"] = {
+                # Estes detalhes serão confirmados/atualizados pelo final_state_updater
+                # com base no fato de que a pergunta Situation foi feita.
+                "spin_questions_asked_this_cycle": 0,  # Será 1 após esta ação
+                "last_spin_type_asked": None,  # Será "Situation" após esta ação
+            }
+
+        # Caso 2: Agente já saudou (talvez com ação simples ou combinada),
+        # e não há interrupções do usuário.
+        # Se a última ação foi uma saudação SIMPLES (sem combined_spin_question_type),
+        # então agora devemos iniciar a investigação.
+        elif (
+            last_agent_action
+            and last_agent_action.get("action_type") == "GENERATE_GREETING"
+            and not last_agent_action.get("details", {}).get(
+                "combined_spin_question_type"
+            )
+            and not _find_priority_interruption(interruptions_queue)
+        ):
+            logger.info(
+                f"[{node_name}] Simple GREETING sent previously and no user interruption. Transitioning to INVESTIGATING_NEEDS."
             )
             effective_goal["goal_type"] = "INVESTIGATING_NEEDS"
             planned_action_command = "ASK_SPIN_QUESTION"
@@ -943,21 +1088,22 @@ async def goal_and_action_planner_node(
                 "spin_questions_asked_this_cycle": 0,
                 "last_spin_type_asked": None,
             }
-        elif not last_agent_action or (
-            last_agent_action
-            and last_agent_action.get("action_type") == "GENERATE_FAREWELL"
-        ):
-            logger.info(
-                f"[{node_name}] Goal is IDLE or GREETING (initial). Planning GREETING."
-            )
-            planned_action_command = "GENERATE_GREETING"
-            effective_goal["goal_type"] = "GREETING"
-            effective_goal["goal_details"] = {}
+
+        # Outros casos:
+        # - Se a última ação já foi GREET_AND_INVESTIGATE (ou GREETING com combined_spin_question_type),
+        #   o goal já deve ser INVESTIGATING_NEEDS. O planner processará a resposta do usuário a essa pergunta.
+        # - Se há interrupções, elas serão tratadas pela lógica de interrupção.
+        # - Se o goal foi resumido para IDLE/GREETING, e não é o início, a lógica acima deve
+        #   tentar mover para INVESTIGATING_NEEDS se apropriado.
         else:
             logger.info(
-                f"[{node_name}] Goal is {effective_goal_type}, already acted. Waiting or re-evaluating."
+                f"[{node_name}] In {effective_goal_type} goal. Conditions for combined GREETING or direct SPIN not met "
+                f"(last_action: {last_agent_action.get('action_type') if last_agent_action else 'None'}, "
+                f"details: {last_agent_action.get('details') if last_agent_action else '{}'}, "
+                f"interruptions: {len(interruptions_queue)}). Waiting or expecting other logic."
             )
             planned_action_command = None
+
     # --- End of Action Planning Logic per Goal ---
 
     # --- MODIFICATION 4: Adjust proactive trigger conditions ---
@@ -1013,34 +1159,56 @@ async def goal_and_action_planner_node(
 
     # --- Update Interrupt Queue ---
     updated_interruptions_queue = list(interruptions_queue)
-    # MODIFICATION 5: Conditional interruption queue update
-    goal_determined_by_interruption_this_cycle = False
+
+    # Verificamos se a ação planejada de fato lida com o tipo de interrupção que foi pega.
+    interruption_was_handled_by_planned_action = False
     if (
-        not is_replan_from_proactive and interruption_to_handle
-    ):  # interruption_to_handle is from this cycle's standard logic
-        # Check if the effective_goal set by standard logic matches the goal for the interruption found
+        interruption_to_handle and planned_action_command
+    ):  # Certifique-se que interruption_to_handle e planned_action_command não são None
+        interruption_type_handled = interruption_to_handle.get("type")
+
         if (
-            effective_goal.get("goal_type")
-            == _get_goal_for_interruption(interruption_to_handle)[0]
+            interruption_type_handled == "direct_question"
+            and planned_action_command == "ANSWER_DIRECT_QUESTION"
         ):
-            goal_determined_by_interruption_this_cycle = True
+            interruption_was_handled_by_planned_action = True
+        elif (
+            interruption_type_handled == "objection"
+            and planned_action_command == "GENERATE_REBUTTAL"
+        ):
+            interruption_was_handled_by_planned_action = True
+        elif (
+            interruption_type_handled == "vague_statement"
+            and planned_action_command == "ASK_CLARIFYING_QUESTION"
+        ):
+            interruption_was_handled_by_planned_action = True
+        elif (
+            interruption_type_handled == "off_topic_comment"
+            and planned_action_command == "ACKNOWLEDGE_AND_TRANSITION"
+        ):
+            interruption_was_handled_by_planned_action = True
 
     if (
-        goal_determined_by_interruption_this_cycle
-        and planned_action_command
-        and interruption_to_handle
-    ):
+        interruption_was_handled_by_planned_action and interruption_to_handle
+    ):  # Adicionado interruption_to_handle aqui para type checker
         try:
-            idx_to_remove = -1
-            for i, item in enumerate(updated_interruptions_queue):
-                if item == interruption_to_handle:
-                    idx_to_remove = i
-                    break
-            if idx_to_remove != -1:
-                updated_interruptions_queue.pop(idx_to_remove)
+            # Tentamos remover o objeto exato da interrupção da cópia da fila.
+            if (
+                interruption_to_handle in updated_interruptions_queue
+            ):  # Checa se o objeto está na lista
+                updated_interruptions_queue.remove(interruption_to_handle)
                 logger.debug(
-                    f"[{node_name}] Removed handled interruption from queue: {interruption_to_handle.get('type')}"
+                    f"[{node_name}] Removed handled interruption from queue: {interruption_to_handle.get('type')} - '{interruption_to_handle.get('text', '')[:30]}...'"
                 )
+            else:
+                logger.warning(
+                    f"[{node_name}] Handled interruption object {interruption_to_handle} not found in queue {updated_interruptions_queue} for removal. Queue state might be unexpected."
+                )
+
+        except ValueError:
+            logger.warning(
+                f"[{node_name}] Tried to remove interruption but it was not found in the queue (ValueError): {interruption_to_handle}"
+            )
         except Exception as e:
             logger.warning(f"[{node_name}] Error removing interruption from queue: {e}")
 
