@@ -76,19 +76,23 @@ Descrição: {business_description}
 Ofertas: {offering_summary}
 {company_address_info}
 {opening_hours_info}
-
 Opções de Entrega/Retirada:
 {delivery_options_info}
-
 Diretrizes: {communication_guidelines}
-
 --- Fim das Informações do Perfil ---
 
 **Instruções Cruciais:**
 1.  **Priorize o Contexto RAG:** Baseie sua resposta PRIMEIRO no 'Contexto Relevante (RAG)', se ele contiver a informação necessária para responder DIRETAMENTE à pergunta.
 2.  **Use o Perfil da Empresa:** Se o RAG não for suficiente ou relevante, use as 'Informações do Perfil da Empresa'.
-3.  **Seja Honesto:** Se a informação não estiver no RAG nem no Perfil, use o texto de fallback: '{fallback_text}'. NÃO invente informações (preços, características, prazos, etc.).
-4.  **Foco na Pergunta:** Responda direta e exclusivamente à '{question_to_answer}'. NÃO adicione perguntas de acompanhamento (como 'Isso ajudou?', 'Posso ajudar com algo mais?') nem frases de encerramento genéricas. Termine a resposta logo após fornecer a informação.
+3.  **Seja Honesto sobre Limites de Conhecimento:**
+    *   Se a informação para responder COMPLETAMENTE à '{question_to_answer}' NÃO estiver no RAG nem no Perfil da Empresa, use EXATAMENTE o seguinte texto de fallback: '{fallback_text}'.
+    *   NÃO invente informações (preços, características, prazos, etc.).
+- 4.  **Foco na Pergunta:** Responda direta e exclusivamente à '{question_to_answer}'. NÃO adicione perguntas de acompanhamento (como 'Isso ajudou?', 'Posso ajudar com algo mais?') nem frases de encerramento genéricas. Termine a resposta logo após fornecer a informação.
++ 4.  **Resposta Direta e Conclusiva:**
++       a.  Responda direta e exclusivamente à '{question_to_answer}' usando as informações encontradas (RAG ou Perfil).
++       b.  **Se você conseguiu encontrar informações e acredita que respondeu à pergunta satisfatoriamente com o conhecimento disponível, TERMINE SUA RESPOSTA IMEDIATAMENTE APÓS FORNECER ESSA INFORMAÇÃO.**
++       c.  **NÃO adicione frases como "Para mais detalhes, visite nosso site", "Entre em contato conosco", ou qualquer outra forma de direcionar o cliente para outro canal SE você já forneceu uma resposta baseada no seu conhecimento.** A exceção é se a própria informação recuperada (RAG/Perfil) explicitamente instruir a fornecer um link específico como parte da resposta direta àquela pergunta.
++       d.  NÃO adicione perguntas de acompanhamento genéricas (como 'Isso ajudou?', 'Posso ajudar com algo mais?') ou frases de encerramento genéricas.
 5.  **Use o Histórico:** Consulte o 'Histórico Recente' abaixo para entender o contexto da conversa.
 6.  **Formatação:** Aplique a formatação WhatsApp ({formatting_instructions}) de forma clara e útil.
 {repetition_context_instructions}
@@ -198,42 +202,47 @@ Gere APENAS a frase curta de reconhecimento e transição.""",
     ]
 )
 
+
 PROMPT_PRESENT_SOLUTION_OFFER = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            """Você é um Assistente de Vendas IA focado em apresentar soluções que resolvem necessidades identificadas do cliente.
-O objetivo é apresentar o '{product_name_to_present}' destacando como ele atende ao '{key_benefit_to_highlight}'.
+            """Você é um Assistente de Vendas IA persuasivo e claro, da '{company_name}'.
+Sua tarefa é apresentar o produto/serviço '{product_name_to_present}', enfatizando como ele resolve o '{key_benefit_to_highlight}' para o cliente.
+O produto e o benefício principal já foram selecionados para você.
 
-**Contexto:**
-Produto a Apresentar: {product_name_to_present}
-Benefício Chave a Destacar: {key_benefit_to_highlight}
-Tom de Vendas: {sales_tone}
-Idioma: {language}
+**Produto Selecionado para Apresentação:** {product_name_to_present}
+**Benefício Chave Principal a ser Destacado:** {key_benefit_to_highlight}
 
-**Informações do Perfil da Empresa (Use para detalhes do produto, se necessário):**
-Nome da Empresa: {company_name}
-Descrição do Negócio: {business_description}
-Ofertas (pode conter detalhes do produto): {offering_summary} 
-Pontos Chave de Venda Gerais: {key_selling_points}
+**Contexto Adicional (Use para enriquecer a descrição do produto, se relevante):**
+- Informações do Perfil da Empresa:
+  - Descrição do Negócio: {business_description}
+  - Resumo das Ofertas (pode conter detalhes do '{product_name_to_present}'): {offering_summary}
+  - Pontos Chave de Venda Gerais: {key_selling_points}
+- Contexto Específico do Produto (RAG - se disponível e relevante para '{product_name_to_present}'):
+  {rag_context}
+--- Fim do Contexto Adicional ---
 
-**Contexto Adicional (RAG - Use se fornecer detalhes específicos sobre o produto/benefício):**
-{rag_context}
+**Instruções para a Mensagem de Apresentação:**
+1.  **Conexão Inicial:** Comece conectando a apresentação ao benefício chave ou à necessidade do cliente.
+    Exemplo: "Considerando seu interesse em {key_benefit_to_highlight}, acredito que o *{product_name_to_present}* seja uma excelente opção para você."
+    Ou: "Para resolver [problema/necessidade do cliente relacionado ao {key_benefit_to_highlight}], temos o *{product_name_to_present}*."
+2.  **Descrição Focada:** Descreva brevemente o *{product_name_to_present}*. Explique COMO ele entrega o *{key_benefit_to_highlight}*.
+    Use detalhes do "Contexto Adicional" (RAG ou Perfil da Empresa) para tornar a descrição mais concreta e valiosa, se esses detalhes forem específicos para o '{product_name_to_present}'.
+3.  **Benefícios sobre Características:** Sempre traduza características em benefícios diretos para o cliente.
+4.  **Chamada para Ação Suave:** Termine com uma pergunta aberta para verificar o interesse e convidar a uma próxima etapa.
+    Exemplos: "Isso parece ser o que você procura?", "O que você acha desta solução para [contexto do benefício]?", "Gostaria de saber mais detalhes sobre como o *{product_name_to_present}* pode te ajudar com {key_benefit_to_highlight}?"
+5.  **Tom e Formatação:** Use o tom de vendas '{sales_tone}', idioma '{language}', e aplique a formatação WhatsApp ({formatting_instructions}).
 
-**Instruções:**
-1. Comece conectando a solução à necessidade/benefício. (Ex: "Com base no que conversamos sobre [benefício/necessidade], a solução ideal para você seria o nosso {product_name_to_present}.")
-2. Descreva brevemente o {product_name_to_present} e COMO ele entrega o {key_benefit_to_highlight}. Use informações do RAG ou das Ofertas se disponíveis.
-3. Foque nos benefícios para o cliente, não apenas nas características.
-4. Termine com uma pergunta de transição suave para verificar o interesse ou convidar a uma próxima etapa (Ex: "Isso parece algo que atenderia às suas expectativas?", "Gostaria de ver como isso funciona na prática?", "O que acha de explorarmos essa opção mais a fundo?").
-5. Aplique formatação WhatsApp: {formatting_instructions}
-
-HISTÓRICO RECENTE:
+**Histórico Recente da Conversa (para seu contexto):**
 {chat_history}
+--- Fim do Histórico ---
 
-Apresente o '{product_name_to_present}' focando no benefício '{key_benefit_to_highlight}'.""",
+Gere APENAS a mensagem de apresentação para o '{product_name_to_present}', focando no '{key_benefit_to_highlight}'.""",
         ),
     ]
 )
+
 
 PROMPT_INITIATE_CLOSING = ChatPromptTemplate.from_messages(
     [
@@ -637,15 +646,31 @@ async def response_generator_node(
                 "objection_text_to_address", "[Objeção não especificada]"
             )
         elif action_command == "ASK_CLARIFYING_QUESTION":
-            # Tentar pegar o texto vago do goal_details associado a esta ação
-            # Assumindo que o Planner colocou o texto vago no goal_details quando definiu o goal CLARIFYING_USER_INPUT
-            vague_text = (
-                state.get("current_agent_goal", {})
-                .get("goal_details", {})
-                .get("text", "[Declaração vaga não especificada]")
-            )
-            specific_values["vague_statement_text"] = vague_text
-            specific_values["last_action_context"] = action_params.get("context", "N/A")
+            context_from_params = action_params.get("context")
+
+            if (
+                context_from_params
+                and isinstance(context_from_params, str)
+                and context_from_params.strip()
+            ):
+                vague_text_for_prompt = context_from_params
+                last_action_context_for_prompt = context_from_params
+            else:  # Fallback
+                logger.warning(
+                    f"[{node_name}] Context from action_params for ASK_CLARIFYING_QUESTION was empty or None. Falling back to goal_details."
+                )
+                vague_text_for_prompt = (
+                    state.get("current_agent_goal", {})
+                    .get("goal_details", {})
+                    .get("text", "[Declaração vaga não especificada]")
+                )
+                last_action_context_for_prompt = (
+                    "N/A"  # Or some other suitable fallback for this case
+                )
+
+            specific_values["vague_statement_text"] = vague_text_for_prompt
+            specific_values["last_action_context"] = last_action_context_for_prompt
+
         elif action_command == "ACKNOWLEDGE_AND_TRANSITION":
 
             specific_values["off_topic_text"] = action_params.get(
@@ -663,7 +688,13 @@ async def response_generator_node(
             specific_values["key_benefit_to_highlight"] = action_params.get(
                 "key_benefit_to_highlight", "[Benefício não especificado]"
             )
-            # Adicionar outros casos aqui..
+            if (
+                specific_values["product_name_to_present"]
+                == "[Produto não especificado pelo planner]"
+            ):
+                logger.error(
+                    f"[{node_name}] Critical: product_name_to_present not found in action_params for PRESENT_SOLUTION_OFFER."
+                )
 
         elif action_command == "INITIATE_CLOSING":
             product_name = action_params.get("product_name")

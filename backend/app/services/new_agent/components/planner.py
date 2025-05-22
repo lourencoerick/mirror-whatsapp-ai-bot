@@ -32,12 +32,10 @@ INTERRUPTION_TO_ACTION_MAP: Dict[str, AgentActionType] = {
 MAX_SPIN_QUESTIONS_PER_CYCLE = 5
 MAX_REBUTTAL_ATTEMPTS_PER_OBJECTION = 2
 
-
 # --- Helper Functions ---
 # (Helper functions _find_priority_interruption, _find_question_status_in_log,
 # _get_goal_for_interruption, _get_previous_goal_to_store, _check_goal_resumption,
 # _find_objection_in_profile, _get_next_spin_type,
-# _select_product_and_benefit_for_presentation remain unchanged from your original)
 
 
 def _find_priority_interruption(
@@ -229,70 +227,6 @@ def _get_next_spin_type(last_spin_type: Optional[SpinQuestionType]) -> SpinQuest
         return "Situation"
 
 
-def _select_product_and_benefit_for_presentation(
-    customer_profile: DynamicCustomerProfile,
-    company_profile_offerings: List[Dict[str, Any]],
-) -> Tuple[str, str]:
-    """
-    Selects a product and key benefit to highlight based on identified needs.
-    """
-    product_to_present = "Nossa Solução Principal"
-    key_benefit = "atender às suas necessidades gerais"
-    identified_needs: List[IdentifiedNeedEntry] = customer_profile.get(
-        "identified_needs", []
-    )
-    target_need: Optional[IdentifiedNeedEntry] = None
-
-    needs_to_consider = sorted(
-        [n for n in identified_needs if n.get("status") != "addressed_by_agent"],
-        key=lambda x: (
-            x.get("status") == "confirmed_by_user",
-            x.get("priority") if isinstance(x.get("priority"), int) else 0,
-            x.get("source_turn", 0),
-        ),
-        reverse=True,
-    )
-
-    if needs_to_consider:
-        target_need = cast(IdentifiedNeedEntry, needs_to_consider[0])
-
-    if target_need:
-        target_need_text = target_need.get("text", "sua necessidade principal")
-        key_benefit = f"o seu desafio em relação a '{target_need_text}'"
-        if company_profile_offerings:
-            best_match_score = -1
-            best_match_product = (
-                company_profile_offerings[0].get("name", product_to_present)
-                if company_profile_offerings
-                else product_to_present
-            )
-            try:
-                need_keywords = {
-                    kw for kw in target_need_text.lower().split() if len(kw) > 3
-                }
-                for offering in company_profile_offerings:
-                    offering_name = offering.get("name", "").lower()
-                    offering_desc = offering.get("short_description", "").lower()
-                    offering_keywords = {
-                        kw
-                        for kw in (offering_name + " " + offering_desc).split()
-                        if len(kw) > 3
-                    }
-                    match_score = len(need_keywords.intersection(offering_keywords))
-                    if match_score > best_match_score:
-                        best_match_score = match_score
-                        best_match_product = offering.get("name", best_match_product)
-            except Exception as e:
-                logger.warning(f"Error during product selection keyword matching: {e}")
-            product_to_present = best_match_product
-            logger.debug(
-                f"Planner: Matched need '{target_need_text}' to product '{product_to_present}'."
-            )
-        else:
-            logger.warning("Planner: No company offerings found.")
-    return product_to_present, key_benefit
-
-
 # --- Main Planner Node ---
 async def goal_and_action_planner_node(
     state: RichConversationState, config: Dict[str, Any]
@@ -340,6 +274,7 @@ async def goal_and_action_planner_node(
 
     # Load other state components
     user_analysis = state.get("user_input_analysis_result")
+    offer_selection_result_dict = state.get("offer_selection_result")
     interruptions_queue = list(state.get("user_interruptions_queue", []))
     customer_profile = cast(
         DynamicCustomerProfile, copy.deepcopy(state.get("customer_profile_dynamic", {}))
@@ -575,10 +510,7 @@ async def goal_and_action_planner_node(
         in ["acknowledged_action", "partially_answered", "ignored_agent_action"]
         or is_vague_response
     )
-    # if minimal_or_vague_user_response:
-    logger.debug(
-        f"AQUIIIIIIIIII MINIMAL RESPONSE:{user_analysis} {user_response_quality} AND {minimal_or_vague_user_response}"
-    )
+
     # --- Action Planning Logic per Goal (Copied from your original file) ---
     if effective_goal_type == "HANDLING_OBJECTION":
         original_objection_text = effective_goal.get("goal_details", {}).get(
@@ -706,22 +638,15 @@ async def goal_and_action_planner_node(
 
             if should_exit_spin:
                 logger.info(
-                    f"[{node_name}] Transitioning from SPIN. Reason: {exit_reason}"
+                    f"[{node_name}] Transitioning from SPIN to PRESENTING_SOLUTION. Reason: {exit_reason}. Will trigger offer selection."
                 )
                 effective_goal["goal_type"] = "PRESENTING_SOLUTION"
-                product_to_present, key_benefit = (
-                    _select_product_and_benefit_for_presentation(
-                        customer_profile, company_profile.get("offering_overview", [])
-                    )
-                )
-                planned_action_command = "PRESENT_SOLUTION_OFFER"
-                planned_action_parameters = {
-                    "product_name_to_present": product_to_present,
-                    "key_benefit_to_highlight": key_benefit,
-                }
-                effective_goal["goal_details"] = {
-                    "presenting_product": product_to_present,
-                    "main_benefit_focus": key_benefit,
+                # Instead of selecting product here, we set the stage for select_offer_node
+                planned_action_command = "SELECT_AVAILABLE_OFFER"  # <<< CHANGE ACTION
+                planned_action_parameters = {}  # No params needed for selection command
+                effective_goal["goal_details"] = {  # Update goal details
+                    "status": "awaiting_offer_selection",  # Indicate we're waiting for selection
+                    "reason_for_presentation_attempt": exit_reason,
                 }
             else:
                 next_spin_type = _get_next_spin_type(last_spin_type_asked)
@@ -733,32 +658,140 @@ async def goal_and_action_planner_node(
                 effective_goal["goal_details"]["last_spin_type_asked"] = next_spin_type
 
     elif effective_goal_type == "PRESENTING_SOLUTION":
+        logger.info(f"[{node_name}] Goal is PRESENTING_SOLUTION.")
+
+        # Check if the agent just presented a solution in the last turn.
+        # If so, it should wait for the user's response.
         if (
             last_agent_action
             and last_agent_action.get("action_type") == "PRESENT_SOLUTION_OFFER"
+            and
+            # Ensure this wasn't an interruption that led to a different action
+            state.get("last_agent_action")
+            == last_agent_action  # Check if it's truly the immediate last action
         ):
             logger.info(
-                f"[{node_name}] Agent just presented solution. Waiting for user response."
+                f"[{node_name}] Agent just presented a solution. Waiting for user response."
             )
             planned_action_command = None
+            # Clear offer_selection_result as it has been consumed by the presentation
+            updated_state_delta["offer_selection_result"] = None
+
+        # Check if offer_selection_result is available from a previous select_offer_node run
+        elif offer_selection_result_dict and isinstance(
+            offer_selection_result_dict, dict
+        ):
+            logger.info(f"[{node_name}] Processing existing offer_selection_result.")
+
+            selected_offer = offer_selection_result_dict.get("selected_offer")
+            no_suitable_offer = offer_selection_result_dict.get(
+                "no_suitable_offer_found", False
+            )
+            clarifying_questions = offer_selection_result_dict.get(
+                "clarifying_questions_to_ask"
+            )
+
+            if (
+                selected_offer
+                and isinstance(selected_offer, dict)
+                and selected_offer.get("product_name")
+            ):
+                product_name = selected_offer.get("product_name")
+                key_benefit = selected_offer.get(
+                    "key_benefit_to_highlight",
+                    f"atender às suas necessidades com {product_name}",
+                )
+
+                logger.info(
+                    f"[{node_name}] Offer '{product_name}' selected by LLM. Planning PRESENT_SOLUTION_OFFER."
+                )
+                planned_action_command = "PRESENT_SOLUTION_OFFER"
+                planned_action_parameters = {
+                    "product_name_to_present": product_name,
+                    "key_benefit_to_highlight": key_benefit,
+                    # We might want to pass the full selected_offer object or more details if ResponseGenerator needs them
+                }
+                effective_goal["goal_details"] = {  # Update goal details for context
+                    "presenting_product": product_name,
+                    "main_benefit_focus": key_benefit,
+                    "offer_selection_details": selected_offer,  # Store for reference
+                }
+                # Clear offer_selection_result as it's about to be consumed
+                # updated_state_delta["offer_selection_result"] = None # Moved to after presentation
+
+            elif no_suitable_offer:
+                logger.info(f"[{node_name}] Offer selector found no suitable offer.")
+                # Decision: What to do if no offer is found?
+                # Option 1: Ask clarifying questions if suggested
+                if (
+                    clarifying_questions
+                    and isinstance(clarifying_questions, list)
+                    and clarifying_questions[0]
+                ):
+                    logger.info(
+                        f"[{node_name}] Planning to ask clarifying questions suggested by offer selector."
+                    )
+                    # For simplicity, let's assume the first clarifying question is good enough for now.
+                    # A more robust approach might involve the ResponseGenerator crafting a message
+                    # that incorporates these questions.
+                    # For now, let's transition goal or plan a generic clarifying action.
+                    # We could change goal to INVESTIGATING_NEEDS or use ASK_CLARIFYING_QUESTION directly.
+                    # Let's try to use ASK_CLARIFYING_QUESTION with context.
+                    effective_goal["goal_type"] = "CLARIFYING_USER_INPUT"  # Change goal
+                    effective_goal["goal_details"] = {
+                        "clarification_type": "vague",  # Treat as vague input needing clarification
+                        "text": f"Não encontrei uma oferta ideal. Para ajudar: {clarifying_questions[0]}",  # Context for LLM
+                        "original_reason": "No suitable offer found, offer_selector suggested questions.",
+                    }
+                    planned_action_command = (
+                        "ASK_CLARIFYING_QUESTION"  # This will use the text above
+                    )
+                    planned_action_parameters = {  # Parameters for ASK_CLARIFYING_QUESTION
+                        "context": f"Não encontrei uma oferta ideal com as informações atuais. {clarifying_questions[0]}"
+                    }
+
+                else:
+                    # Option 2: Inform the user (requires new action/prompt or generic farewell)
+                    logger.info(
+                        f"[{node_name}] No suitable offer and no clarifying questions. Planning to inform user or end."
+                    )
+                    # For now, let's transition to ending conversation gracefully.
+                    # A more advanced agent might have an INFORM_NO_OFFER action.
+                    effective_goal["goal_type"] = "ENDING_CONVERSATION"
+                    effective_goal["goal_details"] = {
+                        "reason": "Nenhuma oferta adequada encontrada para as necessidades atuais."
+                    }
+                    planned_action_command = "GENERATE_FAREWELL"
+                    planned_action_parameters = {
+                        "reason": "Não foi possível encontrar uma oferta adequada no momento."
+                    }
+
+                updated_state_delta["offer_selection_result"] = (
+                    None  # Clear consumed result
+                )
+
+            else:  # Should not happen if schema is correct
+                logger.warning(
+                    f"[{node_name}] offer_selection_result is in an unexpected state. Defaulting to select offer again."
+                )
+                planned_action_command = "SELECT_AVAILABLE_OFFER"
+                planned_action_parameters = {}  # No params needed for selection command
+                # Keep offer_selection_result in state for next iteration if it was malformed, or clear it.
+                # Let's clear it to avoid loops on malformed data.
+                updated_state_delta["offer_selection_result"] = None
+
+        # If not waiting for user response and no offer_selection_result exists,
+        # then we need to trigger the offer selection process.
         else:
             logger.info(
-                f"[{node_name}] In PRESENTING_SOLUTION goal, action not yet taken or user responded to something else. Re-evaluating presentation."
+                f"[{node_name}] No prior presentation and no offer_selection_result. Planning SELECT_AVAILABLE_OFFER."
             )
-            product_to_present, key_benefit = (
-                _select_product_and_benefit_for_presentation(
-                    customer_profile, company_profile.get("offering_overview", [])
-                )
-            )
-            planned_action_command = "PRESENT_SOLUTION_OFFER"
-            planned_action_parameters = {
-                "product_name_to_present": product_to_present,
-                "key_benefit_to_highlight": key_benefit,
-            }
-            effective_goal["goal_details"] = {
-                "presenting_product": product_to_present,
-                "main_benefit_focus": key_benefit,
-            }
+            planned_action_command = "SELECT_AVAILABLE_OFFER"
+            planned_action_parameters = (
+                {}
+            )  # No specific parameters needed for the selection command itself
+            # Goal details remain as PRESENTING_SOLUTION, as we are in the process of it.
+            effective_goal["goal_details"] = {"status": "awaiting_offer_selection"}
 
     elif effective_goal_type == "ATTEMPTING_CLOSE":
         closing_status = state.get("closing_process_status", "not_started")
@@ -1017,6 +1050,21 @@ async def goal_and_action_planner_node(
     if updated_interruptions_queue != interruptions_queue:
         updated_state_delta["user_interruptions_queue"] = updated_interruptions_queue
 
+    # Clear offer_selection_result if it hasn't been explicitly cleared by PRESENTING_SOLUTION logic
+    # and is not being used for an immediate PRESENT_SOLUTION_OFFER action.
+    # This handles cases where planner might decide on a different action after offer_selection_result was set
+    # (e.g., an interruption occurred, or proactive step).
+
+    if (
+        "offer_selection_result" not in updated_state_delta
+        and planned_action_command != "PRESENT_SOLUTION_OFFER"
+        and state.get("offer_selection_result") is not None
+    ):  # Check if it exists in current state
+        logger.debug(
+            f"[{node_name}] Clearing stale offer_selection_result as current action is '{planned_action_command}'."
+        )
+        updated_state_delta["offer_selection_result"] = None
+
     if planned_action_command:
         updated_state_delta["next_agent_action_command"] = planned_action_command
         updated_state_delta["action_parameters"] = planned_action_parameters
@@ -1024,6 +1072,12 @@ async def goal_and_action_planner_node(
             f"[{node_name}] Planned Action: {planned_action_command}, Params: {planned_action_parameters}"
         )
     else:
+        if (
+            "offer_selection_result" not in updated_state_delta
+            and state.get("offer_selection_result") is not None
+        ):
+            updated_state_delta["offer_selection_result"] = None
+
         updated_state_delta["next_agent_action_command"] = None
         updated_state_delta["action_parameters"] = {}
         logger.info(
