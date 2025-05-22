@@ -34,6 +34,8 @@ from app.services.new_agent.state_definition import (
 from app.services.new_agent.schemas.input_analysis import (
     UserInputAnalysisOutput,
     PendingAgentActionResponseAnalysis,
+    ReactionToPresentation,
+    ObjectionAfterRebuttalStatus,
 )
 
 # --- Fixtures ---
@@ -130,6 +132,9 @@ def base_state_for_planner() -> RichConversationState:
         follow_up_scheduled=False,
         follow_up_attempt_count=0,
         last_message_from_agent_timestamp=None,
+        max_follow_up_attempts=3,
+        suggested_goal_type=None,  # Added new field
+        suggested_goal_details=None,  # Added new field
         trigger_event="user_message",  # Default para user_message se current_user_input_text existe
     )
     # Ajustar trigger_event se current_user_input_text for None no setup de um teste específico
@@ -152,7 +157,9 @@ async def test_planner_initial_idle_state_moves_to_greeting(
     """
     state = base_state_for_planner
     state["user_interruptions_queue"] = []
-
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="IDLE", previous_goal_if_interrupted=None, goal_details={}
+    )
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
@@ -402,13 +409,13 @@ async def test_planner_resumes_presenting_solution_and_plans_action(
 ):
     """
     Tests if the planner resumes PRESENTING_SOLUTION after an objection
-    is resolved and immediately plans PRESENT_SOLUTION_OFFER.
+    is resolved and then plans SELECT_AVAILABLE_OFFER.
     """
     state = base_state_for_planner
     previous_sales_goal = AgentGoal(
         goal_type="PRESENTING_SOLUTION",
         previous_goal_if_interrupted=None,
-        goal_details={},
+        goal_details={},  # Initial goal details for PRESENTING_SOLUTION
     )
     objection_text_handled = "Preço alto"
 
@@ -420,23 +427,33 @@ async def test_planner_resumes_presenting_solution_and_plans_action(
     state["customer_profile_dynamic"]["identified_objections"] = [
         IdentifiedObjectionEntry(
             text=objection_text_handled,
-            status="resolved",
+            status="resolved",  # Objection is resolved
             rebuttal_attempts=1,
             source_turn=2,
         )
     ]
     state["user_interruptions_queue"] = []
+    state["offer_selection_result"] = None  # No offer selected yet
 
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
     assert delta["current_agent_goal"]["goal_type"] == "PRESENTING_SOLUTION"
     assert delta["current_agent_goal"]["previous_goal_if_interrupted"] is None
-    assert delta.get("next_agent_action_command") == "PRESENT_SOLUTION_OFFER"
-    assert "product_name_to_present" in delta.get("action_parameters", {})
-    assert "key_benefit_to_highlight" in delta.get("action_parameters", {})
-    assert "presenting_product" in delta["current_agent_goal"]["goal_details"]
-    assert "main_benefit_focus" in delta["current_agent_goal"]["goal_details"]
+
+    # <<< CORRECTED ASSERTION >>>
+    # Now it should plan to select an offer first
+    assert delta.get("next_agent_action_command") == "SELECT_AVAILABLE_OFFER"
+    assert (
+        delta.get("action_parameters", {}) == {}
+    )  # No params for SELECT_AVAILABLE_OFFER
+
+    # Goal details should indicate it's awaiting selection
+    assert "status" in delta["current_agent_goal"]["goal_details"]
+    assert (
+        delta["current_agent_goal"]["goal_details"]["status"]
+        == "awaiting_offer_selection"
+    )
 
 
 @pytest.mark.asyncio
@@ -547,18 +564,30 @@ async def test_planner_exits_spin_after_max_questions(base_state_for_planner):
         goal_type="INVESTIGATING_NEEDS",
         goal_details={
             "spin_questions_asked_this_cycle": MAX_SPIN_QUESTIONS_PER_CYCLE,
-            "last_spin_type_asked": "NeedPayoff",
+            "last_spin_type_asked": "NeedPayoff",  # Example last type
         },
         previous_goal_if_interrupted=None,
     )
+    state["offer_selection_result"] = None  # No offer selected yet
 
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
     assert delta["current_agent_goal"]["goal_type"] == "PRESENTING_SOLUTION"
-    assert delta["next_agent_action_command"] == "PRESENT_SOLUTION_OFFER"
-    assert "product_name_to_present" in delta["action_parameters"]
-    assert "key_benefit_to_highlight" in delta["action_parameters"]
+
+    # <<< CORRECTED ASSERTION >>>
+    assert delta["next_agent_action_command"] == "SELECT_AVAILABLE_OFFER"
+    assert delta.get("action_parameters", {}) == {}
+
+    # Goal details should reflect the transition and awaiting selection
+    assert "status" in delta["current_agent_goal"]["goal_details"]
+    assert (
+        delta["current_agent_goal"]["goal_details"]["status"]
+        == "awaiting_offer_selection"
+    )
+    assert (
+        "reason_for_presentation_attempt" in delta["current_agent_goal"]["goal_details"]
+    )
 
 
 @pytest.mark.asyncio
@@ -569,7 +598,7 @@ async def test_planner_exits_spin_if_strong_need_identified_after_needpayoff(
     state["current_agent_goal"] = AgentGoal(
         goal_type="INVESTIGATING_NEEDS",
         goal_details={
-            "spin_questions_asked_this_cycle": 3,
+            "spin_questions_asked_this_cycle": 3,  # Not max, but need identified
             "last_spin_type_asked": "NeedPayoff",
         },
         previous_goal_if_interrupted=None,
@@ -582,50 +611,64 @@ async def test_planner_exits_spin_if_strong_need_identified_after_needpayoff(
             source_turn=3,
         )
     ]
+    state["offer_selection_result"] = None  # No offer selected yet
 
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
     assert delta["current_agent_goal"]["goal_type"] == "PRESENTING_SOLUTION"
-    assert delta["next_agent_action_command"] == "PRESENT_SOLUTION_OFFER"
+
+    # <<< CORRECTED ASSERTION >>>
+    assert delta["next_agent_action_command"] == "SELECT_AVAILABLE_OFFER"
+    assert delta.get("action_parameters", {}) == {}
+
+    assert "status" in delta["current_agent_goal"]["goal_details"]
     assert (
-        delta["action_parameters"]["key_benefit_to_highlight"]
-        == "o seu desafio em relação a 'Preciso de mais velocidade'"
+        delta["current_agent_goal"]["goal_details"]["status"]
+        == "awaiting_offer_selection"
     )
-    assert "product_name_to_present" in delta["action_parameters"]
+    assert (
+        "reason_for_presentation_attempt" in delta["current_agent_goal"]["goal_details"]
+    )
 
 
 @pytest.mark.asyncio
-async def test_planner_plans_presentation_if_presenting_solution_and_did_not_just_present(
+async def test_planner_plans_selection_if_presenting_solution_and_no_prior_selection(
     base_state_for_planner,
 ):
     """
-    Tests if the planner plans PRESENT_SOLUTION_OFFER when the goal is
-    PRESENTING_SOLUTION but the last action wasn't the presentation itself.
+    Tests if the planner plans SELECT_AVAILABLE_OFFER when the goal is
+    PRESENTING_SOLUTION, the last action wasn't presentation, and no offer_selection_result exists.
     """
     state = base_state_for_planner
     state["current_agent_goal"] = AgentGoal(
         goal_type="PRESENTING_SOLUTION",
-        goal_details={"presenting_product": "Produto X"},
+        goal_details={},  # No specific product yet, awaiting selection
         previous_goal_if_interrupted=None,
     )
     state["user_interruptions_queue"] = []
-    state["last_agent_action"] = PendingAgentAction(
+    state["last_agent_action"] = PendingAgentAction(  # Some other action
         action_type="ANSWER_DIRECT_QUESTION",
         details={},
         action_generation_text="Sim.",
         attempts=1,
     )
+    state["offer_selection_result"] = None  # Crucially, no offer selected yet
 
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
     assert delta["current_agent_goal"]["goal_type"] == "PRESENTING_SOLUTION"
-    assert delta.get("next_agent_action_command") == "PRESENT_SOLUTION_OFFER"
-    assert "product_name_to_present" in delta.get("action_parameters", {})
-    assert "key_benefit_to_highlight" in delta.get("action_parameters", {})
-    assert "presenting_product" in delta["current_agent_goal"]["goal_details"]
-    assert "main_benefit_focus" in delta["current_agent_goal"]["goal_details"]
+
+    # <<< CORRECTED ASSERTION >>>
+    assert delta.get("next_agent_action_command") == "SELECT_AVAILABLE_OFFER"
+    assert delta.get("action_parameters", {}) == {}
+
+    assert "status" in delta["current_agent_goal"]["goal_details"]
+    assert (
+        delta["current_agent_goal"]["goal_details"]["status"]
+        == "awaiting_offer_selection"
+    )
 
 
 @pytest.mark.asyncio
@@ -710,50 +753,49 @@ async def test_planner_generates_farewell_if_objection_persists_at_limit(
 
 
 @pytest.mark.asyncio
-async def test_planner_initiates_closing_after_presentation_with_buying_signal(
+async def test_planner_selects_offer_on_presenting_solution_with_buying_signal_if_not_just_presented(
     base_state_for_planner,
 ):
+    """
+    If goal is PRESENTING_SOLUTION, a buying signal comes, but agent didn't just present,
+    it should plan SELECT_AVAILABLE_OFFER.
+    """
     state = base_state_for_planner
     state["current_agent_goal"] = AgentGoal(
-        goal_type="PRESENTING_SOLUTION",
-        goal_details={"presenting_product": "Produto Top"},
+        goal_type="PRESENTING_SOLUTION",  # Goal is already to present
+        goal_details={},  # No product selected yet
         previous_goal_if_interrupted=None,
     )
-    state["last_agent_action"] = PendingAgentAction(
-        action_type="ANSWER_DIRECT_QUESTION",
-        details={},
-        action_generation_text="Sim.",
-        attempts=1,
+    state["last_agent_action"] = (
+        PendingAgentAction(  # Agent did *not* just present a solution
+            action_type="ANSWER_DIRECT_QUESTION",
+            details={},
+            action_generation_text="Sim.",
+            attempts=1,
+        )
     )
     state["user_interruptions_queue"] = []
     state["customer_profile_dynamic"][
         "last_discerned_intent"
     ] = "RequestForNextStepInPurchase"
     state["customer_profile_dynamic"]["identified_objections"] = []
-    proposal = ProposedSolution(
-        product_name="Produto Top",
-        price=100.0,
-        turn_proposed=1,
-        status="proposed",
-        key_benefits_highlighted=[],
-        quantity=None,
-        price_info=None,
-    )
-    state["active_proposal"] = proposal
+    state["active_proposal"] = None  # No active proposal yet
+    state["offer_selection_result"] = None  # No offer selected yet
 
     delta = await goal_and_action_planner_node(state, {})
 
     assert "current_agent_goal" in delta
-    assert delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
-    assert delta["current_agent_goal"]["goal_details"] == {
-        "closing_step": "initial_attempt"
-    }
-    assert delta.get("next_agent_action_command") == "INITIATE_CLOSING"
+    # The high-priority transition for buying signal when not just presented keeps goal as PRESENTING_SOLUTION
+    assert delta["current_agent_goal"]["goal_type"] == "PRESENTING_SOLUTION"
+
+    # <<< CORRECTED ASSERTION >>>
+    # It should now plan to select an offer
+    assert delta.get("next_agent_action_command") == "SELECT_AVAILABLE_OFFER"
+    assert delta.get("action_parameters", {}) == {}
     assert (
-        delta.get("action_parameters", {}).get("product_name")
-        == proposal["product_name"]
+        delta["current_agent_goal"]["goal_details"]["status"]
+        == "awaiting_offer_selection"
     )
-    assert delta.get("action_parameters", {}).get("price") == proposal["price"]
 
 
 @pytest.mark.asyncio
@@ -988,6 +1030,7 @@ async def test_planner_handles_follow_up_timeout_and_plans_decide_proactive_step
     assert delta.get("action_parameters") == {
         "trigger_source": "follow_up_timeout",
         "current_follow_up_attempts": 0,  # Passa a contagem *antes* do incremento para o decidor
+        "max_follow_up_attempts_total": 3,
     }
     assert delta.get("trigger_event") is None  # Evento deve ser consumido/limpo
     assert (
@@ -1016,7 +1059,7 @@ async def test_planner_handles_follow_up_timeout_max_attempts_reached(
     assert "current_agent_goal" in delta
     assert delta["current_agent_goal"]["goal_type"] == "ENDING_CONVERSATION"
     assert (
-        "Inatividade do usuário"
+        "Inactivity after 2 follow-ups."
         in delta["current_agent_goal"]["goal_details"]["reason"]
     )
 
@@ -1125,7 +1168,280 @@ async def test_planner_proactive_step_after_minimal_user_response_to_answered_qu
     assert delta.get("action_parameters") == {
         "trigger_source": "user_response_or_stagnation",
         "current_follow_up_attempts": 0,
+        "max_follow_up_attempts_total": 3,
     }
     assert delta.get("last_processing_error") is None
     assert "trigger_event" not in delta
     assert delta.get("follow_up_attempt_count", 0) == 0
+
+
+@pytest.mark.asyncio
+async def test_planner_triggers_proactive_step_on_minimal_response_in_investigating_needs(
+    base_state_for_planner: RichConversationState,
+):
+    """
+    Tests that the planner correctly sets next_agent_action_command to
+    DECIDE_PROACTIVE_STEP when the current goal is INVESTIGATING_NEEDS,
+    the agent just asked a SPIN question, and the user gave a minimal response.
+    """
+    state = base_state_for_planner
+
+    # Setup the specific scenario
+    state["current_turn_number"] = 2
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="INVESTIGATING_NEEDS",
+        goal_details={
+            "last_spin_type_asked": "Problem",  # Agent just asked a Problem question
+            "spin_questions_asked_this_cycle": 1,
+        },
+        previous_goal_if_interrupted=None,
+    )
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="ASK_SPIN_QUESTION",
+        details={"spin_type": "Problem"},
+        action_generation_text="Qual é o principal problema que você enfrenta com X?",
+        attempts=1,
+    )
+    state["current_user_input_text"] = "Ok"  # Minimal user response
+
+    # Mock user_input_analysis_result to reflect minimal response
+    state["user_input_analysis_result"] = UserInputAnalysisOutput(
+        overall_intent="RespondingToAgent",
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="acknowledged_action"  # Key condition
+        ),
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        is_primarily_vague_statement=False,  # Can also be True to trigger
+        is_primarily_off_topic=False,
+        correction_details_text=None,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    ).model_dump()
+
+    state["user_interruptions_queue"] = []
+    state["trigger_event"] = "user_message"  # Not a timeout
+    state["follow_up_scheduled"] = False
+    state["follow_up_attempt_count"] = 0
+    state["agent_config"]["max_follow_up_attempts"] = 3  # Ensure available
+
+    # Call the planner
+    delta = await goal_and_action_planner_node(state, {})
+
+    # Assertions
+    assert (
+        delta.get("next_agent_action_command") == "DECIDE_PROACTIVE_STEP"
+    ), "Planner should decide to take a proactive step."
+
+    expected_action_params = {
+        "trigger_source": "user_response_or_stagnation",
+        "current_follow_up_attempts": 0,
+        "max_follow_up_attempts_total": 3,
+    }
+    assert (
+        delta.get("action_parameters") == expected_action_params
+    ), "Action parameters for proactive step are incorrect."
+
+    # Goal should remain INVESTIGATING_NEEDS for the proactive decider's context
+    assert "current_agent_goal" in delta
+    assert delta["current_agent_goal"]["goal_type"] == "INVESTIGATING_NEEDS"
+    # Details of the goal should be preserved for the proactive decider
+    assert (
+        delta["current_agent_goal"]["goal_details"]
+        == state["current_agent_goal"]["goal_details"]
+    )
+
+    assert delta.get("last_processing_error") is None
+    assert (
+        delta.get("suggested_goal_type") is None
+    )  # No goal suggestion from planner itself
+    assert delta.get("suggested_goal_details") is None
+
+
+@pytest.mark.asyncio
+async def test_planner_triggers_proactive_step_on_vague_response_in_investigating_needs(
+    base_state_for_planner: RichConversationState,
+):
+    """
+    Tests that the planner triggers proactive step if user response is primarily vague,
+    even if not just 'acknowledged_action'.
+    """
+    state = base_state_for_planner
+    state["current_turn_number"] = 2
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="INVESTIGATING_NEEDS",
+        goal_details={
+            "last_spin_type_asked": "Problem",
+            "spin_questions_asked_this_cycle": 1,
+        },
+        previous_goal_if_interrupted=None,
+    )
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="ASK_SPIN_QUESTION",
+        details={"spin_type": "Problem"},
+        action_generation_text="Qual é o principal problema?",
+        attempts=1,
+    )
+    state["current_user_input_text"] = "Não sei direito..."
+    state["user_input_analysis_result"] = UserInputAnalysisOutput(
+        overall_intent="RespondingToAgent",
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="partially_answered"  # Could be anything if vague is true
+        ),
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        is_primarily_vague_statement=True,  # Key condition
+        is_primarily_off_topic=False,
+        correction_details_text=None,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    ).model_dump()
+    state["user_interruptions_queue"] = []
+    state["trigger_event"] = "user_message"
+    state["agent_config"]["max_follow_up_attempts"] = 3
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert delta.get("next_agent_action_command") == "DECIDE_PROACTIVE_STEP"
+    expected_action_params = {
+        "trigger_source": "user_response_or_stagnation",
+        "current_follow_up_attempts": 0,
+        "max_follow_up_attempts_total": 3,
+    }
+    assert delta.get("action_parameters") == expected_action_params
+    assert delta["current_agent_goal"]["goal_type"] == "INVESTIGATING_NEEDS"
+
+
+@pytest.mark.asyncio
+async def test_planner_continues_spin_if_response_is_clear_and_not_minimal(
+    base_state_for_planner: RichConversationState,
+):
+    """
+    Tests that the planner continues with normal SPIN progression if the user's
+    response is considered clear and not minimal/vague.
+    """
+    state = base_state_for_planner
+    state["current_turn_number"] = 2
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="INVESTIGATING_NEEDS",
+        goal_details={
+            "last_spin_type_asked": "Problem",
+            "spin_questions_asked_this_cycle": 1,
+        },
+        previous_goal_if_interrupted=None,
+    )
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="ASK_SPIN_QUESTION",
+        details={"spin_type": "Problem"},
+        action_generation_text="Qual é o principal problema?",
+        attempts=1,
+    )
+    state["current_user_input_text"] = (
+        "O principal problema é a demora na entrega dos relatórios."  # Clear response
+    )
+    state["user_input_analysis_result"] = UserInputAnalysisOutput(
+        overall_intent="StatingInformationOrOpinion",  # Or RespondingToAgent
+        analysis_of_response_to_agent_action=PendingAgentActionResponseAnalysis(
+            user_response_to_agent_action="answered_clearly"  # Key condition
+        ),
+        extracted_questions=[],
+        extracted_objections=[],
+        extracted_needs_or_pains=[],
+        is_primarily_vague_statement=False,  # Key condition
+        is_primarily_off_topic=False,
+        correction_details_text=None,
+        reaction_to_solution_presentation=ReactionToPresentation(
+            reaction_type="not_applicable"
+        ),
+        objection_status_after_rebuttal=ObjectionAfterRebuttalStatus(
+            status="not_applicable"
+        ),
+    ).model_dump()
+    state["user_interruptions_queue"] = []
+    state["trigger_event"] = "user_message"
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert delta.get("next_agent_action_command") == "ASK_SPIN_QUESTION"
+    assert (
+        delta.get("action_parameters", {}).get("spin_type") == "Implication"
+    )  # Next SPIN after Problem
+    assert delta["current_agent_goal"]["goal_type"] == "INVESTIGATING_NEEDS"
+    assert (
+        delta["current_agent_goal"]["goal_details"]["last_spin_type_asked"]
+        == "Implication"
+    )
+    assert (
+        delta["current_agent_goal"]["goal_details"]["spin_questions_asked_this_cycle"]
+        == 2
+    )
+
+
+@pytest.mark.asyncio
+async def test_planner_moves_to_attempting_close_if_buying_signal_after_presentation(
+    base_state_for_planner,
+):
+    """
+    If agent JUST presented a solution (PRESENT_SOLUTION_OFFER was last_agent_action
+    and goal was PRESENTING_SOLUTION) and user gives a buying signal,
+    planner should move to ATTEMPTING_CLOSE.
+    """
+    state = base_state_for_planner
+    # Agent was in PRESENTING_SOLUTION goal
+    state["current_agent_goal"] = AgentGoal(
+        goal_type="PRESENTING_SOLUTION",
+        goal_details={
+            "presenting_product": "Produto Top",
+            "main_benefit_focus": "Resolve X",
+        },
+        previous_goal_if_interrupted=None,
+    )
+    # Agent's last action WAS presenting this solution
+    state["last_agent_action"] = PendingAgentAction(
+        action_type="PRESENT_SOLUTION_OFFER",
+        details={
+            "product_name_to_present": "Produto Top",
+            "key_benefit_to_highlight": "Resolve X",
+        },
+        action_generation_text="Apresento o Produto Top...",
+        attempts=1,
+    )
+    state["user_interruptions_queue"] = []
+    # User gives a buying signal
+    state["customer_profile_dynamic"][
+        "last_discerned_intent"
+    ] = "PositiveFeedbackToProposal"
+    state["customer_profile_dynamic"]["identified_objections"] = []
+    # An active proposal would have been set by final_state_updater after the presentation
+    state["active_proposal"] = ProposedSolution(
+        product_name="Produto Top",
+        price=100.0,
+        turn_proposed=state["current_turn_number"] - 1,  # Proposed in previous turn
+        status="proposed",
+        key_benefits_highlighted=["Resolve X"],
+        product_url=None,
+        quantity=None,
+        price_info=None,
+    )
+    state["offer_selection_result"] = None  # Should be cleared after presentation
+
+    delta = await goal_and_action_planner_node(state, {})
+
+    assert "current_agent_goal" in delta
+    assert delta["current_agent_goal"]["goal_type"] == "ATTEMPTING_CLOSE"
+    assert delta["current_agent_goal"]["goal_details"] == {
+        "closing_step": "initial_attempt"
+    }
+    assert delta.get("next_agent_action_command") == "INITIATE_CLOSING"
+    assert delta.get("action_parameters", {}).get("product_name") == "Produto Top"
+    assert delta.get("action_parameters", {}).get("price") == 100.0

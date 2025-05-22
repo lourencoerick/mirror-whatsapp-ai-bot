@@ -381,6 +381,9 @@ async def finalize_turn_state_node(
     ):
         updated_state_delta["user_input_analysis_result"] = None
 
+    if state.get("offer_selection_result") is not None:
+        updated_state_delta["offer_selection_result"] = None
+
     if state.get("trigger_event") is not None:
         updated_state_delta["trigger_event"] = None
 

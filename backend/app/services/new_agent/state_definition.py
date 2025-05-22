@@ -71,6 +71,8 @@ AgentActionType = Literal[
     "DECIDE_PROACTIVE_STEP",
     "SEND_FOLLOW_UP_MESSAGE",
     "REPLAN_WITH_SUGGESTED_GOAL",
+    "SELECTING_OFFER",
+    # "HANDLE_NO_SUITABLE_OFFER",
 ]
 """Defines the specific low-level actions the agent can plan and execute."""
 
@@ -411,6 +413,8 @@ class RichConversationState(TypedDict):
 
     # --- Temporary fields for inter-node communication ---
     user_input_analysis_result: Optional[Dict[str, Any]]  # Output of InputProcessor
+    offer_selection_result: Optional[Dict[str, Any]]
+
     # --- For Proactive Goal Suggestion ---
     suggested_goal_type: Optional[AgentGoalType]
     suggested_goal_details: Optional[Dict[str, Any]]

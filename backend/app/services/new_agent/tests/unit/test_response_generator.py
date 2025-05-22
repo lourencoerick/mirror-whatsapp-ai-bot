@@ -155,22 +155,36 @@ async def test_generator_selects_correct_prompt_for_answer_question(
     """Testa se o prompt ANSWER_DIRECT_QUESTION correto é selecionado."""
     state = base_state_for_generator
     action: AgentActionType = "ANSWER_DIRECT_QUESTION"
-    params: AgentActionDetails = {"question_to_answer_text": "Qual o horário?"}
+    question_text = "Qual o horário?"
+    params: AgentActionDetails = {
+        "question_to_answer_text": question_text,
+        "question_to_answer_status": "newly_asked",  # Provide a status
+    }
     state["next_agent_action_command"] = action
     state["action_parameters"] = params
-    state["retrieved_knowledge_for_next_action"] = (
-        "RAG Context: Abrimos às 9h."  # Simular RAG
-    )
+    state["retrieved_knowledge_for_next_action"] = "RAG Context: Abrimos às 9h."
 
+    # This is what _prepare_common_prompt_context would return
     common_context_mock = {
-        "company_name": "Test",
-        "language": "pt",
-        "sales_tone": "test",
-        "rag_context": "RAG Context: Abrimos às 9h.",
+        "company_name": "TestGen Co",  # From base_state_for_generator
+        "language": "pt-br",
+        "sales_tone": "amigável",
+        "fallback_text": "Fallback default",
+        "business_description": "N/A",  # Assuming default from _prepare_common_prompt_context
+        "offering_summary": "N/A",
+        "key_selling_points": "N/A",
+        "delivery_options_info": "Opções de delivery/pickup não especificadas.",
+        "company_address_info": "",
+        "opening_hours_info": "",
+        "communication_guidelines": "N/A",
+        "company_main_link_fallback": "nosso site.",
+        "formatting_instructions": ANY,  # From prompt_utils
+        "chat_history": "Histórico indisponível.",  # Default from fallback if input_processor not fully mocked
+        "last_user_message": "Input",
+        "rag_context": "RAG Context: Abrimos às 9h.",  # This will be in common_context
+        "current_datetime": ANY,  # This will be set
     }
-    mock_prepare_context.return_value = (
-        common_context_mock  # Mock deve incluir rag_context
-    )
+    mock_prepare_context.return_value = common_context_mock
     expected_llm_response = "Nosso horário é das 9h às 18h."
     mock_call_llm.return_value = expected_llm_response
 
@@ -185,25 +199,18 @@ async def test_generator_selects_correct_prompt_for_answer_question(
     assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
     assert "'{question_to_answer}'" in call_kwargs["prompt"].messages[0].prompt.template
 
-    expected_prompt_values = {
-        **common_context_mock,
-        **{"question_to_answer": "Qual o horário?"},
+    # These are the values specific to this action, added to common_context
+    expected_specific_values = {
+        "question_to_answer": question_text,
+        "repetition_context_instructions": "",  # For newly_asked status
     }
-    # Remover rag_context duplicado se _prepare_common_prompt_context já o inclui
-    if "rag_context" in common_context_mock:
-        expected_prompt_values["rag_context"] = common_context_mock["rag_context"]
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
 
     assert call_kwargs["prompt_values"] == expected_prompt_values
     assert call_kwargs["llm"] == mock_llm_primary
 
     assert delta.get("last_agent_generation_text") == expected_llm_response
     assert delta.get("last_processing_error") is None
-
-
-# Adicionar testes similares para:
-# - GENERATE_REBUTTAL
-# - ASK_CLARIFYING_QUESTION
-# - ACKNOWLEDGE_AND_TRANSITION
 
 
 @pytest.mark.asyncio
@@ -348,17 +355,44 @@ async def test_generator_selects_correct_prompt_for_clarifying_question(
     """Testa se o prompt ASK_CLARIFYING_QUESTION correto é selecionado."""
     state = base_state_for_generator
     action: AgentActionType = "ASK_CLARIFYING_QUESTION"
-    params: AgentActionDetails = {}  # Parâmetros podem estar vazios, texto vem do goal
+    clarification_context_from_planner = (
+        "Isso parece confuso e preciso de mais detalhes."
+    )
+
+    # Planner should put the context for clarification into action_parameters["context"]
+    params: AgentActionDetails = {"context": clarification_context_from_planner}
     state["next_agent_action_command"] = action
     state["action_parameters"] = params
-    # Simular o texto vago no goal_details
+
+    # current_agent_goal is less relevant now for vague_statement_text if planner provides context
     state["current_agent_goal"] = AgentGoal(
-        goal_type="CLARIFYING_USER_INPUT",
-        goal_details={"text": "Isso parece confuso."},
+        goal_type="CLARIFYING_USER_INPUT",  # Goal that led to this action
+        goal_details={
+            "clarification_type": "vague",
+            "text": "Original vague user text",
+        },  # Original text
         previous_goal_if_interrupted=None,
     )
 
-    common_context_mock = {"company_name": "Test"}
+    common_context_mock = {
+        "company_name": "TestGen Co",
+        "language": "pt-br",
+        "sales_tone": "amigável",
+        "fallback_text": "Fallback default",
+        "business_description": "N/A",
+        "offering_summary": "N/A",
+        "key_selling_points": "N/A",
+        "delivery_options_info": "Opções de delivery/pickup não especificadas.",
+        "company_address_info": "",
+        "opening_hours_info": "",
+        "communication_guidelines": "N/A",
+        "company_main_link_fallback": "nosso site.",
+        "formatting_instructions": ANY,
+        "chat_history": "Histórico indisponível.",
+        "last_user_message": "Input",
+        "rag_context": "Nenhum contexto adicional disponível.",
+        "current_datetime": ANY,
+    }
     mock_prepare_context.return_value = common_context_mock
     expected_llm_response = "Poderia me dizer o que especificamente pareceu confuso?"
     mock_call_llm.return_value = expected_llm_response
@@ -373,10 +407,11 @@ async def test_generator_selects_correct_prompt_for_clarifying_question(
 
     assert call_kwargs["prompt"] == PROMPT_ASK_CLARIFYING_QUESTION
 
-    expected_prompt_values = {
-        **common_context_mock,
-        **{"vague_statement_text": "Isso parece confuso."},
+    expected_specific_values = {
+        "vague_statement_text": clarification_context_from_planner,  # Comes from action_params["context"]
+        "last_action_context": clarification_context_from_planner,  # Also from action_params["context"]
     }
+    expected_prompt_values = {**common_context_mock, **expected_specific_values}
     assert call_kwargs["prompt_values"] == expected_prompt_values
     assert call_kwargs["llm"] == mock_llm_primary
 
@@ -666,15 +701,43 @@ async def test_generator_selects_correct_prompt_for_process_order(
     """Tests prompt selection and parameters for PROCESS_ORDER_CONFIRMATION."""
     state = base_state_for_generator
     action: AgentActionType = "PROCESS_ORDER_CONFIRMATION"
-    params: AgentActionDetails = {  # Planner provided details
-        "product_name": "Plano Super Completo"
-    }
+    product_name_confirmed = "Plano Super Completo"
+    params: AgentActionDetails = {"product_name": product_name_confirmed}
     state["next_agent_action_command"] = action
     state["action_parameters"] = params
+    # Simulate active_proposal which might contain the product_url
+    state["active_proposal"] = {
+        "product_name": product_name_confirmed,
+        "product_url": "https://example.com/checkout/super-completo",
+        "price": 199.99,  # Other fields as per ProposedSolution
+        "key_benefits_highlighted": [],
+        "turn_proposed": 1,
+        "status": "accepted",  # or proposed
+        "quantity": None,
+        "price_info": None,
+    }
 
-    common_context_mock = {"language": "pt-br", "sales_tone": "confiante"}  # Example
+    common_context_mock = {
+        "company_name": "TestGen Co",
+        "language": "pt-br",
+        "sales_tone": "confiante",
+        "fallback_text": "Fallback default",
+        "business_description": "N/A",
+        "offering_summary": "N/A",
+        "key_selling_points": "N/A",
+        "delivery_options_info": "Opções de delivery/pickup não especificadas.",
+        "company_address_info": "",
+        "opening_hours_info": "",
+        "communication_guidelines": "N/A",
+        "company_main_link_fallback": "https://example.com/fallback-link",  # Important for this test
+        "formatting_instructions": ANY,
+        "chat_history": "Histórico indisponível.",
+        "last_user_message": "Input",
+        "rag_context": "Nenhum contexto adicional disponível.",
+        "current_datetime": ANY,
+    }
     mock_prepare_context.return_value = common_context_mock
-    expected_llm_response = "Excelente! Seu pedido para o *Plano Super Completo* foi processado com sucesso. Obrigado!"
+    expected_llm_response = f"Excelente! Seu pedido para o *{product_name_confirmed}* foi processado com sucesso. Para finalizar, acesse: https://example.com/checkout/super-completo"
     mock_call_llm.return_value = expected_llm_response
 
     config = {"configurable": {"llm_primary_instance": mock_llm_primary}}
@@ -685,15 +748,15 @@ async def test_generator_selects_correct_prompt_for_process_order(
     call_args, call_kwargs = mock_call_llm.call_args
 
     assert isinstance(call_kwargs["prompt"], ChatPromptTemplate)
-    # Check for identifier in the correct prompt
+    # <<< CORRECTED ASSERTION for prompt content >>>
     assert (
-        "Gere a mensagem de confirmação do pedido"
+        "Gere APENAS a mensagem de confirmação do pedido e o link para finalização da compra"  # More specific to this prompt
         in call_kwargs["prompt"].messages[0].prompt.template
     )
 
-    # Check specific values passed to the prompt
     expected_specific_values = {
-        "product_name": "Plano Super Completo",
+        "product_name": product_name_confirmed,
+        "product_link_or_fallback": "https://example.com/checkout/super-completo",  # From active_proposal
     }
     expected_prompt_values = {**common_context_mock, **expected_specific_values}
     assert call_kwargs["prompt_values"] == expected_prompt_values
