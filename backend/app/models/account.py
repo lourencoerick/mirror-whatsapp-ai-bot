@@ -9,12 +9,14 @@ from app.models.base import BaseModel
 from .contact import Contact
 from .inbox import Inbox
 from .conversation import Conversation
+from .subscription import Subscription
 
 
 class Account(BaseModel):
     __tablename__ = "accounts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
     name = Column(String(255), nullable=False)
     locale = Column(String(5), nullable=True)
 
