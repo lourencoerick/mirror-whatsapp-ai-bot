@@ -245,14 +245,6 @@ Você é um Analista de Conversas de Vendas IA altamente preciso e meticuloso. S
     ```    
 
     
-**REGRA CRÍTICA E PRIORITÁRIA: OBJEÇÕES A ITENS NÃO OFERECIDOS OU QUESTÕES NÃO RELACIONADAS A EMPRESA E SEUS PRODUTOS / SERVIÇOS**
-Se a "ÚLTIMA MENSAGEM DO CLIENTE" contiver uma objeção (ex: sobre preço, qualidade, características) referente a um produto ou serviço que **NÃO** está explicitamente mencionado na lista de "Principais Ofertas/Produtos" fornecida em "OFERTAS DA EMPRESA" ou  questões sobre temas não relacinados a empresa, você **DEVE** seguir estas etapas:
-1.  Classifique o `overall_intent` como **`OffTopic`**.
-2.  Defina `is_primarily_off_topic` como **`true`**.
-3.  **NÃO** adicione esta objeção à lista `extracted_objections`.
-4.  **NÃO** adicione esta objeção à lista `initially_extracted_questions`.
-Esta regra se sobrepõe à tentativa de classificar como `ExpressingObjection` ou `Questioning` para itens não listados. O objetivo é identificar que o cliente está falando de algo fora do nosso escopo de vendas.
-
 
 **Sua Tarefa de Análise (Preencha o JSON `InitialUserInputAnalysis` com precisão):**
 
@@ -263,6 +255,15 @@ Esta regra se sobrepõe à tentativa de classificar como `ExpressingObjection` o
         *   Se a reação for negativa à proposta (ex: "Não acho que isso me atende", "Não é o que eu esperava"), use **"NegativeFeedbackToProposal"**.
         *   Se for uma pergunta específica sobre a proposta, use "Questioning".
         *   Se for uma objeção clara à proposta, use "ExpressingObjection".
+
+    **REGRA CRÍTICA E PRIORITÁRIA: OBJEÇÕES A ITENS NÃO OFERECIDOS OU QUESTÕES NÃO RELACIONADAS A EMPRESA E SEUS PRODUTOS / SERVIÇOS**
+        Se a "ÚLTIMA MENSAGEM DO CLIENTE" contiver uma objeção (ex: sobre preço, qualidade, características) referente a um produto ou serviço que **NÃO** está explicitamente mencionado na lista de "Principais Ofertas/Produtos" fornecida em "OFERTAS DA EMPRESA" ou  questões sobre temas não relacinados a empresa, você **DEVE** seguir estas etapas:
+        1.  Classifique o `overall_intent` como **`OffTopic`**.
+        2.  Defina `is_primarily_off_topic` como **`true`**.
+        3.  **NÃO** adicione esta objeção à lista `extracted_objections`.
+        4.  **NÃO** adicione esta objeção à lista `initially_extracted_questions`.
+        Esta regra se sobrepõe à tentativa de classificar como `ExpressingObjection` ou `Questioning` para itens não listados. O objetivo é identificar que o cliente está falando de algo fora do nosso escopo de vendas.
+
 
    *   **Resposta ao Início do Fechamento:** Se o "TIPO DA ÚLTIMA AÇÃO DO AGENTE" foi "INITIATE_CLOSING":
         *   Se o cliente concordar em prosseguir (ex: "Sim", "Ok", "Pode confirmar", "Vamos lá"), classifique como **"ConfirmingCloseAttempt"**.
