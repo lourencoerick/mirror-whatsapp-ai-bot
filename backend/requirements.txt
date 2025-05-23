@@ -56,6 +56,10 @@ html2text==2025.4.15
 # === Google Cloud Storage ===
 google-cloud-storage
 
+# === Payments ===
+stripe==12.1.0
 
 # === Logging ===
 loguru>=0.5.3
+
+
