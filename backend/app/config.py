@@ -86,6 +86,19 @@ class Settings(BaseSettings):
     # --- Meta ---
     META_APP_SECRET: str = "your-meta-secret"
 
+    # --- Stripe ---
+    STRIPE_SECRET_KEY: str
+    STRIPE_PUBLISHABLE_KEY: str  # Para o frontend depois
+    STRIPE_WEBHOOK_SECRET: str  # Para verificar webhooks
+
+    # URLs do Frontend para redirecionamentos do Stripe Checkout
+    STRIPE_CHECKOUT_SUCCESS_URL: str = (
+        "http://localhost:3000/payment-success"  # Ajuste para sua URL
+    )
+    STRIPE_CHECKOUT_CANCEL_URL: str = "http://localhost:3000/plans"
+
+    STRIPE_PAYMENT_METHOD_TYPES: List[str] = Field(default_factory=lambda: ["card"])
+
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"
     DEBUG: bool = True
