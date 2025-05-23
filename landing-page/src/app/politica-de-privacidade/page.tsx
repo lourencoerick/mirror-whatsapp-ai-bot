@@ -72,7 +72,7 @@ export default function PoliticaDePrivacidadePage() {
           <h2 className="text-xl font-semibold mb-2">6. Contato</h2>
           <p>
             Em caso de dúvidas ou solicitações, entre em contato:<br />
-            📧 <a href="mailto:tectnologia@lambdalabs.com.br" className="text-blue-600 underline">tectnologia@lambdalabs.com.br</a>
+            📧 <a href="mailto:tecnologia@lambdalabs.com.br" className="text-blue-600 underline">tecnologia@lambdalabs.com.br</a>
           </p>
         </section>
   
