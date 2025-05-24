@@ -4,6 +4,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { ReactNode } from "react";
+import { ClientDashboardGuard } from "./client-dashboard-guard";
 import { DashboardShell } from "./shell";
 
 export default async function DashboardLayout({
@@ -22,7 +23,7 @@ export default async function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <DashboardShell>
-        {children}
+        <ClientDashboardGuard>{children}</ClientDashboardGuard>
         <Toaster richColors position="top-right" />
       </DashboardShell>
     </SidebarProvider>
