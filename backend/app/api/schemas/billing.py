@@ -1,10 +1,10 @@
 # backend/app/api/schemas/billing.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 from uuid import UUID
 from typing import Optional
 from datetime import datetime
-from app.models.subscription import Subscription, SubscriptionStatusEnum
+from app.models.subscription import SubscriptionStatusEnum
 
 
 class CreateCheckoutSessionRequest(BaseModel):
@@ -28,6 +28,7 @@ class CreateCheckoutSessionResponse(BaseModel):
     publishable_key: str = Field(
         ..., description="The Stripe publishable key to be used by the frontend."
     )  # Útil para o frontend
+    checkout_url: HttpUrl
 
     model_config = {
         "json_schema_extra": {
@@ -136,6 +137,21 @@ class SubscriptionRead(BaseModel):
     }
 
 
-# Outros schemas de billing podem ser adicionados aqui no futuro
-# class CustomerPortalSessionResponse(BaseModel):
-#     portal_url: str
+class CustomerPortalSessionResponse(BaseModel):
+    """Response schema for creating a Stripe Customer Portal session."""
+
+    portal_url: HttpUrl = Field(
+        ...,
+        description="The URL to redirect the user to for accessing the Stripe Customer Portal.",
+        examples=["https://billing.stripe.com/session/b_test_..."],
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "portal_url": "https://billing.stripe.com/session/b_test_session_for_customer_portal"
+                }
+            ]
+        }
+    }

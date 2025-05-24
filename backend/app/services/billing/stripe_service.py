@@ -157,3 +157,58 @@ async def create_stripe_checkout_session(
             f"Unexpected error creating Checkout Session for Account {app_account_id}: {e}"
         )
         raise
+
+
+async def create_stripe_customer_portal_session(
+    stripe_customer_id: str, app_account_id: UUID  # For logging and context
+) -> stripe.billing_portal.Session:
+    """
+    Creates a Stripe Customer Portal Session.
+
+    This session allows a customer to manage their subscriptions, payment methods,
+    and view their invoice history directly on a Stripe-hosted page.
+
+    Args:
+        stripe_customer_id: The Stripe Customer ID (cus_xxx) for whom the portal session is created.
+        app_account_id: The application's internal Account ID, primarily for logging.
+
+    Returns:
+        A Stripe Billing Portal Session object, containing the URL to redirect the customer.
+
+    Raises:
+        stripe.error.StripeError: If there's an issue communicating with Stripe.
+        ValueError: If stripe_customer_id is missing.
+    """
+    if not stripe_customer_id:
+        logger.error(
+            f"Cannot create customer portal session for Account {app_account_id}: Missing Stripe Customer ID."
+        )
+        raise ValueError("Stripe Customer ID is required to create a portal session.")
+
+    logger.info(
+        f"Creating Stripe Customer Portal Session for Stripe Customer ID: {stripe_customer_id} (Account: {app_account_id})"
+    )
+
+    # The return_url is where Stripe will redirect the user after they are done with the portal.
+    # This should be a page in your application, e.g., their account/subscription management page.
+    return_url = f"{settings.FRONTEND_URL.strip('/')}/dashboard/account/subscription"  # Example return URL
+
+    try:
+        portal_session = stripe.billing_portal.Session.create(
+            customer=stripe_customer_id,
+            return_url=return_url,
+        )
+        logger.info(
+            f"Stripe Customer Portal Session created: {portal_session.id} for Customer {stripe_customer_id}. URL: {portal_session.url}"
+        )
+        return portal_session
+    except stripe.error.StripeError as e:
+        logger.error(
+            f"Stripe API error creating Customer Portal Session for Customer {stripe_customer_id} (Account {app_account_id}): {e}"
+        )
+        raise
+    except Exception as e:
+        logger.error(
+            f"Unexpected error creating Customer Portal Session for Customer {stripe_customer_id} (Account {app_account_id}): {e}"
+        )
+        raise
