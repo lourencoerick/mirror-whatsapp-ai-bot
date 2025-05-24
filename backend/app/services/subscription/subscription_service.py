@@ -1,5 +1,12 @@
 # app/services/subscription_service.py
 
+"""
+Subscription service module.
+
+This module provides functions to synchronize subscription data with Clerk and
+to provision account plan tiers based on active subscriptions.
+"""
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -20,76 +27,76 @@ from app.config import get_settings
 # Importar o SDK do Clerk
 from clerk_backend_api import Clerk
 
-# Opcional: importar tipos específicos de operações se o SDK os fornecer e você os usar
-# from clerk_backend_api.models import operations
-
 settings = get_settings()
-
-# Instanciar o cliente Clerk uma vez se possível, ou usar context manager em cada chamada
-# Se o SDK suportar uma instância global configurada:
-# _clerk_client_instance = None
-# def get_clerk_client():
-#     global _clerk_client_instance
-#     if _clerk_client_instance is None and settings.CLERK_SECRET_KEY:
-#         _clerk_client_instance = Clerk(bearer_auth=settings.CLERK_SECRET_KEY)
-#     elif not settings.CLERK_SECRET_KEY:
-#         logger.warning("CLERK_SECRET_KEY not set. Clerk operations will be skipped.")
-#     return _clerk_client_instance
 
 
 async def _update_single_clerk_user_metadata(
     clerk_uid: str,
     metadata_payload: Dict[str, Any],
-    account_id_for_logging: UUID,  # Apenas para logs melhores
-):
-    """Helper para atualizar metadados de um único usuário Clerk."""
+    account_id_for_logging: UUID,
+) -> bool:
+    """
+    Helper to update public metadata of a single Clerk user.
+
+    Args:
+        clerk_uid (str): The Clerk user ID to update.
+        metadata_payload (Dict[str, Any]): Dictionary of metadata fields to set.
+        account_id_for_logging (UUID): Account ID used for logging context.
+
+    Returns:
+        bool: True if the metadata update succeeded, False otherwise.
+    """
     if not settings.CLERK_SECRET_KEY:
         logger.warning(
             f"CLERK_SECRET_KEY not set. Skipping metadata update for Clerk user {clerk_uid}."
         )
         return False
 
-    # Usar o context manager para cada chamada é mais seguro para gerenciamento de recursos do SDK
     async with Clerk(bearer_auth=settings.CLERK_SECRET_KEY) as clerk:
         try:
             logger.debug(
-                f"Attempting to update Clerk public_metadata for user {clerk_uid} (Account {account_id_for_logging}) with: {metadata_payload}"
+                f"Attempting to update Clerk public_metadata for user {clerk_uid} "
+                f"(Account {account_id_for_logging}) with: {metadata_payload}"
             )
-
-            # Verifique a documentação do SDK para a forma exata de chamar update_metadata.
-            # Pode ser clerk.users.update_metadata(...) ou clerk.users.update(...),
-            # e os parâmetros podem ser diretos ou via um objeto request_body.
-            # Exemplo comum:
-            logger.debug(f"Updating clerk metadata: {metadata_payload}")
-            response = await clerk.users.update_metadata_async(  # Ou users.update se for mais geral
+            response = await clerk.users.update_metadata_async(
                 user_id=clerk_uid,
                 public_metadata=metadata_payload,
-                # Ou: request_body=operations.UsersUpdateMetadataRequestBody(public_metadata=metadata_payload)
             )
 
-            # Verifique a condição de sucesso da resposta conforme a documentação do SDK
-            if (
-                response and hasattr(response, "id") and response.id == clerk_uid
-            ):  # Exemplo de verificação
+            if response and hasattr(response, "id") and response.id == clerk_uid:
                 logger.info(
-                    f"Successfully updated Clerk public_metadata for user {clerk_uid} of Account {account_id_for_logging}."
+                    f"Successfully updated Clerk public_metadata for user {clerk_uid} "
+                    f"of Account {account_id_for_logging}."
                 )
                 return True
             else:
                 logger.warning(
-                    f"Clerk metadata update for user {clerk_uid} may not have succeeded as expected. Response: {response}"
+                    f"Clerk metadata update for user {clerk_uid} may not have "
+                    f"succeeded as expected. Response: {response}"
                 )
                 return False
         except Exception as e:
             logger.error(
-                f"Clerk SDK error updating metadata for user {clerk_uid} (Account {account_id_for_logging}): {e}"
+                f"Clerk SDK error updating metadata for user {clerk_uid} "
+                f"(Account {account_id_for_logging}): {e}"
             )
             return False
 
 
 async def update_clerk_user_metadata_after_subscription_change(
-    db: AsyncSession, account_id: UUID
-):
+    db: AsyncSession,
+    account_id: UUID,
+) -> None:
+    """
+    Update Clerk public metadata for all Clerk users of an account after a subscription change.
+
+    Args:
+        db (AsyncSession): The asynchronous SQLAlchemy session.
+        account_id (UUID): The ID of the account whose users' metadata should be updated.
+
+    Returns:
+        None
+    """
     logger.info(f"Starting Clerk metadata update for users of Account ID: {account_id}")
     account = await db.get(Account, account_id)
     if not account:
@@ -108,7 +115,8 @@ async def update_clerk_user_metadata_after_subscription_change(
 
     if active_subscription:
         logger.debug(
-            f"Account {account_id} has subscription {active_subscription.id} with status {active_subscription.status.value}"
+            f"Account {account_id} has subscription {active_subscription.id} "
+            f"with status {active_subscription.status.value}"
         )
         clerk_metadata_payload["subscription_status"] = active_subscription.status.value
         clerk_metadata_payload["plan_product_id"] = (
@@ -164,26 +172,33 @@ async def update_clerk_user_metadata_after_subscription_change(
         )
         for clerk_uid in clerk_uids_to_update
     ]
-    results = await asyncio.gather(
-        *update_tasks, return_exceptions=True
-    )  # Executar em paralelo
+    results = await asyncio.gather(*update_tasks, return_exceptions=True)
 
     for i, result in enumerate(results):
         if isinstance(result, Exception) or result is False:
             logger.error(
-                f"Failed to update metadata for Clerk UID {clerk_uids_to_update[i]} (from gather). Result: {result}"
+                f"Failed to update metadata for Clerk UID "
+                f"{clerk_uids_to_update[i]} (from gather). Result: {result}"
             )
-        # else: logger.info(f"Successfully updated metadata for Clerk UID {clerk_uids_to_update[i]} (from gather).")
 
 
 async def provision_account_access(
     db: AsyncSession,
     account_id: UUID,
-    active_subscription: Optional[Subscription],  # A assinatura ATIVA ou TRIALING
-):
+    active_subscription: Optional[Subscription],
+) -> None:
     """
-    Updates the account's plan tier based on the active subscription.
-    This function should be called after a subscription status change.
+    Provision the account's access plan tier based on the active or trial subscription.
+
+    This should be called after any change to the subscription status.
+
+    Args:
+        db (AsyncSession): The asynchronous SQLAlchemy session.
+        account_id (UUID): The ID of the account to provision.
+        active_subscription (Optional[Subscription]): The account's active or trial subscription.
+
+    Returns:
+        None
     """
     account = await db.get(Account, account_id)
     if not account:
@@ -192,9 +207,7 @@ async def provision_account_access(
         )
         return
 
-    new_plan_tier = (
-        AccountPlanTierEnum.FREE
-    )  # Default para sem assinatura ativa/trialing
+    new_plan_tier = AccountPlanTierEnum.FREE
 
     if active_subscription and active_subscription.status in [
         SubscriptionStatusEnum.ACTIVE,
@@ -204,23 +217,24 @@ async def provision_account_access(
         if stripe_product_id and stripe_product_id in STRIPE_PRODUCT_TO_PLAN_TIER:
             new_plan_tier = STRIPE_PRODUCT_TO_PLAN_TIER[stripe_product_id]
             logger.info(
-                f"Account {account_id}: Mapping Stripe Product ID {stripe_product_id} to Plan Tier {new_plan_tier}"
+                f"Account {account_id}: Mapping Stripe Product ID {stripe_product_id} "
+                f"to Plan Tier {new_plan_tier}"
             )
         else:
             logger.warning(
-                f"Account {account_id}: Stripe Product ID {stripe_product_id} from active subscription {active_subscription.id} not found in STRIPE_PRODUCT_TO_PLAN_TIER mapping. Defaulting to FREE tier."
+                f"Account {account_id}: Stripe Product ID {stripe_product_id} from active "
+                f"subscription {active_subscription.id} not found in mapping. "
+                f"Defaulting to FREE tier."
             )
-            # Você pode querer um tratamento de erro mais robusto aqui ou um plano padrão.
             new_plan_tier = AccountPlanTierEnum.FREE.value
     else:
         logger.info(
             f"Account {account_id}: No active/trialing subscription. Setting plan tier to FREE."
         )
-        # new_plan_tier já é FREE
 
     if account.active_plan_tier != new_plan_tier:
         account.active_plan_tier = new_plan_tier
-        db.add(account)  # Marcar para salvar a mudança
+        db.add(account)
         logger.info(f"Account {account_id}: Plan tier updated to {new_plan_tier}.")
     else:
         logger.info(
