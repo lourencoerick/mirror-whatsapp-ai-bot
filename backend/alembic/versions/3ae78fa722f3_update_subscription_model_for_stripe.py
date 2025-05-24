@@ -26,6 +26,7 @@ DB_ENUM_VALUES = (
     "incomplete",
     "incomplete_expired",
     "ended",
+    "trialing",
 )
 SUBSCRIPTION_STATUS_ENUM_NAME = "subscription_status_enum"
 

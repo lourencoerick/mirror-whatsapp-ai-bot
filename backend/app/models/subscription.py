@@ -72,7 +72,10 @@ class Subscription(BaseModel):
     # Status da Assinatura (sincronizado com o Stripe via webhooks)
     status: Mapped[SubscriptionStatusEnum] = Column(
         SQLEnum(
-            SubscriptionStatusEnum, name="subscription_status_enum", create_type=True
+            SubscriptionStatusEnum,
+            name="subscription_status_enum",
+            create_type=True,
+            values_callable=lambda x: [e.value for e in x],
         ),
         nullable=False,
         index=True,
