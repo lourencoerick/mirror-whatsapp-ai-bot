@@ -1,122 +1,175 @@
-# app/services/stripe_webhook_service.py (ou stripe_service.py)
+# backend/app/services/stripe_webhook_handlers.py
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from loguru import logger
 from datetime import datetime, timezone
 from typing import Optional
-import stripe
+import stripe  # type: ignore
 
 from app.models.account import Account
 from app.models.subscription import Subscription, SubscriptionStatusEnum
-from app.database import get_db  # Para injetar db se necessário
-from app.config import get_settings
 
-settings = get_settings()
+# Importações do seu subscription_service.py
+from app.services.subscription.subscription_service import (
+    provision_account_access,
+    update_clerk_user_metadata_after_subscription_change,
+)
+
+
+async def _get_account_id_from_stripe_customer(
+    db: AsyncSession, stripe_customer_id: str
+) -> Optional[UUID]:
+    """Retrieves the internal account ID associated with a Stripe Customer ID.
+
+    Args:
+        db: The SQLAlchemy async session.
+        stripe_customer_id: The Stripe Customer ID (cus_xxx).
+
+    Returns:
+        The UUID of the account if found, otherwise None.
+    """
+    if not stripe_customer_id:
+        logger.debug("Attempted to get account ID with no Stripe Customer ID provided.")
+        return None
+
+    stmt = select(Account.id).where(Account.stripe_customer_id == stripe_customer_id)
+    result = await db.execute(stmt)
+    account_id = result.scalars().first()
+
+    if not account_id:
+        logger.warning(f"No account found for Stripe Customer ID: {stripe_customer_id}")
+    else:
+        logger.debug(
+            f"Found Account ID {account_id} for Stripe Customer ID {stripe_customer_id}"
+        )
+    return account_id
 
 
 async def _update_or_create_subscription_from_stripe_object(
     db: AsyncSession,
-    stripe_sub_object: stripe.Subscription,  # O objeto Subscription completo do Stripe
-    account_id_override: Optional[
-        UUID
-    ] = None,  # Para o caso de checkout.session.completed
+    stripe_sub_object: stripe.Subscription,
+    account_id_override: Optional[UUID] = None,
 ) -> Optional[Subscription]:
     """
-    Helper para criar ou atualizar um registro de Subscription no nosso DB
-    a partir de um objeto Subscription do Stripe.
+    Updates an existing subscription record or creates a new one based on a Stripe Subscription object.
+
+    This function is idempotent. It ensures the local subscription database stays in sync
+    with Stripe's subscription data. It populates all relevant fields from the Stripe
+    Subscription object into the local Subscription model instance.
+
+    Args:
+        db: The SQLAlchemy async session.
+        stripe_sub_object: The Stripe Subscription object from a webhook event or API call.
+        account_id_override: An optional account ID to associate with the subscription.
+            Primarily used during 'checkout.session.completed' where the account ID
+            is known from 'client_reference_id'.
+
+    Returns:
+        The updated or newly created Subscription ORM object if successful, otherwise None.
+        The object is added to the session but not committed by this function.
     """
     logger.info(
         f"Updating/creating local subscription for Stripe Sub ID: {stripe_sub_object.id}, Status: {stripe_sub_object.status}"
     )
 
-    # Tentar encontrar a conta. Se account_id_override for fornecido (de client_reference_id), use-o.
-    # Caso contrário, tente encontrar a conta pelo stripe_customer_id.
+    stripe_sub_object = stripe.Subscription.retrieve(stripe_sub_object.id)
+
     account_id_to_use = account_id_override
-    if not account_id_to_use:
-        if not stripe_sub_object.customer or not isinstance(
-            stripe_sub_object.customer, str
-        ):
-            logger.error(
-                f"Stripe Subscription {stripe_sub_object.id} is missing a valid string customer ID."
-            )
-            return (
-                None  # Não podemos prosseguir sem um customer ID para encontrar a conta
-            )
 
-        account_stmt = select(Account).where(
-            Account.stripe_customer_id == stripe_sub_object.customer
-        )
-        account_res = await db.execute(account_stmt)
-        account = account_res.scalars().first()
-        if not account:
-            logger.error(
-                f"No account found for Stripe Customer ID: {stripe_sub_object.customer} (from Stripe Sub {stripe_sub_object.id})"
-            )
-            return None  # Não podemos associar a assinatura
-        account_id_to_use = account.id
+    customer_data = stripe_sub_object.customer
+    stripe_customer_id_str: Optional[str] = None
+    if isinstance(customer_data, str):
+        stripe_customer_id_str = customer_data
+    elif hasattr(customer_data, "id") and customer_data.id:  # type: ignore
+        stripe_customer_id_str = customer_data.id  # type: ignore
 
-    if not account_id_to_use:  # Checagem final
+    if not stripe_customer_id_str:
         logger.error(
-            f"Could not determine account_id for Stripe Subscription {stripe_sub_object.id}"
+            f"Stripe Subscription {stripe_sub_object.id} is missing a valid customer ID. Customer data: {customer_data}"
         )
         return None
 
-    # Verificar se já existe uma Subscription com este stripe_subscription_id
-    sub_stmt = select(Subscription).where(
+    if not account_id_to_use:
+        account_id_to_use = await _get_account_id_from_stripe_customer(
+            db, stripe_customer_id_str
+        )
+
+    if not account_id_to_use:
+        logger.error(
+            f"Could not determine internal account_id for Stripe Subscription {stripe_sub_object.id} "
+            f"(Stripe Customer: {stripe_customer_id_str}). This subscription might belong to a customer "
+            "not yet fully synced or an orphaned Stripe customer."
+        )
+        return None  # Cannot proceed without an internal account ID
+
+    stmt = select(Subscription).where(
         Subscription.stripe_subscription_id == stripe_sub_object.id
     )
-    existing_sub_result = await db.execute(sub_stmt)
+    existing_sub_result = await db.execute(stmt)
     subscription_record = existing_sub_result.scalars().first()
 
     if not subscription_record:
         subscription_record = Subscription(stripe_subscription_id=stripe_sub_object.id)
         logger.info(
-            f"Creating new Subscription record for stripe_subscription_id: {stripe_sub_object.id}"
+            f"Creating new local Subscription record for Stripe Subscription ID: {stripe_sub_object.id} "
+            f"for Account ID: {account_id_to_use}"
         )
     else:
         logger.info(
-            f"Updating existing Subscription record for stripe_subscription_id: {stripe_sub_object.id}"
+            f"Updating existing local Subscription record ID {subscription_record.id} "
+            f"(Stripe Subscription ID: {stripe_sub_object.id}) for Account ID: {account_id_to_use}"
         )
 
     subscription_record.account_id = account_id_to_use
-    subscription_record.stripe_customer_id = str(
-        stripe_sub_object.customer
-    )  # Garantir que é string
+    subscription_record.stripe_customer_id = stripe_customer_id_str
 
-    # Price e Product podem estar em items.data[0].price.id e .product
+    # Extract product and price IDs from the subscription items
+    # Stripe usually includes one item for simple subscriptions.
+    logger.info(f"Subscription obj: {stripe_sub_object}")
+    logger.info(f"Subscription obj Items: {stripe_sub_object.items}")
     if stripe_sub_object.items and stripe_sub_object.items.data:
         primary_item = stripe_sub_object.items.data[0]
         if primary_item and primary_item.price:
             subscription_record.stripe_price_id = primary_item.price.id
-            if primary_item.price.product and isinstance(
-                primary_item.price.product, str
-            ):  # product pode ser objeto expandido ou ID string
-                subscription_record.stripe_product_id = primary_item.price.product
-            elif hasattr(primary_item.price.product, "id"):  # Se for objeto expandido
-                subscription_record.stripe_product_id = primary_item.price.product.id  # type: ignore
-    else:  # Fallback se items não estiver presente como esperado
-        subscription_record.stripe_price_id = (
-            stripe_sub_object.get("plan", {}).get("id")
-            if stripe_sub_object.get("plan")
-            else None
-        )  # Legado
-        if subscription_record.stripe_price_id and stripe_sub_object.get("plan"):
-            subscription_record.stripe_product_id = stripe_sub_object.get(
-                "plan", {}
-            ).get("product")
+            product_data = primary_item.price.product
+            if isinstance(product_data, str):  # Product ID string
+                subscription_record.stripe_product_id = product_data
+            elif hasattr(product_data, "id"):  # Expanded Product object
+                subscription_record.stripe_product_id = product_data.id  # type: ignore
+            else:
+                logger.warning(
+                    f"Could not extract Stripe Product ID from item's price.product for sub {stripe_sub_object.id}. Product data: {product_data}"
+                )
+        else:
+            logger.warning(
+                f"Primary item or item price missing for Stripe Subscription {stripe_sub_object.id}. Items: {stripe_sub_object.items.data}"
+            )
+    else:
+        logger.warning(
+            f"No items found in Stripe Subscription {stripe_sub_object.id} to determine product/price ID."
+        )
 
     try:
-        subscription_record.status = SubscriptionStatusEnum(stripe_sub_object.status)
+        new_status = SubscriptionStatusEnum(stripe_sub_object.status)
+        if subscription_record.status != new_status:
+            logger.info(
+                f"Subscription {stripe_sub_object.id} status changing from {subscription_record.status} to {new_status.value}"
+            )
+            subscription_record.status = new_status
+        else:
+            subscription_record.status = (
+                new_status  # Ensure it's set even if not changing
+            )
     except ValueError:
         logger.warning(
-            f"Unknown Stripe subscription status '{stripe_sub_object.status}' for {stripe_sub_object.id}. Defaulting to 'unpaid' or last known status."
+            f"Unknown Stripe subscription status '{stripe_sub_object.status}' for {stripe_sub_object.id}. "
+            f"Keeping last known status: {subscription_record.status.value if subscription_record.status else 'None'}."
         )
-        # Manter o status anterior ou definir um padrão de erro, ex: SubscriptionStatusEnum.UNPAID
         if (
             not subscription_record.status
-        ):  # Se for uma nova sub com status desconhecido
+        ):  # Only set to UNPAID if it's a new record and status is unknown
             subscription_record.status = SubscriptionStatusEnum.UNPAID
 
     subscription_record.current_period_start = (
@@ -139,7 +192,10 @@ async def _update_or_create_subscription_from_stripe_object(
         if stripe_sub_object.trial_end
         else None
     )
-    subscription_record.cancel_at_period_end = stripe_sub_object.cancel_at_period_end
+    subscription_record.cancel_at_period_end = bool(
+        stripe_sub_object.cancel_at_period_end
+    )
+
     subscription_record.canceled_at = (
         datetime.fromtimestamp(stripe_sub_object.canceled_at, tz=timezone.utc)
         if stripe_sub_object.canceled_at
@@ -152,14 +208,131 @@ async def _update_or_create_subscription_from_stripe_object(
     )
 
     db.add(subscription_record)
-    # O commit será feito pelo chamador principal do webhook handler após todos os processamentos do evento.
     return subscription_record
 
 
-async def process_checkout_session_completed(db: AsyncSession, event: stripe.Event):
+async def _handle_subscription_lifecycle_update(
+    db: AsyncSession,
+    stripe_sub_object: stripe.Subscription,
+    event_type: str,
+    account_id_from_event: Optional[UUID] = None,
+):
+    """
+    Core logic for handling Stripe subscription lifecycle events.
+
+    This function updates the local subscription record, provisions account access
+    based on the new subscription state (which updates Account.active_plan_tier),
+    and triggers metadata updates for associated Clerk users.
+
+    Args:
+        db: The SQLAlchemy async session.
+        stripe_sub_object: The Stripe Subscription object from the event.
+        event_type: The type of the Stripe event (e.g., "customer.subscription.updated").
+        account_id_from_event: The account ID, if directly available from the event
+            (e.g., from `client_reference_id` in `checkout.session.completed`).
+
+    Raises:
+        HTTPException: If critical processing steps fail (e.g., saving subscription,
+                       provisioning access).
+    """
+    logger.info(
+        f"Handling Stripe event: {event_type} for Stripe Subscription ID: {stripe_sub_object.id}"
+    )
+
+    subscription_record = await _update_or_create_subscription_from_stripe_object(
+        db, stripe_sub_object, account_id_override=account_id_from_event
+    )
+
+    if not subscription_record:
+        logger.error(
+            f"Failed to update or create local subscription for Stripe Sub ID {stripe_sub_object.id} during {event_type}. "
+            "This could be due to missing account linkage or an issue with the Stripe object."
+        )
+        # If we can't even get a subscription_record, it's a significant issue.
+        # We might not have an account_id to work with.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,  # Or 500 if it's an internal mapping issue
+            detail=f"Failed to process subscription data from Stripe event {event_type}.",
+        )
+
+    # At this point, subscription_record should exist and have an account_id
+    if not subscription_record.account_id:
+        logger.error(
+            f"Subscription record {subscription_record.id} (Stripe: {stripe_sub_object.id}) "
+            f"is missing an account_id after update/create. This should not happen."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal error: Subscription record is missing account association.",
+        )
+
+    account_id = subscription_record.account_id
+
+    # Provision access based on the updated subscription_record
+    # This will update Account.active_plan_tier
+    try:
+        await provision_account_access(
+            db=db, account_id=account_id, active_subscription=subscription_record
+        )
+        logger.info(
+            f"Account access provisioned/updated for Account {account_id} after event {event_type}."
+        )
+    except ValueError as ve:  # Raised by provision_account_access if account not found
+        logger.error(
+            f"ValueError during access provisioning for Account {account_id}: {ve}"
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
+    except Exception as e_provision:
+        logger.exception(
+            f"Unexpected error during access provisioning for Account {account_id} after {event_type}: {e_provision}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to provision account access due to an internal error.",
+        )
+
+    # Update Clerk user metadata (e.g., plan tier, subscription status)
+    # This should be robust and not fail the entire webhook if Clerk API has transient issues.
+    try:
+        await update_clerk_user_metadata_after_subscription_change(
+            db=db, account_id=account_id
+        )
+        logger.info(
+            f"Clerk user metadata update task initiated for Account {account_id} after event {event_type}."
+        )
+    except Exception as e_clerk_sync:
+        # Log as error, but don't raise HTTPException to Stripe for this,
+        # as the core subscription update was successful.
+        # Consider a retry mechanism for Clerk updates if they are critical and fail.
+        logger.error(
+            f"Error during Clerk metadata sync for Account {account_id} after {event_type}: {e_clerk_sync}. "
+            "The primary subscription update was successful."
+        )
+
+    # The database commit will be handled by the main webhook router function
+    # after this handler successfully completes.
+
+
+async def handle_checkout_session_completed(db: AsyncSession, event: stripe.Event):
+    """
+    Handles the 'checkout.session.completed' Stripe event.
+
+    This event signifies a customer successfully completed Stripe Checkout.
+    If for a subscription, it retrieves the new Stripe Subscription object
+    and updates the local database, linking it to the account specified
+    in `client_reference_id`.
+
+    Args:
+        db: The SQLAlchemy async session.
+        event: The Stripe Event object (`checkout.session.completed`).
+
+    Raises:
+        HTTPException: If required data (client_reference_id, subscription ID)
+                       is missing, or if Stripe API calls fail.
+    """
     checkout_session = event.data.object
     logger.info(
-        f"Processing checkout.session.completed for session ID: {checkout_session.id}"
+        f"Processing checkout.session.completed for Stripe Session ID: {checkout_session.id}"
     )
 
     mode = checkout_session.get("mode")
@@ -167,220 +340,191 @@ async def process_checkout_session_completed(db: AsyncSession, event: stripe.Eve
         logger.info(
             f"Checkout session {checkout_session.id} is not for a subscription (mode: {mode}). Skipping."
         )
-        return
+        return  # Not an error, just not relevant for subscription logic here.
 
     client_reference_id_str = checkout_session.get("client_reference_id")
     stripe_subscription_id = checkout_session.get("subscription")
-    stripe_customer_id = checkout_session.get(
-        "customer"
-    )  # Pode ser string ou objeto Customer expandido
 
     if not client_reference_id_str:
         logger.error(
-            f"Checkout session {checkout_session.id} completed without client_reference_id. Cannot associate with an account."
+            f"Checkout session {checkout_session.id} (mode: subscription) completed without client_reference_id. "
+            "Cannot link to an internal account."
         )
-        return
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing client_reference_id in completed checkout session.",
+        )
 
     try:
         account_id = UUID(client_reference_id_str)
     except ValueError:
         logger.error(
-            f"Invalid UUID format for client_reference_id: {client_reference_id_str}"
+            f"Invalid UUID format for client_reference_id: '{client_reference_id_str}' "
+            f"in checkout session {checkout_session.id}."
         )
-        return
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid client_reference_id format in checkout session.",
+        )
 
     if not stripe_subscription_id:
         logger.error(
-            f"Checkout session {checkout_session.id} (subscription mode) completed without a subscription ID."
+            f"Checkout session {checkout_session.id} (mode: subscription) completed "
+            "without a subscription ID. Cannot fetch subscription details."
         )
-        return
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing subscription ID in completed checkout session.",
+        )
 
-    if (
-        not stripe_customer_id
-    ):  # Se customer não veio na sessão, tentar pegar da subscription
-        try:
-            temp_sub = stripe.Subscription.retrieve(stripe_subscription_id)
-            stripe_customer_id = temp_sub.customer
-        except Exception as e:
-            logger.error(
-                f"Failed to retrieve subscription {stripe_subscription_id} to get customer_id: {e}"
-            )
-            return
-
-    if isinstance(stripe_customer_id, stripe.Customer):  # Se for objeto expandido
-        stripe_customer_id = stripe_customer_id.id
-
-    # Buscar o objeto Subscription completo do Stripe para ter todos os detalhes
     try:
+        # Retrieve the full Subscription object from Stripe
         stripe_sub_object = stripe.Subscription.retrieve(stripe_subscription_id)
     except stripe.error.StripeError as e:
         logger.error(
-            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} during checkout completion: {e}"
+            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} "
+            f"(from checkout session {checkout_session.id}) from Stripe API: {e}"
         )
-        # Considerar se deve levantar erro para o Stripe reenviar
         raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve subscription details from Stripe.",
+            status_code=status.HTTP_502_BAD_GATEWAY,  # Error communicating with Stripe
+            detail="Failed to retrieve subscription details from Stripe after checkout.",
         )
 
-    subscription_record = await _update_or_create_subscription_from_stripe_object(
-        db, stripe_sub_object, account_id_override=account_id
+    # Pass the retrieved account_id directly to the handler
+    await _handle_subscription_lifecycle_update(
+        db, stripe_sub_object, event.type, account_id_from_event=account_id
     )
 
-    if subscription_record:
-        # TODO: Provisionar acesso para account_id
-        logger.info(
-            f"Access to be provisioned for Account {account_id} based on subscription {subscription_record.id} (status: {subscription_record.status.value})"
-        )
-        # TODO: Atualizar metadados do Clerk
-    else:
-        logger.error(
-            f"Failed to create/update subscription record for account {account_id} from checkout session {checkout_session.id}"
-        )
-        # Considerar levantar erro para o Stripe reenviar
 
+async def handle_invoice_payment_succeeded(db: AsyncSession, event: stripe.Event):
+    """
+    Handles the 'invoice.payment_succeeded' Stripe event.
 
-async def process_invoice_payment_succeeded(db: AsyncSession, event: stripe.Event):
+    This event indicates a successful payment for an invoice. If the invoice
+    is for a subscription renewal or initial payment, this handler ensures
+    the local subscription record reflects any changes (e.g., becoming active,
+    period extension).
+
+    Args:
+        db: The SQLAlchemy async session.
+        event: The Stripe Event object (`invoice.payment_succeeded`).
+
+    Raises:
+        HTTPException: If Stripe API calls to retrieve the subscription fail.
+    """
     invoice = event.data.object
-    stripe_subscription_id = invoice.get("subscription")  # ID da assinatura
-    stripe_customer_id = invoice.get("customer")
+    stripe_subscription_id = invoice.get(
+        "subscription"
+    )  # This is Stripe Subscription ID
 
-    logger.info(
-        f"Processing invoice.payment_succeeded for invoice ID: {invoice.id}, Subscription: {stripe_subscription_id}"
-    )
-
-    if not stripe_subscription_id or not stripe_customer_id:
-        logger.warning(
-            f"Invoice {invoice.id} payment succeeded but missing subscription or customer ID. Skipping subscription update."
+    if not stripe_subscription_id:
+        logger.info(
+            f"Invoice {invoice.id} payment succeeded but is not linked to a subscription "
+            "(e.g., one-time payment or setup fee). Skipping subscription update."
         )
         return
+
+    logger.info(
+        f"Processing invoice.payment_succeeded for Invoice ID: {invoice.id}, "
+        f"linked to Stripe Subscription ID: {stripe_subscription_id}"
+    )
 
     try:
         stripe_sub_object = stripe.Subscription.retrieve(stripe_subscription_id)
     except stripe.error.StripeError as e:
         logger.error(
-            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} for invoice.payment_succeeded: {e}"
+            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} "
+            f"(for invoice.payment_succeeded, Invoice: {invoice.id}) from Stripe API: {e}"
         )
         raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve subscription details from Stripe.",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to retrieve subscription details from Stripe for paid invoice.",
         )
 
-    subscription_record = await _update_or_create_subscription_from_stripe_object(
-        db, stripe_sub_object
-    )
-
-    if subscription_record:
-        # TODO: Garantir que o acesso está provisionado (geralmente já estaria se a sub estava ativa)
-        logger.info(
-            f"Access confirmed/updated for Account {subscription_record.account_id} for subscription {subscription_record.id} (status: {subscription_record.status.value})"
-        )
-    else:
-        logger.error(
-            f"Failed to update subscription record from invoice.payment_succeeded for Stripe sub {stripe_subscription_id}"
-        )
-        # Considerar levantar erro
+    await _handle_subscription_lifecycle_update(db, stripe_sub_object, event.type)
 
 
-async def process_customer_subscription_updated(db: AsyncSession, event: stripe.Event):
-    stripe_sub_object = (
-        event.data.object
-    )  # O objeto Subscription já está no payload do evento
+async def handle_customer_subscription_updated(db: AsyncSession, event: stripe.Event):
+    """
+    Handles 'customer.subscription.updated' and similar lifecycle Stripe events.
+
+    Events like '.created', '.updated', '.trial_will_end' signify changes to a
+    subscription's state (e.g., plan changes, status updates like 'past_due',
+    'active', trial period modifications). This handler updates the local
+    subscription record to mirror these changes.
+
+    Args:
+        db: The SQLAlchemy async session.
+        event: The Stripe Event object (e.g., `customer.subscription.updated`),
+               where `event.data.object` is the Stripe Subscription.
+    """
+    stripe_sub_object = event.data.object  # This is the Stripe Subscription object
     logger.info(
-        f"Processing customer.subscription.updated for Stripe Sub ID: {stripe_sub_object.id}, New Status: {stripe_sub_object.status}"
+        f"Processing {event.type} for Stripe Subscription ID: {stripe_sub_object.id}"
     )
-
-    subscription_record = await _update_or_create_subscription_from_stripe_object(
-        db, stripe_sub_object
-    )
-
-    if subscription_record:
-        # TODO: Ajustar provisionamento de acesso com base no novo status/plano
-        logger.info(
-            f"Access to be re-evaluated for Account {subscription_record.account_id} for subscription {subscription_record.id} (new status: {subscription_record.status.value})"
-        )
-        if subscription_record.status not in [
-            SubscriptionStatusEnum.ACTIVE,
-            SubscriptionStatusEnum.TRIALING,
-        ]:
-            logger.info(
-                f"Subscription {subscription_record.id} is not active/trialing. Access might need to be revoked or limited."
-            )
-            # Lógica para desprovisionar/limitar acesso
-        else:
-            logger.info(
-                f"Subscription {subscription_record.id} is active/trialing. Ensuring access."
-            )
-            # Lógica para garantir/atualizar acesso
-    else:
-        logger.error(
-            f"Failed to update subscription record from customer.subscription.updated for Stripe sub {stripe_sub_object.id}"
-        )
-        # Considerar levantar erro
+    await _handle_subscription_lifecycle_update(db, stripe_sub_object, event.type)
 
 
-async def process_customer_subscription_deleted(db: AsyncSession, event: stripe.Event):
-    stripe_sub_object = event.data.object  # O objeto Subscription (cancelado)
+async def handle_customer_subscription_deleted(db: AsyncSession, event: stripe.Event):
+    """
+    Handles the 'customer.subscription.deleted' Stripe event.
+
+    This event means a subscription was canceled and its term ended, or it was
+    canceled immediately. The handler updates the local subscription record,
+    typically marking its status as 'canceled' or 'ended'.
+
+    Args:
+        db: The SQLAlchemy async session.
+        event: The Stripe Event object (`customer.subscription.deleted`),
+               where `event.data.object` is the (now deleted/canceled) Stripe Subscription.
+    """
+    stripe_sub_object = event.data.object  # Status will likely be 'canceled'
     logger.info(
-        f"Processing customer.subscription.deleted for Stripe Sub ID: {stripe_sub_object.id}"
+        f"Processing customer.subscription.deleted for Stripe Subscription ID: {stripe_sub_object.id}"
     )
-
-    # Mesmo que deletada, o objeto ainda tem os dados relevantes
-    subscription_record = await _update_or_create_subscription_from_stripe_object(
-        db, stripe_sub_object
-    )
-
-    if subscription_record:
-        # O status já deve ser 'canceled' ou similar vindo do stripe_sub_object
-        logger.info(
-            f"Subscription {subscription_record.id} (Stripe: {stripe_sub_object.id}) for account {subscription_record.account_id} marked as {subscription_record.status.value}. Des-provisioning access."
-        )
-        # TODO: Desprovisionar acesso
-    else:
-        logger.error(
-            f"Failed to update subscription record from customer.subscription.deleted for Stripe sub {stripe_sub_object.id}"
-        )
-        # Considerar levantar erro
+    await _handle_subscription_lifecycle_update(db, stripe_sub_object, event.type)
 
 
-async def process_invoice_payment_failed(db: AsyncSession, event: stripe.Event):
+async def handle_invoice_payment_failed(db: AsyncSession, event: stripe.Event):
+    """
+    Handles the 'invoice.payment_failed' Stripe event.
+
+    Occurs when a payment attempt for an invoice (often for subscription renewal) fails.
+    The handler updates the local subscription record, potentially changing its status
+    to 'past_due' or 'unpaid', reflecting Stripe's dunning process.
+
+    Args:
+        db: The SQLAlchemy async session.
+        event: The Stripe Event object (`invoice.payment_failed`).
+
+    Raises:
+        HTTPException: If Stripe API calls to retrieve the subscription fail.
+    """
     invoice = event.data.object
     stripe_subscription_id = invoice.get("subscription")
-    stripe_customer_id = invoice.get("customer")
 
-    logger.info(
-        f"Processing invoice.payment_failed for invoice ID: {invoice.id}, Subscription: {stripe_subscription_id}"
-    )
-
-    if not stripe_subscription_id or not stripe_customer_id:
+    if not stripe_subscription_id:
         logger.warning(
-            f"Invoice {invoice.id} payment failed but missing subscription or customer ID. Skipping subscription update."
+            f"Invoice {invoice.id} payment failed but is not linked to a subscription. "
+            "Skipping subscription update."
         )
         return
+
+    logger.info(
+        f"Processing invoice.payment_failed for Invoice ID: {invoice.id}, "
+        f"linked to Stripe Subscription ID: {stripe_subscription_id}"
+    )
 
     try:
         stripe_sub_object = stripe.Subscription.retrieve(stripe_subscription_id)
     except stripe.error.StripeError as e:
         logger.error(
-            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} for invoice.payment_failed: {e}"
+            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} "
+            f"(for invoice.payment_failed, Invoice: {invoice.id}) from Stripe API: {e}"
         )
         raise HTTPException(
-            status_code=500,
-            detail="Failed to retrieve subscription details from Stripe.",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to retrieve subscription details from Stripe for failed invoice.",
         )
 
-    subscription_record = await _update_or_create_subscription_from_stripe_object(
-        db, stripe_sub_object
-    )
-
-    if subscription_record:
-        # O status da subscription_record já deve ter sido atualizado para past_due ou unpaid pelo Stripe
-        logger.warning(
-            f"Payment failed for subscription {subscription_record.id} (Stripe: {stripe_subscription_id}). Account {subscription_record.account_id}. Status: {subscription_record.status.value}."
-        )
-        # TODO: Notificar usuário, iniciar processo de dunning, ou restringir acesso se o status for grave (ex: unpaid)
-    else:
-        logger.error(
-            f"Failed to update subscription record from invoice.payment_failed for Stripe sub {stripe_subscription_id}"
-        )
-        # Considerar levantar erro
+    await _handle_subscription_lifecycle_update(db, stripe_sub_object, event.type)
