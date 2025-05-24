@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     """
 
     BACKEND_BASE_URL: str = "http://localhost:8000"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # --- Database ---
     DATABASE_USER: str = "user"
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
     CLERK_JWKS_URL: str = "clerk-jwks-url"
     CLERK_ISSUER: str = "clerk-issuer"
     CLERK_AUDIENCE: Optional[str] = None
+    CLERK_SECRET_KEY: str = "your-secret-key"
 
     # --- Storage ---
     CONTACT_IMPORT_GCS_BUCKET_NAME: str = "wappbot-import-bucket"

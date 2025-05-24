@@ -33,6 +33,7 @@ from app.api.routes import billing as billing_routes
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
+from app.core.dependencies.billing import require_active_subscription
 
 # Import Services/Config
 from app.services.realtime.redis_pubsub import RedisPubSubBridge
@@ -130,6 +131,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+common_protected_dependencies = [Depends(require_active_subscription)]
 
 # --- API Routers (v1) ---
 api_v1_prefix = "/api/v1"
@@ -140,39 +142,70 @@ logger.info(f"Including API routers under prefix: {api_v1_prefix}")
 app.include_router(
     auth_routes.router, prefix=f"{api_v1_prefix}/auth", tags=["v1 - Auth"]
 )
+
 app.include_router(
-    conversation_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Conversations"]
-)
-app.include_router(
-    message_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Messages"]
-)
-app.include_router(
-    inbox_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Inboxes"]
-)
-app.include_router(
-    contact_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Contacts"]
+    billing_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Billing"]
 )
 
 app.include_router(
-    simulation_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Simulation"]
+    me_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Me"],
+)
+
+
+app.include_router(
+    conversation_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Conversations"],
+    dependencies=common_protected_dependencies,
+)
+app.include_router(
+    message_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Messages"],
+    dependencies=common_protected_dependencies,
+)
+app.include_router(
+    inbox_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Inboxes"],
+    dependencies=common_protected_dependencies,
+)
+app.include_router(
+    contact_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Contacts"],
+    dependencies=common_protected_dependencies,
+)
+
+app.include_router(
+    simulation_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Simulation"],
+    dependencies=common_protected_dependencies,
 )
 
 app.include_router(
     profile_routes.router,
     prefix=f"{api_v1_prefix}",
-    tags=["v1 - Company Profile"],  # Tag já está no router
+    tags=["v1 - Company Profile"],
+    dependencies=common_protected_dependencies,  # Tag já está no router
 )
 
 app.include_router(
-    bot_agent_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Bot Agent"]
+    bot_agent_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Bot Agent"],
+    dependencies=common_protected_dependencies,
 )
 
-app.include_router(me_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Me"])
 
 app.include_router(
     batch_contacts_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Contacts Batch Operations"],
+    dependencies=common_protected_dependencies,
 )
 
 
@@ -180,11 +213,9 @@ app.include_router(
     dashboard_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Dashboard Metrics"],
+    dependencies=common_protected_dependencies,
 )
 
-app.include_router(
-    billing_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Billing"]
-)
 
 # --- Researcher Router ---
 logger.info("Including Researcher router")
@@ -192,6 +223,7 @@ app.include_router(
     research_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Researcher"],
+    dependencies=common_protected_dependencies,
 )
 
 logger.info("Including Knowledge router")
@@ -199,6 +231,7 @@ app.include_router(
     knowledge_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Knowledge"],
+    dependencies=common_protected_dependencies,
 )
 
 
@@ -208,6 +241,7 @@ app.include_router(
     evolution_instance_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Evolution Instances"],
+    dependencies=common_protected_dependencies,
 )
 
 
