@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from loguru import logger
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Dict, Any
 import stripe  # type: ignore
 
 from app.models.account import Account
@@ -49,45 +49,48 @@ async def _get_account_id_from_stripe_customer(
 
 async def _update_or_create_subscription_from_stripe_object(
     db: AsyncSession,
-    stripe_sub_object: stripe.Subscription,
+    stripe_sub_data: Dict[str, Any],  # Tratar como dicionário
     account_id_override: Optional[UUID] = None,
 ) -> Optional[Subscription]:
     """
-    Updates an existing subscription record or creates a new one based on a Stripe Subscription object.
+    Updates an existing subscription record or creates a new one based on Stripe subscription data.
 
-    This function is idempotent. It ensures the local subscription database stays in sync
-    with Stripe's subscription data. It populates all relevant fields from the Stripe
-    Subscription object into the local Subscription model instance.
+    This function is idempotent and expects the Stripe subscription data as a dictionary.
+    It populates all relevant fields from the Stripe data into the local Subscription model.
 
     Args:
         db: The SQLAlchemy async session.
-        stripe_sub_object: The Stripe Subscription object from a webhook event or API call.
+        stripe_sub_data: A dictionary representing the Stripe Subscription object.
         account_id_override: An optional account ID to associate with the subscription.
-            Primarily used during 'checkout.session.completed' where the account ID
-            is known from 'client_reference_id'.
+            Primarily used during 'checkout.session.completed'.
 
     Returns:
         The updated or newly created Subscription ORM object if successful, otherwise None.
         The object is added to the session but not committed by this function.
     """
+    sub_id = stripe_sub_data.get("id")
+    sub_status_str = stripe_sub_data.get("status")
     logger.info(
-        f"Updating/creating local subscription for Stripe Sub ID: {stripe_sub_object.id}, Status: {stripe_sub_object.status}"
+        f"Updating/creating local subscription for Stripe Sub ID: {sub_id}, Status: {sub_status_str}"
     )
-
-    stripe_sub_object = stripe.Subscription.retrieve(stripe_sub_object.id)
+    # logger.debug(f"Full Stripe Subscription data for {sub_id}: {stripe_sub_data}")
 
     account_id_to_use = account_id_override
 
-    customer_data = stripe_sub_object.customer
+    customer_data = stripe_sub_data.get("customer")
     stripe_customer_id_str: Optional[str] = None
+
     if isinstance(customer_data, str):
         stripe_customer_id_str = customer_data
-    elif hasattr(customer_data, "id") and customer_data.id:  # type: ignore
-        stripe_customer_id_str = customer_data.id  # type: ignore
+    elif isinstance(customer_data, dict) and customer_data.get("id"):
+        stripe_customer_id_str = customer_data.get("id")
+    # Fallback se for um objeto Stripe real (menos provável se a entrada for Dict[str, Any])
+    elif hasattr(customer_data, "id") and getattr(customer_data, "id", None):
+        stripe_customer_id_str = getattr(customer_data, "id")
 
     if not stripe_customer_id_str:
         logger.error(
-            f"Stripe Subscription {stripe_sub_object.id} is missing a valid customer ID. Customer data: {customer_data}"
+            f"Stripe Subscription {sub_id} is missing a valid customer ID. Customer data: {customer_data}"
         )
         return None
 
@@ -98,112 +101,137 @@ async def _update_or_create_subscription_from_stripe_object(
 
     if not account_id_to_use:
         logger.error(
-            f"Could not determine internal account_id for Stripe Subscription {stripe_sub_object.id} "
+            f"Could not determine internal account_id for Stripe Subscription {sub_id} "
             f"(Stripe Customer: {stripe_customer_id_str}). This subscription might belong to a customer "
             "not yet fully synced or an orphaned Stripe customer."
         )
-        return None  # Cannot proceed without an internal account ID
+        return None
 
-    stmt = select(Subscription).where(
-        Subscription.stripe_subscription_id == stripe_sub_object.id
-    )
+    stmt = select(Subscription).where(Subscription.stripe_subscription_id == sub_id)
     existing_sub_result = await db.execute(stmt)
     subscription_record = existing_sub_result.scalars().first()
 
     if not subscription_record:
-        subscription_record = Subscription(stripe_subscription_id=stripe_sub_object.id)
+        subscription_record = Subscription(stripe_subscription_id=sub_id)
         logger.info(
-            f"Creating new local Subscription record for Stripe Subscription ID: {stripe_sub_object.id} "
+            f"Creating new local Subscription record for Stripe Subscription ID: {sub_id} "
             f"for Account ID: {account_id_to_use}"
         )
     else:
         logger.info(
             f"Updating existing local Subscription record ID {subscription_record.id} "
-            f"(Stripe Subscription ID: {stripe_sub_object.id}) for Account ID: {account_id_to_use}"
+            f"(Stripe Subscription ID: {sub_id}) for Account ID: {account_id_to_use}"
         )
 
     subscription_record.account_id = account_id_to_use
     subscription_record.stripe_customer_id = stripe_customer_id_str
+    ts_cps = None
+    ts_cpe = None
+    ts_ts = None
+    ts_te = None
+    ts_ca = None
+    ts_ea = None
 
-    # Extract product and price IDs from the subscription items
-    # Stripe usually includes one item for simple subscriptions.
-    logger.info(f"Subscription obj: {stripe_sub_object}")
-    logger.info(f"Subscription obj Items: {stripe_sub_object.items}")
-    if stripe_sub_object.items and stripe_sub_object.items.data:
-        primary_item = stripe_sub_object.items.data[0]
-        if primary_item and primary_item.price:
-            subscription_record.stripe_price_id = primary_item.price.id
-            product_data = primary_item.price.product
-            if isinstance(product_data, str):  # Product ID string
-                subscription_record.stripe_product_id = product_data
-            elif hasattr(product_data, "id"):  # Expanded Product object
-                subscription_record.stripe_product_id = product_data.id  # type: ignore
+    # Acessar items, price, product como dicionário
+    items_data_dict = stripe_sub_data.get("items")
+    if isinstance(items_data_dict, dict):
+        items_list = items_data_dict.get("data")
+        if isinstance(items_list, list) and len(items_list) > 0:
+            primary_item_dict = items_list[0]
+
+            ts_cps = primary_item_dict.get("current_period_start")
+            ts_cpe = primary_item_dict.get("current_period_end")
+            ts_ts = primary_item_dict.get("trial_start")
+            ts_te = primary_item_dict.get("trial_end")
+            ts_ca = primary_item_dict.get("canceled_at")
+            ts_ea = primary_item_dict.get("ended_at")
+            target_pricing_object = primary_item_dict.get("price")
+
+            if target_pricing_object:
+                subscription_record.stripe_price_id = target_pricing_object.get("id")
+                product_id_val = target_pricing_object.get("product")
+                if isinstance(product_id_val, str):
+                    subscription_record.stripe_product_id = product_id_val
+                else:  # Se product for um objeto expandido (raro aqui, mas possível)
+                    logger.warning(
+                        f"Product ID for sub {sub_id} in pricing object {target_pricing_object.get('id')} is not a string: {type(product_id_val)}. Value: {product_id_val}"
+                    )
             else:
                 logger.warning(
-                    f"Could not extract Stripe Product ID from item's price.product for sub {stripe_sub_object.id}. Product data: {product_data}"
+                    f"Primary item for sub {sub_id} does not have a valid 'price' or 'plan' dictionary. Item: {primary_item_dict}"
                 )
+        elif isinstance(items_list, list) and len(items_list) == 0:
+            logger.warning(f"items.data for sub {sub_id} is an empty list.")
         else:
             logger.warning(
-                f"Primary item or item price missing for Stripe Subscription {stripe_sub_object.id}. Items: {stripe_sub_object.items.data}"
+                f"items.data for sub {sub_id} is not a list or is missing. items.data: {items_list}"
             )
-    else:
-        logger.warning(
-            f"No items found in Stripe Subscription {stripe_sub_object.id} to determine product/price ID."
-        )
 
     try:
-        new_status = SubscriptionStatusEnum(stripe_sub_object.status)
-        if subscription_record.status != new_status:
-            logger.info(
-                f"Subscription {stripe_sub_object.id} status changing from {subscription_record.status} to {new_status.value}"
-            )
-            subscription_record.status = new_status
+        if sub_status_str:
+            new_status_enum = SubscriptionStatusEnum(sub_status_str)
+            if subscription_record.status != new_status_enum:
+                current_status_val_log = (
+                    subscription_record.status.value
+                    if subscription_record.status
+                    else "None"
+                )
+                logger.info(
+                    f"Subscription {sub_id} status changing from {current_status_val_log} to {new_status_enum.value}"
+                )
+            subscription_record.status = new_status_enum
         else:
-            subscription_record.status = (
-                new_status  # Ensure it's set even if not changing
+            logger.warning(
+                f"Subscription {sub_id} has no status string. Defaulting to UNPAID if new and no prior status."
             )
-    except ValueError:
+            if (
+                not subscription_record.status
+            ):  # Somente se for um novo registro sem status prévio
+                subscription_record.status = SubscriptionStatusEnum.UNPAID
+    except ValueError:  # Se sub_status_str não for um valor válido no Enum
+        current_status_val_log = (
+            subscription_record.status.value if subscription_record.status else "None"
+        )
         logger.warning(
-            f"Unknown Stripe subscription status '{stripe_sub_object.status}' for {stripe_sub_object.id}. "
-            f"Keeping last known status: {subscription_record.status.value if subscription_record.status else 'None'}."
+            f"Unknown Stripe subscription status string '{sub_status_str}' for {sub_id}. "
+            f"Keeping last known status: {current_status_val_log}."
         )
         if (
             not subscription_record.status
-        ):  # Only set to UNPAID if it's a new record and status is unknown
+        ):  # Somente se for um novo registro sem status prévio e o status do Stripe for inválido
             subscription_record.status = SubscriptionStatusEnum.UNPAID
 
     subscription_record.current_period_start = (
-        datetime.fromtimestamp(stripe_sub_object.current_period_start, tz=timezone.utc)
-        if stripe_sub_object.current_period_start
+        datetime.fromtimestamp(ts_cps, tz=timezone.utc)
+        if isinstance(ts_cps, int)
         else None
     )
     subscription_record.current_period_end = (
-        datetime.fromtimestamp(stripe_sub_object.current_period_end, tz=timezone.utc)
-        if stripe_sub_object.current_period_end
+        datetime.fromtimestamp(ts_cpe, tz=timezone.utc)
+        if isinstance(ts_cpe, int)
         else None
     )
     subscription_record.trial_start_at = (
-        datetime.fromtimestamp(stripe_sub_object.trial_start, tz=timezone.utc)
-        if stripe_sub_object.trial_start
+        datetime.fromtimestamp(ts_ts, tz=timezone.utc)
+        if isinstance(ts_ts, int)
         else None
     )
     subscription_record.trial_ends_at = (
-        datetime.fromtimestamp(stripe_sub_object.trial_end, tz=timezone.utc)
-        if stripe_sub_object.trial_end
+        datetime.fromtimestamp(ts_te, tz=timezone.utc)
+        if isinstance(ts_te, int)
         else None
     )
     subscription_record.cancel_at_period_end = bool(
-        stripe_sub_object.cancel_at_period_end
+        stripe_sub_data.get("cancel_at_period_end", False)
     )
-
     subscription_record.canceled_at = (
-        datetime.fromtimestamp(stripe_sub_object.canceled_at, tz=timezone.utc)
-        if stripe_sub_object.canceled_at
+        datetime.fromtimestamp(ts_ca, tz=timezone.utc)
+        if isinstance(ts_ca, int)
         else None
     )
     subscription_record.ended_at = (
-        datetime.fromtimestamp(stripe_sub_object.ended_at, tz=timezone.utc)
-        if stripe_sub_object.ended_at
+        datetime.fromtimestamp(ts_ea, tz=timezone.utc)
+        if isinstance(ts_ea, int)
         else None
     )
 
@@ -213,7 +241,7 @@ async def _update_or_create_subscription_from_stripe_object(
 
 async def _handle_subscription_lifecycle_update(
     db: AsyncSession,
-    stripe_sub_object: stripe.Subscription,
+    stripe_sub_data: Dict[str, Any],  # Espera um dicionário
     event_type: str,
     account_id_from_event: Optional[UUID] = None,
 ):
@@ -226,7 +254,7 @@ async def _handle_subscription_lifecycle_update(
 
     Args:
         db: The SQLAlchemy async session.
-        stripe_sub_object: The Stripe Subscription object from the event.
+        stripe_sub_data: The Stripe Subscription object from the event.
         event_type: The type of the Stripe event (e.g., "customer.subscription.updated").
         account_id_from_event: The account ID, if directly available from the event
             (e.g., from `client_reference_id` in `checkout.session.completed`).
@@ -235,41 +263,37 @@ async def _handle_subscription_lifecycle_update(
         HTTPException: If critical processing steps fail (e.g., saving subscription,
                        provisioning access).
     """
+    sub_id = stripe_sub_data.get("id", "N/A_SUB_ID")  # Default para logging
     logger.info(
-        f"Handling Stripe event: {event_type} for Stripe Subscription ID: {stripe_sub_object.id}"
+        f"Handling Stripe event: {event_type} for Stripe Subscription ID: {sub_id}"
     )
 
     subscription_record = await _update_or_create_subscription_from_stripe_object(
-        db, stripe_sub_object, account_id_override=account_id_from_event
+        db, stripe_sub_data, account_id_override=account_id_from_event
     )
 
     if not subscription_record:
         logger.error(
-            f"Failed to update or create local subscription for Stripe Sub ID {stripe_sub_object.id} during {event_type}. "
-            "This could be due to missing account linkage or an issue with the Stripe object."
+            f"Failed to update or create local subscription for Stripe Sub ID {sub_id} during {event_type}. "
+            "This could be due to missing account linkage or an issue with the Stripe data."
         )
-        # If we can't even get a subscription_record, it's a significant issue.
-        # We might not have an account_id to work with.
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,  # Or 500 if it's an internal mapping issue
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to process subscription data from Stripe event {event_type}.",
         )
 
-    # At this point, subscription_record should exist and have an account_id
-    if not subscription_record.account_id:
-        logger.error(
-            f"Subscription record {subscription_record.id} (Stripe: {stripe_sub_object.id}) "
-            f"is missing an account_id after update/create. This should not happen."
+    if not subscription_record.account_id:  # Salvaguarda
+        logger.critical(  # Usar critical pois isso não deveria acontecer
+            f"Subscription record {subscription_record.id} (Stripe: {sub_id}) "
+            f"is missing an account_id after update/create. This indicates a severe logic error."
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal error: Subscription record is missing account association.",
+            detail="Internal error: Subscription record is missing account association after processing.",
         )
 
     account_id = subscription_record.account_id
 
-    # Provision access based on the updated subscription_record
-    # This will update Account.active_plan_tier
     try:
         await provision_account_access(
             db=db, account_id=account_id, active_subscription=subscription_record
@@ -277,40 +301,34 @@ async def _handle_subscription_lifecycle_update(
         logger.info(
             f"Account access provisioned/updated for Account {account_id} after event {event_type}."
         )
-    except ValueError as ve:  # Raised by provision_account_access if account not found
+    except ValueError as ve:
         logger.error(
-            f"ValueError during access provisioning for Account {account_id}: {ve}"
+            f"ValueError during access provisioning for Account {account_id} (Sub: {sub_id}): {ve}"
         )
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(ve)
+        )  # Se conta não for encontrada
     except Exception as e_provision:
         logger.exception(
-            f"Unexpected error during access provisioning for Account {account_id} after {event_type}: {e_provision}"
+            f"Unexpected error during access provisioning for Account {account_id} (Sub: {sub_id}) after {event_type}: {e_provision}"
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to provision account access due to an internal error.",
         )
 
-    # Update Clerk user metadata (e.g., plan tier, subscription status)
-    # This should be robust and not fail the entire webhook if Clerk API has transient issues.
     try:
         await update_clerk_user_metadata_after_subscription_change(
             db=db, account_id=account_id
         )
         logger.info(
-            f"Clerk user metadata update task initiated for Account {account_id} after event {event_type}."
+            f"Clerk user metadata update task initiated for Account {account_id} (Sub: {sub_id}) after event {event_type}."
         )
     except Exception as e_clerk_sync:
-        # Log as error, but don't raise HTTPException to Stripe for this,
-        # as the core subscription update was successful.
-        # Consider a retry mechanism for Clerk updates if they are critical and fail.
         logger.error(
-            f"Error during Clerk metadata sync for Account {account_id} after {event_type}: {e_clerk_sync}. "
+            f"Error during Clerk metadata sync for Account {account_id} (Sub: {sub_id}) after {event_type}: {e_clerk_sync}. "
             "The primary subscription update was successful."
         )
-
-    # The database commit will be handled by the main webhook router function
-    # after this handler successfully completes.
 
 
 async def handle_checkout_session_completed(db: AsyncSession, event: stripe.Event):
@@ -330,69 +348,73 @@ async def handle_checkout_session_completed(db: AsyncSession, event: stripe.Even
         HTTPException: If required data (client_reference_id, subscription ID)
                        is missing, or if Stripe API calls fail.
     """
-    checkout_session = event.data.object
+    checkout_session_data: Dict[str, Any] = (
+        event.data.object
+    )  # event.data.object é um StripeObject, que se comporta como dict
+    session_id = checkout_session_data.get("id", "N/A_SESSION_ID")
     logger.info(
-        f"Processing checkout.session.completed for Stripe Session ID: {checkout_session.id}"
+        f"Processing checkout.session.completed for Stripe Session ID: {session_id}"
     )
 
-    mode = checkout_session.get("mode")
+    mode = checkout_session_data.get("mode")
     if mode != "subscription":
         logger.info(
-            f"Checkout session {checkout_session.id} is not for a subscription (mode: {mode}). Skipping."
+            f"Checkout session {session_id} is not for a subscription (mode: {mode}). Skipping."
         )
-        return  # Not an error, just not relevant for subscription logic here.
+        return
 
-    client_reference_id_str = checkout_session.get("client_reference_id")
-    stripe_subscription_id = checkout_session.get("subscription")
+    client_reference_id_str = checkout_session_data.get("client_reference_id")
+    stripe_subscription_id = checkout_session_data.get("subscription")
 
     if not client_reference_id_str:
         logger.error(
-            f"Checkout session {checkout_session.id} (mode: subscription) completed without client_reference_id. "
-            "Cannot link to an internal account."
+            f"Checkout session {session_id} completed without client_reference_id."
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing client_reference_id in completed checkout session.",
+            detail="Missing client_reference_id.",
         )
-
     try:
         account_id = UUID(client_reference_id_str)
     except ValueError:
         logger.error(
-            f"Invalid UUID format for client_reference_id: '{client_reference_id_str}' "
-            f"in checkout session {checkout_session.id}."
+            f"Invalid UUID format for client_reference_id: '{client_reference_id_str}' in session {session_id}."
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid client_reference_id format in checkout session.",
+            detail="Invalid client_reference_id format.",
         )
 
     if not stripe_subscription_id:
         logger.error(
-            f"Checkout session {checkout_session.id} (mode: subscription) completed "
-            "without a subscription ID. Cannot fetch subscription details."
+            f"Checkout session {session_id} (subscription mode) completed without a subscription ID."
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Missing subscription ID in completed checkout session.",
+            detail="Missing subscription ID in session.",
         )
 
     try:
-        # Retrieve the full Subscription object from Stripe
-        stripe_sub_object = stripe.Subscription.retrieve(stripe_subscription_id)
+        # stripe.Subscription.retrieve() retorna um objeto stripe.Subscription.
+        # Para consistência com _update_or_create_subscription_from_stripe_object esperando um dict,
+        # convertemos para dict.
+        retrieved_stripe_sub_object = stripe.Subscription.retrieve(
+            stripe_subscription_id
+        )
+        stripe_sub_data_for_handler: Dict[str, Any] = (
+            retrieved_stripe_sub_object.to_dict_recursive()
+        )
     except stripe.error.StripeError as e:
         logger.error(
-            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} "
-            f"(from checkout session {checkout_session.id}) from Stripe API: {e}"
+            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} (from session {session_id}): {e}"
         )
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,  # Error communicating with Stripe
-            detail="Failed to retrieve subscription details from Stripe after checkout.",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Stripe API error retrieving subscription.",
         )
 
-    # Pass the retrieved account_id directly to the handler
     await _handle_subscription_lifecycle_update(
-        db, stripe_sub_object, event.type, account_id_from_event=account_id
+        db, stripe_sub_data_for_handler, event.type, account_id_from_event=account_id
     )
 
 
@@ -412,36 +434,39 @@ async def handle_invoice_payment_succeeded(db: AsyncSession, event: stripe.Event
     Raises:
         HTTPException: If Stripe API calls to retrieve the subscription fail.
     """
-    invoice = event.data.object
-    stripe_subscription_id = invoice.get(
-        "subscription"
-    )  # This is Stripe Subscription ID
+    invoice_data: Dict[str, Any] = event.data.object
+    invoice_id = invoice_data.get("id", "N/A_INVOICE_ID")
+    stripe_subscription_id = invoice_data.get("subscription")
 
     if not stripe_subscription_id:
         logger.info(
-            f"Invoice {invoice.id} payment succeeded but is not linked to a subscription "
-            "(e.g., one-time payment or setup fee). Skipping subscription update."
+            f"Invoice {invoice_id} payment succeeded but no subscription ID found. Skipping."
         )
         return
 
     logger.info(
-        f"Processing invoice.payment_succeeded for Invoice ID: {invoice.id}, "
-        f"linked to Stripe Subscription ID: {stripe_subscription_id}"
+        f"Processing invoice.payment_succeeded for Invoice ID: {invoice_id}, linked to Stripe Sub ID: {stripe_subscription_id}"
     )
 
     try:
-        stripe_sub_object = stripe.Subscription.retrieve(stripe_subscription_id)
+        retrieved_stripe_sub_object = stripe.Subscription.retrieve(
+            stripe_subscription_id
+        )
+        stripe_sub_data_for_handler: Dict[str, Any] = (
+            retrieved_stripe_sub_object.to_dict_recursive()
+        )
     except stripe.error.StripeError as e:
         logger.error(
-            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} "
-            f"(for invoice.payment_succeeded, Invoice: {invoice.id}) from Stripe API: {e}"
+            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} for invoice.payment_succeeded (Invoice: {invoice_id}): {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to retrieve subscription details from Stripe for paid invoice.",
+            detail="Stripe API error retrieving subscription for invoice.",
         )
 
-    await _handle_subscription_lifecycle_update(db, stripe_sub_object, event.type)
+    await _handle_subscription_lifecycle_update(
+        db, stripe_sub_data_for_handler, event.type
+    )
 
 
 async def handle_customer_subscription_updated(db: AsyncSession, event: stripe.Event):
@@ -458,11 +483,12 @@ async def handle_customer_subscription_updated(db: AsyncSession, event: stripe.E
         event: The Stripe Event object (e.g., `customer.subscription.updated`),
                where `event.data.object` is the Stripe Subscription.
     """
-    stripe_sub_object = event.data.object  # This is the Stripe Subscription object
-    logger.info(
-        f"Processing {event.type} for Stripe Subscription ID: {stripe_sub_object.id}"
-    )
-    await _handle_subscription_lifecycle_update(db, stripe_sub_object, event.type)
+    # event.data.object já é o objeto Subscription (um StripeObject, que se comporta como dict)
+    stripe_sub_data: Dict[str, Any] = event.data.object
+    sub_id = stripe_sub_data.get("id", "N/A_SUB_ID")
+    logger.info(f"Processing {event.type} for Stripe Subscription ID: {sub_id}")
+    # Passamos diretamente, pois _handle_subscription_lifecycle_update espera um dict-like object.
+    await _handle_subscription_lifecycle_update(db, stripe_sub_data, event.type)
 
 
 async def handle_customer_subscription_deleted(db: AsyncSession, event: stripe.Event):
@@ -478,11 +504,12 @@ async def handle_customer_subscription_deleted(db: AsyncSession, event: stripe.E
         event: The Stripe Event object (`customer.subscription.deleted`),
                where `event.data.object` is the (now deleted/canceled) Stripe Subscription.
     """
-    stripe_sub_object = event.data.object  # Status will likely be 'canceled'
+    stripe_sub_data: Dict[str, Any] = event.data.object
+    sub_id = stripe_sub_data.get("id", "N/A_SUB_ID")
     logger.info(
-        f"Processing customer.subscription.deleted for Stripe Subscription ID: {stripe_sub_object.id}"
+        f"Processing customer.subscription.deleted for Stripe Subscription ID: {sub_id}"
     )
-    await _handle_subscription_lifecycle_update(db, stripe_sub_object, event.type)
+    await _handle_subscription_lifecycle_update(db, stripe_sub_data, event.type)
 
 
 async def handle_invoice_payment_failed(db: AsyncSession, event: stripe.Event):
@@ -500,31 +527,36 @@ async def handle_invoice_payment_failed(db: AsyncSession, event: stripe.Event):
     Raises:
         HTTPException: If Stripe API calls to retrieve the subscription fail.
     """
-    invoice = event.data.object
-    stripe_subscription_id = invoice.get("subscription")
+    invoice_data: Dict[str, Any] = event.data.object
+    invoice_id = invoice_data.get("id", "N/A_INVOICE_ID")
+    stripe_subscription_id = invoice_data.get("subscription")
 
     if not stripe_subscription_id:
         logger.warning(
-            f"Invoice {invoice.id} payment failed but is not linked to a subscription. "
-            "Skipping subscription update."
+            f"Invoice {invoice_id} payment failed but no subscription ID found. Skipping."
         )
         return
 
     logger.info(
-        f"Processing invoice.payment_failed for Invoice ID: {invoice.id}, "
-        f"linked to Stripe Subscription ID: {stripe_subscription_id}"
+        f"Processing invoice.payment_failed for Invoice ID: {invoice_id}, linked to Stripe Sub ID: {stripe_subscription_id}"
     )
 
     try:
-        stripe_sub_object = stripe.Subscription.retrieve(stripe_subscription_id)
+        retrieved_stripe_sub_object = stripe.Subscription.retrieve(
+            stripe_subscription_id
+        )
+        stripe_sub_data_for_handler: Dict[str, Any] = (
+            retrieved_stripe_sub_object.to_dict_recursive()
+        )
     except stripe.error.StripeError as e:
         logger.error(
-            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} "
-            f"(for invoice.payment_failed, Invoice: {invoice.id}) from Stripe API: {e}"
+            f"Failed to retrieve Stripe Subscription {stripe_subscription_id} for invoice.payment_failed (Invoice: {invoice_id}): {e}"
         )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Failed to retrieve subscription details from Stripe for failed invoice.",
+            detail="Stripe API error retrieving subscription for failed invoice.",
         )
 
-    await _handle_subscription_lifecycle_update(db, stripe_sub_object, event.type)
+    await _handle_subscription_lifecycle_update(
+        db, stripe_sub_data_for_handler, event.type
+    )

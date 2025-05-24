@@ -1,46 +1,61 @@
-# backend/app/api/routes/stripe/webhook.py
+# backend/app/api/routes/webhooks/stripe.py
 
 from fastapi import APIRouter, Request, Header, HTTPException, status, Response, Depends
 from loguru import logger
-import stripe  # Para stripe.error e stripe.Webhook
+import stripe  # For stripe.error and stripe.Webhook
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# Updated import path for webhook handlers
 from .event_handler import (
-    process_checkout_session_completed,
-    process_invoice_payment_succeeded,
-    process_customer_subscription_updated,
-    process_customer_subscription_deleted,
-    process_invoice_payment_failed,
+    handle_checkout_session_completed,
+    handle_invoice_payment_succeeded,
+    handle_customer_subscription_updated,
+    handle_customer_subscription_deleted,
+    handle_invoice_payment_failed,
 )
 from app.database import get_db
 from app.config import get_settings
 
-# Importaremos os serviços de processamento de webhook depois
-# from app.services.stripe_webhook_service import handle_stripe_event
 
 settings = get_settings()
 
 router = APIRouter(
-    prefix="/webhooks",  # Será /api/v1/webhooks se incluído no api_v1_router
-    tags=["Webhooks"],
-    # Este router NÃO deve ter dependências de autenticação globais da nossa API
+    prefix="/webhooks",  # Prefix is already defined in main.py when including this router
+    tags=["Stripe Webhooks"],  # Tag updated for clarity, main.py uses "Stripe Webhooks"
+    # This router should NOT have global auth dependencies from our API
 )
 
 
 @router.post(
-    "/stripe", include_in_schema=False
-)  # include_in_schema=False para não expor na doc OpenAPI pública
+    "/stripe",  # Path will be /webhooks/stripe due to prefix in main.py
+    include_in_schema=False,  # Keep out of public OpenAPI docs
+)
 async def stripe_webhook_endpoint(
-    request: Request,  # Usamos Request para obter o corpo bruto (raw body)
-    stripe_signature: Optional[str] = Header(
-        None, alias="Stripe-Signature"
-    ),  # Header enviado pelo Stripe
+    request: Request,
+    stripe_signature: Optional[str] = Header(None, alias="Stripe-Signature"),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Endpoint to receive and process webhooks from Stripe.
-    It verifies the signature of the incoming request to ensure it's from Stripe,
-    then processes the event accordingly.
+
+    Verifies the signature of the incoming request to ensure it's from Stripe,
+    then processes the event by dispatching it to the appropriate handler.
+    A 200 OK response must be sent to Stripe quickly to acknowledge receipt.
+    Any actual processing can happen subsequently or be offloaded to a background task
+    if it's time-consuming.
+
+    Args:
+        request: The FastAPI Request object, used to get the raw request body.
+        stripe_signature: The 'Stripe-Signature' header from the request.
+        db: The SQLAlchemy async session, injected by FastAPI.
+
+    Returns:
+        A FastAPI Response object, typically 200 OK if the event is acknowledged.
+
+    Raises:
+        HTTPException: For various errors like missing signature, invalid payload,
+                       signature verification failure, or internal processing errors.
     """
     if not stripe_signature:
         logger.warning("Stripe webhook received without Stripe-Signature header.")
@@ -49,23 +64,19 @@ async def stripe_webhook_endpoint(
             detail="Missing Stripe-Signature header",
         )
 
-    # Obter o corpo bruto da requisição
     payload = await request.body()
-
-    # Segredo do endpoint de webhook (configurado no seu painel do Stripe e no .env)
-    # Certifique-se de que STRIPE_WEBHOOK_SECRET está nas suas Settings
     endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
+
     if not endpoint_secret:
-        logger.error("STRIPE_WEBHOOK_SECRET is not configured in settings.")
-        # Não retorne este erro para o Stripe, pois é um problema de configuração nosso.
-        # Mas logue e talvez retorne um 500 genérico para o Stripe para que ele tente reenviar.
-        # Para segurança, não revele a ausência do segredo.
-        # No entanto, para desenvolvimento, um erro claro é útil.
-        # Em produção, você pode querer apenas logar e retornar 200 para evitar que o Stripe desabilite o webhook.
-        # Mas se não podemos verificar, não podemos processar.
+        logger.error(
+            "STRIPE_WEBHOOK_SECRET is not configured. Cannot verify webhook signature."
+        )
+        # This is a server configuration error. Stripe expects a 2xx or 4xx.
+        # Returning 500 might cause Stripe to retry, but we can't process it anyway.
+        # For security, don't reveal the secret is missing.
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Webhook secret not configured.",
+            detail="Webhook processing configuration error.",
         )
 
     event = None
@@ -75,66 +86,68 @@ async def stripe_webhook_endpoint(
         )
         logger.info(f"Stripe webhook event received: ID={event.id}, Type={event.type}")
     except ValueError as e:
-        # Payload inválido
         logger.error(f"Stripe webhook error: Invalid payload. {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload"
-        ) from e
+        )
     except stripe.error.SignatureVerificationError as e:  # type: ignore
-        # Assinatura inválida
         logger.error(f"Stripe webhook error: Invalid signature. {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature"
-        ) from e
+        )
     except Exception as e:
         logger.error(f"Stripe webhook error: Could not construct event. {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Could not construct event"
-        ) from e
+        )
 
-    # Log do evento completo para depuração inicial (pode ser muito verboso para produção constante)
-    logger.debug(f"Stripe Event Full Payload: {event}")
+    # Optional: Log the full event for debugging, can be verbose
+    # logger.debug(f"Stripe Event Full Payload: {event}")
 
-    # TODO: Chamar um serviço para processar o 'event' com base no 'event.type'
-    # Exemplo: await handle_stripe_event(event=event, db=db) # db precisaria ser injetado se o handler precisar
-    # Por agora, apenas logamos e retornamos sucesso.
+    # Map event types to handlers
+    event_handlers = {
+        "checkout.session.completed": handle_checkout_session_completed,
+        "invoice.payment_succeeded": handle_invoice_payment_succeeded,
+        "customer.subscription.updated": handle_customer_subscription_updated,
+        "customer.subscription.created": handle_customer_subscription_updated,  # Often similar logic to updated
+        "customer.subscription.trial_will_end": handle_customer_subscription_updated,  # Or a specific handler
+        "customer.subscription.deleted": handle_customer_subscription_deleted,
+        "invoice.payment_failed": handle_invoice_payment_failed,
+    }
+
+    handler = event_handlers.get(event.type)
+
+    if not handler:
+        logger.info(f"Received unhandled Stripe event type: {event.type}")
+        # Acknowledge receipt even if not handled to prevent Stripe from resending.
+        return Response(
+            status_code=status.HTTP_200_OK,
+            content=f"Webhook for {event.type} received but not handled.",
+        )
 
     try:
-        if event.type == "checkout.session.completed":
-            await process_checkout_session_completed(db=db, event=event)
-        elif event.type == "invoice.payment_succeeded":
-            await process_invoice_payment_succeeded(db=db, event=event)
-        elif event.type == "customer.subscription.updated":
-            await process_customer_subscription_updated(db=db, event=event)
-        elif event.type == "customer.subscription.deleted":
-            await process_customer_subscription_deleted(db=db, event=event)
-        elif event.type == "invoice.payment_failed":
-            await process_invoice_payment_failed(db=db, event=event)
-        # Adicione outros tipos de evento que você quer tratar
-        # elif event.type == "customer.subscription.trial_will_end":
-        #     await process_trial_will_end(db=db, event=event)
-        else:
-            logger.info(f"Received unhandled Stripe event type: {event.type}")
-
-        # Se chegou aqui sem exceções dos handlers, o processamento principal foi ok
-        # O commit do DB é feito dentro de cada função de processamento se necessário
-        # ou pode ser feito aqui uma vez se todas as operações forem bem-sucedidas.
-        # Por segurança, cada handler pode fazer seu próprio commit/rollback.
-        # Se um handler levanta exceção, o try/except abaixo pegará.
-
-    except HTTPException:  # Re-lançar HTTPExceptions dos handlers
-        raise
-    except Exception as e:
-        # Se qualquer handler de evento específico falhar com uma exceção não HTTP
-        logger.exception(
-            f"Error processing Stripe event {event.type} ({event.id}): {e}"
+        await handler(db=db, event=event)
+        await db.commit()  # Commit transaction if handler was successful
+        logger.info(
+            f"Successfully processed and committed changes for event {event.id} (Type: {event.type})"
         )
-        # Retornar 500 para o Stripe para que ele tente reenviar o evento.
+        return Response(
+            status_code=status.HTTP_200_OK,
+            content="Webhook received and processed successfully.",
+        )
+    except HTTPException as http_exc:  # Re-raise HTTPExceptions from handlers
+        await db.rollback()
+        logger.warning(
+            f"HTTPException during processing event {event.id} (Type: {event.type}): {http_exc.detail}. Stripe might retry."
+        )
+        raise  # FastAPI will handle sending the response
+    except Exception as e:
+        await db.rollback()
+        logger.exception(  # Use logger.exception for full stack trace
+            f"Critical error processing Stripe event {event.type} ({event.id}): {e}"
+        )
+        # Return a 500 to indicate an issue on our end; Stripe may retry.
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Webhook event processing failed internally.",
         ) from e
-
-    return Response(
-        status_code=status.HTTP_200_OK, content="Webhook received and acknowledged"
-    )
