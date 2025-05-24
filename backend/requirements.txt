@@ -25,6 +25,7 @@ svix==1.62.0
 python-jose[cryptography]
 authlib
 PyJWT>=2.8.0
+clerk_backend_api==2.2.0
 
 # === Testes e Qualidade ===
 httpx==0.25.2
