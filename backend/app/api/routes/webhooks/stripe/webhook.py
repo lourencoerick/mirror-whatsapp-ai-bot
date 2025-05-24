@@ -5,7 +5,13 @@ from loguru import logger
 import stripe  # Para stripe.error e stripe.Webhook
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from .event_handler import process_checkout_session_completed
+from .event_handler import (
+    process_checkout_session_completed,
+    process_invoice_payment_succeeded,
+    process_customer_subscription_updated,
+    process_customer_subscription_deleted,
+    process_invoice_payment_failed,
+)
 from app.database import get_db
 from app.config import get_settings
 
@@ -93,34 +99,42 @@ async def stripe_webhook_endpoint(
     # Exemplo: await handle_stripe_event(event=event, db=db) # db precisaria ser injetado se o handler precisar
     # Por agora, apenas logamos e retornamos sucesso.
 
-    # Tipos de evento que vamos tratar inicialmente:
-    if event.type == "checkout.session.completed":
-        logger.info(f"Processing checkout.session.completed: {event.id}")
-        try:
+    try:
+        if event.type == "checkout.session.completed":
             await process_checkout_session_completed(db=db, event=event)
-        except Exception as e:
-            # Se o processamento falhar, logar e retornar 500 para o Stripe tentar de novo
-            logger.exception(f"Error processing event {event.type} ({event.id}): {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Webhook event processing failed.",
-            ) from e
+        elif event.type == "invoice.payment_succeeded":
+            await process_invoice_payment_succeeded(db=db, event=event)
+        elif event.type == "customer.subscription.updated":
+            await process_customer_subscription_updated(db=db, event=event)
+        elif event.type == "customer.subscription.deleted":
+            await process_customer_subscription_deleted(db=db, event=event)
+        elif event.type == "invoice.payment_failed":
+            await process_invoice_payment_failed(db=db, event=event)
+        # Adicione outros tipos de evento que você quer tratar
+        # elif event.type == "customer.subscription.trial_will_end":
+        #     await process_trial_will_end(db=db, event=event)
+        else:
+            logger.info(f"Received unhandled Stripe event type: {event.type}")
 
-    elif event.type == "invoice.payment_succeeded":
-        logger.info(f"Processing invoice.payment_succeeded: {event.id}")
-        pass  # Placeholder
-    elif event.type == "invoice.payment_failed":
-        logger.info(f"Processing invoice.payment_failed: {event.id}")
-        pass  # Placeholder
-    elif event.type == "customer.subscription.updated":
-        logger.info(f"Processing customer.subscription.updated: {event.id}")
-        pass  # Placeholder
-    elif event.type == "customer.subscription.deleted":  # ou .canceled
-        logger.info(f"Processing customer.subscription.deleted: {event.id}")
-        pass  # Placeholder
-    else:
-        logger.info(f"Received unhandled Stripe event type: {event.type}")
+        # Se chegou aqui sem exceções dos handlers, o processamento principal foi ok
+        # O commit do DB é feito dentro de cada função de processamento se necessário
+        # ou pode ser feito aqui uma vez se todas as operações forem bem-sucedidas.
+        # Por segurança, cada handler pode fazer seu próprio commit/rollback.
+        # Se um handler levanta exceção, o try/except abaixo pegará.
 
-    # Retornar 200 OK para o Stripe para acusar o recebimento do evento.
-    # Se você não retornar 200, o Stripe tentará reenviar o evento.
-    return Response(status_code=status.HTTP_200_OK, content="Webhook received")
+    except HTTPException:  # Re-lançar HTTPExceptions dos handlers
+        raise
+    except Exception as e:
+        # Se qualquer handler de evento específico falhar com uma exceção não HTTP
+        logger.exception(
+            f"Error processing Stripe event {event.type} ({event.id}): {e}"
+        )
+        # Retornar 500 para o Stripe para que ele tente reenviar o evento.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Webhook event processing failed internally.",
+        ) from e
+
+    return Response(
+        status_code=status.HTTP_200_OK, content="Webhook received and acknowledged"
+    )
