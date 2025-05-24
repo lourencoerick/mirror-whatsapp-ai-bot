@@ -93,9 +93,9 @@ class Settings(BaseSettings):
 
     # URLs do Frontend para redirecionamentos do Stripe Checkout
     STRIPE_CHECKOUT_SUCCESS_URL: str = (
-        "http://localhost:3000/payment-success"  # Ajuste para sua URL
+        "http://localhost:3000/payment/success"  # Ajuste para sua URL
     )
-    STRIPE_CHECKOUT_CANCEL_URL: str = "http://localhost:3000/plans"
+    STRIPE_CHECKOUT_CANCEL_URL: str = "http://localhost:3000/billing/plans"
 
     STRIPE_PAYMENT_METHOD_TYPES: List[str] = Field(default_factory=lambda: ["card"])
 
