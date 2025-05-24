@@ -58,7 +58,7 @@ async def get_or_create_stripe_customer(
     if user_name:
         customer_params["name"] = user_name
     if clerk_user_id:
-        customer_params["metadata"]["clerk_user_id"] = clerk_user_id
+        customer_params["metadata"]["clerk_user_id"] = str(clerk_user_id)
 
     try:
         customer = stripe.Customer.create(**customer_params)
