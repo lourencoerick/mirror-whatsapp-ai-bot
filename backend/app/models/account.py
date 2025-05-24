@@ -1,8 +1,9 @@
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
-from sqlalchemy import Column, String, ForeignKey
-
+from sqlalchemy import Column, String, ForeignKey, Enum as SQLEnum
+from typing import Optional
+import enum
 
 from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
@@ -12,6 +13,13 @@ from .conversation import Conversation
 from .subscription import Subscription
 
 
+class AccountPlanTierEnum(str, enum.Enum):
+    FREE = "free"
+    BASIC = "basic"
+    PRO = "pro"
+    ENTERPRISE = "enterprise"
+
+
 class Account(BaseModel):
     __tablename__ = "accounts"
 
@@ -19,6 +27,18 @@ class Account(BaseModel):
     stripe_customer_id = Column(String(255), unique=True, nullable=True, index=True)
     name = Column(String(255), nullable=False)
     locale = Column(String(5), nullable=True)
+    active_plan_tier = Column(
+        SQLEnum(
+            AccountPlanTierEnum,
+            name="account_plan_tier_enum",
+            create_type=True,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=True,
+        default=AccountPlanTierEnum.FREE,
+        index=True,
+        comment="Current active plan tier for the account (e.g., free, basic, pro)",
+    )
 
     simulation_inbox_id = Column(
         UUID(as_uuid=True),
