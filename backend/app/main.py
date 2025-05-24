@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-
+import stripe
 from typing import Optional
 import redis.asyncio as aioredis
 
@@ -20,6 +20,7 @@ from app.api.routes.webhooks import clerk as clerk_routes
 from app.api.routes import evolution_instance as evolution_instance_routes
 from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
 from app.api.routes.webhooks.whatsapp_cloud import webhook as whatsapp_cloud_wb_routes
+from app.api.routes.webhooks.stripe import webhook as stripe_wb_routes
 from app.api.routes import batch_contacts as batch_contacts_routes
 from app.api.routes import research as research_routes
 from app.api.routes import bot_agent as bot_agent_routes
@@ -27,7 +28,7 @@ from app.api.routes import company_profile as profile_routes
 from app.api.routes import knowledge as knowledge_routes
 from app.api.routes import simulation as simulation_routes
 from app.api.routes import dashboard as dashboard_routes
-from app.api.routers import billing as billing_routes
+from app.api.routes import billing as billing_routes
 
 
 # Import Dependencies and Context
@@ -51,6 +52,7 @@ load_dotenv()
 # --- Initialization ---
 pubsub_bridge = RedisPubSubBridge()
 settings = get_settings()
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 logger.info("Verifying environment variables...")
 # Verify required environment variables
@@ -212,6 +214,7 @@ app.include_router(
 # --- Webhook Routers ---
 logger.info("Including Webhook routers")
 app.include_router(clerk_routes.router, prefix="", tags=["Clerk Webhooks"])
+
 app.include_router(
     evolution_wb_routes.router, prefix="", tags=["Evolution Instance Webhooks"]
 )
@@ -219,6 +222,8 @@ app.include_router(
 app.include_router(
     whatsapp_cloud_wb_routes.router, prefix="", tags=["Whatsapp Cloud Webhooks"]
 )
+
+app.include_router(stripe_wb_routes.router, prefix="", tags=["Stripe Webhooks"])
 
 
 # --- WebSocket Router ---
