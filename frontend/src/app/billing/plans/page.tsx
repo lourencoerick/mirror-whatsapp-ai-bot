@@ -42,6 +42,16 @@ const plansData: Plan[] = [
     ],
     description: "Para usuários que precisam de mais poder.",
   },
+
+  {
+    id: "enterprise",
+    name: "Plano Enterprise",
+    price: "100,99",
+    currency: "R$",
+    stripePriceId: "price_1RSjfFQH91QtB7wzY7C2GqrS",
+    features: ["Tudo do Pro", "Suporte 1:1"],
+    description: "Para usuários que precisam de mais e mais poder.",
+  },
   // Adicione mais planos conforme necessário
 ];
 
