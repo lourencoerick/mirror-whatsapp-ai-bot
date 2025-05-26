@@ -25,6 +25,7 @@ from .simulation.simulation_message import SimulationMessage
 from .simulation.persona import Persona
 from .knowledge_chunk import KnowledgeChunk
 from .knowledge_document import KnowledgeDocument
+from .usage_event import UsageEvent
 
 __all__ = [
     "AccessToken",
@@ -54,4 +55,5 @@ __all__ = [
     "KnowledgeChunk",
     "KnowledgeDocument",
     "Persona",
+    "UsageEvent",
 ]

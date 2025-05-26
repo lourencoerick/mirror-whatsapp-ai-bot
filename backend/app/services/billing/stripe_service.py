@@ -2,7 +2,7 @@
 
 import stripe
 from uuid import UUID
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from loguru import logger
 
 from app.models.account import Account
@@ -10,6 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings  # Para URLs de sucesso/cancelamento
 
 settings = get_settings()
+METERED_PRICE_IDS: List[str] = [
+    "price_1RSTZWQH91QtB7wzTfoDetj6",  # O Price ID do seu log de erro
+    "price_1RSV0BQH91QtB7wzKDG4shih",
+    "price_1RSV41QH91QtB7wz0puZUrVr",
+    "price_1RSVDJQH91QtB7wz1Z6lXrun",
+    # Adicione outros Price IDs medidos aqui
+    # "price_ANOTHER_METERED_PRICE_ID",
+]
 
 
 async def get_or_create_stripe_customer(
@@ -119,16 +127,31 @@ async def create_stripe_checkout_session(
         f"Creating Stripe Checkout Session for Customer {stripe_customer_id}, Price {price_id}, Account {app_account_id}"
     )
 
+    line_item: Dict[str, Any] = {"price": price_id}
+    if price_id not in METERED_PRICE_IDS:
+        # Adiciona quantity apenas se o preço NÃO for medido
+        line_item["quantity"] = 1
+    else:
+        logger.info(
+            f"Price ID {price_id} is metered. Quantity will not be set in line_items."
+        )
+
     session_params: Dict[str, Any] = {
         "customer": stripe_customer_id,
-        "payment_method_types": settings.STRIPE_PAYMENT_METHOD_TYPES
-        or ["card"],  # Ex: ['card', 'boleto']
-        "line_items": [{"price": price_id, "quantity": 1}],
+        "payment_method_types": [],
+        # settings.STRIPE_PAYMENT_METHOD_TYPES
+        # or ["card"],  # Ex: ['card', 'boleto']
+        "line_items": [
+            line_item,
+            # {"price": "price_1RSVVIQH91QtB7wzP0OsL7vS", "quantity": 1},
+        ],
         "mode": "subscription",
         "success_url": settings.STRIPE_CHECKOUT_SUCCESS_URL
         + "?session_id={CHECKOUT_SESSION_ID}",
         "cancel_url": settings.STRIPE_CHECKOUT_CANCEL_URL,
         "client_reference_id": str(app_account_id),
+        "payment_method_collection": "if_required",
+        "phone_number_collection": {"enabled": True},
         "metadata": checkout_metadata or {},  # Garante que metadata seja um dict
     }
 

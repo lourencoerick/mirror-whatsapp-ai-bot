@@ -107,9 +107,19 @@ class Account(BaseModel):
         cascade="all, delete-orphan",
     )
 
-    knowledge_documents = relationship("KnowledgeDocument", back_populates="account")
+    knowledge_documents = relationship(
+        "KnowledgeDocument", back_populates="account", cascade="all, delete-orphan"
+    )
 
-    knowledge_chunks = relationship("KnowledgeChunk", back_populates="account")
+    knowledge_chunks = relationship(
+        "KnowledgeChunk", back_populates="account", cascade="all, delete-orphan"
+    )
+
+    usage_events = relationship(
+        "UsageEvent",
+        back_populates="account",
+        cascade="all, delete-orphan",
+    )
 
     # ------------------ relacionamentos de produção ------------------
 
