@@ -89,15 +89,15 @@ class Settings(BaseSettings):
     META_APP_SECRET: str = "your-meta-secret"
 
     # --- Stripe ---
-    STRIPE_SECRET_KEY: str
-    STRIPE_PUBLISHABLE_KEY: str  # Para o frontend depois
-    STRIPE_WEBHOOK_SECRET: str  # Para verificar webhooks
+    STRIPE_SECRET_KEY: str = "your-secret-key"
+    STRIPE_PUBLISHABLE_KEY: str = "your-secret-key"
+    STRIPE_WEBHOOK_SECRET: str = "your-secret-key"
 
     # URLs do Frontend para redirecionamentos do Stripe Checkout
     STRIPE_CHECKOUT_SUCCESS_URL: str = (
         "http://localhost:3000/payment/success"  # Ajuste para sua URL
     )
-    STRIPE_CHECKOUT_CANCEL_URL: str = "http://localhost:3000/billing/plans"
+    STRIPE_CHECKOUT_CANCEL_URL: str = "http://localhost:3000/"
 
     STRIPE_PAYMENT_METHOD_TYPES: List[str] = Field(default_factory=lambda: ["card"])
 
