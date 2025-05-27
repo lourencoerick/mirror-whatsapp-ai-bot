@@ -4,14 +4,14 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, // Para o botão de fechar
+  Dialog,
   DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"; // Importar componentes do Dialog
+} from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLayoutContext } from "@/contexts/layout-context";
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
@@ -20,7 +20,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   BetaRequestRow,
@@ -34,15 +34,19 @@ type AdminBetaListResponse =
   components["schemas"]["AdminBetaTesterListResponse"];
 type AdminBetaActionResponse = components["schemas"]["AdminBetaActionResponse"];
 
-// Chave da query para a lista de solicitações beta
+// Query key for the list of beta requests
 const ADMIN_BETA_REQUESTS_QUERY_KEY = "adminBetaRequests";
 
+/**
+ * @file Admin page for managing beta access requests.
+ * @returns {JSX.Element} The admin beta requests page component.
+ */
 export default function AdminBetaRequestsPage() {
   const { setPageTitle } = useLayoutContext();
   const fetcher = useAuthenticatedFetch();
   const queryClient = useQueryClient();
 
-  // Estados para rastrear qual item está sendo aprovado/negado para feedback na UI
+  // State to track which item is being approved/denied for UI feedback
   const [processingAction, setProcessingAction] = useState<{
     email: string;
     type: "approve" | "deny";
@@ -65,34 +69,33 @@ export default function AdminBetaRequestsPage() {
     refetch,
     isRefetching,
   } = useQuery<AdminBetaListResponse, Error>({
-    queryKey: [ADMIN_BETA_REQUESTS_QUERY_KEY], // Adicionar filtros/paginações aqui se a API suportar e você quiser que a chave reflita isso
+    queryKey: [ADMIN_BETA_REQUESTS_QUERY_KEY], // Consider adding filters/pagination to the key if API supports them
     queryFn: async () => {
-      if (!fetcher) throw new Error("Fetcher não disponível");
-      // TODO: Adicionar parâmetros de paginação e filtro à chamada da API
+      if (!fetcher) throw new Error("Fetcher not available");
+      // TODO: Add pagination and filter parameters to the API call
       const response = await fetcher(
-        "/api/v1/admin/beta/requests?page=1&size=50"
-      ); // Exemplo inicial
+        "/api/v1/admin/beta/requests?page=1&size=50" // Initial example, consider making dynamic
+      );
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = await response.json().catch(() => ({})); // Graceful catch if JSON parsing fails
         throw new Error(
-          errorData.detail ||
-            `Falha ao buscar solicitações: ${response.statusText}`
+          errorData.detail || `Failed to fetch requests: ${response.statusText}`
         );
       }
       return response.json();
     },
-    enabled: !!fetcher,
+    enabled: !!fetcher, // Ensures fetcher is available before attempting to query
   });
 
   const approveMutation = useMutation<AdminBetaActionResponse, Error, string>({
     mutationFn: (email: string) => {
-      if (!fetcher) throw new Error("Fetcher não disponível");
+      if (!fetcher) throw new Error("Fetcher not available");
       setProcessingAction({ email, type: "approve" });
       return fetcher(`/api/v1/admin/beta/requests/${email}/approve`, {
         method: "POST",
       }).then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Falha ao aprovar.");
+        if (!res.ok) throw new Error(data.detail || "Falha ao aprovar."); // User message in PT-BR
         return data;
       });
     },
@@ -106,19 +109,19 @@ export default function AdminBetaRequestsPage() {
       toast.error("Erro ao Aprovar", { description: error.message });
     },
     onSettled: () => {
-      setProcessingAction(null);
+      setProcessingAction(null); // Clear processing state regardless of outcome
     },
   });
 
   const denyMutation = useMutation<AdminBetaActionResponse, Error, string>({
     mutationFn: (email: string) => {
-      if (!fetcher) throw new Error("Fetcher não disponível");
+      if (!fetcher) throw new Error("Fetcher not available");
       setProcessingAction({ email, type: "deny" });
       return fetcher(`/api/v1/admin/beta/requests/${email}/deny`, {
         method: "POST",
       }).then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Falha ao negar.");
+        if (!res.ok) throw new Error(data.detail || "Falha ao negar."); // User message in PT-BR
         return data;
       });
     },
@@ -132,7 +135,7 @@ export default function AdminBetaRequestsPage() {
       toast.error("Erro ao Negar", { description: error.message });
     },
     onSettled: () => {
-      setProcessingAction(null);
+      setProcessingAction(null); // Clear processing state
     },
   });
 
@@ -148,7 +151,9 @@ export default function AdminBetaRequestsPage() {
     setSelectedRequest(request);
     setIsDetailModalOpen(true);
   };
-  // Memoize as colunas para evitar recriação desnecessária
+
+  // Memoize columns to prevent unnecessary re-renders of the data table
+  // Re-created if processingAction changes to update button states (disabled/loading)
   const memoizedColumns = useMemo(
     () =>
       columns(
@@ -161,14 +166,16 @@ export default function AdminBetaRequestsPage() {
         (email) =>
           processingAction?.type === "deny" && processingAction?.email === email
       ),
-    [processingAction, handleApprove, handleDeny, handleViewDetails]
-  ); // Recriar colunas se processingAction mudar para atualizar o estado disabled/loading dos botões
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [processingAction] // Dependencies: handleApprove, handleDeny, handleViewDetails are stable due to useCallback/definition scope
+  );
 
   const handleRefresh = () => {
     toast.info("Atualizando lista de solicitações...");
-    refetch(); // Chama a função refetch do useQuery
+    refetch(); // Calls the refetch function from useQuery
   };
 
+  // Display full-page loader only on initial load
   if (isLoading && !isRefetching) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -178,6 +185,7 @@ export default function AdminBetaRequestsPage() {
     );
   }
 
+  // Display full-page error only on initial load error
   if (isError && !isRefetching) {
     return (
       <div className="container mx-auto p-4 text-center">
@@ -197,6 +205,14 @@ export default function AdminBetaRequestsPage() {
   }
 
   const dataToDisplay = betaRequestsData?.items || [];
+
+  /**
+   * @description A simple component to display a label-value pair.
+   * @param {object} props The component props.
+   * @param {string} props.label The label for the detail item.
+   * @param {ReactNode} props.value The value for the detail item.
+   * @returns {JSX.Element}
+   */
   const DetailItem = ({
     label,
     value,
@@ -204,9 +220,13 @@ export default function AdminBetaRequestsPage() {
     label: string;
     value: ReactNode;
   }) => (
-    <div className="grid grid-cols-3 gap-4 py-2 border-b border-slate-100 last:border-b-0">
-      <dt className="text-sm font-medium text-gray-500 col-span-1">{label}</dt>
-      <dd className="text-sm text-gray-900 col-span-2">{value || "-"}</dd>
+    <div className="grid grid-cols-3 gap-4 py-2 border-b border-slate-100 dark:border-slate-700 last:border-b-0">
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 col-span-1">
+        {label}
+      </dt>
+      <dd className="text-sm text-gray-900 dark:text-gray-100 col-span-2">
+        {value || "-"}
+      </dd>
     </div>
   );
 
@@ -217,7 +237,7 @@ export default function AdminBetaRequestsPage() {
         <Button
           onClick={handleRefresh}
           variant="outline"
-          disabled={isRefetching || isLoading}
+          disabled={isRefetching || isLoading} // Disable if initial loading or refetching
         >
           <RefreshCw
             className={`mr-2 h-4 w-4 ${isRefetching ? "animate-spin" : ""}`}
@@ -226,6 +246,7 @@ export default function AdminBetaRequestsPage() {
         </Button>
       </div>
 
+      {/* Show toast notification for refetch errors, doesn't block UI like initial error */}
       {isError &&
         isRefetching &&
         toast.error("Erro ao atualizar", {
@@ -241,11 +262,10 @@ export default function AdminBetaRequestsPage() {
         </p>
       )}
 
-      {/* --- INÍCIO: Componente Dialog para Detalhes --- */}
+      {/* Details Dialog Component */}
       <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
         <DialogContent className="sm:max-w-lg md:max-w-2xl">
-          {" "}
-          {/* Ajuste o tamanho conforme necessário */}
+          {/* Adjust width as needed */}
           <DialogHeader>
             <DialogTitle>Detalhes da Solicitação Beta</DialogTitle>
             <DialogDescription>
@@ -255,8 +275,7 @@ export default function AdminBetaRequestsPage() {
           </DialogHeader>
           {selectedRequest && (
             <ScrollArea className="max-h-[60vh] pr-2">
-              {" "}
-              {/* Para conteúdo longo */}
+              {/* For long content */}
               <div className="space-y-1 py-4">
                 <DetailItem label="Email" value={selectedRequest.email} />
                 <DetailItem
@@ -319,7 +338,7 @@ export default function AdminBetaRequestsPage() {
                   />
                 )}
 
-                <h3 className="text-md font-semibold pt-4 pb-1 text-gray-700">
+                <h3 className="text-md font-semibold pt-4 pb-1 text-gray-700 dark:text-gray-300">
                   Detalhes do Negócio
                 </h3>
                 <DetailItem
@@ -339,7 +358,7 @@ export default function AdminBetaRequestsPage() {
                   }
                 />
 
-                <h3 className="text-md font-semibold pt-4 pb-1 text-gray-700">
+                <h3 className="text-md font-semibold pt-4 pb-1 text-gray-700 dark:text-gray-300">
                   Informações Adicionais
                 </h3>
                 <DetailItem
@@ -379,7 +398,7 @@ export default function AdminBetaRequestsPage() {
 
                 {selectedRequest.notes_by_admin && (
                   <>
-                    <h3 className="text-md font-semibold pt-4 pb-1 text-gray-700">
+                    <h3 className="text-md font-semibold pt-4 pb-1 text-gray-700 dark:text-gray-300">
                       Notas Internas
                     </h3>
                     <DetailItem
@@ -404,7 +423,6 @@ export default function AdminBetaRequestsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* --- FIM: Componente Dialog para Detalhes --- */}
     </div>
   );
 }
