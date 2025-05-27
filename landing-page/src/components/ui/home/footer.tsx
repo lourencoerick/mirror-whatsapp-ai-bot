@@ -15,14 +15,32 @@ export default function Footer() {
           <p className="text-sm text-gray-500">
             © {new Date().getFullYear()} {siteMetadata.headerTitle}. Todos os direitos reservados.
           </p>
-          <p className="text-sm text-gray-500 mt-1">
-            <Link
-              href="/politica-de-privacidade"
-              className="text-blue-600 hover:underline"
-            >
-              Política de Privacidade
-            </Link>
-          </p>
+
+          <div className="flex flex-row gap-1.5">
+            
+            <p className="text-sm text-gray-500 mt-1">
+              <Link
+                href="/politica-de-privacidade"
+                className="text-foreground hover:underline"
+              >
+                Política de Privacidade
+              </Link>
+            </p>
+
+            <p className="text-sm text-gray-500 mt-1">
+                | 
+            </p> 
+
+            <p className="text-sm text-gray-500 mt-1">
+              <Link
+                href="/termos-de-servico"
+                className="text-foreground hover:underline"
+              >
+                Termos de Serviço
+              </Link>
+            </p>               
+          </div>
+       
         </div>
       </div>
     </footer>
