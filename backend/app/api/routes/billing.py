@@ -101,6 +101,8 @@ async def create_checkout_session_endpoint(
         # Example: Pass trial data if the plan itself doesn't define it in Stripe
         # subscription_data = {"trial_period_days": 7} if some_condition else None
         checkout_session = await create_stripe_checkout_session(
+            db=db,
+            auth_context_user_email=user.email,
             stripe_customer_id=stripe_customer_id,
             price_id=request_data.price_id,
             app_account_id=account.id,  # Used for client_reference_id

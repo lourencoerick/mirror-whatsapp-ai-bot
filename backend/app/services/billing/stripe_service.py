@@ -4,20 +4,16 @@ import stripe
 from uuid import UUID
 from typing import Optional, Dict, Any, List
 from loguru import logger
-
-from app.models.account import Account
+from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.models.account import Account
 from app.config import get_settings  # Para URLs de sucesso/cancelamento
+from app.models.beta_tester import BetaTester, BetaStatusEnum
 
 settings = get_settings()
-METERED_PRICE_IDS: List[str] = [
-    "price_1RSTZWQH91QtB7wzTfoDetj6",  # O Price ID do seu log de erro
-    "price_1RSV0BQH91QtB7wzKDG4shih",
-    "price_1RSV41QH91QtB7wz0puZUrVr",
-    "price_1RSVDJQH91QtB7wz1Z6lXrun",
-    # Adicione outros Price IDs medidos aqui
-    # "price_ANOTHER_METERED_PRICE_ID",
-]
+METERED_PRICE_IDS: List[str] = []
+STRIPE_BETA_PLAN_PRICE_ID = "price_1RT9fVQH91QtB7wzr8fduQ9H"
 
 
 async def get_or_create_stripe_customer(
@@ -99,6 +95,8 @@ async def get_or_create_stripe_customer(
 
 
 async def create_stripe_checkout_session(
+    db: AsyncSession,
+    auth_context_user_email: str,
     stripe_customer_id: str,
     price_id: str,
     app_account_id: UUID,  # Para client_reference_id
@@ -127,6 +125,26 @@ async def create_stripe_checkout_session(
         f"Creating Stripe Checkout Session for Customer {stripe_customer_id}, Price {price_id}, Account {app_account_id}"
     )
 
+    if price_id == STRIPE_BETA_PLAN_PRICE_ID:
+        logger.info(
+            f"Attempting to subscribe to Beta Plan (Price ID: {price_id}) for user {auth_context_user_email}."
+        )
+        stmt = select(BetaTester).where(BetaTester.email == auth_context_user_email)
+        beta_tester_entry = await db.scalar(stmt)
+
+        if not beta_tester_entry or beta_tester_entry.status != BetaStatusEnum.APPROVED:
+            logger.warning(
+                f"User {auth_context_user_email} is not approved for the Beta Plan. "
+                f"Beta status: {beta_tester_entry.status.value if beta_tester_entry else 'Not Found'}."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso ao plano beta não autorizado. Sua solicitação precisa ser aprovada.",
+            )
+        logger.info(
+            f"User {auth_context_user_email} is approved for Beta Plan. Proceeding with checkout."
+        )
+
     line_item: Dict[str, Any] = {"price": price_id}
     if price_id not in METERED_PRICE_IDS:
         # Adiciona quantity apenas se o preço NÃO for medido
@@ -138,12 +156,10 @@ async def create_stripe_checkout_session(
 
     session_params: Dict[str, Any] = {
         "customer": stripe_customer_id,
-        "payment_method_types": [],
-        # settings.STRIPE_PAYMENT_METHOD_TYPES
-        # or ["card"],  # Ex: ['card', 'boleto']
+        "payment_method_types": settings.STRIPE_PAYMENT_METHOD_TYPES
+        or ["card"],  # Ex: ['card', 'boleto']
         "line_items": [
             line_item,
-            # {"price": "price_1RSVVIQH91QtB7wzP0OsL7vS", "quantity": 1},
         ],
         "mode": "subscription",
         "success_url": settings.STRIPE_CHECKOUT_SUCCESS_URL
