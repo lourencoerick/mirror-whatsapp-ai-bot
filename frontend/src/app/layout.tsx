@@ -3,6 +3,7 @@ import { SubscriptionProvider } from "@/contexts/subscription-context";
 import { ClerkProvider } from "@clerk/nextjs";
 import { type Metadata } from "next";
 
+import { Toaster } from "@/components/ui/sonner";
 import siteMetadata from "@/data/siteMetadata";
 import { ptBR } from "@clerk/localizations";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -74,7 +75,10 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <ReactQueryProvider>
-            <SubscriptionProvider>{children}</SubscriptionProvider>
+            <SubscriptionProvider>
+              {children}
+              <Toaster richColors position="top-right" />
+            </SubscriptionProvider>
           </ReactQueryProvider>
         </body>
       </html>
