@@ -1,6 +1,7 @@
 from .access_token import AccessToken
 from .account import Account
 from .account_user import AccountUser
+from .beta_tester import BetaTester
 from .bot_agent import BotAgent
 from .bot_agent_inbox import BotAgentInbox
 from .base import BaseModel
@@ -31,6 +32,7 @@ __all__ = [
     "AccessToken",
     "Account",
     "AccountUser",
+    "BetaTester",
     "BotAgent",
     "BotAgentInbox",
     "BaseModel",
