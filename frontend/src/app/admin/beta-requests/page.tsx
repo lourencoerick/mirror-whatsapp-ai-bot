@@ -13,13 +13,26 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Added for page size selection
 import { useLayoutContext } from "@/contexts/layout-context";
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
 import { components } from "@/types/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+} from "lucide-react"; // Added pagination icons
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -31,11 +44,13 @@ import {
 import { BetaRequestsDataTable } from "./data-table";
 
 type AdminBetaListResponse =
-  components["schemas"]["AdminBetaTesterListResponse"];
+  components["schemas"]["AdminBetaTesterListResponse"]; // Assuming this includes a 'total' field for pagination
 type AdminBetaActionResponse = components["schemas"]["AdminBetaActionResponse"];
 
 // Query key for the list of beta requests
 const ADMIN_BETA_REQUESTS_QUERY_KEY = "adminBetaRequests";
+const DEFAULT_PAGE_SIZE = 25; // Define a default page size
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 /**
  * @file Admin page for managing beta access requests.
@@ -46,7 +61,6 @@ export default function AdminBetaRequestsPage() {
   const fetcher = useAuthenticatedFetch();
   const queryClient = useQueryClient();
 
-  // State to track which item is being approved/denied for UI feedback
   const [processingAction, setProcessingAction] = useState<{
     email: string;
     type: "approve" | "deny";
@@ -56,6 +70,11 @@ export default function AdminBetaRequestsPage() {
     null
   );
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // --- START: Pagination State ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  // --- END: Pagination State ---
 
   useEffect(() => {
     setPageTitle?.("Admin - Gerenciar Solicitações Beta");
@@ -69,22 +88,24 @@ export default function AdminBetaRequestsPage() {
     refetch,
     isRefetching,
   } = useQuery<AdminBetaListResponse, Error>({
-    queryKey: [ADMIN_BETA_REQUESTS_QUERY_KEY], // Consider adding filters/pagination to the key if API supports them
+    // Query key now includes pagination parameters
+    queryKey: [ADMIN_BETA_REQUESTS_QUERY_KEY, currentPage, pageSize],
     queryFn: async () => {
       if (!fetcher) throw new Error("Fetcher not available");
-      // TODO: Add pagination and filter parameters to the API call
       const response = await fetcher(
-        "/api/v1/admin/beta/requests?page=1&size=50" // Initial example, consider making dynamic
+        // API call now uses dynamic page and size
+        `/api/v1/admin/beta/requests?page=${currentPage}&size=${pageSize}`
       );
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({})); // Graceful catch if JSON parsing fails
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(
           errorData.detail || `Failed to fetch requests: ${response.statusText}`
         );
       }
       return response.json();
     },
-    enabled: !!fetcher, // Ensures fetcher is available before attempting to query
+    enabled: !!fetcher,
+    keepPreviousData: true, // Keep previous data visible while new data is fetching for smoother UX
   });
 
   const approveMutation = useMutation<AdminBetaActionResponse, Error, string>({
@@ -95,21 +116,22 @@ export default function AdminBetaRequestsPage() {
         method: "POST",
       }).then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Falha ao aprovar."); // User message in PT-BR
+        if (!res.ok) throw new Error(data.detail || "Falha ao aprovar.");
         return data;
       });
     },
     onSuccess: (data) => {
       toast.success("Solicitação Aprovada!", { description: data.message });
+      // Invalidate queries for the current page or all pages if preferred
       queryClient.invalidateQueries({
-        queryKey: [ADMIN_BETA_REQUESTS_QUERY_KEY],
+        queryKey: [ADMIN_BETA_REQUESTS_QUERY_KEY, currentPage, pageSize],
       });
     },
     onError: (error) => {
       toast.error("Erro ao Aprovar", { description: error.message });
     },
     onSettled: () => {
-      setProcessingAction(null); // Clear processing state regardless of outcome
+      setProcessingAction(null);
     },
   });
 
@@ -121,21 +143,21 @@ export default function AdminBetaRequestsPage() {
         method: "POST",
       }).then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Falha ao negar."); // User message in PT-BR
+        if (!res.ok) throw new Error(data.detail || "Falha ao negar.");
         return data;
       });
     },
     onSuccess: (data) => {
       toast.info("Solicitação Negada.", { description: data.message });
       queryClient.invalidateQueries({
-        queryKey: [ADMIN_BETA_REQUESTS_QUERY_KEY],
+        queryKey: [ADMIN_BETA_REQUESTS_QUERY_KEY, currentPage, pageSize],
       });
     },
     onError: (error) => {
       toast.error("Erro ao Negar", { description: error.message });
     },
     onSettled: () => {
-      setProcessingAction(null); // Clear processing state
+      setProcessingAction(null);
     },
   });
 
@@ -152,8 +174,6 @@ export default function AdminBetaRequestsPage() {
     setIsDetailModalOpen(true);
   };
 
-  // Memoize columns to prevent unnecessary re-renders of the data table
-  // Re-created if processingAction changes to update button states (disabled/loading)
   const memoizedColumns = useMemo(
     () =>
       columns(
@@ -167,16 +187,32 @@ export default function AdminBetaRequestsPage() {
           processingAction?.type === "deny" && processingAction?.email === email
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [processingAction] // Dependencies: handleApprove, handleDeny, handleViewDetails are stable due to useCallback/definition scope
+    [processingAction]
   );
 
   const handleRefresh = () => {
     toast.info("Atualizando lista de solicitações...");
-    refetch(); // Calls the refetch function from useQuery
+    refetch();
   };
 
-  // Display full-page loader only on initial load
-  if (isLoading && !isRefetching) {
+  const totalItems = betaRequestsData?.total || 0; // Assuming 'total' field in API response
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => (prev < totalPages ? prev + 1 : prev));
+  };
+
+  const handlePageSizeChange = (value: string) => {
+    setPageSize(Number(value));
+    setCurrentPage(1); // Reset to first page when page size changes
+  };
+
+  if (isLoading && !isRefetching && !betaRequestsData) {
+    // Show loader only on true initial load
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
@@ -185,8 +221,8 @@ export default function AdminBetaRequestsPage() {
     );
   }
 
-  // Display full-page error only on initial load error
-  if (isError && !isRefetching) {
+  if (isError && !isRefetching && !betaRequestsData) {
+    // Show error only on true initial load error
     return (
       <div className="container mx-auto p-4 text-center">
         <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
@@ -237,7 +273,7 @@ export default function AdminBetaRequestsPage() {
         <Button
           onClick={handleRefresh}
           variant="outline"
-          disabled={isRefetching || isLoading} // Disable if initial loading or refetching
+          disabled={isRefetching || isLoading}
         >
           <RefreshCw
             className={`mr-2 h-4 w-4 ${isRefetching ? "animate-spin" : ""}`}
@@ -246,7 +282,6 @@ export default function AdminBetaRequestsPage() {
         </Button>
       </div>
 
-      {/* Show toast notification for refetch errors, doesn't block UI like initial error */}
       {isError &&
         isRefetching &&
         toast.error("Erro ao atualizar", {
@@ -254,18 +289,82 @@ export default function AdminBetaRequestsPage() {
             (error as Error)?.message || "Não foi possível atualizar a lista.",
         })}
 
-      {dataToDisplay.length > 0 ? (
-        <BetaRequestsDataTable columns={memoizedColumns} data={dataToDisplay} />
+      {isLoading && !dataToDisplay.length ? ( // Show loading indicator if loading and no data to display yet (even with keepPreviousData)
+        <div className="flex items-center justify-center h-32">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="ml-3">Carregando dados...</p>
+        </div>
+      ) : dataToDisplay.length > 0 ? (
+        <>
+          <BetaRequestsDataTable
+            columns={memoizedColumns}
+            data={dataToDisplay}
+          />
+          {/* --- START: Pagination Controls --- */}
+          {totalPages > 0 && (
+            <div className="flex items-center justify-between mt-6">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-muted-foreground">
+                  Itens por página:
+                </span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={handlePageSizeChange}
+                >
+                  <SelectTrigger className="w-[70px] h-9">
+                    <SelectValue placeholder={pageSize} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages} ({totalItems}{" "}
+                  {totalItems === 1 ? "item" : "itens"})
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreviousPage}
+                  disabled={currentPage <= 1 || isLoading || isRefetching}
+                  aria-label="Página anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleNextPage}
+                  disabled={
+                    currentPage >= totalPages || isLoading || isRefetching
+                  }
+                  aria-label="Próxima página"
+                >
+                  Próxima
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+          {/* --- END: Pagination Controls --- */}
+        </>
       ) : (
         <p className="text-muted-foreground py-10 text-center">
-          {isLoading ? "Carregando..." : "Nenhuma solicitação beta encontrada."}
+          Nenhuma solicitação beta encontrada.
         </p>
       )}
 
       {/* Details Dialog Component */}
       <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
         <DialogContent className="sm:max-w-lg md:max-w-2xl">
-          {/* Adjust width as needed */}
           <DialogHeader>
             <DialogTitle>Detalhes da Solicitação Beta</DialogTitle>
             <DialogDescription>
@@ -275,7 +374,6 @@ export default function AdminBetaRequestsPage() {
           </DialogHeader>
           {selectedRequest && (
             <ScrollArea className="max-h-[60vh] pr-2">
-              {/* For long content */}
               <div className="space-y-1 py-4">
                 <DetailItem label="Email" value={selectedRequest.email} />
                 <DetailItem
