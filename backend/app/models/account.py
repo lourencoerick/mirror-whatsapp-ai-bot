@@ -121,6 +121,13 @@ class Account(BaseModel):
         cascade="all, delete-orphan",
     )
 
+    beta_application = relationship(
+        "BetaTester",
+        back_populates="account",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+
     # ------------------ relacionamentos de produção ------------------
 
     contacts = relationship(
