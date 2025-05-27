@@ -29,7 +29,8 @@ from app.api.routes import knowledge as knowledge_routes
 from app.api.routes import simulation as simulation_routes
 from app.api.routes import dashboard as dashboard_routes
 from app.api.routes import billing as billing_routes
-
+from app.api.routes import beta_tester as beta_routes
+from app.api.routes import admin_beta as admin_beta_routes
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
@@ -153,6 +154,17 @@ app.include_router(
     tags=["v1 - Me"],
 )
 
+app.include_router(
+    beta_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Beta Program"],
+)
+
+app.include_router(
+    admin_beta_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Admin - Beta Program"],
+)
 
 app.include_router(
     conversation_routes.router,
