@@ -26,6 +26,8 @@ python-jose[cryptography]
 authlib
 PyJWT>=2.8.0
 clerk_backend_api==2.2.0
+# === CRM ===
+sendgrid==6.12.2
 
 # === Testes e Qualidade ===
 httpx==0.28.1
