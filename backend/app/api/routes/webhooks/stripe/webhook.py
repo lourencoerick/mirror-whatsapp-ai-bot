@@ -108,11 +108,11 @@ async def stripe_webhook_endpoint(
     event_handlers = {
         "checkout.session.completed": handle_checkout_session_completed,
         "invoice.payment_succeeded": handle_invoice_payment_succeeded,
+        "invoice.payment_failed": handle_invoice_payment_failed,
         "customer.subscription.updated": handle_customer_subscription_updated,
         "customer.subscription.created": handle_customer_subscription_updated,  # Often similar logic to updated
         "customer.subscription.trial_will_end": handle_customer_subscription_updated,  # Or a specific handler
         "customer.subscription.deleted": handle_customer_subscription_deleted,
-        "invoice.payment_failed": handle_invoice_payment_failed,
     }
 
     handler = event_handlers.get(event.type)
