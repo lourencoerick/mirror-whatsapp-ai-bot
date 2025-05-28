@@ -1,121 +1,241 @@
+// src/app/dashboard/ClientDashboardGuard.tsx
 "use client";
 
 import { useSubscription } from "@/contexts/subscription-context";
-import { Loader2 } from "lucide-react";
+import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
+import {
+  AppBetaStatusEnum,
+  AppBetaStatusEnumType,
+  BetaTesterStatusResponse,
+} from "@/lib/enums";
+import { useUser } from "@clerk/nextjs";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
-const PUBLIC_DASHBOARD_PATHS_OR_MANAGEMENT = [
-  "/dashboard/account/subscription", // Para gerenciar ou ver que não tem
-];
+// Rotas dentro do dashboard que são permitidas mesmo sem uma assinatura paga ativa
+// ou para usuários que precisam gerenciar sua assinatura/beta.
+const ALWAYS_ALLOWED_DASHBOARD_PATHS = ["/dashboard/account/subscription"];
 
 export function ClientDashboardGuard({ children }: { children: ReactNode }) {
+  const { isSignedIn, isLoaded: isClerkLoaded } = useUser();
   const {
-    hasActiveSubscription,
-    planTier,
-    isLoadingSubscription,
-    isErrorSubscription,
-    subscription,
+    subscription, // Objeto SubscriptionRead | null
+    isLoadingSubscription, // Booleano do useQuery da assinatura
+    isErrorSubscription, // Booleano do useQuery da assinatura
+    // hasActiveSubscription, // Derivado de 'subscription'
   } = useSubscription();
+
+  const fetcher = useAuthenticatedFetch();
   const pathname = usePathname();
   const router = useRouter();
 
+  // Estado para o status da solicitação beta
+  const [betaCheckStatus, setBetaCheckStatus] = useState<
+    | AppBetaStatusEnumType
+    | "not_found"
+    | "loading"
+    | "error"
+    | "not_checked"
+    | "not_applicable"
+  >("not_checked"); // not_checked: ainda não verificamos; not_applicable: não precisa verificar (tem sub paga)
+
+  const [isInitialLogicComplete, setIsInitialLogicComplete] = useState(false);
+
+  // Efeito para buscar status da assinatura e, se necessário, status beta
   useEffect(() => {
+    if (!isClerkLoaded || !isSignedIn || !fetcher) {
+      if (isClerkLoaded && !isSignedIn) setIsInitialLogicComplete(true); // Se não logado, marca como completo para evitar loader infinito
+      return;
+    }
+
     if (isLoadingSubscription) {
       console.log("ClientDashboardGuard: Aguardando dados da assinatura...");
-      return;
+      return; // Aguarda a query da assinatura resolver primeiro
     }
 
-    if (isErrorSubscription) {
-      console.error(
-        "ClientDashboardGuard: Erro ao buscar dados da assinatura. Acesso pode ser restrito."
-      );
-      return;
+    // Se chegou aqui, isLoadingSubscription é false.
+    // E isClerkLoaded, isSignedIn, fetcher são true.
+
+    const performChecks = async () => {
+      if (
+        subscription &&
+        (subscription.status === "active" || subscription.status === "trialing")
+      ) {
+        console.log(
+          "ClientDashboardGuard: Assinatura ativa ou em trial encontrada. Verificação beta não aplicável."
+        );
+        setBetaCheckStatus("not_applicable");
+        setIsInitialLogicComplete(true);
+        return;
+      }
+
+      // Se tem assinatura mas com status problemático, a lógica de redirecionamento abaixo cuidará.
+      // Não precisamos buscar status beta nesses casos, pois o problema da assinatura tem prioridade.
+      if (
+        subscription &&
+        subscription.status !== "active" &&
+        subscription.status !== "trialing"
+      ) {
+        console.log(
+          "ClientDashboardGuard: Assinatura com status problemático. Verificação beta não aplicável neste momento."
+        );
+        setBetaCheckStatus("not_applicable"); // Ou um status específico de "sub_issue"
+        setIsInitialLogicComplete(true);
+        return;
+      }
+
+      // Se não há NENHUMA assinatura (subscription é null), então verificar status beta
+      if (!subscription) {
+        console.log(
+          "ClientDashboardGuard: Nenhuma assinatura. Verificando status beta..."
+        );
+        setBetaCheckStatus("loading");
+        try {
+          const response = await fetcher("/api/v1/beta/my-status");
+          if (response.ok) {
+            const data: BetaTesterStatusResponse = await response.json();
+            setBetaCheckStatus(data.status || "not_found");
+          } else if (response.status === 404) {
+            setBetaCheckStatus("not_found");
+          } else {
+            setBetaCheckStatus("error");
+          }
+        } catch (error) {
+          setBetaCheckStatus("error");
+        }
+      }
+      setIsInitialLogicComplete(true);
+    };
+
+    if (!isInitialLogicComplete) {
+      // Só roda uma vez ou se as dependências mudarem
+      performChecks();
     }
-
-    const isAllowedPathWithoutActiveSub =
-      PUBLIC_DASHBOARD_PATHS_OR_MANAGEMENT.some((path) =>
-        pathname.startsWith(path)
-      );
-
-    // Cenário 1: Usuário não tem assinatura ativa e está tentando acessar uma rota protegida
-    if (!hasActiveSubscription && !isAllowedPathWithoutActiveSub) {
-      console.log(
-        `ClientDashboardGuard: Usuário sem assinatura ativa em rota protegida (${pathname}). Redirecionando para planos.`
-      );
-      router.replace("/billing/plans?reason=subscription_required");
-      return;
-    }
-
-    // Cenário 2: Status problemático da assinatura (ex: past_due, unpaid)
-    // Redireciona para a página de gerenciamento de assinatura se não estiver já lá ou na página de planos.
-    const problematicStatus =
-      subscription &&
-      (subscription.status === "past_due" ||
-        subscription.status === "unpaid" ||
-        // Se cancelada imediatamente (não apenas agendada para o fim do período)
-        (subscription.status === "canceled" &&
-          !subscription.cancel_at_period_end &&
-          subscription.ended_at &&
-          new Date(subscription.ended_at) <= new Date()));
-
-    if (problematicStatus && !isAllowedPathWithoutActiveSub) {
-      console.log(
-        `ClientDashboardGuard: Status problemático da assinatura (${subscription?.status}) em ${pathname}. Redirecionando para gerenciamento.`
-      );
-      router.replace(
-        "/dashboard/account/subscription?reason=manage_subscription"
-      );
-      return;
-    }
-
-    // Você pode adicionar mais lógicas aqui, como verificação de tier específico para certas rotas
-    // Exemplo:
-    // const requiresProTier = pathname.startsWith('/dashboard/pro-feature');
-    // if (requiresProTier && planTier !== 'pro' && !isAllowedPathWithoutActiveSub) {
-    //   console.log(`ClientDashboardGuard: Rota ${pathname} requer plano Pro. Usuário tem ${planTier}. Redirecionando.`);
-    //   router.replace('/dashboard/billing/plans?reason=upgrade_required&feature=pro');
-    //   return;
-    // }
   }, [
-    hasActiveSubscription,
-    planTier,
+    isClerkLoaded,
+    isSignedIn,
+    fetcher,
     isLoadingSubscription,
-    isErrorSubscription,
-    pathname,
-    router,
     subscription,
+    isInitialLogicComplete,
   ]);
 
-  // Feedback visual enquanto a lógica de assinatura está sendo processada e pode redirecionar
-  if (isLoadingSubscription) {
+  // Efeito para redirecionamentos, SÓ DEPOIS que isInitialLogicComplete for true
+  useEffect(() => {
+    if (
+      !isInitialLogicComplete ||
+      isLoadingSubscription ||
+      betaCheckStatus === "loading" ||
+      betaCheckStatus === "not_checked"
+    ) {
+      return; // Aguarda todas as informações e a primeira checagem
+    }
+
+    const isAllowedPath = ALWAYS_ALLOWED_DASHBOARD_PATHS.some((path) =>
+      pathname.startsWith(path)
+    );
+    if (isAllowedPath) {
+      console.log(
+        `ClientDashboardGuard (Redirect Logic): Rota ${pathname} é permitida. Sem redirecionamento.`
+      );
+      return;
+    }
+
+    // 1. Prioridade: Problemas com assinatura existente
+    if (
+      subscription &&
+      subscription.status !== "active" &&
+      subscription.status !== "trialing"
+    ) {
+      console.log(
+        `ClientDashboardGuard (Redirect Logic): Assinatura com status '${subscription.status}'. Redirecionando para /dashboard/account/subscription.`
+      );
+      router.replace(
+        "/dashboard/account/subscription?reason=subscription_issue"
+      );
+      return;
+    }
+
+    // 2. Se tem assinatura ativa/trialing, permite acesso (já que não é uma ALWAYS_ALLOWED_PATH)
+    if (
+      subscription &&
+      (subscription.status === "active" || subscription.status === "trialing")
+    ) {
+      console.log(
+        `ClientDashboardGuard (Redirect Logic): Assinatura '${subscription.status}'. Acesso permitido para ${pathname}.`
+      );
+      return;
+    }
+
+    // 3. Se não tem assinatura (subscription é null), usa o status beta para decidir
+    if (!subscription) {
+      switch (betaCheckStatus) {
+        case AppBetaStatusEnum.APPROVED:
+          console.log(
+            `ClientDashboardGuard (Redirect Logic): Sem sub, Beta APROVADO. Redirecionando para /billing/plans.`
+          );
+          router.replace("/beta/status?reason=beta_approved");
+          break;
+        case AppBetaStatusEnum.PENDING_APPROVAL:
+          console.log(
+            `ClientDashboardGuard (Redirect Logic): Sem sub, Beta PENDENTE. Redirecionando para /beta/status.`
+          );
+          router.replace("/beta/status?reason=pending");
+          break;
+        case AppBetaStatusEnum.DENIED:
+        case "not_found":
+        case "error":
+        default: // Inclui 'not_applicable' se chegou aqui sem sub, o que é estranho, mas trata como 'apply'
+          console.log(
+            `ClientDashboardGuard (Redirect Logic): Sem sub, status beta '${betaCheckStatus}'. Redirecionando para /beta/apply.`
+          );
+          router.replace("/beta/apply?reason=no_beta_access");
+          break;
+      }
+    }
+  }, [
+    isInitialLogicComplete,
+    isLoadingSubscription,
+    subscription,
+    betaCheckStatus,
+    pathname,
+    router,
+  ]);
+
+  // Feedback de carregamento inicial
+  if (
+    !isInitialLogicComplete ||
+    isLoadingSubscription ||
+    (betaCheckStatus === "loading" && !subscription)
+  ) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
-        <p className="ml-4 text-lg">Verificando sua assinatura...</p>
+        <p className="ml-4 text-lg">Carregando seu ambiente...</p>
       </div>
     );
   }
 
-  // Se um redirecionamento for necessário, o useEffect o fará.
-  // Enquanto isso, ou se nenhum redirecionamento for necessário, renderiza os filhos.
-  // Poderíamos adicionar uma verificação aqui para não renderizar children se um redirecionamento estiver iminente,
-  // mas o piscar de conteúdo pode ser mínimo.
-  const isAllowedPathWithoutActiveSub =
-    PUBLIC_DASHBOARD_PATHS_OR_MANAGEMENT.some((path) =>
-      pathname.startsWith(path)
-    );
+  // Feedback de erro na busca da assinatura (se não for tratado por redirecionamento)
   if (
-    !isLoadingSubscription &&
-    !isErrorSubscription &&
-    !hasActiveSubscription &&
-    !isAllowedPathWithoutActiveSub
+    isErrorSubscription &&
+    !ALWAYS_ALLOWED_DASHBOARD_PATHS.some((path) => pathname.startsWith(path))
   ) {
-    // Se ainda não redirecionou e não deveria estar aqui, mostra carregando para o redirecionamento
+    // Se betaCheckStatus levou a um redirecionamento, este return não será atingido.
+    // Este é para o caso de erro na sub e o status beta não levar a um redirecionamento específico.
     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
-        <p className="ml-4 text-lg">Redirecionando...</p>
+      <div className="flex h-screen w-full items-center justify-center p-4 text-center">
+        <div>
+          <AlertTriangle className="mx-auto h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-xl font-semibold text-red-700">
+            Erro ao Carregar Dados da Conta
+          </h2>
+          <p className="text-muted-foreground">
+            Não foi possível verificar sua assinatura. Tente novamente mais
+            tarde.
+          </p>
+        </div>
       </div>
     );
   }
