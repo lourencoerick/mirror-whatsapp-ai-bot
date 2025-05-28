@@ -21,6 +21,7 @@ from loguru import logger
 
 # (Opcional) Importar serviço de email
 # from app.services.email_service import send_beta_approval_email, send_beta_denial_email
+from app.services.email.email_service import email_service
 
 router = APIRouter(
     prefix="/admin/beta",  # Será /api/v1/admin/beta
@@ -125,8 +126,9 @@ async def approve_beta_request_admin(
             f"Beta request for {applicant_email} approved by admin {auth_context.user.email if auth_context.user else 'N/A'}."
         )
 
-        # TODO: Enviar email de aprovação para o usuário
-        # await send_beta_approval_email(applicant_email, beta_tester_entry.contact_name)
+        await email_service.send_beta_approval_email(
+            user_email=applicant_email, user_name=beta_tester_entry.contact_name
+        )
 
         return AdminBetaActionResponse(
             message="Beta applicant approved successfully.",
@@ -184,8 +186,9 @@ async def deny_beta_request_admin(
             f"Beta request for {applicant_email} denied by admin {auth_context.user.email if auth_context.user else 'N/A'}."
         )
 
-        # TODO: (Opcional) Enviar email de negação para o usuário
-        # await send_beta_denial_email(applicant_email, beta_tester_entry.contact_name)
+        await email_service.send_beta_denial_email(
+            user_email=applicant_email, user_name=beta_tester_entry.contact_name
+        )
 
         return AdminBetaActionResponse(
             message="Beta applicant denied successfully.",

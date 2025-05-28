@@ -88,6 +88,12 @@ class Settings(BaseSettings):
     # --- Meta ---
     META_APP_SECRET: str = "your-meta-secret"
 
+    # --- Sendgrid ---
+    SENDGRID_API_KEY: str = "your-secret-key"
+    EMAILS_FROM_EMAIL: str = "noreply@lambdalabs.com.br"
+    EMAILS_FROM_NAME: str = "Equipe Lambda Labs"
+    ADMIN_EMAIL_NOTIFICATIONS: str = "tecnologia@lambdalabs.com.br"
+
     # --- Stripe ---
     STRIPE_SECRET_KEY: str = "your-secret-key"
     STRIPE_PUBLISHABLE_KEY: str = "your-secret-key"
@@ -102,7 +108,7 @@ class Settings(BaseSettings):
     STRIPE_PAYMENT_METHOD_TYPES: List[str] = Field(default_factory=lambda: ["card"])
 
     # --- App ---
-    APP_NAME: str = "WhatsApp AI Bot"
+    APP_NAME: str = "Lambda Labs"
     DEBUG: bool = True
     ENVIRONMENT: str = "development"
 

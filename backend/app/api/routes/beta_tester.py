@@ -16,6 +16,7 @@ from loguru import logger
 
 # (Opcional) Importar serviço de email se for enviar notificações
 # from app.services.email_service import send_beta_request_admin_notification, send_beta_request_confirmation
+from app.services.email.email_service import email_service
 
 router = APIRouter(
     prefix="/beta",  # Será /api/v1/beta
@@ -103,12 +104,14 @@ async def request_beta_access(
             f"Beta access request for {user.email} saved with status PENDING_APPROVAL."
         )
 
-        # TODO: Enviar email para admin (opcional, mas recomendado)
-        # await send_beta_request_admin_notification(admin_email="your_admin_email@example.com", applicant_email=user.email, details=payload)
-
-        # TODO: Enviar email de confirmação para o usuário (opcional)
-        # await send_beta_request_confirmation(user_email=user.email, user_name=beta_tester_entry.contact_name)
-
+        await email_service.send_beta_request_confirmation(
+            user_email=user.email, user_name=beta_tester_entry.contact_name
+        )
+        await email_service.send_beta_request_admin_notification(
+            applicant_email=user.email,
+            applicant_name=beta_tester_entry.contact_name,
+            details=payload,  # Passamos o payload original com os detalhes
+        )
     except Exception as e:  # Captura erros de DB, etc.
         await db.rollback()
         logger.exception(f"Failed to save beta access request for {user.email}: {e}")
