@@ -1,7 +1,7 @@
 // src/contexts/subscription-context.tsx
 "use client";
 
-import { PLAN_DETAILS_MAP } from "@/config/billing-plans";
+import { getPlanDetailsByStripeIds } from "@/config/billing-plans";
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
 import { getMySubscription } from "@/lib/api/billing";
 import { components } from "@/types/api";
@@ -78,7 +78,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     effectivePlanTier = null;
   } else if (hasActivePaidSubscription && subscription?.stripe_product_id) {
     effectivePlanTier =
-      PLAN_DETAILS_MAP[subscription.stripe_product_id].tier ||
+      getPlanDetailsByStripeIds(subscription.stripe_product_id)?.tier ||
       `unknown_paid_plan (${subscription.stripe_product_id.slice(-4)})`;
   } else {
     effectivePlanTier = isError ? "error_fetching" : "free";
