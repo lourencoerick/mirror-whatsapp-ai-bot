@@ -335,9 +335,9 @@ class WorkerSettings:
                 13,
                 19,
                 23,
-            },  # Ex: Rodar a cada 6 horas (1h, 7h, 13h, 19h UTC)
-            minute=59,  # Aos 15 minutos da hora
-            run_at_startup=True,  # Geralmente não queremos rodar na inicialização, a menos que para teste
+            },
+            minute=59,
+            run_at_startup=True,
         ),
     ]
 
