@@ -11,12 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AppBetaStatusEnum } from "@/lib/enums"; // Seu enum do frontend
-import { components } from "@/types/api"; // Seus tipos OpenAPI
+import { AppBetaStatusEnum } from "@/lib/enums";
+import { components } from "@/types/api";
 import { ColumnDef } from "@tanstack/react-table";
-import {
-  format, // Para formatar datas
-} from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ArrowUpDown,
@@ -36,11 +34,11 @@ export const getStatusBadgeVariant = (
 ): "default" | "secondary" | "destructive" | "outline" => {
   switch (status) {
     case AppBetaStatusEnum.APPROVED:
-      return "default"; // Verde (shadcn default é geralmente primário)
+      return "default";
     case AppBetaStatusEnum.PENDING_APPROVAL:
-      return "secondary"; // Amarelo/Cinza
+      return "secondary";
     case AppBetaStatusEnum.DENIED:
-      return "destructive"; // Vermelho
+      return "destructive";
     default:
       return "outline";
   }
@@ -120,7 +118,6 @@ export const columns = (
       );
     },
     filterFn: (row, id, value) => {
-      // Para filtro por select
       return value.includes(row.getValue(id));
     },
   },
@@ -141,8 +138,6 @@ export const columns = (
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Ações</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => onViewDetails(request)}>
-              {" "}
-              {/* <<< CHAMAR onViewDetails */}
               <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -170,7 +165,6 @@ export const columns = (
                 </DropdownMenuItem>
               </>
             )}
-            {/* ... (outras ações condicionais como antes) ... */}
             {request.status === AppBetaStatusEnum.APPROVED && (
               <DropdownMenuItem
                 onClick={() => onDeny(email)}

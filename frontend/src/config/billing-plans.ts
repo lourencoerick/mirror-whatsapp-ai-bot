@@ -1,4 +1,5 @@
 // src/config/billing-plans.ts
+
 import { Plan } from "@/components/ui/billing/plan-card";
 
 export const plansData: Plan[] = [
@@ -6,10 +7,10 @@ export const plansData: Plan[] = [
     id: "beta",
     tier: "pro",
     name: "Plano Beta VIP",
-    price: "Grátis", // Ou "Trial Longo"
+    price: "Grátis",
     currency: "BRL",
     stripeProductId: "prod_SLYFjJMKBp22Xz",
-    stripePriceId: "price_1RTAIqQJjxj1kzOyGTlA2iFd", // << SEU PRICE ID DO PLANO BETA
+    stripePriceId: "price_1RTAIqQJjxj1kzOyGTlA2iFd",
     features: [
       "Acesso a todos os recursos",
       "Suporte VIP para Beta Testers",
@@ -18,7 +19,7 @@ export const plansData: Plan[] = [
     description:
       "Exclusivo para nossos parceiros beta. Ajude-nos a refinar a ferramenta!",
     isBeta: true,
-    buttonText: "Ativar Acesso Beta Gratuito", // Texto mais específico
+    buttonText: "Ativar Acesso Beta Gratuito",
     highlight: true,
   },
 ];
@@ -35,7 +36,6 @@ export const getPlanDetailsByStripeIds = (
     return undefined;
   }
 
-  // Tenta encontrar pelo Price ID primeiro, pois é mais específico
   if (priceId) {
     const planByPrice = plansData.find((p) => p.stripePriceId === priceId);
     if (planByPrice) {
@@ -43,7 +43,6 @@ export const getPlanDetailsByStripeIds = (
     }
   }
 
-  // Se não encontrou por Price ID (ou se não foi fornecido), tenta por Product ID
   if (productId) {
     const planByProduct = plansData.find(
       (p) => p.stripeProductId === productId
@@ -53,5 +52,5 @@ export const getPlanDetailsByStripeIds = (
     }
   }
 
-  return undefined; // Nenhum plano encontrado
+  return undefined;
 };

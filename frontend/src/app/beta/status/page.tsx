@@ -1,7 +1,7 @@
 // src/app/beta/status/page.tsx
 "use client";
 
-import { Plan, PlanCard } from "@/components/ui/billing/plan-card"; // Ajuste o caminho se PlanCard estiver em outro local
+import { Plan, PlanCard } from "@/components/ui/billing/plan-card";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getBetaPlan } from "@/config/billing-plans"; // Ajuste o caminho
+import { getBetaPlan } from "@/config/billing-plans";
 import { useLayoutContext } from "@/contexts/layout-context";
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
 import { AppBetaStatusEnum, BetaTesterStatusResponse } from "@/lib/enums";
@@ -43,7 +43,7 @@ export default function BetaStatusPage() {
   const [betaPlanDetails, setBetaPlanDetails] = useState<Plan | undefined>(
     undefined
   );
-  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false); // Estado para o loading do botão de refresh
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
 
   useEffect(() => {
     setPageTitle?.("Status da sua Solicitação Beta");
@@ -68,9 +68,9 @@ export default function BetaStatusPage() {
       if (isButtonRefresh) {
         setIsRefreshingStatus(true);
       } else {
-        setCurrentStatus("loading"); // Loader principal da página apenas na carga inicial
+        setCurrentStatus("loading");
       }
-      if (!isButtonRefresh) setApiError(null); // Limpa erro da API apenas na carga inicial
+      if (!isButtonRefresh) setApiError(null);
 
       try {
         const response = await fetcher("/api/v1/beta/my-status");

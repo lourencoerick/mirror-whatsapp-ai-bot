@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // src/components/billing/PlanCard.tsx
 "use client";
 
@@ -10,13 +11,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch"; // Para o fetcher
-import { createCheckoutSession } from "@/lib/api/billing"; // API call
+import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
+import { createCheckoutSession } from "@/lib/api/billing";
 import { components } from "@/types/api";
-import { useUser } from "@clerk/nextjs"; // Para verificar autenticação
+import { useUser } from "@clerk/nextjs";
 import { CheckIcon, Loader2 } from "lucide-react";
-import { useState } from "react"; // Adicionado useState
-import { toast } from "sonner"; // Para feedback
+import { useState } from "react";
+import { toast } from "sonner";
 
 export interface Plan {
   id: string;
@@ -58,7 +59,7 @@ export function PlanCard({
 }: PlanCardProps) {
   const { user, isSignedIn } = useUser();
   const fetcher = useAuthenticatedFetch();
-  const [isLoading, setIsLoading] = useState(false); // Estado de carregamento interno
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubscribeInternal = async () => {
     if (!isSignedIn || !fetcher) {
@@ -69,7 +70,7 @@ export function PlanCard({
     }
 
     setIsLoading(true);
-    if (onSubscriptionError) onSubscriptionError(""); // Limpar erro anterior na página pai
+    if (onSubscriptionError) onSubscriptionError("");
 
     try {
       console.log(
