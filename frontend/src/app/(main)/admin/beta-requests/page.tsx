@@ -35,10 +35,12 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  LayoutDashboard,
   Loader2,
   RefreshCw,
 } from "lucide-react"; // Added pagination icons
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   BetaRequestRow,
@@ -166,18 +168,26 @@ export default function AdminBetaRequestsPage() {
     },
   });
 
-  const handleApprove = (email: string) => {
-    approveMutation.mutate(email);
-  };
+  const handleApprove = useCallback(
+    (email: string) => {
+      approveMutation.mutate(email);
+    },
+    [approveMutation]
+  ); // Depende da instância da mutação
 
-  const handleDeny = (email: string) => {
-    denyMutation.mutate(email);
-  };
+  const handleDeny = useCallback(
+    (email: string) => {
+      denyMutation.mutate(email);
+    },
+    [denyMutation]
+  ); // Depende da instância da mutação
 
-  const handleViewDetails = (request: BetaRequestRow) => {
+  const handleViewDetails = useCallback((request: BetaRequestRow) => {
     setSelectedRequest(request);
     setIsDetailModalOpen(true);
-  };
+    // As funções setSelectedRequest e setIsDetailModalOpen do useState
+    // têm identidades estáveis e não precisam ser listadas como dependências.
+  }, []);
 
   const memoizedColumns = useMemo(
     () =>
@@ -191,7 +201,7 @@ export default function AdminBetaRequestsPage() {
         (email) =>
           processingAction?.type === "deny" && processingAction?.email === email
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
     [processingAction, handleApprove, handleDeny, handleViewDetails]
   );
 
@@ -273,18 +283,29 @@ export default function AdminBetaRequestsPage() {
 
   return (
     <div className="container mx-auto py-10 px-4 md:px-0">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Gerenciar Solicitações Beta</h1>
-        <Button
-          onClick={handleRefresh}
-          variant="outline"
-          disabled={isRefetching || isLoading}
-        >
-          <RefreshCw
-            className={`mr-2 h-4 w-4 ${isRefetching ? "animate-spin" : ""}`}
-          />
-          {isRefetching ? "Atualizando..." : "Atualizar Lista"}
-        </Button>
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+        <h1 className="text-3xl font-bold text-center sm:text-left">
+          Gerenciar Solicitações Beta
+        </h1>
+        <div className="flex items-center space-x-2">
+          <Button
+            onClick={handleRefresh}
+            variant="outline"
+            disabled={isRefetching || isLoading}
+            size="sm"
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 ${isRefetching ? "animate-spin" : ""}`}
+            />
+            {isRefetching ? "Atualizando..." : "Atualizar Lista"}
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Dashboard Principal
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {isError &&
