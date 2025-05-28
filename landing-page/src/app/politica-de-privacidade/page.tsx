@@ -3,7 +3,7 @@ import Navbar from "@/components/ui/home/navbar";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = genPageMetadata({
-  title: "Política de Privacidade – Lambda Labs",
+  title: "Política de Privacidade",
   description:
     "Veja como a Lambda Labs coleta, usa e protege seus dados em nossa plataforma de vendas automatizadas via WhatsApp.",
   url: "/politica-de-privacidade",
