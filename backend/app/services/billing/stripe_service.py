@@ -13,7 +13,7 @@ from app.models.beta_tester import BetaTester, BetaStatusEnum
 
 settings = get_settings()
 METERED_PRICE_IDS: List[str] = []
-STRIPE_BETA_PLAN_PRICE_ID = "price_1RT9fVQH91QtB7wzr8fduQ9H"
+STRIPE_BETA_PLAN_PRICE_ID = "price_1RTAIqQJjxj1kzOyGTlA2iFd"
 
 
 async def get_or_create_stripe_customer(
