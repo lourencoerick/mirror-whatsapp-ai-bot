@@ -108,18 +108,19 @@ export default function BetaStatusPage() {
           // Limpar erro da API em caso de sucesso, mesmo que seja refresh do botão
           setApiError(null);
         }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (err) {
-        const errorMsg =
-          err instanceof Error
-            ? err.message
-            : "Não foi possível carregar seu status.";
-        console.error("Erro ao buscar status beta na página de status:", err);
-        setApiError(errorMsg);
-        if (!isButtonRefresh) {
-          setCurrentStatus(null); // Indica erro no estado principal apenas na carga inicial
-        }
-        // Mostrar toast de erro em ambos os casos (carga inicial ou refresh do botão)
-        toast.error("Falha ao Buscar Status", { description: errorMsg });
+        // const errorMsg =
+        // err instanceof Error
+        // ? err.message
+        // : "Não foi possível carregar seu status.";
+        // console.error("Erro ao buscar status beta na página de status:", err);
+        // setApiError(errorMsg);
+        // if (!isButtonRefresh) {
+        //   setCurrentStatus(null); // Indica erro no estado principal apenas na carga inicial
+        // }
+        // // Mostrar toast de erro em ambos os casos (carga inicial ou refresh do botão)
+        // toast.error("Falha ao Buscar Status", { description: errorMsg });
       } finally {
         if (isButtonRefresh) {
           setIsRefreshingStatus(false);
