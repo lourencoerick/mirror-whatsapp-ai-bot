@@ -73,10 +73,7 @@ def upgrade() -> None:
         sa.Column("willing_to_give_feedback", sa.Boolean(), nullable=True),
         sa.Column(
             "status",
-            sa.Enum(
-                *DB_ENUM_VALUES,
-                name="beta_status_enum",
-            ),
+            db_beta_status_enum,
             nullable=False,
         ),
         sa.Column(
