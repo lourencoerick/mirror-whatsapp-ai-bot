@@ -137,6 +137,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/beta/request-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit a new beta program application
+         * @description Allows an authenticated user to submit an application for the beta program.
+         *     The user's email, user_id, and account_id are taken from their auth context.
+         */
+        post: operations["request_beta_access_api_v1_beta_request_access_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/beta/my-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the current user's beta program application status
+         * @description Retrieves the beta application status for the currently authenticated user.
+         */
+        get: operations["get_my_beta_status_api_v1_beta_my_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/beta/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List beta tester applications (Admin) */
+        get: operations["list_beta_requests_admin_api_v1_admin_beta_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/beta/requests/{applicant_email}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a beta tester application (Admin) */
+        post: operations["approve_beta_request_admin_api_v1_admin_beta_requests__applicant_email__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/beta/requests/{applicant_email}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deny a beta tester application (Admin) */
+        post: operations["deny_beta_request_admin_api_v1_admin_beta_requests__applicant_email__deny_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{conversation_id}": {
         parameters: {
             query?: never;
@@ -1231,6 +1323,64 @@ export interface components {
              */
             url: string;
         };
+        /** AdminBetaActionResponse */
+        AdminBetaActionResponse: {
+            /** Message */
+            message: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            new_status: components["schemas"]["BetaStatusEnum"];
+        };
+        /** AdminBetaTesterListResponse */
+        AdminBetaTesterListResponse: {
+            /** Items */
+            items: components["schemas"]["AdminBetaTesterRead"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Size */
+            size: number;
+        };
+        /** AdminBetaTesterRead */
+        AdminBetaTesterRead: {
+            /** Contact Name */
+            contact_name?: string | null;
+            /** Company Name */
+            company_name?: string | null;
+            /** Company Website */
+            company_website?: string | null;
+            /** Business Description */
+            business_description?: string | null;
+            /** Beta Goal */
+            beta_goal?: string | null;
+            /** Has Sales Team */
+            has_sales_team?: boolean | null;
+            /** Sales Team Size */
+            sales_team_size?: string | null;
+            /** Avg Leads Per Period */
+            avg_leads_per_period?: string | null;
+            /** Current Whatsapp Usage */
+            current_whatsapp_usage?: string | null;
+            /** Willing To Give Feedback */
+            willing_to_give_feedback?: boolean | null;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            status: components["schemas"]["BetaStatusEnum"];
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Approved At */
+            approved_at?: string | null;
+        };
         /**
          * AgentInboxAssociationUpdate
          * @description Schema for defining the list of Inboxes associated with an Agent.
@@ -1247,6 +1397,53 @@ export interface components {
              * @description Complete list of Inbox IDs that should be associated with this agent.
              */
             inbox_ids?: string[];
+        };
+        /** BetaRequestResponse */
+        BetaRequestResponse: {
+            /** Message */
+            message: string;
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            status: components["schemas"]["BetaStatusEnum"];
+        };
+        /**
+         * BetaStatusEnum
+         * @enum {string}
+         */
+        BetaStatusEnum: "pending_approval" | "approved" | "denied" | "invited";
+        /** BetaTesterCreate */
+        BetaTesterCreate: {
+            /** Contact Name */
+            contact_name: string;
+            /** Company Name */
+            company_name?: string | null;
+            /** Company Website */
+            company_website?: string | null;
+            /** Business Description */
+            business_description?: string | null;
+            /** Beta Goal */
+            beta_goal?: string | null;
+            /** Has Sales Team */
+            has_sales_team?: boolean | null;
+            /** Sales Team Size */
+            sales_team_size?: string | null;
+            /** Avg Leads Per Period */
+            avg_leads_per_period?: string | null;
+            /** Current Whatsapp Usage */
+            current_whatsapp_usage?: string | null;
+            /** Willing To Give Feedback */
+            willing_to_give_feedback?: boolean | null;
+        };
+        /** BetaTesterStatusResponse */
+        BetaTesterStatusResponse: {
+            /** Email */
+            email?: string | null;
+            status?: components["schemas"]["BetaStatusEnum"] | null;
+            /** Requested At */
+            requested_at?: string | null;
         };
         /** Body_initiate_contact_import_api_v1_contacts_batch_import_post */
         Body_initiate_contact_import_api_v1_contacts_batch_import_post: {
@@ -3855,6 +4052,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InboxRead"][];
+                };
+            };
+        };
+    };
+    request_beta_access_api_v1_beta_request_access_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BetaTesterCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BetaRequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_my_beta_status_api_v1_beta_my_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BetaTesterStatusResponse"];
+                };
+            };
+        };
+    };
+    list_beta_requests_admin_api_v1_admin_beta_requests_get: {
+        parameters: {
+            query?: {
+                /** @description Page number */
+                page?: number;
+                /** @description Items per page */
+                size?: number;
+                /** @description Filter by status */
+                status_filter?: components["schemas"]["BetaStatusEnum"] | null;
+                /** @description Field to sort by (e.g., requested_at, email) */
+                sort_by?: string;
+                /** @description Sort order (asc or desc) */
+                sort_order?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBetaTesterListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_beta_request_admin_api_v1_admin_beta_requests__applicant_email__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicant_email: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBetaActionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deny_beta_request_admin_api_v1_admin_beta_requests__applicant_email__deny_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicant_email: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminBetaActionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
