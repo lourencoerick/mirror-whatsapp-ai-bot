@@ -1380,6 +1380,8 @@ export interface components {
             requested_at: string;
             /** Approved At */
             approved_at?: string | null;
+            /** Notes By Admin */
+            notes_by_admin?: string | null;
         };
         /**
          * AgentInboxAssociationUpdate

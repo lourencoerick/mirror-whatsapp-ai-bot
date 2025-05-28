@@ -13,7 +13,10 @@ import {
 } from "@tanstack/react-query";
 import { createContext, ReactNode, useContext } from "react";
 
-type SubscriptionData = components["schemas"]["SubscriptionRead"] | null;
+type SubscriptionData =
+  | components["schemas"]["SubscriptionRead"]
+  | null
+  | undefined;
 
 interface SubscriptionContextType {
   subscription: SubscriptionData;

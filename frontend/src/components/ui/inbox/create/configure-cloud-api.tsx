@@ -82,7 +82,6 @@ export const ConfigureCloudApiStep: React.FC<ConfigureCloudApiStepProps> = ({
       };
       onConfigured(finalPayload);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, onConfigured, onValidityChange, isMounted]);
 
   const webhookBaseUrl =

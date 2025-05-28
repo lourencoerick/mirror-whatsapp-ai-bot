@@ -89,6 +89,7 @@ export default function BetaStatusPage() {
           const data: BetaTesterStatusResponse = await response.json();
           if (
             data.status &&
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             Object.values(AppBetaStatusEnum).includes(data.status as any)
           ) {
             setCurrentStatus(data.status as AppBetaStatusValue);
@@ -133,9 +134,7 @@ export default function BetaStatusPage() {
 
   useEffect(() => {
     // Busca inicial quando o fetcher estiver disponível
-    if (fetcher) {
-      fetchUserBetaStatus(false);
-    }
+    fetchUserBetaStatus(false);
   }, [fetcher, fetchUserBetaStatus]); // Adicionado fetchUserBetaStatus como dependência
 
   const handlePlanCardError = (errorMessage: string) => {

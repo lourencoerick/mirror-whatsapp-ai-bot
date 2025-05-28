@@ -12,6 +12,7 @@ class AdminBetaTesterRead(BetaTesterBase):  # Estende a base com mais campos par
     requested_at: datetime
     approved_at: Optional[datetime] = None
     contact_name: Optional[str] = None  # Já está em BetaTesterBase, mas para clareza
+    notes_by_admin: Optional[str] = None  #
     # Adicione user_id e account_id se quiser exibi-los na UI de admin
     # user_id: Optional[UUID] = None
     # account_id: Optional[UUID] = None

@@ -23,7 +23,12 @@ import {
 import { useLayoutContext } from "@/contexts/layout-context";
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
 import { components } from "@/types/api";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -105,7 +110,7 @@ export default function AdminBetaRequestsPage() {
       return response.json();
     },
     enabled: !!fetcher,
-    keepPreviousData: true, // Keep previous data visible while new data is fetching for smoother UX
+    placeholderData: keepPreviousData,
   });
 
   const approveMutation = useMutation<AdminBetaActionResponse, Error, string>({
