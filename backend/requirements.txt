@@ -25,6 +25,7 @@ svix==1.62.0
 python-jose[cryptography]
 authlib
 PyJWT>=2.8.0
+clerk_backend_api==2.2.0
 
 # === Testes e Qualidade ===
 httpx==0.25.2
@@ -56,6 +57,10 @@ html2text==2025.4.15
 # === Google Cloud Storage ===
 google-cloud-storage
 
+# === Payments ===
+stripe==12.1.0
 
 # === Logging ===
 loguru>=0.5.3
+
+

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     """
 
     BACKEND_BASE_URL: str = "http://localhost:8000"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # --- Database ---
     DATABASE_USER: str = "user"
@@ -39,6 +40,7 @@ class Settings(BaseSettings):
     CLERK_JWKS_URL: str = "clerk-jwks-url"
     CLERK_ISSUER: str = "clerk-issuer"
     CLERK_AUDIENCE: Optional[str] = None
+    CLERK_SECRET_KEY: str = "your-secret-key"
 
     # --- Storage ---
     CONTACT_IMPORT_GCS_BUCKET_NAME: str = "wappbot-import-bucket"
@@ -85,6 +87,19 @@ class Settings(BaseSettings):
 
     # --- Meta ---
     META_APP_SECRET: str = "your-meta-secret"
+
+    # --- Stripe ---
+    STRIPE_SECRET_KEY: str = "your-secret-key"
+    STRIPE_PUBLISHABLE_KEY: str = "your-secret-key"
+    STRIPE_WEBHOOK_SECRET: str = "your-secret-key"
+
+    # URLs do Frontend para redirecionamentos do Stripe Checkout
+    STRIPE_CHECKOUT_SUCCESS_URL: str = (
+        "http://localhost:3000/payment/success"  # Ajuste para sua URL
+    )
+    STRIPE_CHECKOUT_CANCEL_URL: str = "http://localhost:3000/"
+
+    STRIPE_PAYMENT_METHOD_TYPES: List[str] = Field(default_factory=lambda: ["card"])
 
     # --- App ---
     APP_NAME: str = "WhatsApp AI Bot"

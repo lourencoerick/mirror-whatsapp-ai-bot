@@ -60,3 +60,10 @@ class User(BaseModel):
         "InboxMember", back_populates="user", cascade="all, delete-orphan"
     )
     events = relationship("Event", back_populates="user", cascade="all, delete-orphan")
+
+    beta_application = relationship(
+        "BetaTester",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

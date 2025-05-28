@@ -62,6 +62,11 @@ export default function ContactsPage() {
   // --- SWR Fetcher ---
   const fetcher = useCallback(
     async (url: string): Promise<PaginatedContact> => {
+      if (!authenticatedFetch) {
+        throw new Error(
+          "SWR fetcher chamado quando authenticatedFetch não está pronto."
+        );
+      }
       const res = await authenticatedFetch(url);
       if (!res.ok) {
         const errorInfo = await res.json().catch(() => ({}));
@@ -72,7 +77,7 @@ export default function ContactsPage() {
       }
       return res.json();
     },
-    [authenticatedFetch]
+    [authenticatedFetch] // Dependência
   );
 
   // --- API URL Construction ---
@@ -159,7 +164,16 @@ export default function ContactsPage() {
   };
   const confirmDeleteContact = async () => {
     if (!contactToDelete) return;
+
+    if (!authenticatedFetch) {
+      toast.error("Erro de Autenticação", {
+        description:
+          "Ação de exclusão não disponível no momento. Por favor, recarregue a página ou tente novamente.",
+      });
+      return;
+    }
     setIsDeleting(true);
+
     try {
       const response = await authenticatedFetch(
         `/api/v1/contacts/${contactToDelete.id}`,

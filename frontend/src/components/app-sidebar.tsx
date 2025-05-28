@@ -1,7 +1,7 @@
 "use client";
 
-import { NavUser } from "@/components/nav-user";
 import { NavAccount } from "@/components/nav-account";
+import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -11,18 +11,11 @@ import {
 import { UserCheck } from "lucide-react"; // Example icon
 
 // --- Configuration Import ---
-import { sidebarNavItems } from "@/config/sidebar-nav";
-import type { NavItem as ConfigNavItem } from "@/config/sidebar-nav"; 
 import { NavMain, type NavItem as NavMainItem } from "@/components/nav-main";
-
-// --- Placeholder Data  ---
-// TODO: use the account route to get the data from backend
-// or use org hook from clerk
-const accountData = {
-  name: "Conta Individual", 
-  logo: UserCheck,
-  plan: "Plano PME",
-};
+import { getPlanDetailsByStripeIds } from "@/config/billing-plans";
+import type { NavItem as ConfigNavItem } from "@/config/sidebar-nav";
+import { sidebarNavItems } from "@/config/sidebar-nav";
+import { useSubscription } from "@/contexts/subscription-context";
 
 // --- Helper Function for Data Mapping ---
 /**
@@ -44,7 +37,6 @@ const mapNavItemToNavMainProps = (navItem: ConfigNavItem): NavMainItem => {
   return mappedItem;
 };
 
-
 /**
  * The main application sidebar component.
  */
@@ -52,16 +44,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // console.log("Raw sidebarNavItems:", JSON.stringify(sidebarNavItems, null, 2));
 
   // Filter out hidden items
-  const visibleNavItems = sidebarNavItems.filter(
-    (item) => !item.hidden
-  );
-
-  
+  const visibleNavItems = sidebarNavItems.filter((item) => !item.hidden);
 
   // console.log("Visible Nav Items:", JSON.stringify(visibleNavItems, null, 2));
 
   const navMainPropsItems = visibleNavItems.map(mapNavItemToNavMainProps);
+  const { subscription, hasActiveSubscription } = useSubscription();
 
+  const planName = hasActiveSubscription
+    ? getPlanDetailsByStripeIds(
+        subscription?.stripe_price_id,
+        subscription?.stripe_product_id
+      )?.name
+    : "Sem plano";
+  const accountData = {
+    name: "Conta Individual",
+    logo: UserCheck,
+    plan: planName,
+  };
   // console.log("Items passed to NavMain:", JSON.stringify(navMainPropsItems, null, 2));
 
   return (

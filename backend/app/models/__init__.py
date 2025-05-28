@@ -1,6 +1,7 @@
 from .access_token import AccessToken
 from .account import Account
 from .account_user import AccountUser
+from .beta_tester import BetaTester
 from .bot_agent import BotAgent
 from .bot_agent_inbox import BotAgentInbox
 from .base import BaseModel
@@ -25,11 +26,13 @@ from .simulation.simulation_message import SimulationMessage
 from .simulation.persona import Persona
 from .knowledge_chunk import KnowledgeChunk
 from .knowledge_document import KnowledgeDocument
+from .usage_event import UsageEvent
 
 __all__ = [
     "AccessToken",
     "Account",
     "AccountUser",
+    "BetaTester",
     "BotAgent",
     "BotAgentInbox",
     "BaseModel",
@@ -54,4 +57,5 @@ __all__ = [
     "KnowledgeChunk",
     "KnowledgeDocument",
     "Persona",
+    "UsageEvent",
 ]

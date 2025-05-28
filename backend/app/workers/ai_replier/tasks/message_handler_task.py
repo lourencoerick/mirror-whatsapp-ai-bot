@@ -146,6 +146,8 @@ try:
     from app.api.schemas.message import MessageCreate
     from app.api.schemas.company_profile import CompanyProfileSchema
     from app.api.schemas.bot_agent import BotAgentRead
+    from app.models.account import Account
+    from app.models.usage_event import UsageEvent
 
     MODELS_SCHEMAS_AVAILABLE = True
     logger.info(
@@ -156,6 +158,12 @@ except ImportError:
     logger.error(
         "MessageHandlerTask: Models/Schemas unavailable. Data handling impaired."
     )
+
+    class Account:
+        pass  # type: ignore
+
+    class UsageEvent:
+        pass  # type: ignore
 
     class Message:
         pass  # type: ignore
@@ -195,6 +203,7 @@ AI_DELAY_MAX_SECONDS = float(
     os.getenv("AI_DELAY_MAX_SECONDS", "0.03")
 )  # Ensure this is a reasonable max
 CONVERSATION_HISTORY_LIMIT = 20
+METER_EVENT_NAME_AI_MESSAGE = "generated_ia_messages"
 
 # ==============================================================================
 # Helper Functions
@@ -264,6 +273,8 @@ async def _process_one_message(
         str(agent_config_db.id) if agent_config_db and agent_config_db.id else None
     )
 
+    current_utc_time = datetime.now(timezone.utc)
+
     message_data = MessageCreate(
         account_id=account_id,
         inbox_id=conversation.inbox_id,
@@ -273,7 +284,7 @@ async def _process_one_message(
         bot_agent_id=agent_config_db.id,
         direction="out",
         status="processing",
-        message_timestamp=datetime.now(timezone.utc),
+        message_timestamp=current_utc_time,
         content=ai_response_text,
         content_type="text",
         content_attributes={
@@ -290,6 +301,45 @@ async def _process_one_message(
     logger.info(
         f"{log_prefix} Created outgoing AI message record (ID: {ai_message.id})."
     )
+
+    if not conversation.is_simulation:
+        # Buscar a conta para obter o stripe_customer_id
+        # O objeto 'conversation' já tem 'account_id', mas precisamos do objeto Account
+        # para pegar 'stripe_customer_id'. Se 'conversation.account' for uma relação carregada, melhor.
+        # Caso contrário, buscar a conta.
+
+        # Se conversation.account já é um objeto Account carregado com stripe_customer_id:
+        # account_stripe_customer_id = conversation.account.stripe_customer_id if conversation.account else None
+
+        # Se precisar buscar a Account:
+        account_for_usage = await db.get(Account, account_id)  # account_id já é UUID
+
+        if account_for_usage and account_for_usage.stripe_customer_id:
+            usage_event = UsageEvent(
+                account_id=account_id,
+                stripe_customer_id=account_for_usage.stripe_customer_id,
+                meter_event_name=METER_EVENT_NAME_AI_MESSAGE,  # Usar a constante
+                quantity=1,  # Uma mensagem de IA gerada
+                event_timestamp=current_utc_time,  # Usar o mesmo timestamp da mensagem
+                # reported_to_stripe_at e stripe_meter_event_id serão preenchidos pela task de reporte
+            )
+            db.add(usage_event)
+            logger.info(
+                f"{log_prefix} UsageEvent for 1 '{METER_EVENT_NAME_AI_MESSAGE}' prepared for DB (Account: {account_id})."
+            )
+        elif not account_for_usage:
+            logger.error(
+                f"{log_prefix} Account {account_id} not found. Cannot determine stripe_customer_id for usage event."
+            )
+        else:  # account_for_usage existe, mas não tem stripe_customer_id
+            logger.warning(
+                f"{log_prefix} Account {account_id} does not have a stripe_customer_id. "
+                f"Usage for '{METER_EVENT_NAME_AI_MESSAGE}' will not be reported to Stripe."
+            )
+    else:
+        logger.info(
+            f"{log_prefix} Skipping usage event logging for simulation message."
+        )
 
     if conversation.is_simulation:
         logger.info(

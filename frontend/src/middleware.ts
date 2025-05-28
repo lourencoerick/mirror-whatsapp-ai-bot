@@ -1,56 +1,46 @@
-// middleware.ts
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
+// src/middleware.ts
+
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 // Public routes (no auth)
-const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/beta',
-]);
+const isPublicRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 
-// Routes that require admin role
-const isAdminRoute = createRouteMatcher([
-  '/dashboard(.*)',
-]);
+// Admin-only routes
+const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId } = await auth();
-
-  // it is needed the full origin to construct absolute URLs
+  const { userId, sessionClaims } = await auth();
   const origin = req.nextUrl.origin;
+  const role = (sessionClaims?.metadata as { role?: string })?.role;
 
-  // 1) Logged-in user accessing sign-in/sign-up → redirect to '/'
+  // 1) Not logged in & not on a public route → redirect to sign-in
+  if (!userId && !isPublicRoute(req)) {
+    return NextResponse.redirect(new URL("/sign-in", origin));
+  }
+
+  // 2) Logged-in user on a public route → redirect to home
   if (userId && isPublicRoute(req)) {
-    const redirectUrl = new URL('/', req.url);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL("/", origin));
   }
 
-  // 2) /dashboard/** routes: require admin role
+  // 3) Admin routes require "admin" role
   if (isAdminRoute(req)) {
-    console.log(`Accessing admin route ${req.url}`);
-    await auth.protect(
-      // (has) => has({ role: 'admin' }),
-      {
-        unauthenticatedUrl: `${origin}/sign-in`,
-        unauthorizedUrl:    `${origin}/pending-approval`,
-      }
-    );
-  }
-  // 3) All other non-public routes: require login only
-  else if (!isPublicRoute(req)) {
-    await auth.protect({
+    const isAdmin = role === "admin";
+    await auth.protect(() => isAdmin, {
       unauthenticatedUrl: `${origin}/sign-in`,
+      unauthorizedUrl: `${origin}/`, // or another "not authorized" page
     });
   }
 
-  // 4) Continue as normal
+  // 4) All other routes are allowed for any logged-in user
   return NextResponse.next();
 });
 
 export const config = {
   matcher: [
-    '/((?!_next|.*\\..*).*)',
-    '/(api|trpc)(.*)',
+    // Match everything except _next static files and root file extensions
+    "/((?!_next|.*\\..*).*)",
+    "/(api|trpc)(.*)",
   ],
 };

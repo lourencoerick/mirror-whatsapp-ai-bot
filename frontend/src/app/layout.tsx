@@ -1,7 +1,9 @@
 import ReactQueryProvider from "@/components/providers/query-provider";
+import { SubscriptionProvider } from "@/contexts/subscription-context";
 import { ClerkProvider } from "@clerk/nextjs";
 import { type Metadata } from "next";
 
+import { Toaster } from "@/components/ui/sonner";
 import siteMetadata from "@/data/siteMetadata";
 import { ptBR } from "@clerk/localizations";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -72,7 +74,12 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <ReactQueryProvider>{children}</ReactQueryProvider>
+          <ReactQueryProvider>
+            <SubscriptionProvider>
+              {children}
+              <Toaster richColors position="top-right" />
+            </SubscriptionProvider>
+          </ReactQueryProvider>
         </body>
       </html>
     </ClerkProvider>

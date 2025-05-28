@@ -11,6 +11,20 @@ from app.database import get_db
 
 from app.api.routes.auth import verify_clerk_token
 
+try:
+    from clerk_backend_api import Clerk
+
+    CLERK_SDK_AVAILABLE = True
+except ImportError:
+    CLERK_SDK_AVAILABLE = False
+    logger.warning(
+        "Clerk Python SDK (clerk_backend_api) not found. Admin role checks via Clerk API disabled."
+    )
+
+from app.config import get_settings
+
+settings = get_settings()
+
 
 class AuthContext:
     """Holds the authenticated internal user and their active account."""
@@ -131,3 +145,67 @@ async def get_auth_context(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred while processing authentication context.",
         ) from e
+
+
+async def require_admin_user(
+    auth_context: AuthContext = Depends(get_auth_context),
+) -> AuthContext:
+    """
+    Dependency that ensures the current user has an admin role.
+    Raises 401 if not authenticated,
+    403 if not an admin,
+    or 503 if the admin check cannot be performed.
+    """
+    if not auth_context.user or not auth_context.user.uid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
+
+    user_is_admin = False
+
+    # Approach 1: If 'role' is already on your internal User model
+    if hasattr(auth_context.user, "role") and auth_context.user.role == "admin":
+        user_is_admin = True
+
+    # Approach 2 (more robust if internal User lacks 'role'): call Clerk API
+    # Requires CLERK_SECRET_KEY set and clerk_backend_api installed.
+    elif CLERK_SDK_AVAILABLE and settings.CLERK_SECRET_KEY:
+        try:
+            async with Clerk(bearer_auth=settings.CLERK_SECRET_KEY) as clerk:
+                clerk_user = await clerk.users.get_async(user_id=auth_context.user.uid)
+                # Check public or private metadata for admin role
+                if clerk_user and clerk_user.public_metadata.get("role") == "admin":
+                    user_is_admin = True
+                elif clerk_user and clerk_user.private_metadata.get("role") == "admin":
+                    user_is_admin = True
+                else:
+                    logger.warning(
+                        f"User {auth_context.user.uid} does not have 'role: admin' in Clerk metadata."
+                    )
+        except Exception as e:
+            logger.error(
+                f"Error fetching metadata for user {auth_context.user.uid} from Clerk: {e}"
+            )
+            # Fail closed: deny admin access if check fails
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Unable to verify admin permissions.",
+            )
+    else:
+        logger.error(
+            "Cannot determine admin role: Clerk SDK unavailable or secret key missing, and no 'role' on internal User."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin verification not properly configured.",
+        )
+
+    if not user_is_admin:
+        logger.warning(f"Admin access DENIED for user {auth_context.user.uid}.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User does not have administrator privileges.",
+        )
+
+    logger.info(f"Admin access GRANTED for user {auth_context.user.uid}.")
+    return auth_context

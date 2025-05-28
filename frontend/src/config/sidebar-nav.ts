@@ -155,9 +155,9 @@ export const sidebarNavItems: NavItem[] = [
   },
   {
     name: "Faturamento",
-    href: "/dashboard/billing",
+    href: "/dashboard/account/subscription",
     icon: CreditCard,
-    hidden: true,
+    hidden: false,
   },
   {
     name: "Ajuda & FAQ",

@@ -6,6 +6,7 @@ from loguru import logger
 
 # --- ARQ Specific Imports ---
 from arq.connections import RedisSettings, ArqRedis
+from arq import cron
 
 # --- Project Imports ---
 # Configuration
@@ -72,6 +73,10 @@ except ImportError:
 # --- Import Task Functions ---
 from app.workers.ai_replier.tasks.message_handler_task import handle_ai_reply_request
 from app.workers.ai_replier.tasks.follow_up_task import schedule_conversation_follow_up
+from app.workers.ai_replier.tasks.billing_task import (
+    report_usage_to_stripe_task,
+    REPORT_USAGE_TASK_NAME,
+)
 
 # ==============================================================================
 # Arq Worker Configuration Callbacks
@@ -291,6 +296,7 @@ class WorkerSettings:
     functions = [
         handle_ai_reply_request,
         schedule_conversation_follow_up,
+        report_usage_to_stripe_task,
     ]
     """List of all task functions this worker can execute."""
 
@@ -317,6 +323,23 @@ class WorkerSettings:
         # password=settings.REDIS_PASSWORD
     )
     """Redis connection settings for ARQ."""
+
+    cron_jobs = [
+        cron(
+            report_usage_to_stripe_task,
+            name=REPORT_USAGE_TASK_NAME,
+            hour={
+                1,
+                6,
+                7,
+                13,
+                19,
+                23,
+            },
+            minute=59,
+            run_at_startup=True,
+        ),
+    ]
 
     logger.info(
         f"Unified ARQ WorkerSettings configured. "

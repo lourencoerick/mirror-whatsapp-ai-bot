@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
-
+import stripe
 from typing import Optional
 import redis.asyncio as aioredis
 
@@ -20,6 +20,7 @@ from app.api.routes.webhooks import clerk as clerk_routes
 from app.api.routes import evolution_instance as evolution_instance_routes
 from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
 from app.api.routes.webhooks.whatsapp_cloud import webhook as whatsapp_cloud_wb_routes
+from app.api.routes.webhooks.stripe import webhook as stripe_wb_routes
 from app.api.routes import batch_contacts as batch_contacts_routes
 from app.api.routes import research as research_routes
 from app.api.routes import bot_agent as bot_agent_routes
@@ -27,10 +28,13 @@ from app.api.routes import company_profile as profile_routes
 from app.api.routes import knowledge as knowledge_routes
 from app.api.routes import simulation as simulation_routes
 from app.api.routes import dashboard as dashboard_routes
-
+from app.api.routes import billing as billing_routes
+from app.api.routes import beta_tester as beta_routes
+from app.api.routes import admin_beta as admin_beta_routes
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
+from app.core.dependencies.billing import require_active_subscription
 
 # Import Services/Config
 from app.services.realtime.redis_pubsub import RedisPubSubBridge
@@ -50,6 +54,7 @@ load_dotenv()
 # --- Initialization ---
 pubsub_bridge = RedisPubSubBridge()
 settings = get_settings()
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 logger.info("Verifying environment variables...")
 # Verify required environment variables
@@ -127,6 +132,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+common_protected_dependencies = [Depends(require_active_subscription)]
 
 # --- API Routers (v1) ---
 api_v1_prefix = "/api/v1"
@@ -137,39 +143,81 @@ logger.info(f"Including API routers under prefix: {api_v1_prefix}")
 app.include_router(
     auth_routes.router, prefix=f"{api_v1_prefix}/auth", tags=["v1 - Auth"]
 )
+
 app.include_router(
-    conversation_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Conversations"]
-)
-app.include_router(
-    message_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Messages"]
-)
-app.include_router(
-    inbox_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Inboxes"]
-)
-app.include_router(
-    contact_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Contacts"]
+    billing_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Billing"]
 )
 
 app.include_router(
-    simulation_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Simulation"]
+    me_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Me"],
+)
+
+app.include_router(
+    beta_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Beta Program"],
+)
+
+app.include_router(
+    admin_beta_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Admin - Beta Program"],
+)
+
+app.include_router(
+    conversation_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Conversations"],
+    dependencies=common_protected_dependencies,
+)
+app.include_router(
+    message_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Messages"],
+    dependencies=common_protected_dependencies,
+)
+app.include_router(
+    inbox_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Inboxes"],
+    dependencies=common_protected_dependencies,
+)
+app.include_router(
+    contact_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Contacts"],
+    dependencies=common_protected_dependencies,
+)
+
+app.include_router(
+    simulation_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Simulation"],
+    dependencies=common_protected_dependencies,
 )
 
 app.include_router(
     profile_routes.router,
     prefix=f"{api_v1_prefix}",
-    tags=["v1 - Company Profile"],  # Tag já está no router
+    tags=["v1 - Company Profile"],
+    dependencies=common_protected_dependencies,  # Tag já está no router
 )
 
 app.include_router(
-    bot_agent_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Bot Agent"]
+    bot_agent_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Bot Agent"],
+    dependencies=common_protected_dependencies,
 )
 
-app.include_router(me_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Me"])
 
 app.include_router(
     batch_contacts_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Contacts Batch Operations"],
+    dependencies=common_protected_dependencies,
 )
 
 
@@ -177,6 +225,7 @@ app.include_router(
     dashboard_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Dashboard Metrics"],
+    dependencies=common_protected_dependencies,
 )
 
 
@@ -186,6 +235,7 @@ app.include_router(
     research_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Researcher"],
+    dependencies=common_protected_dependencies,
 )
 
 logger.info("Including Knowledge router")
@@ -193,6 +243,7 @@ app.include_router(
     knowledge_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Knowledge"],
+    dependencies=common_protected_dependencies,
 )
 
 
@@ -202,12 +253,14 @@ app.include_router(
     evolution_instance_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Evolution Instances"],
+    dependencies=common_protected_dependencies,
 )
 
 
 # --- Webhook Routers ---
 logger.info("Including Webhook routers")
 app.include_router(clerk_routes.router, prefix="", tags=["Clerk Webhooks"])
+
 app.include_router(
     evolution_wb_routes.router, prefix="", tags=["Evolution Instance Webhooks"]
 )
@@ -215,6 +268,8 @@ app.include_router(
 app.include_router(
     whatsapp_cloud_wb_routes.router, prefix="", tags=["Whatsapp Cloud Webhooks"]
 )
+
+app.include_router(stripe_wb_routes.router, prefix="", tags=["Stripe Webhooks"])
 
 
 # --- WebSocket Router ---
