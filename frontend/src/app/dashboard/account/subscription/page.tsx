@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { PLAN_DETAILS_MAP } from "@/config/billing-plans";
+import { getPlanDetailsByStripeIds } from "@/config/billing-plans";
 import { useLayoutContext } from "@/contexts/layout-context";
 import { useSubscription } from "@/contexts/subscription-context";
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
@@ -96,26 +96,6 @@ export default function AccountSubscriptionPage() {
     mutation.mutate();
   };
 
-  const getPlanDisplayName = (
-    priceId?: string,
-    productId?: string | null
-  ): string => {
-    // Tenta primeiro por Product ID, pois geralmente é mais genérico para o "plano"
-    if (productId && PLAN_DETAILS_MAP[productId]) {
-      return PLAN_DETAILS_MAP[productId].name;
-    }
-    // Depois tenta por Price ID
-    if (priceId && PLAN_DETAILS_MAP[priceId]) {
-      return PLAN_DETAILS_MAP[priceId].name;
-    }
-
-    // Fallbacks se não houver mapeamento, para ajudar na depuração
-    if (productId) return `Plano (ID Produto: ${productId.slice(0, 12)}...)`; // Mostra parte do ID
-    if (priceId) return `Plano (ID Preço: ${priceId.slice(0, 12)}...)`;
-
-    return "Plano não identificado";
-  };
-
   const renderSubscriptionDetails = () => {
     // Se está carregando e ainda não tem dados de assinatura (primeira carga)
     if (isLoadingSubscription && !subscription) {
@@ -134,7 +114,7 @@ export default function AccountSubscriptionPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/dashboard/billing/plans">
+            <Link href="/billing/plans">
               {" "}
               <Button>Ver Planos Disponíveis</Button>
             </Link>
@@ -194,10 +174,12 @@ export default function AccountSubscriptionPage() {
           <div className="flex justify-between items-center border-b pb-3">
             <span className="text-sm text-muted-foreground">Plano Atual:</span>
             <span className="font-semibold text-lg">
-              {getPlanDisplayName(
-                subscription.stripe_price_id,
-                subscription.stripe_product_id
-              )}
+              {
+                getPlanDetailsByStripeIds(
+                  subscription.stripe_price_id,
+                  subscription.stripe_product_id
+                )?.name
+              }
             </span>
           </div>
           <div className="flex justify-between items-center border-b pb-3">
