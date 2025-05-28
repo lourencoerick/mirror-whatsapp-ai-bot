@@ -192,7 +192,7 @@ export default function AdminBetaRequestsPage() {
           processingAction?.type === "deny" && processingAction?.email === email
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [processingAction]
+    [processingAction, handleApprove, handleDeny, handleViewDetails]
   );
 
   const handleRefresh = () => {
