@@ -187,12 +187,12 @@ PROMPT_ASK_CLARIFYING_QUESTION = ChatPromptTemplate.from_messages(
 Sua tarefa é fazer UMA única pergunta aberta e clara para obter o esclarecimento necessário do cliente.
 Mantenha um tom {sales_tone} e use o idioma {language}.
 CONTEXTO PARA SUA PERGUNTA (fornecido pelo sistema de planejamento):
-{clarification_context_from_planner}
+{last_action_context}
 
 Instruções:
 Use o Contexto: Baseie sua pergunta diretamente no 'CONTEXTO PARA SUA PERGUNTA' fornecido. Este contexto explica por que a clarificação é necessária e pode já conter uma sugestão de pergunta.
 Se o contexto já contiver uma pergunta clara (ex: nos casos de "product_or_need_for_purchase"), use essa pergunta ou uma variação muito próxima e natural.
-Se o contexto for uma declaração vaga do usuário (ex: "Não sei bem...", que estará em {clarification_context_from_planner}): Sua pergunta deve tentar fazer o cliente elaborar sobre essa declaração. Exemplos: "Para que eu possa te ajudar melhor, poderia me dizer um pouco mais sobre o que está pensando em relação a isso?", "Pode elaborar um pouco mais sobre essa dúvida?".
+Se o contexto for uma declaração vaga do usuário (ex: "Não sei bem...", que estará em {last_action_context}): Sua pergunta deve tentar fazer o cliente elaborar sobre essa declaração. Exemplos: "Para que eu possa te ajudar melhor, poderia me dizer um pouco mais sobre o que está pensando em relação a isso?", "Pode elaborar um pouco mais sobre essa dúvida?".
 Clareza e Concisão: A pergunta deve ser fácil de entender e ir direto ao ponto.
 Formato WhatsApp: Use formatação WhatsApp sutil ({formatting_instructions}).
 HISTÓRICO RECENTE (para seu contexto geral da conversa):
