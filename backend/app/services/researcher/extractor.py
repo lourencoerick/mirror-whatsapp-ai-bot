@@ -116,7 +116,7 @@ Your task is to analyze the provided 'Website Text' and extract information to p
 **Guidance for `offering_overview`**
 * List only the actual products, services, subscriptions, or plans customers buy.
 * Do **NOT** list payment methods, delivery methods, categories, or internal sections.
-* For each offering extract: `name`, `short_description`, `key_features`, `price_info` (if available), `link` (if available), and `bonus_items`.
+* For each offering extract: `name`, `short_description`, `key_features`, `price` ,`price_info` (if available), `link` (if available), and `bonus_items`.
 
 *** Bundles (one offering that includes several bonuses) ***
 • If one total price covers several items, treat it as ONE offering.
