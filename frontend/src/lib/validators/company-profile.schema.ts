@@ -14,6 +14,13 @@ export const offeringValidationSchema = z.object({
     .max(500),
   key_features: z.array(z.string()).optional().default([]),
   bonus_items: z.array(z.string()).optional().default([]),
+  price: z
+    .number({
+      invalid_type_error: "Price must be a number.",
+    })
+    .nonnegative({ message: "Price must be zero or a positive number." })
+    .nullable()
+    .optional(),
   price_info: z.string().max(255).nullable().optional(),
   link: z
     .string()

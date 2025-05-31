@@ -38,6 +38,7 @@ export function OfferingForm({
       short_description: initialData?.short_description || "",
       key_features: initialData?.key_features || [],
       bonus_items: initialData?.bonus_items || [],
+      price: initialData?.price || null,
       price_info: initialData?.price_info || "",
       link: initialData?.link || "",
     },
@@ -79,6 +80,38 @@ export function OfferingForm({
           </p>
         )}
       </div>
+      <div>
+        <Label htmlFor="offering-price-value" className="mb-1.5 block">
+          Preço (R$)
+        </Label>
+        <Input
+          id="offering-price-value"
+          type="number"
+          step="0.01" // Permite duas casas decimais para centavos
+          min="0" // Corresponde ao .nonnegative() do Zod, para UX
+          placeholder="Ex: 29.90 (deixe em branco ou 0 se gratuito)"
+          {...register("price", {
+            setValueAs: (value) => {
+              if (
+                value === "" ||
+                value === null ||
+                value === undefined ||
+                String(value).trim() === ""
+              ) {
+                return null;
+              }
+              const num = parseFloat(value);
+              return isNaN(num) ? null : num;
+            },
+          })}
+          disabled={disabled}
+          className="w-full"
+        />
+        {errors.price && (
+          <p className="text-xs text-red-600 mt-1">{errors.price.message}</p>
+        )}
+      </div>
+
       <div>
         <Label htmlFor="offering-price" className="mb-1.5 block">
           Informação de Preço
