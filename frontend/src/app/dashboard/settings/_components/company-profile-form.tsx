@@ -686,8 +686,8 @@ export function CompanyProfileForm({
           open={isOfferingModalOpen}
           onOpenChange={setIsOfferingModalOpen}
         >
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-[800px] max-h-[85vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
               <DialogTitle>
                 {editingOfferingIndex !== null
                   ? "Editar Oferta"
@@ -696,14 +696,15 @@ export function CompanyProfileForm({
             </DialogHeader>
             {/* Render the OfferingForm inside the modal */}
             {/* Pass initial data (if editing) and callbacks */}
-            <OfferingForm
-              // Use key to force re-mount/reset when switching between add/edit or editing different items
-              key={editingOfferingIndex ?? "new"}
-              initialData={offeringFormData}
-              onSubmit={handleSaveOffering}
-              onCancel={() => setIsOfferingModalOpen(false)}
-              isLoading={isSubmitting} // Pass the main form's submitting state to disable OfferingForm if needed
-            />
+            <div className="flex-grow overflow-y-auto mt-4 custom-scrollbar">
+              <OfferingForm
+                key={editingOfferingIndex ?? "new"}
+                initialData={offeringFormData}
+                onSubmit={handleSaveOffering}
+                onCancel={() => setIsOfferingModalOpen(false)}
+                isLoading={isSubmitting}
+              />
+            </div>
             {/* Note: Cancel/Save buttons are now part of the OfferingForm component */}
           </DialogContent>
         </Dialog>

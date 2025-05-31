@@ -1,7 +1,7 @@
 # backend/app/schemas/company_profile.py
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import List, Optional, Dict, Any
 import json
 
@@ -13,6 +13,10 @@ from pydantic import BaseModel, Field, HttpUrl
 class OfferingInfo(BaseModel):
     """Brief information about a key product or service offering."""
 
+    id: UUID = Field(
+        default_factory=uuid4, description="Unique identifier for the offering."
+    )
+
     name: str = Field(..., description="Name of the product or service.")
     short_description: str = Field(
         ..., description="A concise description (1-2 sentences)."
@@ -20,6 +24,10 @@ class OfferingInfo(BaseModel):
     key_features: List[str] = Field(
         default_factory=list,
         description="Bullet points of key features, benefits, or components.",
+    )
+    price: Optional[float] = Field(
+        None,
+        description="Price value of the offering.",
     )
     price_info: Optional[str] = Field(
         None,
@@ -36,6 +44,13 @@ class OfferingInfo(BaseModel):
             "when purchasing the main offering. These may include templates, e-books, consultations, etc."
         ),
     )
+
+    @field_validator("link", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, value: Any) -> Optional[Any]:
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
 
 
 class CompanyProfileSchema(BaseModel):
@@ -117,6 +132,13 @@ class CompanyProfileSchema(BaseModel):
     profile_version: int = Field(
         default=1, description="Version number of the profile schema."
     )
+
+    @field_validator("website", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, value: Any) -> Optional[Any]:
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
 
     # Pydantic v2 uses model_config
     model_config = {

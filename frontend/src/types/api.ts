@@ -3178,6 +3178,12 @@ export interface components {
          */
         OfferingInfo: {
             /**
+             * Id
+             * Format: uuid
+             * @description Unique identifier for the offering.
+             */
+            id?: string;
+            /**
              * Name
              * @description Name of the product or service.
              */
@@ -3192,6 +3198,11 @@ export interface components {
              * @description Bullet points of key features, benefits, or components.
              */
             key_features?: string[];
+            /**
+             * Price
+             * @description Price value of the offering.
+             */
+            price?: number | null;
             /**
              * Price Info
              * @description Brief pricing information (e.g., 'Starts at $X', 'Contact for quote').
