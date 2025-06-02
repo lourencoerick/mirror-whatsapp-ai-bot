@@ -97,7 +97,7 @@ async def get_offering_details_by_id(
             )
             details_parts.append(f"- Bonus Items:\n  {bonus_str}")
         if found_offering.link:
-            details_parts.append(f"- More Info/Purchase Link: {found_offering.link}")
+            details_parts.append(f"- Checkout Link: {found_offering.link}")
 
         return "\n".join(details_parts)
     else:

@@ -100,7 +100,7 @@ async def query_knowledge_base(
     logger.info(f"--- Executing Tool: {tool_name} ---")
     logger.info(f"[{tool_name}] Received query: '{user_query[:100]}...'")
 
-    account_id = state.get("account_id")
+    account_id = state.account_id
     logger.info(
         f"Printando company profile Bot agent:{state.company_profile.offering_overview}"
     )

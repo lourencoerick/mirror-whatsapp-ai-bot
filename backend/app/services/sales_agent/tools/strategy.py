@@ -1,13 +1,22 @@
-from langchain_core.tools import tool
+from langchain_core.tools import tool, InjectedToolCallId
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import ToolMessage
 from typing_extensions import Annotated
-from ..agent_state import AgentState
+from ..agent_state import AgentState  # Assuming AgentState is in a parent directory
+from langgraph.types import Command
 from langgraph.prebuilt import InjectedState
 from loguru import logger
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import (
+    BaseModel,
+    Field,
+)  # Use Field alias for clarity if needed
 from typing import List, Optional, Dict, Any
 from langchain_core.runnables import RunnableConfig
-from app.api.schemas.company_profile import OfferingInfo, CompanyProfileSchema
+from app.api.schemas.company_profile import (
+    OfferingInfo,
+    CompanyProfileSchema,
+)  # Ensure these are correct paths
 
 
 class ObjectionResponseStrategy(BaseModel):
@@ -32,93 +41,180 @@ class ObjectionResponseStrategy(BaseModel):
     )
     next_step_options: List[str] = Field(
         default_factory=list,
-        description="Sugestões de próximos passos dependendo da reação do cliente à tentativa de refutação.",
+        description="Sugestões de próximos passos CONCRETOS E REALIZÁVEIS pelo agente de vendas virtual, considerando as capacidades da empresa. Evite sugerir ações que a empresa não oferece (ex: demonstrações, se não disponíveis).",
     )
-    # Poderíamos adicionar um campo para "coisas a evitar"
-    # things_to_avoid: List[str] = Field(default_factory=list)
-
     model_config = {"validate_assignment": True}
 
 
 @tool
 async def suggest_objection_response_strategy(
     objection_type: str,
-    config: RunnableConfig,
-    state: Annotated[AgentState, InjectedState],
+    config: RunnableConfig,  # Contains llm_primary_instance, db_session_factory etc.
+    state: Annotated[AgentState, InjectedState],  # Access to full agent state
+    tool_call_id: Annotated[str, InjectedToolCallId],
     offering_id_str: Optional[str] = None,
     customer_identified_needs: Optional[List[str]] = None,
-) -> Dict[
-    str, Any
-]:  # Retorna um dicionário que pode ser validado com ObjectionResponseStrategy
+    conversation_context: Optional[str] = None,
+) -> Dict[str, Any]:
     """
-    Sugere uma estratégia detalhada para responder a uma objeção específica do cliente.
-    Analisa o tipo de objeção, o contexto da oferta (se fornecido) e as necessidades
-    identificadas do cliente para fornecer táticas de resposta.
+    Provides strategic advice for handling customer objections.
+    The output is structured suggestions FOR THE AI AGENT to consider.
+    The AI agent should NOT directly output this structure to the user, but rather
+    synthesize the information into a natural, conversational response,
+    filtering suggestions based on actual company offerings.
 
     Args:
-        objection_type (str): O tipo principal da objeção (ex: 'price', 'need', 'timing', 'trust', 'competitor').
-        offering_id_str (Optional[str]): O ID da oferta específica que está sendo discutida e à qual a objeção se refere.
-        customer_identified_needs (Optional[List[str]]): Uma lista das necessidades ou dores do cliente já identificadas.
-        state (AgentState): [INJETADO AUTOMATICAMENTE, OPCIONAL NESTA TOOL SE OS OUTROS ARGS FOREM SUFICIENTES]
-                            O estado completo da conversa, caso a tool precise de mais contexto.
+        objection_type: Main type of objection (e.g., 'price', 'need').
+        config: RunnableConfig containing 'llm_primary_instance'.
+        state: Current agent state, providing access to company_profile.
+        offering_id_str: ID of the specific offering being discussed.
+        customer_identified_needs: List of customer's identified needs.
+        conversation_context: Brief context of the objection.
+
     Returns:
-        Dict[str, Any]: Um dicionário contendo sugestões estratégicas estruturadas,
-                        aderindo ao schema ObjectionResponseStrategy.
-                        Em caso de falha ao gerar estratégia, retorna um dicionário com uma mensagem de erro.
+        A dictionary adhering to ObjectionResponseStrategy schema, or an error dict.
     """
     tool_name = "suggest_objection_response_strategy"
     logger.info(f"--- Executing Tool: {tool_name} ---")
     logger.info(
-        f"Objection Type: {objection_type}, Offering Context: {offering_id_str}, Needs: {customer_identified_needs}"
+        f"Objection Type: {objection_type}, Offering ID: {offering_id_str}, Needs: {customer_identified_needs}"
     )
 
-    # --- Lógica Interna da Tool (Pode usar um LLM ou uma base de conhecimento/regras) ---
-    # Para este exemplo, vamos simular a lógica com base no objection_type.
-    # Em uma implementação real, um LLM seria muito poderoso aqui.
-    company_profile = state.company_profile
+    llm_for_strategy: Optional[BaseChatModel] = config.get("configurable", {}).get(
+        "llm_primary_instance"
+    )
+    if not llm_for_strategy:
+        logger.error(f"[{tool_name}] LLM for strategy generation not found in config.")
+        return {
+            "error": "Internal configuration error: LLM for strategy not available."
+        }
 
-    try:
-        offering_uuid = UUID(offering_id_str)
-    except ValueError:
+    # Access company_profile from the injected state
+    company_profile: Optional[CompanyProfileSchema] = state.company_profile
+    if not company_profile:
         logger.warning(
-            f"[{tool_name}] Invalid UUID format for offering_id_str: '{offering_id_str}'"
+            f"[{tool_name}] Company profile not found in agent state. Strategy suggestions might be generic."
         )
-        return (
-            f"The provided offering ID '{offering_id_str}' is not in a valid format. "
-            "An offering ID should be a standard unique identifier."
-        )
+        # Proceed with generic advice, or return an error/specific message
+        # For now, let's allow it to proceed but the prompt will be less informed.
 
     offering_in_context: Optional[OfferingInfo] = None
-    for offering in company_profile.offering_overview:
-        if offering.id == offering_uuid:
-            offering_in_context = offering
-            break
-    llm_primary_instance = config.get("configurable", {}).get("llm_primary_instance")
+    if offering_id_str and company_profile and company_profile.offering_overview:
+        try:
+            offering_uuid = UUID(offering_id_str)
+            for offering in company_profile.offering_overview:
+                if offering.id == offering_uuid:
+                    offering_in_context = offering
+                    break
+        except ValueError:
+            logger.warning(
+                f"[{tool_name}] Invalid UUID format for offering_id_str: '{offering_id_str}'"
+            )
+            # Continue without specific offering context if ID is bad
 
-    # Acessar company_profile e offering_details do estado se necessário e se 'state' for usado
-    company_profile: Optional[CompanyProfileSchema] = None
-    offering_in_context: Optional[OfferingInfo] = None
-
-    # Construir o prompt para o LLM interno (se usado)
+    # --- Constructing the prompt for the internal LLM ---
     internal_llm_prompt_parts = [
-        f"Você é um especialista em treinamento de vendas. Um cliente levantou uma objeção do tipo '{objection_type}'."
+        f"Você é um especialista sênior em treinamento de vendas. Sua tarefa é gerar uma estratégia detalhada para um assistente de vendas virtual (IA) lidar com uma objeção de cliente.",
+        f"O assistente de vendas representa a empresa '{company_profile.company_name if company_profile else 'N/A'}'.",
+        f"O tipo de objeção levantada pelo cliente é: '{objection_type}'.",
     ]
+
+    if conversation_context:
+        internal_llm_prompt_parts.append(
+            f"Contexto da conversa em que a objeção surgiu: '{conversation_context}'."
+        )
     if offering_in_context:
         internal_llm_prompt_parts.append(
-            f"A objeção é sobre a oferta: '{offering_in_context.name}', que tem as seguintes características: {', '.join(offering_in_context.key_features)} e preço {offering_in_context.price_info}."
+            f"A objeção refere-se à oferta: '{offering_in_context.name}'. Detalhes da oferta: Descrição='{offering_in_context.short_description}', Preço='{offering_in_context.price_info or offering_in_context.price}'."
         )
     if customer_identified_needs:
         internal_llm_prompt_parts.append(
-            f"As necessidades já identificadas do cliente são: {', '.join(customer_identified_needs)}."
+            f"Necessidades do cliente já identificadas: {', '.join(customer_identified_needs)}."
         )
-    internal_llm_prompt_parts.append(
-        "Forneça uma estratégia de resposta detalhada, incluindo: abordagem principal, perguntas sugeridas, pontos chave a enfatizar, "
-        "possíveis reenquadramentos e opções de próximos passos. Formate sua resposta como um JSON aderindo ao schema ObjectionResponseStrategy."
-    )
-    internal_llm_prompt = "\n".join(internal_llm_prompt_parts)
-    logger.debug(f"Internal LLM Prompt for objection strategy: {internal_llm_prompt}")
 
-    response_from_internal_llm = await llm_primary_instance.with_structured_output(
-        ObjectionResponseStrategy
-    ).ainvoke(internal_llm_prompt)
-    return response_from_internal_llm.model_dump()
+    # --- NEW: Adding Company Capabilities to the Internal LLM Prompt ---
+    if company_profile:
+        internal_llm_prompt_parts.append(
+            "\nInformações sobre as capacidades da empresa para guiar suas sugestões de 'next_step_options':"
+        )
+        # Example: Explicitly state what's available. You'll need to define these in CompanyProfileSchema
+        # or derive them. For now, let's use fallback_contact_info as an example of a concrete next step.
+        if company_profile.fallback_contact_info:
+            internal_llm_prompt_parts.append(
+                f"- A empresa PODE direcionar o cliente para o seguinte contato para questões complexas ou negociações: '{company_profile.fallback_contact_info}'."
+            )
+        else:
+            internal_llm_prompt_parts.append(
+                "- A empresa NÃO possui um canal de fallback específico listado para negociações complexas (o agente deve tentar resolver ou pedir para o cliente aguardar)."
+            )
+
+        # Add more based on your CompanyProfileSchema. For example:
+        # if getattr(company_profile, "offers_demos", False):
+        #     internal_llm_prompt_parts.append("- A empresa OFERECE demonstrações de produtos.")
+        # else:
+        #     internal_llm_prompt_parts.append("- A empresa NÃO oferece demonstrações de produtos como um próximo passo padrão.")
+
+        # if getattr(company_profile, "has_testimonials_publicly_available", False): # Example field
+        #     internal_llm_prompt_parts.append("- A empresa POSSUI depoimentos que podem ser mencionados.")
+        # else:
+        #     internal_llm_prompt_parts.append("- A empresa NÃO possui depoimentos facilmente acessíveis para o agente compartilhar.")
+
+        internal_llm_prompt_parts.append(
+            "Ao sugerir 'next_step_options', foque em ações que o assistente virtual PODE REALMENTE EXECUTAR ou que são consistentes com as práticas da empresa mencionadas acima. "
+            "Priorize próximos passos como: fornecer mais informações, esclarecer dúvidas sobre o produto/oferta em questão, discutir opções de pagamento (se conhecidas), ou, como último recurso, usar o contato de fallback."
+        )
+    else:
+        internal_llm_prompt_parts.append(
+            "\nAVISO: O perfil da empresa não está disponível. Suas sugestões de 'next_step_options' devem ser mais genéricas, e o agente de vendas principal precisará filtrá-las."
+        )
+
+    internal_llm_prompt_parts.append(
+        "\nForneça uma estratégia de resposta detalhada, incluindo: 'primary_approach', 'suggested_questions_to_ask', 'key_points_to_emphasize', "
+        "'potential_reframes_or_analogies', e 'next_step_options'. "
+        "Formate sua resposta como um JSON que adira estritamente ao schema ObjectionResponseStrategy."
+    )
+    internal_llm_prompt_str = "\n".join(internal_llm_prompt_parts)
+    logger.debug(
+        f"Internal LLM Prompt for objection strategy:\n{internal_llm_prompt_str}"
+    )
+
+    tool_message_content: str
+    try:
+        structured_llm_chain = llm_for_strategy.with_structured_output(
+            ObjectionResponseStrategy
+        )
+        response_model: ObjectionResponseStrategy = await structured_llm_chain.ainvoke(
+            internal_llm_prompt_str
+        )
+
+        strategy_json_str = response_model.model_dump_json(indent=2)
+
+        # --- Append the guidance for the main agent to the ToolMessage content ---
+        guidance_for_main_agent = (
+            "\n\n--- INSTRUÇÃO PARA O AGENTE DE VENDAS (IA) ---:\n"
+            "Analise a estratégia JSON acima. NÃO a apresente diretamente ao usuário.\n"
+            "Em vez disso, use-a como base para formular sua PRÓPRIA resposta conversacional e natural.\n"
+            "Ao considerar os 'next_step_options' sugeridos, priorize e selecione APENAS aqueles que são REALMENTE POSSÍVEIS de serem executados pela empresa ou por você (IA), com base no perfil da empresa e nas ferramentas disponíveis. "
+        )
+        tool_message_content = strategy_json_str + guidance_for_main_agent
+        logger.success(
+            f"[{tool_name}] Successfully generated objection response strategy."
+        )
+
+    except Exception as e:
+        logger.exception(
+            f"[{tool_name}] Error calling internal LLM or processing strategy: {e}"
+        )
+        tool_message_content = f'{{"error": "Failed to generate objection strategy: {str(e)}"}}\n\n--- INSTRUÇÃO PARA O AGENTE DE VENDAS (IA) ---:\nOcorreu um erro ao gerar a estratégia. Tente lidar com a objeção usando seu conhecimento geral e as informações do perfil da empresa.'
+
+    return Command(
+        update={
+            "messages": [
+                ToolMessage(
+                    content=tool_message_content,
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                )
+            ]
+        }
+    )
