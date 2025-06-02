@@ -1,12 +1,6 @@
-from langchain_core.tools import tool
+from typing import List, Optional, Any
 from typing_extensions import Annotated
-from typing import Dict, List, Optional, Any
 from loguru import logger
-
-
-from langchain_core.runnables import RunnableConfig
-from langgraph.prebuilt import InjectedState  # Para anotar o parâmetro state
-from ..agent_state import AgentState  # Ajuste o caminho
 
 try:
     from app.core.embedding_utils import get_embedding
@@ -21,8 +15,11 @@ except ImportError:
 
 
 try:
-    from app.services.repository.knowledge_chunk import search_similar_chunks
-    from app.models.knowledge_chunk import KnowledgeChunk  # Para type hint
+    from app.services.repository.knowledge_chunk import (
+        search_similar_chunks,
+        check_knowledge_chunks_exist_for_account,
+    )
+    from app.models.knowledge_chunk import KnowledgeChunk
 
     CHUNK_REPO_AVAILABLE = True
 except ImportError:
@@ -52,7 +49,13 @@ except ImportError:
     async_sessionmaker = Any  # type: ignore
 
 
-# --- Constantes (podem vir da configuração do agente ou do perfil da empresa) ---
+from langchain_core.tools import tool
+from langchain_core.runnables import RunnableConfig
+from langgraph.prebuilt import InjectedState
+
+
+from ..agent_state import AgentState
+
 RAG_CHUNK_LIMIT_DEFAULT = 3
 RAG_SIMILARITY_THRESHOLD_DEFAULT = 0.5
 
@@ -63,38 +66,45 @@ async def query_knowledge_base(
     state: Annotated[AgentState, InjectedState],
     config: RunnableConfig,
 ) -> str:
-    """
-    Ferramenta para busca RAG (Retrieval-Augmented Generation) em uma base de conhecimento por conta de usuário.
+    """Searches the company's knowledge base to answer user questions or find specific information.
 
-    Descrição:
-        Gera um embedding a partir de uma consulta de usuário (user_query), encontra trechos semelhantes
-        na base de conhecimento vinculada ao “account_id” obtido do estado do agente (state) e retorna
-        esses trechos formatados. Se não houver correspondência ou ocorrer algum erro, devolve mensagens
-        de falha apropriadas.
+    Use this tool when you need to find information that is likely documented
+    by the company you represent. This includes details about products/services
+    not covered in your initial summary, specific company policies (e.g., refund policy,
+    terms of service), operational details (e.g., detailed shipping procedures if not
+    in your general knowledge), troubleshooting steps, or answers to frequently asked questions (FAQs).
 
-    Argumentos:
+    To use this tool effectively, provide a clear and specific `user_query` that
+    represents the information you are trying to find. For example, instead of
+    just "refunds", ask "What is the company's refund policy for digital products?".
+
+    The tool will search documents and data specifically uploaded for this company.
+    The retrieved information will be returned as text chunks, which you should then
+    synthesize into a natural, conversational answer for the user. Do not simply
+    output the raw chunks.
+
+    Args:
         user_query (str):
-            Pergunta ou texto fornecido pelo usuário. Deve ser não vazio. Será convertido em embedding
-            para buscar similaridade.
+            The specific question or topic you want to find information about in the
+            company's knowledge base. This should be a well-phrased query reflecting
+            the user's need or your information gap. Must be non-empty.
         state (AgentState):
-            Estado injetado pelo agente. Deve conter a chave “account_id” (ID da conta) usada para filtrar
-            a pesquisa na base de conhecimento.
+            (Injected by the system) The current agent state. This tool uses the
+            `account_id` from the state to access the correct knowledge base.
+            You do not need to provide this argument explicitly.
         config (RunnableConfig):
-            Configuração executável. Espera-se que “config.configurable” inclua:
-            - db_session_factory: async_sessionmaker[AsyncSession] do SQLAlchemy para abrir sessões de BD.
-            - rag_chunk_limit (int, opcional): número máximo de chunks a recuperar (padrão: RAG_CHUNK_LIMIT_DEFAULT).
-            - rag_similarity_threshold (float, opcional): limiar de similaridade (padrão: RAG_SIMILARITY_THRESHOLD_DEFAULT).
+            (Injected by the system) The runnable configuration. This tool uses
+            `db_session_factory`, `rag_chunk_limit`, and `rag_similarity_threshold`
+            from this config. You do not need to provide this argument explicitly.
 
-    Retorno:
+    Returns:
         str:
-            - Se user_query for vazio: mensagem solicitando consulta válida.
-            - Se account_id ausente: mensagem de erro interno indicando falta de informação da conta.
-            - Se db_session_factory não estiver configurado ou dependências (embeddings, repositório) indisponíveis:
-              mensagem de erro interno apropriada.
-            - Se chunks relevantes forem encontrados: string contendo “Contexto relevante encontrado...” seguida
-              de lista numerada dos textos dos chunks.
-            - Se nenhum chunk satisfizer o limiar: mensagem indicando que nada foi encontrado e sugerindo reformular.
-            - Em caso de exceção: mensagem genérica de erro ao buscar informações.
+            A string containing relevant information chunks found in the knowledge base,
+            prefixed with "Relevant context found:". If no relevant information is
+            found, it will return a message like "No specific information found for
+            your query '[user_query]'. You might try rephrasing or asking more broadly."
+            In case of internal errors (e.g., misconfiguration), it will return an
+            error message indicating the issue.
     """
     tool_name = "query_knowledge_base"
     logger.info(f"--- Executing Tool: {tool_name} ---")
@@ -135,6 +145,27 @@ async def query_knowledge_base(
         logger.error(f"[{tool_name}] Chunk repository unavailable.")
         return "Erro interno: Funcionalidade de busca indisponível no momento (repositório)."
 
+    try:
+        async with db_session_factory() as db:
+            knowledge_exists = await check_knowledge_chunks_exist_for_account(
+                db=db, account_id=account_id
+            )
+
+        if not knowledge_exists:
+            logger.info(
+                f"[{tool_name}] No knowledge base content found for account_id: {account_id}. Skipping search."
+            )
+            return (
+                f"Atualmente, não tenho informações documentadas específicas para a conta "
+                f"'{state.company_profile.company_name if state.company_profile else account_id}' "
+                f"que possam ser pesquisadas em relação a '{user_query}'."
+            )
+    except Exception as db_check_err:
+        logger.error(
+            f"[{tool_name}] Error checking for knowledge base existence: {db_check_err}"
+        )
+        return "Erro interno: Houve um problema ao acessar o status da base de conhecimento."
+
     # --- Executar RAG ---
     retrieved_context_str: str
     try:
@@ -150,9 +181,9 @@ async def query_knowledge_base(
             f"[{tool_name}] Searching for similar chunks (limit={rag_limit}, threshold={rag_threshold})..."
         )
         similar_chunks: List[KnowledgeChunk] = []
-        async with db_session_factory() as db:  # type: ignore
+        async with db_session_factory() as db:
             similar_chunks = await search_similar_chunks(
-                db=db,  # type: ignore
+                db=db,
                 account_id=account_id,
                 query_embedding=query_embedding,
                 limit=rag_limit,

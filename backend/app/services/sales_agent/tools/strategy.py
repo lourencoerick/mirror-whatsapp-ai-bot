@@ -1,49 +1,23 @@
+from typing import List, Optional, Dict, Any
+from uuid import UUID
+from typing_extensions import Annotated
+
+from loguru import logger
+
 from langchain_core.tools import tool, InjectedToolCallId
+from langchain_core.runnables import RunnableConfig
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import ToolMessage
-from typing_extensions import Annotated
-from ..agent_state import AgentState  # Assuming AgentState is in a parent directory
 from langgraph.types import Command
 from langgraph.prebuilt import InjectedState
-from loguru import logger
-from uuid import UUID
-from pydantic import (
-    BaseModel,
-    Field,
-)  # Use Field alias for clarity if needed
-from typing import List, Optional, Dict, Any
-from langchain_core.runnables import RunnableConfig
+
+
 from app.api.schemas.company_profile import (
     OfferingInfo,
     CompanyProfileSchema,
-)  # Ensure these are correct paths
-
-
-class ObjectionResponseStrategy(BaseModel):
-    """
-    Estrutura para as sugestões de estratégia de resposta a objeções.
-    """
-
-    primary_approach: str = Field(
-        description="A abordagem principal ou filosofia para lidar com este tipo de objeção (ex: 'Reenquadrar valor vs. custo', 'Aprofundar na necessidade não percebida')."
-    )
-    suggested_questions_to_ask: List[str] = Field(
-        default_factory=list,
-        description="Perguntas específicas que o agente pode fazer ao cliente para entender melhor a objeção ou redirecionar a conversa.",
-    )
-    key_points_to_emphasize: List[str] = Field(
-        default_factory=list,
-        description="Benefícios, características ou pontos de valor específicos da oferta ou da empresa que devem ser reforçados.",
-    )
-    potential_reframes_or_analogies: List[str] = Field(
-        default_factory=list,
-        description="Maneiras de recontextualizar a objeção ou analogias que podem ajudar o cliente a ver de outra perspectiva.",
-    )
-    next_step_options: List[str] = Field(
-        default_factory=list,
-        description="Sugestões de próximos passos CONCRETOS E REALIZÁVEIS pelo agente de vendas virtual, considerando as capacidades da empresa. Evite sugerir ações que a empresa não oferece (ex: demonstrações, se não disponíveis).",
-    )
-    model_config = {"validate_assignment": True}
+)
+from ..agent_state import AgentState
+from ..schemas import ObjectionResponseStrategyOutput
 
 
 @tool
@@ -72,7 +46,7 @@ async def suggest_objection_response_strategy(
         conversation_context: Brief context of the objection.
 
     Returns:
-        A dictionary adhering to ObjectionResponseStrategy schema, or an error dict.
+        A dictionary adhering to ObjectionResponseStrategyOutput schema, or an error dict.
     """
     tool_name = "suggest_objection_response_strategy"
     logger.info(f"--- Executing Tool: {tool_name} ---")
@@ -148,17 +122,6 @@ async def suggest_objection_response_strategy(
                 "- A empresa NÃO possui um canal de fallback específico listado para negociações complexas (o agente deve tentar resolver ou pedir para o cliente aguardar)."
             )
 
-        # Add more based on your CompanyProfileSchema. For example:
-        # if getattr(company_profile, "offers_demos", False):
-        #     internal_llm_prompt_parts.append("- A empresa OFERECE demonstrações de produtos.")
-        # else:
-        #     internal_llm_prompt_parts.append("- A empresa NÃO oferece demonstrações de produtos como um próximo passo padrão.")
-
-        # if getattr(company_profile, "has_testimonials_publicly_available", False): # Example field
-        #     internal_llm_prompt_parts.append("- A empresa POSSUI depoimentos que podem ser mencionados.")
-        # else:
-        #     internal_llm_prompt_parts.append("- A empresa NÃO possui depoimentos facilmente acessíveis para o agente compartilhar.")
-
         internal_llm_prompt_parts.append(
             "Ao sugerir 'next_step_options', foque em ações que o assistente virtual PODE REALMENTE EXECUTAR ou que são consistentes com as práticas da empresa mencionadas acima. "
             "Priorize próximos passos como: fornecer mais informações, esclarecer dúvidas sobre o produto/oferta em questão, discutir opções de pagamento (se conhecidas), ou, como último recurso, usar o contato de fallback."
@@ -171,7 +134,7 @@ async def suggest_objection_response_strategy(
     internal_llm_prompt_parts.append(
         "\nForneça uma estratégia de resposta detalhada, incluindo: 'primary_approach', 'suggested_questions_to_ask', 'key_points_to_emphasize', "
         "'potential_reframes_or_analogies', e 'next_step_options'. "
-        "Formate sua resposta como um JSON que adira estritamente ao schema ObjectionResponseStrategy."
+        "Formate sua resposta como um JSON que adira estritamente ao schema ObjectionResponseStrategyOutput."
     )
     internal_llm_prompt_str = "\n".join(internal_llm_prompt_parts)
     logger.debug(
@@ -181,10 +144,10 @@ async def suggest_objection_response_strategy(
     tool_message_content: str
     try:
         structured_llm_chain = llm_for_strategy.with_structured_output(
-            ObjectionResponseStrategy
+            ObjectionResponseStrategyOutput
         )
-        response_model: ObjectionResponseStrategy = await structured_llm_chain.ainvoke(
-            internal_llm_prompt_str
+        response_model: ObjectionResponseStrategyOutput = (
+            await structured_llm_chain.ainvoke(internal_llm_prompt_str)
         )
 
         strategy_json_str = response_model.model_dump_json(indent=2)
