@@ -260,6 +260,7 @@ def auto_follow_up_scheduler_hook(
         state_updates["pending_follow_up_trigger"] = next_pending_trigger.model_dump(
             mode="json"
         )
+
         # state_updates["current_sales_stage"] = "follow_up_scheduled"
         state_updates["follow_up_attempt_count"] = next_attempt_number
         state_updates["last_agent_message_timestamp"] = last_agent_message_timestamp
