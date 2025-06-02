@@ -122,6 +122,17 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
         "\n- Seu objetivo é ter um diálogo útil e realista, não apresentar uma lista de verificação de uma ferramenta ou prometer ações que não podemos cumprir. A saída da ferramenta é para SEU direcionamento como IA."
     )
 
+    proactive_engagement_guideline = [
+        "\n**Engajamento Proativo Pós-Resposta:**",
+        "- Depois de fornecer uma informação solicitada, NUNCA termine sua resposta de forma passiva.",
+        "- SEMPRE busque ativamente engajar o usuário para o próximo passo. Considere estas opções:",
+        "  1. **Conectar ao Valor:** Se a informação respondida se relaciona com um benefício do produto ou uma necessidade do cliente, reforce essa conexão. Ex: 'Essa política de reembolso flexível visa garantir sua satisfação ao explorar nosso conteúdo sobre finanças.'",
+        "  2. **Fazer Pergunta de Acompanhamento Relevante:** Pergunte algo que mantenha o diálogo fluindo e ajude a descobrir mais sobre as necessidades do cliente ou a direcioná-lo. Ex: 'Essa informação sobre o reembolso esclarece suas dúvidas? Há algo mais sobre o pacote que você gostaria de saber para te ajudar a decidir se ele atende suas metas de organização financeira?'",
+        "  3. **Sugerir Próximo Passo Lógico:** Se apropriado, sugira uma ação. Ex: 'Com essa dúvida esclarecida, você gostaria de explorar como os módulos de finanças do pacote podem te ajudar especificamente?' ou 'Posso te mostrar outros benefícios do pacote que se alinham com seu interesse em cuidar da casa?'",
+        "  4. **Verificar Entendimento e Satisfação:** 'Ficou claro para você? Posso ajudar em algo mais neste momento?' (Use esta com moderação, priorize as opções mais proativas acima).",
+        "- Seu objetivo é manter a conversa produtiva e guiar o cliente sutilmente através do funil de vendas, agregando valor a cada interação.",
+    ]
+
     communication_rules_list = ["\nDiretrizes de Comunicação Específicas:"]
     communication_rules_list.append(
         "- **CRÍTICO** Não fornecer preço nem link de compra no início da resposta. Somente apresente essas informações quando você estiver confiante de que o cliente demonstra forte interesse e está pronto para seguir com a compra. Caso contrário, concentre-se em qualificar, descobrir necessidades e gerar valor antes de falar em preço ou envio de link."
@@ -141,6 +152,7 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
         "\n".join(general_sales_principles)
         + "\n".join(objection_and_closing_guidelines)
         + tool_output_synthesis_guideline
+        + "\n".join(proactive_engagement_guideline)
         + "\n".join(communication_rules_list)
     )
 

@@ -8,6 +8,7 @@ from langchain_core.messages import (
     SystemMessage,
     BaseMessage,
     HumanMessage,
+    AIMessage,
     RemoveMessage,
 )
 from langchain_core.language_models import BaseChatModel
@@ -113,7 +114,7 @@ async def intelligent_stage_analyzer_hook(
                     Você é um analista sênior de operações de vendas. Suas tarefas são:
                         1. Determinar o estágio atual de vendas de uma conversa com base nas mensagens recentes e no estágio atual conhecido.
                         2. Fornecer uma breve justificativa para sua determinação de estágio.
-                        3. Sugerir um foco estratégico ou um próximo passo lógico para o agente de vendas principal. Esta sugestão deve ser concisa e acionável.
+                        3. Sugerir um foco estratégico ou um próximo passo lógico para o agente de vendas principal. Esta sugestão deve ser concisa, acionável, e **incentivar o engajamento proativo do cliente**. Por exemplo, se o agente acabou de responder a uma pergunta, o foco sugerido deve incluir uma forma de continuar a conversa (ex: fazer uma pergunta de acompanhamento, conectar a um benefício, sugerir explorar outro aspecto)
 
                     Os estágios de vendas disponíveis são: {available_stages_str}.
                     O estágio atual conhecido é: {original_sales_stage}.
@@ -187,7 +188,7 @@ async def intelligent_stage_analyzer_hook(
 
     # Prepend the new context message to the (potentially filtered) message history
     first_message = current_messages[0] if current_messages else None
-    if first_message.id == STATE_CONTEXT_MESSAGE_ID:
+    if first_message and first_message.id == STATE_CONTEXT_MESSAGE_ID:
         messages_to_add = current_messages[1:]
     else:
         messages_to_add = current_messages
@@ -197,7 +198,6 @@ async def intelligent_stage_analyzer_hook(
         stage_context_message,
         *messages_to_add,
     ]
-    state_updates["messages"] = [stage_context_message] + messages_for_llm_input
 
     logger.debug(f"Pre-model hook returning updates: {list(state_updates.keys())}")
     return state_updates
