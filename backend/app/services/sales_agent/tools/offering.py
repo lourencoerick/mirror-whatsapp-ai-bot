@@ -1,17 +1,16 @@
 # app/services/sales_agent/tools/offering.py
 
 from typing import Optional, List, Literal, Dict, Any
-from uuid import UUID, uuid4
+from uuid import UUID
 from loguru import logger
-from langchain_core.tools import tool, InjectedToolCallId
 from typing_extensions import Annotated
 
-from langgraph.prebuilt import InjectedState
-
+from langchain_core.tools import tool, InjectedToolCallId
 from langchain_core.messages import ToolMessage
+from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
-from app.services.sales_agent.agent_state import AgentState, ShoppingCartItem
 
+from app.services.sales_agent.agent_state import AgentState, ShoppingCartItem
 from app.api.schemas.company_profile import OfferingInfo
 
 
@@ -88,7 +87,7 @@ async def get_offering_details_by_id(
             details_parts.append(f"- Key Features:\n  {features_str}")
         if found_offering.price_info:
             details_parts.append(f"- Price: {found_offering.price_info}")
-        elif found_offering.price is not None:  # Fallback if price_info is not detailed
+        elif found_offering.price is not None:
             details_parts.append(f"- Price: {found_offering.price}")
 
         if found_offering.bonus_items:
@@ -118,10 +117,10 @@ CartAction = Literal["add", "remove", "update_quantity"]
 async def update_shopping_cart(
     action: CartAction,
     offering_id_str: str,
-    state: Annotated[AgentState, InjectedState],  # state is mutable here
+    state: Annotated[AgentState, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
     quantity: Optional[int] = None,
-) -> Command:  # Return type is now Command
+) -> Command:
     """
     Internal tool to manage a draft list of offerings the user is interested in.
     Use this to add, remove, or update quantities of items as you understand the
@@ -153,16 +152,12 @@ async def update_shopping_cart(
         f"[{tool_name}] Action: {action}, Offering ID: {offering_id_str}, Quantity: {quantity}"
     )
 
-    # Create a mutable copy of the shopping cart from the current state to modify
-    # This ensures we are proposing an update based on the current state,
-    # and the Command will patch this new list back into the state.
+    # Create a mutable copy of the shopping cart from the current state
     current_shopping_cart: List[ShoppingCartItem] = (
         list(state.shopping_cart) if state.shopping_cart else []
     )
 
-    # This will be the string content for the ToolMessage
     tool_message_content: str = ""
-    # This dictionary will hold the state fields to be updated
     state_updates: Dict[str, Any] = {}
 
     # --- Validations and Setup ---
@@ -260,24 +255,22 @@ async def update_shopping_cart(
                         else None
                     ),
                 )
-                current_shopping_cart.append(new_cart_item)  # Modify the copy
+                current_shopping_cart.append(new_cart_item)
                 logger.info(
                     f"[{tool_name}] Added '{new_cart_item.name}' (Qty: {quantity}) to cart."
                 )
                 tool_message_content = (
                     f"Added {quantity} of '{new_cart_item.name}' to your cart."
                 )
-            state_updates["shopping_cart"] = (
-                current_shopping_cart  # Propose update to the cart
-            )
+            state_updates["shopping_cart"] = current_shopping_cart
 
     elif action == "remove":
         if current_cart_item_in_copied_list:
             item_name = current_cart_item_in_copied_list.name
-            current_shopping_cart.pop(existing_cart_item_index)  # type: ignore # Modify the copy
+            current_shopping_cart.pop(existing_cart_item_index)
             logger.info(f"[{tool_name}] Removed '{item_name}' from cart.")
             tool_message_content = f"Removed '{item_name}' from your cart."
-            state_updates["shopping_cart"] = current_shopping_cart  # Propose update
+            state_updates["shopping_cart"] = current_shopping_cart
         else:
             logger.info(
                 f"[{tool_name}] Item with ID '{offering_uuid}' not found in cart to remove."
@@ -298,7 +291,7 @@ async def update_shopping_cart(
         else:
             if quantity <= 0:
                 item_name = current_cart_item_in_copied_list.name
-                current_shopping_cart.pop(existing_cart_item_index)  # type: ignore # Modify the copy
+                current_shopping_cart.pop(existing_cart_item_index)
                 logger.info(
                     f"[{tool_name}] Quantity set to {quantity}. Removed '{item_name}' from cart."
                 )
@@ -316,7 +309,7 @@ async def update_shopping_cart(
                     f"[{tool_name}] Updated quantity of '{current_cart_item_in_copied_list.name}' to {quantity}."
                 )
                 tool_message_content = f"Updated quantity of '{current_cart_item_in_copied_list.name}' in your cart to {quantity}."
-            state_updates["shopping_cart"] = current_shopping_cart  # Propose update
+            state_updates["shopping_cart"] = current_shopping_cart
 
     else:
         logger.error(f"[{tool_name}] Invalid action '{action}' received.")
@@ -363,7 +356,7 @@ async def generate_checkout_link_for_cart(
 
     cart_summary_parts = ["Here's a summary of your cart and your checkout link(s):"]
     grand_total: float = 0.0
-    checkout_links: List[str] = []  # To store individual links if needed
+    checkout_links: List[str] = []
 
     for item in state.shopping_cart:
         cart_summary_parts.append(
@@ -379,14 +372,12 @@ async def generate_checkout_link_for_cart(
         )
         checkout_links.append(f"  Link for {item.name}: {checkout_link_w_qty}")
 
-    # For this example, we'll just list the dummy links.
-    # If you have a single master link, you'd adjust the output.
     if checkout_links:
         cart_summary_parts.append(
             "\nPlease use the link(s) below to complete your purchase:"
         )
         cart_summary_parts.extend(checkout_links)
-    else:  # Should not happen if cart is not empty and dummy links are generated
+    else:
         logger.error(
             f"[{tool_name}] No checkout links were generated despite non-empty cart."
         )
@@ -397,7 +388,6 @@ async def generate_checkout_link_for_cart(
     if grand_total > 0:
         cart_summary_parts.append(f"\nGrand Total: ${grand_total:.2f}")
 
-    # Update sales stage - this is a good place to transition
     state.current_sales_stage = "checkout_link_sent"
     logger.info(
         f"[{tool_name}] Cart links generated. Sales stage updated to '{state.current_sales_stage}'."

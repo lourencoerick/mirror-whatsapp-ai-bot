@@ -1,46 +1,52 @@
-# app/services/sales_agent/pydantic_models.py
-from pydantic import BaseModel, Field
+# app/services/sales_agent/schemas.py
 from typing import List
+from pydantic import BaseModel, Field
 from .agent_state import (
     SalesStageLiteral,
-)  # Assuming SalesStageLiteral is in agent_state.py
+)
 
 
 class StageAnalysisOutput(BaseModel):
+    """
+    Output schema for the stage analysis performed by the pre-model hook.
+    It provides the determined sales stage, reasoning, and a suggested focus.
+    """
+
     determined_sales_stage: SalesStageLiteral = Field(
-        description="O estágio de vendas determinado pela análise da conversa recente."
+        description="The sales stage determined by analyzing the recent conversation."
     )
     reasoning: str = Field(
-        description="Breve justificativa para a determinação deste estágio."
+        description="Brief reasoning for why this sales stage was determined."
     )
     suggested_next_focus: str = Field(
-        description="Uma breve sugestão para o agente de vendas principal sobre o que focar em seguida ou um próximo passo lógico, dada a fase atual e a conversa."
+        description="A concise suggestion for the main sales agent on what to focus on next or a logical next step, given the current stage and conversation."
     )
     model_config = {"validate_assignment": True}
 
 
 class ObjectionResponseStrategyOutput(BaseModel):
     """
-    Estrutura para as sugestões de estratégia de resposta a objeções.
+    Structure for the suggested strategies to respond to customer objections.
+    This model outlines different approaches and actionable items for the sales agent.
     """
 
     primary_approach: str = Field(
-        description="A abordagem principal ou filosofia para lidar com este tipo de objeção (ex: 'Reenquadrar valor vs. custo', 'Aprofundar na necessidade não percebida')."
+        description="The main approach or philosophy for handling this type of objection (e.g., 'Reframe value vs. cost', 'Deepen understanding of unmet need')."
     )
     suggested_questions_to_ask: List[str] = Field(
         default_factory=list,
-        description="Perguntas específicas que o agente pode fazer ao cliente para entender melhor a objeção ou redirecionar a conversa.",
+        description="Specific questions the agent can ask the customer to better understand the objection or redirect the conversation.",
     )
     key_points_to_emphasize: List[str] = Field(
         default_factory=list,
-        description="Benefícios, características ou pontos de valor específicos da oferta ou da empresa que devem ser reforçados.",
+        description="Specific benefits, features, or value points of the offering or company that should be reinforced.",
     )
     potential_reframes_or_analogies: List[str] = Field(
         default_factory=list,
-        description="Maneiras de recontextualizar a objeção ou analogias que podem ajudar o cliente a ver de outra perspectiva.",
+        description="Ways to recontextualize the objection or analogies that can help the customer see it from a different perspective.",
     )
     next_step_options: List[str] = Field(
         default_factory=list,
-        description="Sugestões de próximos passos CONCRETOS E REALIZÁVEIS pelo agente de vendas virtual, considerando as capacidades da empresa. Evite sugerir ações que a empresa não oferece (ex: demonstrações, se não disponíveis).",
+        description="Suggestions for CONCRETE AND FEASIBLE next steps the virtual sales agent can take, considering the company's capabilities. Avoid suggesting actions the company does not offer (e.g., demos, if not available).",
     )
     model_config = {"validate_assignment": True}

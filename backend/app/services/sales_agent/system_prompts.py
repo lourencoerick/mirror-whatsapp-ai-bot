@@ -1,20 +1,25 @@
 # app/services/sales_agent/system_prompts.py
-from typing import Optional
 from app.api.schemas.company_profile import (
     CompanyProfileSchema,
 )
 
 
 def generate_system_message(profile: CompanyProfileSchema) -> str:
-    """
-    Gera o prompt de sistema para o agente de vendas IA com base no perfil da empresa.
+    """Generates the system prompt for the AI sales agent based on company profile.
+
+    This function constructs a detailed system message that defines the AI's
+    persona, company background, sales objectives, communication guidelines,
+    tool usage instructions, and fallback procedures. The prompt is tailored
+    using the provided company profile to ensure the AI agent acts as a
+    knowledgeable and effective representative of the company.
 
     Args:
-        profile: Um objeto CompanyProfileSchema contendo os detalhes da empresa
-                 e estratégia de vendas.
+        profile: A CompanyProfileSchema object containing the company's details,
+                offerings, and sales strategy parameters.
 
     Returns:
-        Uma string representando a mensagem de sistema completa para o agente IA.
+        A string representing the complete system message to be used for initializing
+        the AI sales agent.
     """
     # --- Seção 1: Identidade e Persona do AI ---
     persona_intro = f"Você é um assistente de vendas virtual especialista da empresa '{profile.company_name}'."
@@ -118,7 +123,6 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
     )
 
     communication_rules_list = ["\nDiretrizes de Comunicação Específicas:"]
-    # Added your specific critical guidelines from the notebook
     communication_rules_list.append(
         "- **CRÍTICO** Não fornecer preço nem link de compra no início da resposta. Somente apresente essas informações quando você estiver confiante de que o cliente demonstra forte interesse e está pronto para seguir com a compra. Caso contrário, concentre-se em qualificar, descobrir necessidades e gerar valor antes de falar em preço ou envio de link."
     )
@@ -149,8 +153,6 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
         "respostas precisas e eficientes e para executar ações solicitadas, e principalmente guiar a venda de maneira ótima.\n"
         "Após decidir o próximo passo, atualize o estágio da venda via `update_sales_stage`."
     )
-    # The synthesis guideline was moved to section 5, but if you want it repeated or emphasized under tools:
-    # tools_mention += tool_output_synthesis_guideline # Already included in all_guidelines
 
     # --- Seção 7: Fallback e Escalonamento ---
     fallback_instruction = ""

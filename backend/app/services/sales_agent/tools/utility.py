@@ -1,21 +1,21 @@
-from typing import Optional, Literal, Dict, Any, get_args
+from typing import Optional, Dict, Any, get_args
 from loguru import logger
 from typing_extensions import Annotated
+
 from langchain_core.tools import tool, InjectedToolCallId
 from langchain_core.messages import ToolMessage
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+
 from app.services.sales_agent.agent_state import AgentState, SalesStageLiteral
 
 
 @tool
 async def update_sales_stage(
     new_stage: SalesStageLiteral,
-    state: Annotated[
-        AgentState, InjectedState
-    ],  # InjectedState might not be needed if only returning Command
+    state: Annotated[AgentState, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
-    reason: Optional[str] = None,  # Optional reason for logging/tracing
+    reason: Optional[str] = None,
 ) -> Command:
     """
     Updates the current sales stage of the conversation.

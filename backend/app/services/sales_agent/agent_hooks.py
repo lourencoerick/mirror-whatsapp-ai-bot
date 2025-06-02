@@ -1,7 +1,7 @@
 # app/services/sales_agent/agent_hooks.py
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, get_args
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 from loguru import logger
 
 from langchain_core.messages import (
@@ -14,7 +14,6 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
-from app.config import get_settings  # For default delays
 
 from app.workers.ai_replier.utils.datetime import calculate_follow_up_delay
 
@@ -22,7 +21,6 @@ from .agent_state import (
     AgentState,
     SalesStageLiteral,
     PendingFollowUpTrigger,
-    FollowUpTypeLiteral,
 )
 from .schemas import StageAnalysisOutput
 
@@ -34,6 +32,41 @@ STATE_CONTEXT_MESSAGE_ID = (
 async def intelligent_stage_analyzer_hook(
     state: AgentState, config: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
+    """Analyzes conversation to determine and update sales stage before main LLM call.
+
+    This pre-model hook is executed before the main agent LLM makes its decision
+    for the turn. It performs the following steps:
+    1.  Checks if the last message is a HumanMessage (i.e., new user input).
+        If not, it skips analysis to avoid redundant processing on agent's internal
+        turns or tool responses.
+    2.  Retrieves a 'primary' LLM instance from the provided `config`.
+    3.  If the LLM is available, it analyzes the last few messages of the conversation
+        and the current sales stage from the input `state`.
+    4.  It prompts the analysis LLM to determine the most appropriate current sales
+        stage, provide reasoning, and suggest a strategic focus for the main agent.
+    5.  If the analysis LLM determines a new sales stage different from the one in
+        the input `state`, this hook updates `current_sales_stage` in the `state_updates`.
+    6.  It then constructs a `SystemMessage` containing the (potentially updated)
+        sales stage, the reasoning from the analysis, and the suggested focus.
+    7.  This `SystemMessage` is prepended to the list of messages that will be
+        sent to the main agent LLM for the current turn (using the `messages` key).
+        It also ensures any previous context message from this hook is removed.
+
+    If the analysis LLM is not available or an error occurs during analysis,
+    it falls back to using the `current_sales_stage` from the input `state` and
+    provides a default context message.
+
+    Args:
+        state: The current state of the conversation (AgentState object).
+        config: The runnable config dictionary, expected to contain
+                `configurable.llm_primary_instance` for the analysis LLM.
+
+    Returns:
+        A dictionary containing updates to be applied to the agent's state.
+        This will include 'messages' for the main LLM and potentially
+        'current_sales_stage' if it was changed by the analysis.
+        Returns None or minimal updates if analysis is skipped.
+    """
     logger.info("--- Executing pre_model_hook: intelligent_stage_analyzer_hook ---")
 
     state_updates: Dict[str, Any] = {}
@@ -68,11 +101,7 @@ async def intelligent_stage_analyzer_hook(
         suggested_focus = "Proceda com base no estágio atual e no bom senso."
     else:
         original_sales_stage = state.current_sales_stage
-        recent_messages_for_analysis = messages_for_llm_input[
-            -5:
-        ]  # Analyze based on history without old context msgs
-
-        from typing import get_args  # Keep import local if only used here
+        recent_messages_for_analysis = messages_for_llm_input[-5:]
 
         available_stages_str = ", ".join(get_args(SalesStageLiteral))
 
@@ -80,19 +109,20 @@ async def intelligent_stage_analyzer_hook(
             [
                 (
                     "system",
-                    f"""Você é um analista sênior de operações de vendas. Suas tarefas são:
-1. Determinar o estágio atual de vendas de uma conversa com base nas mensagens recentes e no estágio atual conhecido.
-2. Fornecer uma breve justificativa para sua determinação de estágio.
-3. Sugerir um foco estratégico ou um próximo passo lógico para o agente de vendas principal. Esta sugestão deve ser concisa e acionável.
+                    f"""
+                    Você é um analista sênior de operações de vendas. Suas tarefas são:
+                        1. Determinar o estágio atual de vendas de uma conversa com base nas mensagens recentes e no estágio atual conhecido.
+                        2. Fornecer uma breve justificativa para sua determinação de estágio.
+                        3. Sugerir um foco estratégico ou um próximo passo lógico para o agente de vendas principal. Esta sugestão deve ser concisa e acionável.
 
-Os estágios de vendas disponíveis são: {available_stages_str}.
-O estágio atual conhecido é: {original_sales_stage}.
+                    Os estágios de vendas disponíveis são: {available_stages_str}.
+                    O estágio atual conhecido é: {original_sales_stage}.
 
-Analise as seguintes mensagens recentes. Envie sua resposta no formato JSON especificado.
-SEMPRE oriente o agente a verificar se é possível realizar a ação ou oferecer algo.
+                    Analise as seguintes mensagens recentes. Envie sua resposta no formato JSON especificado.
+                    SEMPRE oriente o agente a verificar se é possível realizar a ação ou oferecer algo.
 
-Conversa recente:
-{{recent_messages_formatted}}""",
+                    Conversa recente:
+                    {{recent_messages_formatted}}""",
                 ),
             ]
         )
@@ -110,21 +140,23 @@ Conversa recente:
         analysis_chain = analysis_prompt_template | structured_analyzer_llm
 
         logger.debug(
-            f"Invocando LLM analisador de estágio. Estágio original: {original_sales_stage}"
+            f"Invoking the LLM Sales Stage Analyst. Initial stage: {original_sales_stage}"
         )
         try:
             analysis_result: StageAnalysisOutput = await analysis_chain.ainvoke(
                 {
                     "recent_messages_formatted": formatted_recent_messages,
-                    "original_sales_stage": original_sales_stage,  # Pass original_sales_stage to prompt
-                    "available_stages_str": available_stages_str,  # Pass available_stages_str to prompt
+                    "original_sales_stage": original_sales_stage,
+                    "available_stages_str": available_stages_str,
                 }
             )
             analyzed_sales_stage = analysis_result.determined_sales_stage
             analysis_reasoning = analysis_result.reasoning
             suggested_focus = analysis_result.suggested_next_focus
             logger.info(
-                f"Analisador de estágio determinou: {analyzed_sales_stage}. Razão: {analysis_reasoning}. Foco Sugerido: {suggested_focus}"
+                f"Analisador de estágio determinou: {analyzed_sales_stage}. "
+                f"Razão: {analysis_reasoning}. "
+                f"Foco Sugerido: {suggested_focus}"
             )
         except Exception as e:
             logger.error(
@@ -142,7 +174,7 @@ Conversa recente:
         state_updates["current_sales_stage"] = analyzed_sales_stage
     else:
         logger.info(
-            f"Estágio de vendas '{original_sales_stage}' confirmado pela análise do pre-model hook."
+            f"Sales stage '{original_sales_stage}' confirmed by pre-model hook analysis."
         )
 
     stage_context_message = SystemMessage(
@@ -167,15 +199,48 @@ Conversa recente:
     ]
     state_updates["messages"] = [stage_context_message] + messages_for_llm_input
 
-    logger.debug(
-        f"Pre-model hook retornando atualizações para chaves: {list(state_updates.keys())}"
-    )
+    logger.debug(f"Pre-model hook returning updates: {list(state_updates.keys())}")
     return state_updates
 
 
 def auto_follow_up_scheduler_hook(
     state: AgentState, config: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
+    """Schedules or re-schedules follow-ups automatically after an agent turn.
+
+    This post-model hook is executed after the main agent LLM and any tools
+    have completed their actions for the current turn. Its primary responsibilities are:
+
+    1.  **Sequential Follow-ups:** If the current turn was triggered by a
+        `follow_up_timeout` event (meaning the agent just handled a scheduled
+        follow-up), this hook will schedule the *next* follow-up in the
+        sequence, provided the conversation is not closed and the maximum
+        number of follow-up attempts has not been reached. It uses an
+        incrementing attempt count and potentially an increasing delay.
+
+    2.  **Default "Safety-Net" Follow-up:** If the current turn was *not* a
+        follow-up timeout, the conversation is not closed, AND no follow-up
+        is already explicitly pending (e.g., set by the agent's `schedule_follow_up`
+        tool during the turn), this hook schedules a default initial follow-up.
+        This ensures that open conversations receive a follow-up if the agent
+        doesn't explicitly schedule one.
+
+    The hook updates the `pending_follow_up_trigger` and `follow_up_attempt_count` fields in the
+    `AgentState` by returning a dictionary of updates. These updates are then
+    used by the ARQ task system to physically schedule the next check.
+
+    Args:
+        state: The current state of the conversation (AgentState object) after
+               the agent's turn.
+        config: The runnable config dictionary (currently unused in this hook but
+                available if needed for future enhancements, e.g., passing settings).
+
+    Returns:
+        A dictionary containing updates to be applied to the agent's state,
+        primarily for `pending_follow_up_trigger`, and
+        `follow_up_attempt_count`. Returns `None` or an empty dictionary if
+        no follow-up scheduling action is taken.
+    """
     logger.info("--- Executing post_model_hook: auto_follow_up_scheduler_hook ---")
 
     current_stage: Optional[SalesStageLiteral] = state.current_sales_stage
@@ -191,17 +256,17 @@ def auto_follow_up_scheduler_hook(
 
     try:
         hook_settings = config.get("configurable", {}).get("hook_settings")
-        default_delay_seconds = getattr(hook_settings, "default_delay_seconds", 86400)
-        follow_up_base_delay = getattr(hook_settings, "follow_up_base_delay", 86400)
-        follow_up_factor = getattr(hook_settings, "follow_up_factor", 2)
+        default_delay_seconds = getattr(hook_settings, "default_delay_seconds", 600)
+        follow_up_base_delay = getattr(hook_settings, "follow_up_base_delay", 600)
+        follow_up_factor = getattr(hook_settings, "follow_up_factor", 11)
         max_follow_up_attempts = getattr(hook_settings, "max_follow_up_attempts", 3)
     except Exception:
         logger.warning(
             "Auto-Follow-Up Hook: Could not load settings, using hardcoded defaults."
         )
-        default_delay_seconds = 600  # 86400
-        follow_up_base_delay = 600  # 86400
-        follow_up_factor = 11
+        default_delay_seconds = 86400
+        follow_up_base_delay = 86400
+        follow_up_factor = 2
         max_follow_up_attempts = 3
 
     if current_trigger_event == "follow_up_timeout":
@@ -261,7 +326,6 @@ def auto_follow_up_scheduler_hook(
             mode="json"
         )
 
-        # state_updates["current_sales_stage"] = "follow_up_scheduled"
         state_updates["follow_up_attempt_count"] = next_attempt_number
         state_updates["last_agent_message_timestamp"] = last_agent_message_timestamp
 
@@ -293,12 +357,7 @@ def auto_follow_up_scheduler_hook(
         state_updates["pending_follow_up_trigger"] = auto_pending_trigger.model_dump(
             mode="json"
         )
-        # if current_stage not in [
-        #     "checkout_link_sent",
-        #     "follow_up_scheduled",
-        #     "follow_up_in_progress",
-        # ]:
-        #     state_updates["current_sales_stage"] = "follow_up_scheduled"
+
         state_updates["follow_up_attempt_count"] = 0
         logger.info(
             f"Auto-Follow-Up Hook: Default follow-up scheduled. Due in {default_delay_seconds}s."

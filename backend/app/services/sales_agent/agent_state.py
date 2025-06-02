@@ -1,16 +1,14 @@
-from typing_extensions import Annotated, TypedDict, List, Optional, Literal, Dict, Any
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
-from langchain_core.messages import BaseMessage
-from langgraph.managed.is_last_step import RemainingSteps
-from langgraph.graph import add_messages
-
 from uuid import UUID, uuid4
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from typing_extensions import Annotated, List, Optional, Literal, Dict, Any
+from langgraph.graph import add_messages
+from langgraph.managed.is_last_step import RemainingSteps
+from langchain_core.messages import BaseMessage
+
 from app.api.schemas.company_profile import CompanyProfileSchema
 from app.api.schemas.bot_agent import BotAgentRead
 
-TriggerEventType = Literal[
-    "user_message", "follow_up_timeout", "system_event"  # Added a generic system event
-]
+TriggerEventType = Literal["user_message", "follow_up_timeout"]
 
 SalesStageLiteral = Literal[
     "initial_contact",  # First interaction with the customer.
@@ -51,13 +49,11 @@ class ShoppingCartItem(BaseModel):
         None,
         description="Total price for this item in the cart (quantity * unit_price).",
     )
-    # You might want to add a snapshot of more offering details if needed later
-    # offering_details_snapshot: Optional[Dict[str, Any]] = Field(None, description="A snapshot of key offering details at the time of adding to cart.")
 
 
 FollowUpTypeLiteral = Literal[
     "cart_abandonment",
-    "post_interaction_check_in",  # General check-in after some interaction
+    "post_interaction_check_in",
     "no_response_to_offer",
     "custom_reminder",
 ]
@@ -70,11 +66,11 @@ class PendingFollowUpTrigger(BaseModel):
     """
 
     trigger_id: UUID = Field(
-        default_factory=uuid4,  # Each trigger instance gets a unique ID
+        default_factory=uuid4,
         description="Unique identifier for this specific follow-up trigger instance.",
     )
     follow_up_type: FollowUpTypeLiteral = Field(
-        ...,  # Ellipsis means this field is required
+        ...,
         description="The specific type or reason for this follow-up.",
     )
     due_timestamp: float = Field(
@@ -87,13 +83,11 @@ class PendingFollowUpTrigger(BaseModel):
         description="The difference between current datetime and due_timestamp in seconds.",
     )
 
-    target_conversation_id: UUID = (
-        Field(  # Or target_user_id, depending on your main identifier
-            ...,
-            description="Identifier of the conversation or user this follow-up pertains to.",
-        )
+    target_conversation_id: UUID = Field(
+        ...,
+        description="Identifier of the conversation or user this follow-up pertains to.",
     )
-    # Contextual information to help the agent formulate the follow-up message
+
     context: Optional[Dict[str, Any]] = Field(
         None,
         description="Optional dictionary palavras-chave containing relevant context for the follow-up. "
@@ -104,9 +98,7 @@ class PendingFollowUpTrigger(BaseModel):
     model_config = {"validate_assignment": True}
 
 
-class AgentState(
-    BaseModel
-):  # Renamed from State to AgentState for clarity, common practice
+class AgentState(BaseModel):
     """
     The central state representation for an AI sales agent conversation.
     Manages all aspects of the dialogue, agent's strategy, customer understanding,
@@ -161,27 +153,21 @@ class AgentState(
     )
 
     # --- Follow-up & Engagement Tracking ---
-    pending_follow_up_trigger: Optional[PendingFollowUpTrigger] = (
-        Field(  # From our ideal agent discussion
-            None,
-            description="Details of a scheduled follow-up action (e.g., {'type': 'cart_abandonment', 'due_timestamp': 1678886400, 'context': '...'})",
-        )
+    pending_follow_up_trigger: Optional[PendingFollowUpTrigger] = Field(
+        None,
+        description="Details of a scheduled follow-up action (e.g., {'type': 'cart_abandonment', 'due_timestamp': 1678886400, 'context': '...'})",
     )
     follow_up_attempt_count: Optional[int] = Field(
         default=0,
         description="Number of follow-up attempts made for the current pending follow-up or in the current sequence.",
     )
 
-    last_user_interaction_timestamp: Optional[float] = (
-        Field(  # More specific than just last_interaction
-            None,
-            description="Timestamp (epoch) of the last message received from the user.",
-        )
+    last_user_interaction_timestamp: Optional[float] = Field(
+        None,
+        description="Timestamp (epoch) of the last message received from the user.",
     )
-    last_agent_message_timestamp: Optional[float] = (
-        Field(  # Useful for inactivity timeouts
-            None, description="Timestamp (epoch) of the last message sent by the agent."
-        )
+    last_agent_message_timestamp: Optional[float] = Field(
+        None, description="Timestamp (epoch) of the last message sent by the agent."
     )
 
     # --- Operational & Debugging ---

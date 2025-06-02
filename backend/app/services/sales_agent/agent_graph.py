@@ -14,10 +14,11 @@ from app.api.schemas.company_profile import CompanyProfileSchema
 from .agent_state import AgentState
 from .system_prompts import generate_system_message
 
+# hooks
 from .agent_hooks import (
     intelligent_stage_analyzer_hook,
     auto_follow_up_scheduler_hook,
-)  # Import hooks
+)
 
 # Tools
 from .tools.knowledge import query_knowledge_base
@@ -31,7 +32,6 @@ from .tools.strategy import (
 )
 from .tools.utility import (
     update_sales_stage,
-    schedule_follow_up,
 )
 
 
@@ -43,7 +43,6 @@ ALL_TOOLS: List[Callable] = [
     generate_checkout_link_for_cart,
     suggest_objection_response_strategy,
     update_sales_stage,
-    # schedule_follow_up,
 ]
 
 

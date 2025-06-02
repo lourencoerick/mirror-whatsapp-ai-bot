@@ -16,10 +16,12 @@ class JsonOnlySerializer(JsonPlusSerializer):
             return str(o)
         try:
             return super()._default(o)
-        except TypeError:  # Catch broader TypeError from super if it can't handle
+        except (
+            TypeError
+        ) as exc:  # Catch broader TypeError from super if it can't handle
             raise TypeError(
                 f"Object of type {o.__class__.__name__} is not JSON serializable by JsonOnlySerializer's fallback"
-            )
+            ) from exc
 
     def dumps_typed(self, obj: Any) -> Tuple[str, bytes]:
         return "json", self.dumps(obj)
