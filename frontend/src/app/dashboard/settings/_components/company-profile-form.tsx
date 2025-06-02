@@ -1,6 +1,9 @@
 // app/dashboard/settings/_components/CompanyProfileForm.tsx
 "use client";
 
+import { GuidelineInput } from "@/components/custom/guideline-input"; // Custom input for guidelines
+import { StringListInput } from "@/components/custom/single-list-input"; // Custom input for string lists
+import { formatCurrencyBRL } from "@/lib/utils/currency-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   AlertTriangle,
@@ -12,9 +15,6 @@ import {
 import { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner"; // For user notifications
-
-import { GuidelineInput } from "@/components/custom/guideline-input"; // Custom input for guidelines
-import { StringListInput } from "@/components/custom/single-list-input"; // Custom input for string lists
 // UI Components
 import { Button } from "@/components/ui/button";
 import {
@@ -531,16 +531,16 @@ export function CompanyProfileForm({
                                 )}
                               </TableCell>
                               <TableCell className="max-w-[150px] lg:max-w-[200px]">
-                                {offering.price_info ? (
+                                {offering.price ? (
                                   <Tooltip delayDuration={300}>
                                     <TooltipTrigger asChild>
                                       <span className="block truncate">
-                                        {offering.price_info}
+                                        {formatCurrencyBRL(offering.price)}
                                       </span>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" align="start">
                                       <p className="max-w-xs break-words whitespace-pre-wrap">
-                                        {offering.price_info}
+                                        {formatCurrencyBRL(offering.price)}
                                       </p>
                                     </TooltipContent>
                                   </Tooltip>
