@@ -48,7 +48,7 @@ cloudscraper==1.2.71
 # === IA / NLP / Vetorização ===
 langchain==0.3.24
 langchain-openai==0.3.14
-langgraph==0.3.32
+langgraph==0.4.7
 langchain_community==0.3.22
 langchain-experimental==0.3.4
 sentence-transformers==4.1.0
