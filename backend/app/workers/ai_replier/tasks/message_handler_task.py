@@ -16,11 +16,13 @@ from arq.connections import ArqRedis  # For type hinting ctx['arq_pool']
 
 # --- LangGraph Imports ---
 try:
-    from app.services.new_agent.graph import create_agent_graph
-    from app.services.new_agent.state_definition import (
-        RichConversationState,
+    from app.services.sales_agent.agent_graph import create_react_sales_agent_graph
+    from app.services.sales_agent.agent_state import (
+        AgentState,
+        PendingFollowUpTrigger,
         TriggerEventType,
     )
+    from app.services.sales_agent.serializers import JsonOnlySerializer
 
     GRAPH_AVAILABLE = True
     logger.info("MessageHandlerTask: Successfully imported LangGraph components.")
@@ -30,17 +32,20 @@ except ImportError as e:
     )
     GRAPH_AVAILABLE = False
 
-    class RichConversationState(dict):
+    class AgentState(dict):
         pass  # type: ignore
 
     class TriggerEventType(str):
+        pass  # type: ignore
+
+    class JsonOnlySerializer:
         pass  # type: ignore
 
 
 # --- LangGraph Checkpointer ---
 try:
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+    from langgraph.managed.is_last_step import RemainingSteps
 
     CHECKPOINTER_AVAILABLE = True
     logger.info(
@@ -64,14 +69,20 @@ except ImportError:
 
             return DummyCheckpointer()
 
-    class JsonPlusSerializer:
+    class RemainingSteps:
         pass  # type: ignore
 
 
 # --- LangChain Imports ---
 try:
     from langchain_core.language_models import BaseChatModel
-    from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+    from langchain_core.messages import (
+        BaseMessage,
+        HumanMessage,
+        AIMessage,
+        ToolMessage,
+        SystemMessage,
+    )
 
     LANGCHAIN_AVAILABLE = True
     logger.info("MessageHandlerTask: Successfully imported LangChain components.")
@@ -89,6 +100,9 @@ except ImportError:
         pass  # type: ignore
 
     class AIMessage:
+        pass  # type: ignore
+
+    class ToolMessage:
         pass  # type: ignore
 
 
@@ -195,45 +209,12 @@ from app.services.helper.websocket import publish_to_conversation_ws
 from app.workers.ai_replier.utils.datetime import calculate_follow_up_delay
 
 # --- Configuration Constants ---
-AI_DELAY_BASE_SECONDS = float(os.getenv("AI_DELAY_BASE_SECONDS", "0.5"))
-AI_DELAY_PER_CHAR_SECONDS = float(os.getenv("AI_DELAY_PER_CHAR_SECONDS", "0.025"))
-AI_DELAY_RANDOM_SECONDS = float(os.getenv("AI_DELAY_RANDOM_SECONDS", "1.5"))
-AI_DELAY_MIN_SECONDS = float(os.getenv("AI_DELAY_MIN_SECONDS", "0.02"))
-AI_DELAY_MAX_SECONDS = float(
-    os.getenv("AI_DELAY_MAX_SECONDS", "0.03")
-)  # Ensure this is a reasonable max
 CONVERSATION_HISTORY_LIMIT = 20
 METER_EVENT_NAME_AI_MESSAGE = "generated_ia_messages"
 
 # ==============================================================================
 # Helper Functions
 # ==============================================================================
-
-
-def _compute_delay(response_text: str) -> float:
-    """
-    Calculates simulated typing delay based on response length.
-
-    Args:
-        response_text: The text of the AI's response.
-
-    Returns:
-        The calculated delay in seconds, clamped within min/max limits.
-    """
-    if not response_text:
-        return AI_DELAY_MIN_SECONDS
-    response_length = len(response_text)
-    length_delay = response_length * AI_DELAY_PER_CHAR_SECONDS
-    base_calculated_delay = AI_DELAY_BASE_SECONDS + length_delay
-    random_offset = random.uniform(
-        -AI_DELAY_RANDOM_SECONDS / 2, AI_DELAY_RANDOM_SECONDS / 2
-    )
-    total_delay = base_calculated_delay + random_offset
-    clamped_delay = max(AI_DELAY_MIN_SECONDS, min(AI_DELAY_MAX_SECONDS, total_delay))
-    logger.debug(
-        f"Computed delay: Clamped={clamped_delay:.2f}s for text length {response_length}"
-    )
-    return clamped_delay
 
 
 async def _process_one_message(
@@ -273,6 +254,7 @@ async def _process_one_message(
         str(agent_config_db.id) if agent_config_db and agent_config_db.id else None
     )
 
+    final_state = dict(final_state)
     current_utc_time = datetime.now(timezone.utc)
 
     message_data = MessageCreate(
@@ -296,32 +278,22 @@ async def _process_one_message(
         is_simulation=conversation.is_simulation,
     )
     ai_message = await message_repo.create_message(db=db, message_data=message_data)
-    await db.flush()  # Ensure ID is populated
+    await db.flush()
     await db.refresh(ai_message)
     logger.info(
         f"{log_prefix} Created outgoing AI message record (ID: {ai_message.id})."
     )
 
     if not conversation.is_simulation:
-        # Buscar a conta para obter o stripe_customer_id
-        # O objeto 'conversation' já tem 'account_id', mas precisamos do objeto Account
-        # para pegar 'stripe_customer_id'. Se 'conversation.account' for uma relação carregada, melhor.
-        # Caso contrário, buscar a conta.
-
-        # Se conversation.account já é um objeto Account carregado com stripe_customer_id:
-        # account_stripe_customer_id = conversation.account.stripe_customer_id if conversation.account else None
-
-        # Se precisar buscar a Account:
-        account_for_usage = await db.get(Account, account_id)  # account_id já é UUID
+        account_for_usage = await db.get(Account, account_id)
 
         if account_for_usage and account_for_usage.stripe_customer_id:
             usage_event = UsageEvent(
                 account_id=account_id,
                 stripe_customer_id=account_for_usage.stripe_customer_id,
-                meter_event_name=METER_EVENT_NAME_AI_MESSAGE,  # Usar a constante
-                quantity=1,  # Uma mensagem de IA gerada
-                event_timestamp=current_utc_time,  # Usar o mesmo timestamp da mensagem
-                # reported_to_stripe_at e stripe_meter_event_id serão preenchidos pela task de reporte
+                meter_event_name=METER_EVENT_NAME_AI_MESSAGE,
+                quantity=1,
+                event_timestamp=current_utc_time,
             )
             db.add(usage_event)
             logger.info(
@@ -331,7 +303,7 @@ async def _process_one_message(
             logger.error(
                 f"{log_prefix} Account {account_id} not found. Cannot determine stripe_customer_id for usage event."
             )
-        else:  # account_for_usage existe, mas não tem stripe_customer_id
+        else:
             logger.warning(
                 f"{log_prefix} Account {account_id} does not have a stripe_customer_id. "
                 f"Usage for '{METER_EVENT_NAME_AI_MESSAGE}' will not be reported to Stripe."
@@ -348,12 +320,12 @@ async def _process_one_message(
         try:
             message_payload_ws = jsonable_encoder(ai_message)
             await publish_to_conversation_ws(
-                conversation_id=str(conversation.id),  # Ensure string for WS
+                conversation_id=str(conversation.id),
                 data={"type": "new_message", "payload": message_payload_ws},
             )
-            ai_message.status = "delivered"  # Mark as delivered for simulations
+            ai_message.status = "delivered"
             db.add(ai_message)
-            await db.flush([ai_message])  # Persist status update
+            await db.flush([ai_message])
             logger.info(
                 f"{log_prefix} Published simulation message {ai_message.id} to WS and marked delivered."
             )
@@ -362,25 +334,12 @@ async def _process_one_message(
                 f"{log_prefix} Failed to publish simulation message {ai_message.id} to WS: {ws_err}"
             )
     else:
-        final_delay = _compute_delay(ai_response_text)
-        logger.info(
-            f"{log_prefix} Applying delay of {final_delay:.2f}s before queueing message {ai_message.id}."
-        )
-        if final_delay > 0:
-            await asyncio.sleep(final_delay)
-
         sender_payload = {"message_id": str(ai_message.id)}
-        # Assuming RedisQueue is a simple wrapper, direct use of arq_pool for enqueueing
-        # might be an option if RedisQueue is complex or not available in this context.
-        # For now, keeping RedisQueue as per original.
         output_queue = RedisQueue(queue_name=settings.RESPONSE_SENDER_QUEUE_NAME)
         await output_queue.enqueue(sender_payload)
         logger.info(
             f"{log_prefix} Enqueued message {ai_message.id} to '{settings.RESPONSE_SENDER_QUEUE_NAME}'."
         )
-
-    # Commit is handled by the main task function after all messages are processed.
-    # await db.commit() # DO NOT COMMIT HERE, commit in the main task handler
 
 
 # ==============================================================================
@@ -395,6 +354,7 @@ async def handle_ai_reply_request(
     user_input_content: Optional[str] = None,
     event_type: Optional[str] = None,  # e.g., "user_message", "follow_up_timeout"
     follow_up_attempt_count: Optional[int] = 0,
+    follow_up_reason_context: Optional[str] = None,
     **kwargs,
 ):
     """
@@ -442,9 +402,7 @@ async def handle_ai_reply_request(
     )
     llm_primary_client: Optional[BaseChatModel] = ctx.get("llm_primary")
     llm_fast_client: Optional[BaseChatModel] = ctx.get("llm_fast")
-    arq_pool: Optional[ArqRedis] = ctx.get(
-        "arq_pool"
-    )  # ARQ Redis pool for enqueuing other tasks
+    arq_pool: Optional[ArqRedis] = ctx.get("arq_pool")
 
     # --- 2. Validate Dependencies ---
     if not all([db_session_factory, llm_primary_client, llm_fast_client, arq_pool]):
@@ -471,10 +429,10 @@ async def handle_ai_reply_request(
         return f"Worker missing core components for task {task_id}"
 
     # --- 3. Main Processing Block ---
-    final_state: Optional[RichConversationState] = None
+    final_state: Optional[AgentState] = None
     try:
-        serializer = JsonPlusSerializer()
-        # Ensure DATABASE_URL is correctly formatted for AsyncPostgresSaver
+        serializer = JsonOnlySerializer()
+
         db_conn_string_pg = str(settings.DATABASE_URL).replace(
             "postgresql+asyncpg://", "postgresql://"
         )
@@ -485,9 +443,6 @@ async def handle_ai_reply_request(
             logger.debug(
                 f"{log_prefix} AsyncPostgresSaver checkpointer context acquired."
             )
-            compiled_reply_graph = create_agent_graph(checkpointer=checkpointer)
-            logger.debug(f"{log_prefix} Reply graph compiled with checkpointer.")
-
             async with db_session_factory() as db:
                 logger.debug(f"{log_prefix} Database session acquired.")
                 profile_db = await profile_repo.get_profile_by_account_id(
@@ -496,22 +451,14 @@ async def handle_ai_reply_request(
                 conversation = await conversation_repo.find_conversation_by_id(
                     db, account_id=account_id, conversation_id=conversation_id
                 )
-                history_db = await message_repo.find_messages_by_conversation(
-                    db,
-                    account_id=account_id,
-                    conversation_id=conversation_id,
-                    limit=CONVERSATION_HISTORY_LIMIT,
-                )
 
-                agent_config_db_model: Optional[BotAgentRead] = None
+                agent_config_db: Optional[BotAgentRead] = None
                 if conversation and conversation.inbox_id:
                     agent_data_raw = await bot_agent_repo.get_bot_agent_for_inbox(
                         db, inbox_id=conversation.inbox_id, account_id=account_id
                     )
                     if agent_data_raw:
-                        agent_config_db_model = BotAgentRead.model_validate(
-                            agent_data_raw
-                        )
+                        agent_config_db = BotAgentRead.model_validate(agent_data_raw)
 
                 if not profile_db:
                     logger.error(
@@ -523,24 +470,69 @@ async def handle_ai_reply_request(
                         f"{log_prefix} Conversation not found: {conversation_id}. Aborting."
                     )
                     return f"Conversation not found: {conversation_id}"
-                if not agent_config_db_model:
+                if not agent_config_db:
                     logger.warning(
                         f"{log_prefix} No active BotAgent configuration found for inbox {conversation.inbox_id}. Skipping AI reply."
                     )
                     return f"No BotAgent for inbox {conversation.inbox_id}"
-                # History can be empty for the first message, but graph should handle it.
-                # if not history_db and not is_follow_up_trigger: # Allow follow-up on empty history if logic supports
-                #     logger.warning(f"{log_prefix} No message history found for conversation {conversation_id}. Skipping AI reply unless it's a follow-up.")
-                #     # Depending on graph logic, this might be an error or a valid start.
-                #     # For now, let the graph decide.
+
+                compiled_reply_graph = create_react_sales_agent_graph(
+                    model=llm_primary_client,
+                    company_profile=profile_db,
+                    checkpointer=checkpointer,
+                )
+                logger.debug(f"{log_prefix} Reply graph compiled with checkpointer.")
+
+                graph_config = {
+                    "configurable": {
+                        "thread_id": str(conversation_id),
+                        "llm_primary_instance": llm_primary_client,
+                        "llm_fast_instance": llm_fast_client,
+                        "db_session_factory": db_session_factory,  # Pass the factory
+                    }
+                }
+
+                logger.debug(
+                    f"{log_prefix} Graph config prepared with thread_id: {conversation_id}"
+                )
 
                 current_user_input_content: Optional[str] = None
+                current_input_updates: Optional[Dict[str, Any]] = {}
                 trigger_event_for_graph: TriggerEventType = "user_message"
                 if is_follow_up_trigger:
                     trigger_event_for_graph = "follow_up_timeout"
-                    logger.info(f"{log_prefix} Event type set to FOLLOW_UP_TIMEOUT.")
+                    reason_from_payload = (
+                        follow_up_reason_context
+                        if follow_up_reason_context
+                        else "our previous discussion"
+                    )
+
+                    follow_up_directive_message = SystemMessage(
+                        content=f"SYSTEM DIRECTIVE: This turn is a scheduled follow-up (Attempt: {follow_up_attempt_count}) regarding '{reason_from_payload}'. Your primary goal is to re-engage the user. Craft a suitable follow-up message.",
+                        # tool_call_id="follow_up_timeout",
+                    )
+                    current_input_updates["messages"] = [follow_up_directive_message]
+
+                    # Updates for the state for THIS agent turn
+                    current_input_updates["pending_follow_up_trigger"] = None
+                    current_input_updates["current_sales_stage"] = (
+                        "follow_up_in_progress"
+                    )
+                    # Set the attempt count for the state of THIS turn to what was passed in
+                    current_input_updates["follow_up_attempt_count"] = (
+                        follow_up_attempt_count
+                    )
+                    logger.info(
+                        f"{log_prefix} Event type FOLLOW_UP_TIMEOUT. Attempt: {follow_up_attempt_count}. Added directive."
+                    )
+
                 elif user_input_content:
                     current_user_input_content = user_input_content
+
+                    human_message = HumanMessage(content=current_user_input_content)
+                    current_input_updates["messages"] = [human_message]
+                    current_input_updates["pending_follow_up_trigger"] = None
+                    current_input_updates["follow_up_attempt_count"] = 0
 
                     if (
                         current_user_input_content.lower().strip()
@@ -557,7 +549,7 @@ async def handle_ai_reply_request(
                             db,
                             account_id,
                             task_id,
-                            agent_config_db_model,
+                            agent_config_db,
                             {},
                             conversation,
                             "Conversa resetada! Mande uma nova mensagem, e inicie uma conversa sem histórico.",
@@ -577,38 +569,19 @@ async def handle_ai_reply_request(
                 profile_dict = CompanyProfileSchema.model_validate(
                     profile_db
                 ).model_dump(mode="json")
-                agent_config_dict = agent_config_db_model.model_dump(mode="json")
+                agent_config_dict = agent_config_db.model_dump(mode="json")
 
-                current_input: RichConversationState = {
+                current_input: AgentState = {
                     "account_id": str(account_id),
                     "conversation_id": str(conversation_id),
-                    "bot_agent_id": str(agent_config_db_model.id),
+                    "bot_agent_id": str(agent_config_db.id),
                     "company_profile": profile_dict,
                     "agent_config": agent_config_dict,
-                    "messages": (
-                        [HumanMessage(content=current_user_input_content)]
-                        if current_user_input_content
-                        else []
-                    ),  # Checkpointer loads historical messages
-                    "current_user_input_text": current_user_input_content,
-                    "is_simulation": conversation.is_simulation,
-                    "last_interaction_timestamp": time.time(),
                     "trigger_event": trigger_event_for_graph,
-                    # Fields to be reset or populated by the graph each turn
-                    "next_agent_action_command": None,
-                    "action_parameters": {},
-                    "retrieved_knowledge_for_next_action": None,
-                    "last_agent_generation_text": None,
-                    "final_agent_message_text": None,
-                    "user_input_analysis_result": None,
                     "last_processing_error": None,
-                    "conversation_summary_for_llm": None,
-                    "disengagement_reason": None,
-                    "current_turn_extracted_questions": [],
+                    "remaining_steps": RemainingSteps(),
+                    **current_input_updates,
                 }
-
-                if is_follow_up_trigger:
-                    current_input["follow_up_attempt_count"] = follow_up_attempt_count
 
                 logger.trace(
                     f"{log_prefix} Current graph input prepared: {json.dumps(current_input, indent=2, default=str)}"
@@ -650,16 +623,16 @@ async def handle_ai_reply_request(
                 final_state_values = await compiled_reply_graph.ainvoke(
                     current_input, config={**graph_config, "recursion_limit": 50}
                 )
-                # final_state_values is the dict of the RichConversationState
-                final_state = RichConversationState(**final_state_values)
+
+                final_state = AgentState(**final_state_values)
 
                 logger.info(f"{log_prefix} Reply graph execution finished.")
                 logger.trace(
                     f"{log_prefix} Final graph state: {json.dumps(final_state, indent=2, default=str)}"
                 )
 
-                graph_error = final_state.get("last_processing_error")
-                final_messages_lc_from_state = final_state.get("messages", [])
+                graph_error = final_state.last_processing_error
+                final_messages_lc_from_state = final_state.messages
 
                 new_ai_messages_to_process: List[AIMessage] = []
                 if isinstance(final_messages_lc_from_state, list):
@@ -680,10 +653,6 @@ async def handle_ai_reply_request(
                         elif isinstance(msg_lc, AIMessage) and not hasattr(
                             msg_lc, "id"
                         ):
-                            # This case is for AIMessages that might be added by the graph but don't have an ID
-                            # (e.g., simple AIMessage(content="...") without metadata).
-                            # We might want to process these too, or ensure all graph-generated AIMessages get IDs.
-                            # For now, let's assume we only care about those with IDs for deduping.
                             logger.warning(
                                 f"{log_prefix} Found AIMessage without an ID in final state: '{str(msg_lc.content)[:50]}...'. It won't be processed by the standard new message logic."
                             )
@@ -698,7 +667,7 @@ async def handle_ai_reply_request(
                             db,
                             account_id,
                             task_id,
-                            agent_config_db_model,
+                            agent_config_db,
                             final_state,
                             conversation,
                             "I encountered an issue processing your request. Please try again later.",
@@ -719,7 +688,7 @@ async def handle_ai_reply_request(
                                 account_id=account_id,
                                 task_id=task_id,
                                 conversation=conversation,
-                                agent_config_db=agent_config_db_model,
+                                agent_config_db=agent_config_db,
                                 final_state=final_state,  # Pass the whole state
                                 ai_response_text=str(ai_msg_lc.content),
                             )
@@ -729,58 +698,85 @@ async def handle_ai_reply_request(
                             )
 
                 # --- Follow-up Scheduling Logic ---
-                if final_state.get("follow_up_scheduled") and arq_pool:
-                    agent_config_from_state = final_state.get(
-                        "agent_config", {}
-                    )  # agent_config from the graph state
-                    follow_up_delay_seconds = agent_config_from_state.get(
-                        "follow_up_timeout_seconds", 1
-                    )  # Default 1 second to test
-                    next_follow_up_attempt = final_state.get(
-                        "follow_up_attempt_count", 0
-                    )  # This should be the attempt for the *next* follow-up
-                    last_agent_msg_ts = final_state.get(
-                        "last_message_from_agent_timestamp", time.time()
-                    )
+                if final_state.pending_follow_up_trigger and arq_pool:
 
-                    logger.info(
-                        f"{log_prefix} Scheduling follow-up. Delay: {follow_up_delay_seconds}s, Next Attempt: {next_follow_up_attempt}"
-                    )
+                    current_pending_trigger: Optional[PendingFollowUpTrigger] = None
+                    if isinstance(
+                        final_state.pending_follow_up_trigger, PendingFollowUpTrigger
+                    ):
+                        current_pending_trigger = final_state.pending_follow_up_trigger
+                    elif isinstance(final_state.pending_follow_up_trigger, dict):
+                        try:
+                            current_pending_trigger = (
+                                PendingFollowUpTrigger.model_validate(
+                                    final_state.pending_follow_up_trigger
+                                )
+                            )
+                        except Exception as e_parse:
+                            logger.warning(
+                                f"{log_prefix} Could not parse pending_follow_up_trigger dict into object: {e_parse}"
+                            )
+                            current_pending_trigger = None  # Treat as malformed
 
-                    # TODO: parametrize the factor and base_delay_seconds
-                    computed_follow_up_delay = calculate_follow_up_delay(
-                        attempt_number=(next_follow_up_attempt + 1),
-                        base_delay_seconds=60,
-                        factor=11,
-                    )
+                    if current_pending_trigger and hasattr(
+                        current_pending_trigger, "due_timestamp"
+                    ):
+                        due_timestamp: float = current_pending_trigger.due_timestamp
+                        current_time: float = time.time()
 
-                    await arq_pool.enqueue_job(
-                        "schedule_conversation_follow_up",  # Name of the task in follow_up_task.py
-                        _queue_name=settings.AI_REPLY_QUEUE_NAME,
-                        conversation_id=conversation_id,
-                        account_id=account_id,
-                        bot_agent_id=(
-                            agent_config_db_model.id if agent_config_db_model else None
-                        ),
-                        follow_up_attempt_count_for_this_job=next_follow_up_attempt,
-                        origin_agent_message_timestamp=last_agent_msg_ts,
-                        _defer_by=computed_follow_up_delay,  # timedelta(seconds=1),
-                    )
-                    logger.info(
-                        f"{log_prefix} Enqueued 'schedule_conversation_follow_up' to '{settings.AI_REPLY_QUEUE_NAME}' "
-                        f"for ConvID {conversation_id}, scheduled in {computed_follow_up_delay}s."
-                    )
-                else:
-                    if not arq_pool:
-                        logger.error(
-                            f"{log_prefix} Arq pool not available, cannot schedule follow-up."
+                        defer_seconds: float = current_pending_trigger.defer_by
+
+                        origin_ts_for_job: float = (
+                            final_state.last_agent_message_timestamp or current_time
                         )
-                    elif not final_state.get("follow_up_scheduled"):
+
+                        attempt_count_for_next_follow_up: int = (
+                            final_state.follow_up_attempt_count or 0
+                        )
+
+                        bot_agent_id_to_schedule: Optional[UUID] = None
+                        if final_state.agent_config and final_state.agent_config.id:
+                            bot_agent_id_to_schedule = final_state.agent_config.id
+                        elif (
+                            agent_config_db
+                        ):  # Fallback to initially loaded if not in state model
+                            bot_agent_id_to_schedule = agent_config_db.id
+
                         logger.info(
-                            f"{log_prefix} Follow-up not scheduled by the graph."
+                            f"{log_prefix} Found pending follow-up in final_state. "
+                            f"Deferring 'schedule_conversation_follow_up' by {defer_seconds:.2f}s. "
+                            f"Attempt for Job: {attempt_count_for_next_follow_up}."
                         )
 
-                await db.commit()  # Commit all DB changes for this task run
+                        await arq_pool.enqueue_job(
+                            "schedule_conversation_follow_up",
+                            _queue_name=settings.AI_REPLY_QUEUE_NAME,
+                            conversation_id=conversation_id,  # from task args
+                            account_id=account_id,  # from task args
+                            bot_agent_id=bot_agent_id_to_schedule,
+                            follow_up_attempt_count_for_this_job=attempt_count_for_next_follow_up,
+                            origin_agent_message_timestamp=origin_ts_for_job,
+                            _defer_by=timedelta(seconds=defer_seconds),
+                        )
+                        logger.info(
+                            f"{log_prefix} Enqueued 'schedule_conversation_follow_up' for ConvID {conversation_id}."
+                        )
+                    else:
+                        logger.warning(
+                            f"{log_prefix} 'pending_follow_up_trigger' in final_state is present but malformed, "
+                            f"not a valid PendingFollowUpTrigger object/dict, or missing 'due_timestamp'. "
+                            f"Trigger data: {final_state.pending_follow_up_trigger}"
+                        )
+                elif not arq_pool:
+                    logger.error(
+                        f"{log_prefix} Arq pool not available, cannot schedule any follow-up."
+                    )
+                elif not final_state.pending_follow_up_trigger:
+                    logger.info(
+                        f"{log_prefix} No pending follow-up trigger found in final_state. No follow-up will be enqueued."
+                    )
+
+                await db.commit()
                 logger.info(
                     f"{log_prefix} Database transaction committed successfully."
                 )

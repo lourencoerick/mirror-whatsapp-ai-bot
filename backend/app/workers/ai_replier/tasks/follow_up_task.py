@@ -9,7 +9,8 @@ from loguru import logger
 # --- LangGraph Checkpointer ---
 try:
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+
+    # from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
     CHECKPOINTER_AVAILABLE = True
     logger.info("FollowUpTask: Successfully imported LangGraph AsyncPostgresSaver.")
@@ -42,8 +43,9 @@ except ImportError:
 try:
     from arq.connections import ArqRedis  # For type hinting ctx['arq_pool']
     from app.config import get_settings  # Use the centralized settings
-    from app.services.new_agent.state_definition import (
-        RichConversationState,
+    from app.services.sales_agent.agent_state import (
+        AgentState,
+        PendingFollowUpTrigger,
     )  # For type hinting state
 
     settings = get_settings()
@@ -67,6 +69,7 @@ except ImportError as e:
     )()
 from app.services.repository import conversation as conversation_repo
 from app.models.conversation import ConversationStatusEnum
+from app.services.sales_agent.serializers import JsonOnlySerializer
 
 
 async def schedule_conversation_follow_up(
@@ -121,7 +124,7 @@ async def schedule_conversation_follow_up(
         return f"ARQ pool missing for follow-up on {conversation_id_str}"
 
     try:
-        serializer = JsonPlusSerializer()
+        serializer = JsonOnlySerializer()
         # Ensure DATABASE_URL is correctly formatted for AsyncPostgresSaver
         db_conn_string_pg = str(settings.DATABASE_URL).replace(
             "postgresql+asyncpg://", "postgresql://"
@@ -157,45 +160,80 @@ async def schedule_conversation_follow_up(
                 return f"No state checkpoint for {conversation_id_str}"
 
             # The actual conversation state is within checkpoint.values
-            current_convo_state: RichConversationState = checkpoint.get(
-                "channel_values", {}
+            current_convo_state: Dict[str, Any] = checkpoint.get("channel_values", {})
+
+            pending_trigger_data_from_state: Optional[Dict[str, Any]] = (
+                current_convo_state.get("pending_follow_up_trigger")
             )
 
-            if not current_convo_state.get("follow_up_scheduled"):
+            if not pending_trigger_data_from_state:
                 logger.info(
-                    f"{log_prefix} Follow-up was cancelled or completed (flag 'follow_up_scheduled' is false in state). Discarding task."
+                    f"{log_prefix} No 'pending_follow_up_trigger' found in current state. Follow-up might have been cancelled or already processed. Discarding task."
                 )
-                return f"Follow-up cancelled (flag) for {conversation_id_str}"
+                return f"Follow-up trigger not found in state for {conversation_id_str}"
 
-            current_last_agent_msg_ts_in_state = current_convo_state.get(
-                "last_message_from_agent_timestamp"
+            # --- 2. Validate and Parse the Trigger Data ---
+            try:
+                # Assuming pending_trigger_data_from_state is a dict from JSON
+                current_pending_trigger = PendingFollowUpTrigger.model_validate(
+                    pending_trigger_data_from_state
+                )
+            except Exception as e:
+                logger.error(
+                    f"{log_prefix} Failed to parse PendingFollowUpTrigger from state: {e}. Data: {pending_trigger_data_from_state}"
+                )
+                return f"Malformed follow-up trigger data for {conversation_id_str}"
+
+            # if current_pending_trigger.due_timestamp > (
+            #     time.time() + 60
+            # ):  # Example: if it's more than 60s in the future, something is wrong with scheduling
+            #     logger.warning(
+            #         f"{log_prefix} Follow-up trigger found, but its due_timestamp ({current_pending_trigger.due_timestamp}) is significantly in the future. Current time: {time.time()}. This might be an issue with ARQ scheduling or a stale trigger. Discarding."
+            #     )
+            #     return f"Follow-up trigger due time mismatch for {conversation_id_str}"
+
+            # --- 4. Staleness Check: Has the conversation progressed significantly since this follow-up was scheduled? ---
+            last_agent_msg_ts_in_state: Optional[float] = current_convo_state.get(
+                "last_agent_message_timestamp"
             )
+
+            # The origin_agent_message_timestamp is the timestamp of the agent message
+            # that *led to this specific PendingFollowUpTrigger being created*.
             if (
-                current_last_agent_msg_ts_in_state is not None
-                and current_last_agent_msg_ts_in_state > origin_agent_message_timestamp
+                last_agent_msg_ts_in_state is not None
+                and origin_agent_message_timestamp
+                is not None  # Ensure origin_ts is not None
+                and last_agent_msg_ts_in_state > origin_agent_message_timestamp
             ):
                 logger.info(
                     f"{log_prefix} Conversation has progressed since this follow-up was scheduled. "
-                    f"(State TS: {current_last_agent_msg_ts_in_state} > Origin TS: {origin_agent_message_timestamp}). "
+                    f"(State's LastAgentMsgTS: {last_agent_msg_ts_in_state} > Follow-up's OriginTS: {origin_agent_message_timestamp}). "
                     f"This follow-up is stale. Discarding task."
                 )
-                return f"Follow-up stale (timestamp) for {conversation_id_str}"
+                return (
+                    f"Follow-up stale (timestamp comparison) for {conversation_id_str}"
+                )
+            # --- All checks passed, prepare to trigger the main AI handler ---
+            follow_up_reason_for_handler = current_pending_trigger.context.get(
+                "reason", "your previous discussion"
+            )
+            # The follow_up_attempt_count_for_this_job is the attempt number of the PFT being processed.
+            # This was set when this PFT was scheduled.
 
-            # If all checks pass, enqueue the main AI reply handler task with a follow-up event
             payload_for_ai_replier = {
                 "account_id": account_id,
                 "conversation_id": conversation_id,
-                "bot_agent_id": bot_agent_id,  # Pass it along
-                "event_type": "follow_up_timeout",  # Critical: informs the AI handler
+                "bot_agent_id": bot_agent_id,  # The bot_agent_id at the time of original scheduling
+                "event_type": "follow_up_timeout",
                 "follow_up_attempt_count": follow_up_attempt_count_for_this_job,
-                # trigger_message_id is intentionally None for follow-ups
+                "follow_up_reason_context": follow_up_reason_for_handler,  # Pass the reason
             }
 
             logger.info(
-                f"{log_prefix} Follow-up conditions met. Enqueuing 'handle_ai_reply_request' to '{settings.AI_REPLY_QUEUE_NAME}'."
+                f"{log_prefix} Follow-up validation passed. Enqueuing 'handle_ai_reply_request'."
             )
             await arq_write_pool.enqueue_job(
-                "handle_ai_reply_request",  # The main task in message_handler_task.py
+                "handle_ai_reply_request",
                 _queue_name=settings.AI_REPLY_QUEUE_NAME,
                 **payload_for_ai_replier,
             )
@@ -207,6 +245,3 @@ async def schedule_conversation_follow_up(
     except Exception as e:
         logger.exception(f"{log_prefix} Error processing follow-up: {e}")
         raise  # Re-raise to let ARQ handle it
-
-    # No finally block needed for checkpointer as it's an async context manager
-    # ARQ pool is managed by the worker, not closed here.
