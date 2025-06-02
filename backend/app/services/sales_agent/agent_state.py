@@ -21,8 +21,9 @@ SalesStageLiteral = Literal[
     "objection_handling",  # Addressing customer concerns or objections.
     "checkout_initiated",  # Customer has confirmed intent to purchase, preparing for payment.
     "checkout_link_sent",  # Payment link or instructions have been provided.
-    # "follow_up_pending",        # A follow-up action has been scheduled and is waiting for its trigger time.
-    # "follow_up_in_progress",    # A follow-up message has been sent, awaiting customer response or next step.
+    "follow_up_scheduled",
+    "follow_up_pending",  # A follow-up action has been scheduled and is waiting for its trigger time.
+    "follow_up_in_progress",  # A follow-up message has been sent, awaiting customer response or next step.
     # "human_handoff_requested",  # Customer requested or agent decided to escalate to a human agent.
     # "human_handoff_in_progress",# The process of transferring to a human agent is underway.
     "closed_won",  # Sale successfully completed.
@@ -80,6 +81,12 @@ class PendingFollowUpTrigger(BaseModel):
         ...,
         description="The epoch timestamp (seconds since epoch) when this follow-up is due to be triggered.",
     )
+
+    defer_by: float = Field(
+        ...,
+        description="The difference between current datetime and due_timestamp in seconds.",
+    )
+
     target_conversation_id: UUID = (
         Field(  # Or target_user_id, depending on your main identifier
             ...,
