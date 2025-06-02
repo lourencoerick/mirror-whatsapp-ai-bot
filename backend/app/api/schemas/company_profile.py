@@ -34,7 +34,8 @@ class OfferingInfo(BaseModel):
         description="Brief pricing information (e.g., 'Starts at $X', 'Contact for quote').",
     )
     link: Optional[HttpUrl] = Field(
-        None, description="Direct link to the product/service page, if available."
+        None,
+        description="Direct link to the checkout page of the product or service, if available.",
     )
 
     bonus_items: List[str] = Field(
