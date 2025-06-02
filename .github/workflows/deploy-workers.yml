@@ -9,7 +9,7 @@ on:
       - "backend/app/workers/**"
       - "backend/app/services/researcher/**"
       - "backend/app/services/knowledge/**"
-      - "backend/app/services/new_agent/**"
+      - "backend/app/services/sales_agent/**"
       - "backend/requirements.txt"
       - "backend/app/workers/Dockerfile"
       - ".github/workflows/deploy-workers.yml"
@@ -49,7 +49,7 @@ jobs:
               - "backend/requirements.txt"
             ai_replier:
               - 'backend/app/workers/ai_replier/**'
-              - 'backend/app/services/new_agent/**'
+              - 'backend/app/services/sales_agent/**'
               - "backend/app/workers/Dockerfile"
               - "backend/requirements.txt"
 
