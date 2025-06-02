@@ -259,7 +259,7 @@ def auto_follow_up_scheduler_hook(
         state_updates["pending_follow_up_trigger"] = next_pending_trigger.model_dump(
             mode="json"
         )
-        state_updates["current_sales_stage"] = "follow_up_scheduled"
+        # state_updates["current_sales_stage"] = "follow_up_scheduled"
         state_updates["follow_up_attempt_count"] = next_attempt_number
         state_updates["last_agent_message_timestamp"] = last_agent_message_timestamp
 
@@ -291,12 +291,12 @@ def auto_follow_up_scheduler_hook(
         state_updates["pending_follow_up_trigger"] = auto_pending_trigger.model_dump(
             mode="json"
         )
-        if current_stage not in [
-            "checkout_link_sent",
-            "follow_up_scheduled",
-            "follow_up_in_progress",
-        ]:
-            state_updates["current_sales_stage"] = "follow_up_scheduled"
+        # if current_stage not in [
+        #     "checkout_link_sent",
+        #     "follow_up_scheduled",
+        #     "follow_up_in_progress",
+        # ]:
+        #     state_updates["current_sales_stage"] = "follow_up_scheduled"
         state_updates["follow_up_attempt_count"] = 0
         logger.info(
             f"Auto-Follow-Up Hook: Default follow-up scheduled. Due in {default_delay_seconds}s."
