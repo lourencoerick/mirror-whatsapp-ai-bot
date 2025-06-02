@@ -18,6 +18,19 @@ except ImportError:
 from app.models.knowledge_chunk import KnowledgeChunk, EMBEDDING_DIMENSION
 
 
+async def check_knowledge_chunks_exist_for_account(
+    db: AsyncSession, account_id: UUID
+) -> bool:
+    """Checks if any knowledge chunks exist for a given account."""
+    stmt = (
+        select(KnowledgeChunk.id)
+        .where(KnowledgeChunk.account_id == account_id)
+        .limit(1)
+    )
+    result = await db.execute(select(stmt.exists()))
+    return result.scalar_one()
+
+
 async def add_chunks(
     db: AsyncSession,
     account_id: UUID,
