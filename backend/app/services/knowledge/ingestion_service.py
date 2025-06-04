@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, Literal
 from uuid import UUID
 from urllib.parse import urlparse, urlunparse
 
-from html2text import html2text
+import html2text
 
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -305,12 +305,26 @@ class KnowledgeIngestionService:
                         )
                     )
 
+                    h2t = html2text.HTML2Text()
+                    h2t.body_width = 0  # No automatic line wrapping
+                    h2t.ignore_images = True  # Usually good for RAG
+                    h2t.ignore_links = False  # Keep links by default, can be changed
+                    h2t.ignore_emphasis = False  # Keep bold/italic
+                    h2t.unicode_snob = True
+                    h2t.mark_code = True
+                    h2t.header_style = 1  # Use #, ## for headers (ATX style)
+                    h2t.use_automatic_links = True
+                    h2t.skip_internal_links = True
+                    h2t.include_doc_title = (
+                        False  # Don't use <title> tag as H1 for the whole doc
+                    )
+
                     loader = RecursiveUrlLoader(
                         url=source_uri,
                         max_depth=2,
                         prevent_outside=False,
                         base_url=base_url,
-                        extractor=html2text,
+                        extractor=h2t.handle,
                         check_response_status=True,
                         continue_on_failure=True,
                         link_regex=r'<a\s+(?:[^>]*?\s+)?href="([^"]*)"',
