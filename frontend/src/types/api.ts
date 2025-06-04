@@ -1319,9 +1319,15 @@ export interface components {
             /**
              * Url
              * Format: uri
-             * @description The URL to ingest content from.
+             * @description The URL to be scraped and ingested.
              */
             url: string;
+            /**
+             * Recursive
+             * @description Whether to recursively crawl and ingest pages linked from this URL.
+             * @default false
+             */
+            recursive: boolean | null;
         };
         /** AdminBetaActionResponse */
         AdminBetaActionResponse: {
@@ -3210,7 +3216,7 @@ export interface components {
             price_info?: string | null;
             /**
              * Link
-             * @description Direct link to the product/service page, if available.
+             * @description Direct link to the checkout page of the product or service, if available.
              */
             link?: string | null;
             /**

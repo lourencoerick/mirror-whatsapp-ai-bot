@@ -2,6 +2,7 @@
 import asyncio
 from typing import Any, Dict, List, Optional, Tuple, Union, Literal
 from uuid import UUID
+from urllib.parse import urlparse, urlunparse
 
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -15,8 +16,7 @@ try:
         PyPDFLoader,
         TextLoader,
         UnstructuredFileLoader,  # Keep if used, remove if not
-        WebBaseLoader,
-        UnstructuredURLLoader,
+        RecursiveUrlLoader,
     )
     from langchain_core.documents import Document
     from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -204,7 +204,10 @@ class KnowledgeIngestionService:
         )
 
     async def _load_documents(
-        self, source_type: str, source_uri: str
+        self,
+        source_type: str,
+        source_uri: str,
+        recursive: bool = False,
     ) -> List[Document]:
         """
         Loads documents from the specified source using appropriate LangChain loaders.
@@ -284,7 +287,32 @@ class KnowledgeIngestionService:
             elif source_type == "url":
                 logger.debug("Using WebBaseLoader...")
                 # WebBaseLoader expects a list of URLs
-                loader = CustomWebLoader(source_uri)
+
+                if not recursive:
+                    loader = CustomWebLoader(source_uri)
+                else:
+                    parsed_url = urlparse(source_uri)
+                    base_url = urlunparse(
+                        (
+                            parsed_url.scheme,
+                            parsed_url.netloc,
+                            "/",  # We want the path to be just the root
+                            "",  # No parameters
+                            "",  # No query string
+                            "",  # No fragment
+                        )
+                    )
+
+                    loader = RecursiveUrlLoader(
+                        url=source_uri,
+                        max_depth=2,
+                        prevent_outside=False,
+                        base_url=base_url,
+                        check_response_status=True,
+                        continue_on_failure=True,
+                        link_regex=r'<a\s+(?:[^>]*?\s+)?href="([^"]*)"',
+                    )
+
                 if hasattr(loader, "alazy_load"):
                     logger.debug("Attempting asynchronous loading (alazy_load)...")
                     documents = [doc async for doc in loader.alazy_load()]
@@ -421,6 +449,7 @@ class KnowledgeIngestionService:
         source_type: str,
         source_uri: str,
         source_identifier: str,
+        recursive: bool,
         document_id: Optional[UUID] = None,
         text_splitter_type: Optional[Literal["semantic", "recursive"]] = "recursive",
     ) -> bool:
@@ -463,7 +492,7 @@ class KnowledgeIngestionService:
                     await db.commit()
 
             # --- Step 1: Load Documents ---
-            documents = await self._load_documents(source_type, source_uri)
+            documents = await self._load_documents(source_type, source_uri, recursive)
             if not documents:
                 # Loading failed or produced no documents
                 logger.warning(f"No documents loaded from source: {source_identifier}")
