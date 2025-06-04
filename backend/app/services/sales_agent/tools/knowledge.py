@@ -126,7 +126,15 @@ async def query_knowledge_base(
         "rag_similarity_threshold", RAG_SIMILARITY_THRESHOLD_DEFAULT
     )
 
+    is_rag_active = state.agent_config.use_rag
+
     # --- Validações e Dependências ---
+    if not is_rag_active:
+        logger.warning(f"[{tool_name}] RAG is not active. Skipping retrieval.")
+        return (
+            f"Atualmente, não tenho informações documentadas específicas para a conta "
+            f"'{state.company_profile.company_name if state.company_profile else account_id}'. "
+        )
     if not user_query:
         logger.warning(f"[{tool_name}] No query text provided. Skipping retrieval.")
         return "Por favor, forneça uma pergunta para buscar na base de conhecimento."
