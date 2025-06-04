@@ -292,7 +292,7 @@ def auto_follow_up_scheduler_hook(
             return None
 
         next_delay = calculate_follow_up_delay(
-            attempt_number=next_attempt_number,
+            attempt_number=next_attempt_number + 1,
             base_delay_seconds=follow_up_base_delay,
             factor=follow_up_factor,
         )
