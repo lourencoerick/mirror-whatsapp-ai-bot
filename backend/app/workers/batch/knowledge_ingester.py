@@ -62,7 +62,7 @@ async def process_knowledge_source(
     source_type: str,
     source_uri: str,
     source_identifier: str,
-    recursive: bool,
+    recursive: Optional[bool] = False,
     document_id: Optional[UUID] = None,
 ):
     """
