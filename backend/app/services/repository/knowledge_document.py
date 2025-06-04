@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from loguru import logger
 from sqlalchemy import select, update, func
@@ -103,6 +103,45 @@ async def list_documents_by_account(
     docs = result.scalars().all()
     logger.debug(f"Retrieved {len(docs)} documents for account {account_id}.")
     return docs
+
+
+async def update_extracted_content(
+    db: AsyncSession,
+    document_id: UUID,
+    extracted_content: List[Dict[str, Any]],
+) -> Optional[KnowledgeDocument]:
+    """
+    Update the extracted_content of a knowledge document.
+
+    Args:
+        db: The SQLAlchemy AsyncSession.
+        document_id: The UUID of the document to update.
+        extracted_content: List of Documents extracted from source_uri
+
+    Returns:
+        The updated KnowledgeDocument object, or None if not found.
+    """
+    logger.info(f"Updating document {document_id} with the extracted content")
+    values = {
+        "extracted_content": extracted_content,
+    }
+    stmt = (
+        update(KnowledgeDocument)
+        .where(KnowledgeDocument.id == document_id)
+        .values(**values)
+        .returning(KnowledgeDocument)
+    )
+    try:
+        result = await db.execute(stmt)
+        updated = result.scalars().first()
+        if updated:
+            await db.flush()
+        else:
+            logger.warning(f"Document {document_id} not found.")
+        return updated
+    except Exception:
+        logger.exception("Error updating document status.")
+        raise
 
 
 async def update_document_status(

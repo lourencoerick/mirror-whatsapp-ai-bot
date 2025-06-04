@@ -4,6 +4,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union, Literal
 from uuid import UUID
 from urllib.parse import urlparse, urlunparse
 
+from html2text import html2text
+
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from .custom_web_loader import CustomWebLoader
@@ -308,6 +310,7 @@ class KnowledgeIngestionService:
                         max_depth=2,
                         prevent_outside=False,
                         base_url=base_url,
+                        extractor=html2text,
                         check_response_status=True,
                         continue_on_failure=True,
                         link_regex=r'<a\s+(?:[^>]*?\s+)?href="([^"]*)"',
@@ -507,131 +510,143 @@ class KnowledgeIngestionService:
                 final_status = DocumentStatus.FAILED  # Explicitly set failed status
                 # Go directly to finally block
                 return False  # Indicate failure early
-
-            # --- Step 2: Split into Chunks ---
-            logger.debug(f"Splitting {len(documents)} documents into chunks...")
-
-            chunks: List[Document] = None
-            if text_splitter_type == "semantic":
-                chunks = self.semantic_text_splitter.split_documents(documents)
             else:
-                chunks = self.text_splitter.split_documents(documents)
-
-            logger.info(f"Split into {len(chunks)} chunks.")
-            if not chunks:
-                logger.warning(
-                    "Splitting resulted in zero chunks. Marking as complete."
+                logger.debug(
+                    f"Successfully loaded {len(documents)} documents. Converting for storage..."
                 )
-                final_status = (
-                    DocumentStatus.COMPLETED
-                )  # No chunks is considered 'completed'
-                error_message = None  # No error in this case
-                processed_chunk_count = 0
-                ingestion_successful = True  # Technically successful, just no data
-                # Go to finally block via return
-                return True
-
-            # --- Step 3: Generate Embeddings ---
-            chunk_texts = [chunk.page_content for chunk in chunks]
-            # This call will raise ValueError on failure
-            embeddings = await self._generate_embeddings_in_batches(chunk_texts)
-
-            # --- Step 4: Prepare Chunk Data for Saving ---
-            logger.debug("Preparing chunk data for database insertion...")
-            chunks_to_save: List[Dict[str, Any]] = []
-            for i, chunk_doc in enumerate(chunks):
-                # Prepare metadata, ensuring 'page' becomes 'page_number' if present
-                metadata = chunk_doc.metadata.copy() if chunk_doc.metadata else {}
-                metadata["original_source"] = (
-                    source_identifier  # Add original source identifier
+                loaded_documents_for_db = [
+                    {"page_content": doc.page_content, "metadata": doc.metadata}
+                    for doc in documents
+                ]
+                logger.info(
+                    f"Converted {len(loaded_documents_for_db)} documents for 'extracted_content'."
                 )
-                if "page" in metadata:
-                    metadata["page_number"] = metadata.pop("page")  # Rename 'page' key
 
-                # Structure data for the repository function
-                chunks_to_save.append(
-                    {
-                        "chunk_text": chunk_doc.page_content,
-                        "embedding": embeddings[i],
-                        "source_type": source_type,
-                        "source_identifier": source_identifier,
-                        "metadata_": metadata,  # Pass prepared metadata
-                        "document_id": document_id,  # Link chunk to document if ID provided
-                    }
-                )
-            processed_chunk_count = len(chunks_to_save)
-            logger.debug(f"Prepared {processed_chunk_count} chunks with embeddings.")
-
-            # --- Step 5: Save Chunks to Database ---
-            logger.debug(f"Saving {processed_chunk_count} chunks to the repository...")
-            async with self.db_session_factory() as db:
-                added_count = await add_chunks(
-                    db, account_id=account_id, chunks_data=chunks_to_save
-                )
-                # Verify that all prepared chunks were added
-                if added_count != processed_chunk_count:
-                    error_message = (
-                        f"Database save mismatch: Expected {processed_chunk_count} chunks, "
-                        f"but repository reported saving {added_count}."
-                    )
-                    logger.error(error_message)
-                    # Treat as failure, let finally handle status
-                    final_status = DocumentStatus.FAILED
-                    return False
+            if not loaded_documents_for_db:
+                ingestion_successful = False
+            else:
+                # --- Step 2: Split into Chunks ---
+                logger.debug(f"Splitting {len(documents)} documents into chunks...")
+                chunks: List[Document]  # Langchain Document
+                if text_splitter_type == "semantic":
+                    chunks = self.semantic_text_splitter.split_documents(documents)
                 else:
-                    # Success case
-                    await db.commit()  # Commit the transaction
-                    logger.success(
-                        f"Successfully ingested and saved {added_count} chunks."
+                    chunks = self.text_splitter.split_documents(documents)
+
+                logger.info(f"Split into {len(chunks)} chunks.")
+                if not chunks:
+                    logger.warning(
+                        "Splitting resulted in zero chunks. Marking as complete with 0 chunks."
                     )
                     final_status = DocumentStatus.COMPLETED
-                    error_message = None  # Clear error message on success
+                    error_message = None
+                    processed_chunk_count = 0
                     ingestion_successful = True
+                    # Não precisa retornar, o finally cuidará
+                else:
+                    # --- Step 3: Generate Embeddings ---
+                    chunk_texts = [chunk.page_content for chunk in chunks]
+                    embeddings = await self._generate_embeddings_in_batches(chunk_texts)
 
-        except (
-            ValueError
-        ) as ve:  # Catch specific errors from helpers (embeddings, loading)
+                    # --- Step 4: Prepare Chunk Data for Saving ---
+                    logger.debug("Preparing chunk data for database insertion...")
+                    chunks_to_save: List[Dict[str, Any]] = []
+                    for i, chunk_doc in enumerate(chunks):
+                        metadata = (
+                            chunk_doc.metadata.copy() if chunk_doc.metadata else {}
+                        )
+                        metadata["original_source"] = source_identifier
+                        if "page" in metadata:
+                            metadata["page_number"] = metadata.pop("page")
+
+                        chunks_to_save.append(
+                            {
+                                "chunk_text": chunk_doc.page_content,
+                                "embedding": embeddings[i],
+                                "source_type": source_type,
+                                "source_identifier": source_identifier,
+                                "metadata_": metadata,
+                                "document_id": document_id,
+                            }
+                        )
+                    processed_chunk_count = len(chunks_to_save)
+                    logger.debug(
+                        f"Prepared {processed_chunk_count} chunks with embeddings."
+                    )
+
+                    # --- Step 5: Save Chunks to Database ---
+                    logger.debug(
+                        f"Saving {processed_chunk_count} chunks to the repository..."
+                    )
+                    async with self.db_session_factory() as db:
+                        added_count = await add_chunks(
+                            db, account_id=account_id, chunks_data=chunks_to_save
+                        )
+                        if added_count != processed_chunk_count:
+                            error_message = (
+                                f"Database save mismatch: Expected {processed_chunk_count} chunks, "
+                                f"but repository reported saving {added_count}."
+                            )
+                            logger.error(error_message)
+                            final_status = DocumentStatus.FAILED
+                            ingestion_successful = False
+                        else:
+                            await db.commit()
+                            logger.success(
+                                f"Successfully ingested and saved {added_count} chunks."
+                            )
+                            final_status = DocumentStatus.COMPLETED
+                            error_message = None
+                            ingestion_successful = True
+        except ValueError as ve:
             logger.error(f"Ingestion failed due to ValueError: {ve}")
-            error_message = f"Processing error: {str(ve)[:500]}"  # Limit length
+            error_message = f"Processing error: {str(ve)[:500]}"
             final_status = DocumentStatus.FAILED
             ingestion_successful = False
-        except Exception as e:  # Catch unexpected errors during the process
+        except Exception as e:
             logger.exception(
                 f"Unexpected error during ingestion for source {source_identifier}: {e}"
             )
-            error_message = f"Unexpected error: {str(e)[:500]}"  # Limit length
+            error_message = f"Unexpected error: {str(e)[:500]}"
             final_status = DocumentStatus.FAILED
             ingestion_successful = False
 
         finally:
-            # --- Step 6: Update Final Document Status (Always Attempt) ---
             if DOCUMENT_REPO_AVAILABLE and document_id:
                 logger.debug(
                     f"Updating final document status for {document_id} to {final_status}."
                 )
                 try:
                     async with self.db_session_factory() as db:
-                        # Update status and error message
+
                         await knowledge_document_repo.update_document_status(
                             db,
                             document_id=document_id,
                             status=final_status,
-                            error_message=error_message,  # Pass the captured error message
+                            error_message=error_message,
                         )
-                        # Update chunk count only if completed successfully
-                        if final_status == DocumentStatus.COMPLETED:
+
+                        await knowledge_document_repo.update_extracted_content(
+                            db,
+                            document_id=document_id,
+                            extracted_content=loaded_documents_for_db,
+                        )
+
+                        if (
+                            final_status == DocumentStatus.COMPLETED
+                            and ingestion_successful
+                        ):
                             await knowledge_document_repo.update_document_chunk_count(
                                 db, document_id=document_id, count=processed_chunk_count
                             )
+
                         await db.commit()
                         logger.info(
-                            f"Final document status updated to {final_status} for {document_id}."
+                            f"Final document status and content updated for {document_id}."
                         )
                 except Exception as db_final_err:
-                    # Log if the final status update itself fails, but don't change the outcome
                     logger.error(
-                        f"CRITICAL: Failed to update final document status for {document_id} "
-                        f"to {final_status}. Error: {db_final_err}"
+                        f"CRITICAL: Failed to update final document status/content for {document_id}. Error: {db_final_err}"
                     )
 
-        return ingestion_successful
+            return ingestion_successful
