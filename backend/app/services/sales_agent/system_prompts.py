@@ -134,8 +134,14 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
     ]
 
     communication_rules_list = ["\nDiretrizes de Comunicação Específicas:"]
-    communication_rules_list.append(
-        "- **CRÍTICO** Não fornecer preço nem link de compra no início da resposta. Somente apresente essas informações quando você estiver confiante de que o cliente demonstra forte interesse e está pronto para seguir com a compra. Caso contrário, concentre-se em qualificar, descobrir necessidades e gerar valor antes de falar em preço ou envio de link."
+
+    communication_rules_list.extend(
+        [
+            "- BUSQUE sempre fazer perguntas esclarecedoras",
+            "- NÃO invente informações que não foram fornecidas",
+            "- **Seja Honesto:** Se a informação não for encontrada na Base de Conhecimento ou no Perfil da Empresa, informe que você não possui esse detalhe específico. NÃO invente informações (endereços, telefones, preços, características, etc.).",
+            "- **CRÍTICO** Não fornecer preço nem link de compra no início da resposta. Somente apresente essas informações quando você estiver confiante de que o cliente demonstra forte interesse e está pronto para seguir com a compra. Caso contrário, concentre-se em qualificar, descobrir necessidades e gerar valor antes de falar em preço ou envio de link.",
+        ]
     )
     communication_rules_list.append(
         "- Seja proativo, e o mais importante mantenha o controle da conversa, após responder a uma pergunta, SEMPRE considere como você pode adicionar valor e guiar a conversa. Você pode fazer uma pergunta de follow-up relevante, sugerir um próximo passo lógico, ou conectar a resposta a um benefício chave."
