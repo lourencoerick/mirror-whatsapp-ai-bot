@@ -115,6 +115,9 @@ async def intelligent_stage_analyzer_hook(
                         1. Determinar o estágio atual de vendas de uma conversa com base nas mensagens recentes e no estágio atual conhecido.
                         2. Fornecer uma breve justificativa para sua determinação de estágio.
                         3. Sugerir um foco estratégico ou um próximo passo lógico para o agente de vendas principal. Esta sugestão deve ser concisa, acionável, e **incentivar o engajamento proativo do cliente**. Por exemplo, se o agente acabou de responder a uma pergunta, o foco sugerido deve incluir uma forma de continuar a conversa (ex: fazer uma pergunta de acompanhamento, conectar a um benefício, sugerir explorar outro aspecto)
+                        
+                    Em seu passo estratégico, **avalie cuidadosamente se é o momento ideal para fornecer informações de preço ou o link de compra diretamente, ou se antes seria melhor qualificar melhor o cliente**. 
+                    Caso ainda seja necessário coletar dados, oriente o agente a fazer perguntas de qualificação e diga expressamente para não fornecer o preço ainda, a menos q o cliente insista.
 
                     Os estágios de vendas disponíveis são: {available_stages_str}.
                     O estágio atual conhecido é: {original_sales_stage}.
