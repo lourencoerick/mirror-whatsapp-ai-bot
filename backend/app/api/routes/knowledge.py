@@ -251,10 +251,11 @@ async def add_knowledge_url(
     """
     account_id: UUID = auth_context.account.id
     url_to_ingest = str(request.url)
+    recursive_crawl = request.recursive
     source_identifier = url_to_ingest
 
     logger.info(
-        f"Received URL ingestion request: '{url_to_ingest}' for account {account_id}"
+        f"Received URL ingestion request: '{url_to_ingest}' (recursive: {recursive_crawl}) for account {account_id}"
     )
 
     if not DOCUMENT_REPO_AVAILABLE or not knowledge_document_repo:
@@ -314,18 +315,19 @@ async def add_knowledge_url(
             source_uri=url_to_ingest,
             source_identifier=source_identifier,
             document_id=document_id,
+            recursive=recursive_crawl,
             _queue_name=BATCH_ARQ_QUEUE_NAME,
         )
         if not job:
             raise RuntimeError("arq_pool.enqueue_job returned None.")
 
         logger.info(
-            f"Enqueued knowledge ingestion job '{job.job_id}' for document {document_id} (URL)."
+            f"Enqueued knowledge ingestion job '{job.job_id}' for document {document_id} (URL: {url_to_ingest}, recursive: {recursive_crawl})."
         )
         return IngestResponse(
             document_id=document_id,
             job_id=job.job_id,
-            message=f"URL '{url_to_ingest}' ingestion task queued.",
+            message=f"URL '{url_to_ingest}' ingestion task (recursive: {recursive_crawl}) queued.",
         )
 
     except (ArqConnectionError, EnqueueTimeout, RuntimeError, Exception) as q_err:

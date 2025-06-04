@@ -18,15 +18,14 @@ const KNOWLEDGE_API_PREFIX = "/api/v1/knowledge"; // API Prefix
 /**
  * Calls the backend API to add a URL for knowledge ingestion.
  * @param {FetchFunction} fetcher - The authenticated fetch function.
- * @param {string} url - The URL string to ingest.
+ * @param {AddUrlRequest} payload - The URL string to ingest.
  * @returns {Promise<IngestResponse>} A promise resolving to the IngestResponse.
  * @throws {Error} If the API call fails.
  */
 export const addKnowledgeUrl = async (
   fetcher: FetchFunction,
-  url: string
+  payload: AddUrlRequest 
 ): Promise<IngestResponse> => {
-  const payload: AddUrlRequest = { url };
   const response = await fetcher(`${KNOWLEDGE_API_PREFIX}/add-url`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

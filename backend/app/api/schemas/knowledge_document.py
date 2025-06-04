@@ -104,8 +104,11 @@ class AddTextRequest(BaseModel):
 
 
 class AddUrlRequest(BaseModel):
-    url: HttpUrl = Field(..., description="The URL to ingest content from.")
-    # Optional: Add description?
+    url: HttpUrl = Field(..., description="The URL to be scraped and ingested.")
+    recursive: Optional[bool] = Field(
+        default=False,
+        description="Whether to recursively crawl and ingest pages linked from this URL.",
+    )
 
 
 class IngestResponse(BaseModel):

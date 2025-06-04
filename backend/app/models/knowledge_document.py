@@ -3,11 +3,10 @@ from sqlalchemy import (
     Column,
     String,
     ForeignKey,
-    DateTime,
     Integer,
     Enum as SAEnum,
 )
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -59,6 +58,7 @@ class KnowledgeDocument(BaseModel):
     original_filename: Optional[str] = Column(
         String, nullable=True, doc="Original filename for source_type 'file'."
     )
+
     status: DocumentStatus = Column(
         SAEnum(DocumentStatus, name="document_status_enum", create_type=True),
         nullable=False,
@@ -73,6 +73,12 @@ class KnowledgeDocument(BaseModel):
         Integer,
         nullable=True,
         doc="Number of chunks generated from this document.",
+    )
+
+    extracted_content = Column(
+        JSONB,
+        nullable=True,
+        doc="The extracted content from the source_uri",
     )
 
     account = relationship("Account", back_populates="knowledge_documents")
