@@ -2,12 +2,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query"; // Use useMutation
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner"; // For user feedback
+import { toast } from "sonner";
 import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox"; // Import Checkbox
 import {
   Dialog,
   DialogClose,
@@ -20,25 +21,30 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription, // Import FormDescription
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react"; // Loading icon
+import { Loader2 } from "lucide-react";
 
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
-import { addKnowledgeUrl } from "@/lib/api/knowledge"; // API function
-// import { KNOWLEDGE_QUERY_KEY } from "@/lib/constants"; // Query key constant
-import { components } from "@/types/api"; // API type definitions
+import { addKnowledgeUrl } from "@/lib/api/knowledge";
+import { components } from "@/types/api";
 type IngestResponse = components["schemas"]["IngestResponse"];
+// Assuming AddUrlRequest schema from backend is { url: string, recursive: boolean }
+type AddUrlApiPayload = components["schemas"]["AddUrlRequest"];
+
 const KNOWLEDGE_QUERY_KEY = "knowledgeDocuments";
-// Zod schema for form validation (pt-BR message)
+
+// Zod schema for form validation (pt-BR messages)
 const addUrlFormSchema = z.object({
   url: z.string().url({
     message: "Por favor, insira uma URL válida (ex: https://exemplo.com).",
   }),
+  recursive: z.boolean().default(false).optional(), // Add recursive field
 });
 
 type AddUrlFormValues = z.infer<typeof addUrlFormSchema>;
@@ -53,6 +59,7 @@ interface AddUrlFormProps {
 /**
  * A dialog form component for adding a new knowledge source via URL.
  * Handles input validation, API submission, and user feedback.
+ * Allows optional recursive fetching of linked pages.
  * @param {AddUrlFormProps} props - The component props.
  */
 export function AddUrlForm({ open, onOpenChange }: AddUrlFormProps) {
@@ -63,45 +70,48 @@ export function AddUrlForm({ open, onOpenChange }: AddUrlFormProps) {
     resolver: zodResolver(addUrlFormSchema),
     defaultValues: {
       url: "",
+      recursive: false, // Default recursive to false
     },
   });
 
+  const isRecursiveEnabled = form.watch("recursive"); // Watch the recursive field
+
   // --- Mutation for adding URL ---
   const mutation = useMutation({
-    mutationFn: (url: string) => {
-      if (!fetcher)
+    mutationFn: (payload: AddUrlApiPayload) => {
+      // Payload is now an object
+      if (!fetcher) {
         return Promise.reject(
           new Error("Authentication context not available.")
         );
-      return addKnowledgeUrl(fetcher, url);
+      }
+      return addKnowledgeUrl(fetcher, payload);
     },
     onMutate: async () => {
-      // Display loading toast and return its ID for updates
       return {
         toastId: toast.loading("Adicionando URL à Base de Conhecimento..."),
-      }; // pt-BR
+      };
     },
     onSuccess: (data: IngestResponse, variables, context) => {
-      // Check if the API response indicates success (adjust condition if needed)
       if (data && data.document_id) {
+        const recursiveMessage = variables.recursive
+          ? " (com varredura recursiva)"
+          : "";
         toast.success(
-          `URL adicionada com sucesso! Ingestão iniciada (ID da Tarefa: ${
+          `URL adicionada com sucesso! Ingestão iniciada${recursiveMessage} (ID da Tarefa: ${
             data.job_id || "N/A"
           }).`,
           {
-            // pt-BR
             id: context?.toastId,
           }
         );
-        // Invalidate the query to refresh the document list
         queryClient.invalidateQueries({ queryKey: [KNOWLEDGE_QUERY_KEY] });
-        form.reset(); // Clear the form
-        onOpenChange(false); // Close the dialog
+        form.reset();
+        onOpenChange(false);
       } else {
-        // Handle cases where the API returns 2xx but without expected data
         throw new Error(
           "Falha ao iniciar a tarefa de ingestão. A API não retornou o resultado esperado."
-        ); // pt-BR
+        );
       }
     },
     onError: (error: Error, variables, context) => {
@@ -109,12 +119,10 @@ export function AddUrlForm({ open, onOpenChange }: AddUrlFormProps) {
       toast.error(
         `Falha ao adicionar URL: ${error.message || "Erro desconhecido"}`,
         {
-          // pt-BR
           id: context?.toastId,
         }
       );
     },
-    // No need for explicit 'finally' block as useMutation handles pending state
   });
 
   /** Handles form submission by triggering the mutation. */
@@ -122,26 +130,29 @@ export function AddUrlForm({ open, onOpenChange }: AddUrlFormProps) {
     if (!fetcher) {
       toast.error(
         "Não é possível enviar: Contexto de autenticação indisponível."
-      ); // pt-BR
+      );
       return;
     }
-    mutation.mutate(values.url);
+    // Ensure recursive is explicitly passed, even if undefined (backend default is false)
+    const payload: AddUrlApiPayload = {
+      url: values.url,
+      recursive: values.recursive || false,
+    };
+    mutation.mutate(payload);
   }
 
   /** Handles dialog close actions and resets the form. */
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
-      form.reset(); // Reset form when closing
+      form.reset();
     }
     onOpenChange(isOpen);
   };
 
   return (
-    // The Dialog component wraps the form
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          {/* User-facing text translated to pt-BR */}
           <DialogTitle>Adicionar URL à Base de Conhecimento</DialogTitle>
           <DialogDescription>
             Insira a URL de uma página web para ingerir seu conteúdo. O sistema
@@ -155,19 +166,48 @@ export function AddUrlForm({ open, onOpenChange }: AddUrlFormProps) {
               name="url"
               render={({ field }) => (
                 <FormItem>
-                  {/* User-facing text translated to pt-BR */}
                   <FormLabel>URL do Site</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="https://exemplo.com/sobre-nos" // pt-BR placeholder
+                      placeholder="https://exemplo.com/sobre-nos"
                       {...field}
-                      disabled={mutation.isPending} // Disable input while submitting
+                      disabled={mutation.isPending}
                     />
                   </FormControl>
-                  <FormMessage /> {/* Displays validation errors */}
+                  <FormMessage />
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="recursive"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={mutation.isPending}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Varredura Recursiva</FormLabel>
+                    <FormDescription>
+                      Buscar e ingerir páginas vinculadas a partir desta URL
+                      (mesmo domínio, profundidade 1).
+                    </FormDescription>
+                    {isRecursiveEnabled && (
+                      <p className="text-sm text-muted-foreground pt-1">
+                        <strong>Atenção:</strong> Isso pode aumentar o tempo de
+                        processamento e o número de documentos ingeridos.
+                      </p>
+                    )}
+                  </div>
+                </FormItem>
+              )}
+            />
+
             <DialogFooter>
               <DialogClose asChild>
                 <Button
@@ -175,14 +215,13 @@ export function AddUrlForm({ open, onOpenChange }: AddUrlFormProps) {
                   variant="outline"
                   disabled={mutation.isPending}
                 >
-                  Cancelar {/* pt-BR */}
+                  Cancelar
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                {/* User-facing text translated to pt-BR */}
                 {mutation.isPending ? "Adicionando..." : "Adicionar URL"}
               </Button>
             </DialogFooter>
