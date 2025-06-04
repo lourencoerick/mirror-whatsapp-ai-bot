@@ -614,7 +614,7 @@ async def plan_next_step(state: ResearchState, config: dict) -> Dict[str, Any]:
 
     # --- Get State ---
     iteration_count = state.get("iteration_count", 0)
-    max_iterations = state.get("max_iterations", 5)
+    max_iterations = state.get("max_iterations", 7)
     error_message = state.get("error_message")
     missing_info = state.get("missing_info_summary", "Analysis not available.")
     profile_draft = state.get("profile_draft")
