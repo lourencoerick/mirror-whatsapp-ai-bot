@@ -456,9 +456,9 @@ export function CompanyProfileForm({
                   render={({ field, fieldState: { error } }) => (
                     <StringListInput
                       field={field}
-                      label="Métodos de Pagamentos"
+                      label="Métodos de Pagamento"
                       id="accepted_payment_methods"
-                      placeholder="Adicione os métodos de pagamentos aceito..."
+                      placeholder="Adicione os métodos de pagamento aceito..."
                       error={error}
                     />
                   )}
