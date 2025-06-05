@@ -111,6 +111,7 @@ export function CompanyProfileForm({
         initialData?.ai_objective ||
         "Engajar clientes, responder perguntas sobre ofertas e guiá-los para uma compra ou próximo passo.", // Default objective in pt-BR
       key_selling_points: initialData?.key_selling_points || [],
+      accepted_payment_methods: initialData?.accepted_payment_methods || [],
       delivery_options: initialData?.delivery_options || [],
       opening_hours: initialData?.opening_hours || "",
       fallback_contact_info: initialData?.fallback_contact_info || "",
@@ -168,6 +169,7 @@ export function CompanyProfileForm({
           initialData.ai_objective ||
           "Engajar clientes, responder perguntas sobre ofertas e guiá-los para uma compra ou próximo passo.",
         key_selling_points: initialData.key_selling_points || [],
+        accepted_payment_methods: initialData.accepted_payment_methods || [],
         delivery_options: initialData.delivery_options || [],
         offering_overview: initialData.offering_overview || [],
         opening_hours: initialData.opening_hours || "",
@@ -440,6 +442,23 @@ export function CompanyProfileForm({
                       label="Principais Pontos de Venda (Diferenciais)"
                       id="key_selling_points"
                       placeholder="Adicione um ponto de venda..."
+                      error={error}
+                    />
+                  )}
+                />
+              </div>
+
+              {/* Key Payment Methods using StringListInput component */}
+              <div>
+                <Controller
+                  name="accepted_payment_methods"
+                  control={control}
+                  render={({ field, fieldState: { error } }) => (
+                    <StringListInput
+                      field={field}
+                      label="Métodos de Pagamentos"
+                      id="accepted_payment_methods"
+                      placeholder="Adicione os métodos de pagamentos aceito..."
                       error={error}
                     />
                   )}

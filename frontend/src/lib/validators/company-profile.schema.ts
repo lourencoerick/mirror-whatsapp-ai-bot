@@ -59,6 +59,7 @@ export const companyProfileValidationSchema = z.object({
     .min(1, { message: "AI objective is required." })
     .max(1000),
   key_selling_points: z.array(z.string()).optional(),
+  accepted_payment_methods: z.array(z.string()).optional(),
   offering_overview: z.array(offeringValidationSchema).optional().default([]), // Usa o schema aninhado
 
   delivery_options: z.array(z.string()).optional(),
