@@ -50,6 +50,16 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
     if profile.opening_hours:
         company += f" Horário de funcionamento: {profile.opening_hours}."
 
+    accepted_payment_methods = ""
+    if profile.accepted_payment_methods:
+        payment_method_str = "\n".join(
+            [
+                f"- {payment_method}"
+                for payment_method in profile.accepted_payment_methods
+            ]
+        )
+        accepted_payment_methods = f"Meios de pagamento aceitos:\n{payment_method_str}"
+
     # --- Seção 3: Objetivos e Estratégia de Vendas do AI ---
     objective_statement = f"Seu principal objetivo como AI é: {profile.ai_objective}."
 
@@ -152,6 +162,7 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
         language_instruction,
         "\n--- Sobre Nós ---",
         company,
+        accepted_payment_methods,
         "\n--- Seu Papel e Objetivos ---",
         objective_statement,
         key_selling_points_list if profile.key_selling_points else "",
