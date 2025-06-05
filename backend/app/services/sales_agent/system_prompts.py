@@ -144,19 +144,6 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
     else:
         fallback_instruction = "\nSe você não puder ajudar diretamente, peça desculpas e informe que você não tem a informação no momento. "
 
-    last_rule = """
-        ** NÃO ESQUEÇA DE FORMATAR BEM SUA MENSAGEM, COM ESPAÇAMENTO, QUEBRA DE LINHA ETC... **       
-        **Fluxo obrigatório antes de responder ao usuário (use a ferramenta 'validate_response_and_references'):**
-        1. Elabore internamente:
-            a. `reasoning_steps`: descrevendo seu processo de pensamento.
-            b. `information_sources`: listando a origem de cada dado factual.
-            c. `proposed_response_to_user`: texto exato da mensagem que enviará.
-        2. Chame a ferramenta `validate_response_and_references` com (`reasoning_steps`, `information_sources`, `proposed_response_to_user`).
-        3. Aguarde validação:
-            - Se for validado, envie o conteúdo aprovado como resposta final.
-            - Se receber 'VALIDATION FEEDBACK', revise seu raciocínio e resposta, então repita o fluxo.
-    """
-
     # --- Montagem Final do System Message ---
     system_message_parts = [
         security_layer,
@@ -179,8 +166,6 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
         tools_mention,
         "\n--- Fallback e Escalonamento ---",
         fallback_instruction,
-        "\n--- ÚLTIMA REGRA E IMPORTANTÍSSIMA ---",
-        last_rule,
         "\nLembre-se, seu objetivo é ser um consultor de vendas eficaz, ajudando os clientes e representando bem a marca.",
     ]
 
