@@ -1691,6 +1691,11 @@ export interface components {
              */
             key_selling_points?: string[];
             /**
+             * Accepted Payment Methods
+             * @description Accepted payment methods.
+             */
+            accepted_payment_methods?: string[];
+            /**
              * Offering Overview
              * @description List of key products/services with short details.
              */
@@ -1824,6 +1829,11 @@ export interface components {
              * @description Unique selling propositions (USPs) or differentiators.
              */
             key_selling_points?: string[];
+            /**
+             * Accepted Payment Methods
+             * @description Accepted payment methods.
+             */
+            accepted_payment_methods?: string[];
             /**
              * Offering Overview
              * @description List of key products/services with short details.

@@ -109,6 +109,11 @@ class CompanyProfileSchema(BaseModel):
         description="Unique selling propositions (USPs) or differentiators.",
     )
 
+    accepted_payment_methods: List[str] = Field(
+        default_factory=list,
+        description="Accepted payment methods.",
+    )
+
     offering_overview: List[OfferingInfo] = Field(
         default_factory=list,
         description="List of key products/services with short details.",
