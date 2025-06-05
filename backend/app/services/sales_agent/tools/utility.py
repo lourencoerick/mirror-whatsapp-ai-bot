@@ -71,9 +71,10 @@ async def update_sales_stage(
 async def validate_response_and_references(
     reasoning_steps: List[str],
     information_sources: List[str],
-    proposed_response_to_user: str,
     compliance_declaration: str,
     correct_format_output_declaration: str,
+    used_sales_principles_declaration: str,
+    proposed_response_to_user: str,
     state: Annotated[AgentState, InjectedState],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
@@ -95,7 +96,8 @@ async def validate_response_and_references(
        or tool outputs) and are feasible for the company to offer or for you (AI) to execute.
        Example: "I have verified that the proposed next steps (e.g., discussing payment plans)
        are consistent with the company's offerings as per the 'get_offering_details_by_id' tool output."
-    5. `correct_output_declaration`: A statement from you confirming that you formatted the output to make the conversation fluid and natural and that you are following the: `Como Você Deve Se Comunicar e Agir` and the `Princípios Gerais de Vendas` sections.
+    5. `correct_output_declaration`: A statement confirming that you formatted the output—using appropriate line spacing, clear organization, and bullet points where applicable—to ensure the conversation flows naturally and is easy to understand, and that you used the tool’s information to SUPPORT your final messages and not copied and paste the text, i.e., rewrote everything as needed to maintain a smooth dialogue.
+    6. `used_sales_principles_declaration`: A statement from you confirming that you are using the communication rules and the sales principles provided in the instructions, and that you are being proactive and engaging the customer toward the next step of the sale without sharing princing and checkout information before qualifying the lead, unless that the customer insists.
 
     This tool will review your preparation.
     - If approved, the `ToolMessage` content you receive back WILL BE your
@@ -147,6 +149,12 @@ async def validate_response_and_references(
     elif not correct_format_output_declaration:  # Check for the new field
         validation_passed = False  # For now, just a warning if missing
         feedback_to_agent_llm = "Validation Warning: Format the output accordingly."
+
+    elif not used_sales_principles_declaration:  # Check for the new field
+        validation_passed = False  # For now, just a warning if missing
+        feedback_to_agent_llm = (
+            "Validation Warning: Use the sales principles and communications rules."
+        )
 
     # In a real validator, you'd have more complex checks here.
     # For example, checking if sources are plausible, if reasoning aligns with response, etc.
