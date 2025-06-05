@@ -15,6 +15,67 @@ from app.api.schemas.company_profile import OfferingInfo
 
 
 @tool
+async def list_available_offerings(
+    state: Annotated[AgentState, InjectedState],
+) -> str:
+    """Lists all available offerings (products/services) from the company profile.
+
+    Use this tool when the user asks general questions like "What do you sell?",
+    "What products do you have?", or "Can you list your services?".
+    It provides a summary of each offering, including its name, ID, and a short description.
+    The agent should then present this information clearly to the user.
+
+    Args:
+        state: The current state of the agent, providing access to the
+               company profile and its offering overview.
+
+    Returns:
+        A string containing a formatted list of available offerings with their
+        names, IDs, and short descriptions. If no offerings are defined,
+        it returns a message indicating that.
+    """
+    tool_name = "list_available_offerings"
+    logger.info(f"--- Executing Tool: {tool_name} ---")
+
+    company_profile_data = getattr(
+        state,
+        "company_profile",
+        state.get("company_profile") if isinstance(state, dict) else None,
+    )
+
+    if not company_profile_data:
+        logger.error(f"[{tool_name}] Company profile is missing from agent state.")
+        return "Internal error: Company information is currently unavailable, so I cannot list offerings."
+
+    offering_overview_list = getattr(company_profile_data, "offering_overview", None)
+
+    if not offering_overview_list:
+        logger.info(f"[{tool_name}] No offerings are listed in the company profile.")
+        return "Currently, there are no specific offerings listed for this company."
+
+    summary_parts = ["Here are the available offerings from our company:"]
+    for offer in offering_overview_list:
+        offer_detail = f"\n\n**Offering Name:** {offer.name}"
+        offer_detail += f"\n  **ID (internal information):** {str(offer.id)} "  # Crucial for follow-up questions
+        offer_detail += f"\n  **Summary:** {offer.short_description}"
+        # Optionally add price if you want a brief price indication here
+        price_display = ""
+
+        if hasattr(offer, "price") and offer.price is not None:
+            price_display += f"\n\t**Price**: R${offer.price:.2f}"  # Example
+
+        if hasattr(offer, "price_info") and offer.price_info:
+            price_display += f"\n\t**Price Details**: {offer.price_info}"
+
+        if price_display:
+            offer_detail += f"\n  **Price Indication:** {price_display}"
+        summary_parts.append(offer_detail)
+
+    logger.info(f"[{tool_name}] Found {len(offering_overview_list)} offerings to list.")
+    return "\n".join(summary_parts)
+
+
+@tool
 async def get_offering_details_by_id(
     offering_id_str: str,
     state: Annotated[AgentState, InjectedState],
@@ -158,7 +219,7 @@ async def update_shopping_cart(
     )
 
     tool_message_content: str = ""
-    state_updates: Dict[str, Any] = {}
+    state_updates: Dict[str, Any] = {"shopping_cart": current_shopping_cart}
 
     # --- Validations and Setup ---
     if not offering_id_str:

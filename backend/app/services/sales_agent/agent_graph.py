@@ -1,11 +1,17 @@
 # app/services/sales_agent/agent_graph.py
 
-from typing import List, Callable
+from typing import List, Callable, Any
 
 # Langchain & LangGraph
 from langchain_core.language_models import BaseChatModel
-from langgraph.prebuilt import create_react_agent
+from langchain_core.messages import (
+    BaseMessage,
+    SystemMessage,
+)
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.graph import StateGraph, END
+from langgraph.utils.runnable import RunnableCallable
+from langgraph.prebuilt import ToolNode, tools_condition
 
 
 from app.api.schemas.company_profile import CompanyProfileSchema
@@ -18,6 +24,7 @@ from .system_prompts import generate_system_message
 from .agent_hooks import (
     intelligent_stage_analyzer_hook,
     auto_follow_up_scheduler_hook,
+    validation_compliance_check_hook,
 )
 
 # Tools
@@ -26,24 +33,36 @@ from .tools.offering import (
     get_offering_details_by_id,
     update_shopping_cart,
     generate_checkout_link_for_cart,
+    list_available_offerings,
 )
 from .tools.strategy import (
     suggest_objection_response_strategy,
 )
 from .tools.utility import (
     update_sales_stage,
+    validate_response_and_references,
 )
 
 
 # List of all tools for the agent
 ALL_TOOLS: List[Callable] = [
-    query_knowledge_base,
+    list_available_offerings,
     get_offering_details_by_id,
     update_shopping_cart,
     generate_checkout_link_for_cart,
+    query_knowledge_base,
     suggest_objection_response_strategy,
     update_sales_stage,
+    validate_response_and_references,
 ]
+
+
+def _get_state_value(state: AgentState, key: str, default: Any = None) -> Any:
+    return (
+        state.get(key, default)
+        if isinstance(state, dict)
+        else getattr(state, key, default)
+    )
 
 
 def create_react_sales_agent_graph(
@@ -63,15 +82,44 @@ def create_react_sales_agent_graph(
         A compiled LangGraph agent (Callable).
     """
     company_profile = CompanyProfileSchema.model_validate(company_profile)
-    static_system_prompt_str = generate_system_message(profile=company_profile)
 
-    return create_react_agent(
-        model=model,
-        tools=ALL_TOOLS,
-        state_schema=AgentState,
-        prompt=static_system_prompt_str,
-        checkpointer=checkpointer,
-        pre_model_hook=intelligent_stage_analyzer_hook,
-        post_model_hook=auto_follow_up_scheduler_hook,
-        version="v2",
+    static_system_prompt_str = generate_system_message(profile=company_profile)
+    _system_message: BaseMessage = SystemMessage(content=static_system_prompt_str)
+    prompt_runnable = RunnableCallable(
+        lambda state: [_system_message] + _get_state_value(state, "messages"),
+        name="prompt",
     )
+
+    model_runnable = prompt_runnable | model.bind_tools(ALL_TOOLS)
+
+    graph_builder = StateGraph(AgentState)
+    graph_builder.add_node(
+        "intelligent_stage_analyzer", intelligent_stage_analyzer_hook
+    )
+    graph_builder.add_node("auto_follow_up_scheduler", auto_follow_up_scheduler_hook)
+    graph_builder.add_node(
+        "validation_compliance_check", validation_compliance_check_hook
+    )
+    graph_builder.add_node("tools", ToolNode(ALL_TOOLS))
+    graph_builder.add_node(
+        "chatbot",
+        lambda state: {"messages": model_runnable.invoke(state)},
+    )
+
+    graph_builder.set_entry_point("intelligent_stage_analyzer")
+    graph_builder.add_edge("intelligent_stage_analyzer", "chatbot")
+    graph_builder.add_conditional_edges(
+        "chatbot",
+        tools_condition,
+        {
+            "tools": "tools",
+            END: "validation_compliance_check",
+        },
+    )
+    graph_builder.add_edge("tools", "chatbot")
+
+    graph_builder.add_edge("auto_follow_up_scheduler", END)
+
+    graph = graph_builder.compile(checkpointer=checkpointer)
+
+    return graph

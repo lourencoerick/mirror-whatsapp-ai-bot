@@ -10,10 +10,12 @@ from langchain_core.messages import (
     HumanMessage,
     AIMessage,
     RemoveMessage,
+    ToolMessage,
 )
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
+from langgraph.types import Command
 
 
 from app.workers.ai_replier.utils.datetime import calculate_follow_up_delay
@@ -206,7 +208,7 @@ async def intelligent_stage_analyzer_hook(
     return state_updates
 
 
-def auto_follow_up_scheduler_hook(
+async def auto_follow_up_scheduler_hook(
     state: AgentState, config: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
     """Schedules or re-schedules follow-ups automatically after an agent turn.
@@ -370,3 +372,164 @@ def auto_follow_up_scheduler_hook(
 
     state_updates["last_agent_message_timestamp"] = last_agent_message_timestamp
     return state_updates
+
+
+from uuid import uuid4
+
+MAIN_AGENT_NODE_NAME = "chatbot"
+VALIDATION_TOOL_NAME = "validate_response_and_references"
+COMPLIANCE_HOOK_REMINDER_ID_PREFIX = "compliance_reminder_system_msg_"
+
+
+PERFORM_DEEP_CLEANUP_ON_SUCCESS = True
+
+
+async def validation_compliance_check_hook(state: AgentState) -> Optional[Command]:
+    """
+    Post-model hook to:
+    1. Check compliance: If agent sends direct AIMessage without validation, force retry.
+    2. Clean up: If a validated AIMessage was just sent, clean up validation-related
+       messages (the validator tool's output, the AI's tool call to validator)
+       and any prior compliance reminder messages from this hook.
+    """
+    logger.info("--- Executing post_model_hook: validation_compliance_check_hook ---")
+    messages: List[BaseMessage] = state.messages[:]  # Work with a copy
+
+    if not messages:
+        logger.debug("ComplianceCheckHook: No messages. Skipping.")
+        return None
+
+    # --- Part 1: Compliance Check & Forced Retry ---
+    last_message = messages[-1]
+    last_message_id = getattr(last_message, "id", None)
+
+    if isinstance(last_message, AIMessage) and not last_message.tool_calls:
+        logger.debug(
+            f"ComplianceCheckHook: Last message is an AIMessage to user: '{last_message.content[:50]}...'"
+        )
+
+        validation_step_found_and_matched = False
+        validator_tool_message_id_to_remove_on_success: Optional[str] = None
+        ai_tool_call_message_id_to_remove_on_success: Optional[str] = None
+
+        if len(messages) >= 2:
+            validator_tool_message = messages[-2]
+            if (
+                isinstance(validator_tool_message, ToolMessage)
+                and validator_tool_message.name == VALIDATION_TOOL_NAME
+                # and validator_tool_message.content == last_message.content
+            ):
+                validation_step_found_and_matched = True
+                validator_tool_message_id_to_remove_on_success = getattr(
+                    validator_tool_message, "id", None
+                )
+                if len(messages) >= 3:
+                    ai_tool_call_message = messages[-3]
+                    # Check if this message was an AIMessage that called the validation tool
+                    if (
+                        isinstance(ai_tool_call_message, AIMessage)
+                        and ai_tool_call_message.tool_calls
+                    ):
+                        for tc in ai_tool_call_message.tool_calls:
+                            if tc.get("name") == VALIDATION_TOOL_NAME:
+                                ai_tool_call_message_id_to_remove_on_success = getattr(
+                                    ai_tool_call_message, "id", None
+                                )
+                                break
+
+        if not validation_step_found_and_matched:
+            logger.error(
+                f"COMPLIANCE BREACH: Agent sent AIMessage (ID: {last_message_id}) without proper validation or content mismatch!"
+            )
+            messages_to_update_for_retry: List[Any] = []
+            if last_message_id:
+                messages_to_update_for_retry.append(RemoveMessage(id=last_message_id))
+
+            reminder_id = f"{COMPLIANCE_HOOK_REMINDER_ID_PREFIX}{uuid4().hex[:8]}"
+            retry_instruction_message = SystemMessage(
+                content="SYSTEM ALERT: CRITICAL PROTOCOL VIOLATION. "
+                "You attempted to send a message without prior validation or your response mismatched. "
+                "Your unvalidated message is being retracted. "
+                "You MUST NOW RE-EVALUATE and call 'validate_response_and_references' correctly.",
+                id=reminder_id,
+            )
+            messages_to_update_for_retry.append(retry_instruction_message)
+
+            logger.info(
+                f"ComplianceCheckHook: Instructing agent to retry. Redirecting to '{MAIN_AGENT_NODE_NAME}'."
+            )
+            return Command(
+                update={"messages": messages_to_update_for_retry},
+                goto=MAIN_AGENT_NODE_NAME,
+            )
+        else:
+            # --- Part 2: Successful Validation - Perform Cleanup ---
+            logger.info(
+                "ComplianceCheckHook: Last AIMessage was validated and compliant. Proceeding with cleanup."
+            )
+            messages_to_remove_ids_on_success: List[str] = []
+
+            if PERFORM_DEEP_CLEANUP_ON_SUCCESS:
+                if validator_tool_message_id_to_remove_on_success:
+                    messages_to_remove_ids_on_success.append(
+                        validator_tool_message_id_to_remove_on_success
+                    )
+                    logger.info(
+                        f"ComplianceCheckHook: Marking validator ToolMessage (ID: {validator_tool_message_id_to_remove_on_success}) for removal."
+                    )
+                if ai_tool_call_message_id_to_remove_on_success:
+                    messages_to_remove_ids_on_success.append(
+                        ai_tool_call_message_id_to_remove_on_success
+                    )
+                    logger.info(
+                        f"ComplianceCheckHook: Marking AI tool call message (ID: {ai_tool_call_message_id_to_remove_on_success}) for removal."
+                    )
+
+            # Clean up any old reminder messages from this hook
+            # Iterate up to where the potential AI tool call message was, or further if no deep cleanup
+            limit_for_reminder_scan = (
+                -3
+                if PERFORM_DEEP_CLEANUP_ON_SUCCESS
+                and ai_tool_call_message_id_to_remove_on_success
+                else -2
+            )
+
+            for i in range(len(messages) + limit_for_reminder_scan, -1, -1):
+                if i < 0 or i >= len(messages):
+                    continue  # Boundary check
+                msg = messages[i]
+                msg_id_to_check = getattr(msg, "id", "")
+                if isinstance(msg, SystemMessage) and msg_id_to_check.startswith(
+                    COMPLIANCE_HOOK_REMINDER_ID_PREFIX
+                ):
+                    if (
+                        msg_id_to_check not in messages_to_remove_ids_on_success
+                    ):  # Avoid double adding
+                        messages_to_remove_ids_on_success.append(msg_id_to_check)
+                        logger.info(
+                            f"ComplianceCheckHook: Cleaning up old reminder SystemMessage (ID: {msg_id_to_check})."
+                        )
+
+            if messages_to_remove_ids_on_success:
+                logger.info(
+                    f"ComplianceCheckHook: Proposing removal of messages: {messages_to_remove_ids_on_success}"
+                )
+                return Command(
+                    update={
+                        "messages": [
+                            RemoveMessage(id=msg_id)
+                            for msg_id in messages_to_remove_ids_on_success
+                        ]
+                    },
+                    goto="auto_follow_up_scheduler",
+                )
+            else:
+                logger.info(
+                    "ComplianceCheckHook: No specific cleanup actions needed for this successful turn."
+                )
+                return None  # No updates if no cleanup needed
+
+    logger.debug(
+        "ComplianceCheckHook: Last agent action not a direct AIMessage to user, or other condition. No action."
+    )
+    return None
