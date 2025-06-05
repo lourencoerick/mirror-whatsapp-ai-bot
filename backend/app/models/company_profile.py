@@ -65,6 +65,7 @@ class CompanyProfile(BaseModel):
         default="pt-BR",
         doc="Primary language the AI should use.",
     )
+
     communication_guidelines = Column(
         JSON,  # Store list as JSON
         nullable=False,
@@ -82,6 +83,12 @@ class CompanyProfile(BaseModel):
         nullable=False,
         default=list,
         doc="Unique selling propositions (USPs) (list of strings).",
+    )
+    accepted_payment_methods = Column(
+        JSON,  # Store list as JSON
+        nullable=False,
+        default=list,
+        doc="Accepted payment methods.",
     )
     offering_overview = Column(
         JSON,  # Store list of offering dicts as JSON
