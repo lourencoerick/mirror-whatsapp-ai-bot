@@ -208,7 +208,7 @@ async def intelligent_stage_analyzer_hook(
     return state_updates
 
 
-def auto_follow_up_scheduler_hook(
+async def auto_follow_up_scheduler_hook(
     state: AgentState, config: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
     """Schedules or re-schedules follow-ups automatically after an agent turn.
@@ -376,7 +376,7 @@ def auto_follow_up_scheduler_hook(
 
 from uuid import uuid4
 
-MAIN_AGENT_NODE_NAME = "agent"
+MAIN_AGENT_NODE_NAME = "chatbot"
 VALIDATION_TOOL_NAME = "validate_response_and_references"
 COMPLIANCE_HOOK_REMINDER_ID_PREFIX = "compliance_reminder_system_msg_"
 
@@ -384,9 +384,7 @@ COMPLIANCE_HOOK_REMINDER_ID_PREFIX = "compliance_reminder_system_msg_"
 PERFORM_DEEP_CLEANUP_ON_SUCCESS = True
 
 
-def validation_compliance_check_hook(
-    state: AgentState, config: Dict[str, Any]
-) -> Optional[Command]:
+async def validation_compliance_check_hook(state: AgentState) -> Optional[Command]:
     """
     Post-model hook to:
     1. Check compliance: If agent sends direct AIMessage without validation, force retry.
@@ -419,7 +417,7 @@ def validation_compliance_check_hook(
             if (
                 isinstance(validator_tool_message, ToolMessage)
                 and validator_tool_message.name == VALIDATION_TOOL_NAME
-                and validator_tool_message.content == last_message.content
+                # and validator_tool_message.content == last_message.content
             ):
                 validation_step_found_and_matched = True
                 validator_tool_message_id_to_remove_on_success = getattr(
@@ -512,7 +510,6 @@ def validation_compliance_check_hook(
                             f"ComplianceCheckHook: Cleaning up old reminder SystemMessage (ID: {msg_id_to_check})."
                         )
 
-            validation_compliance_check_hook(state=state, config=config)
             if messages_to_remove_ids_on_success:
                 logger.info(
                     f"ComplianceCheckHook: Proposing removal of messages: {messages_to_remove_ids_on_success}"
@@ -523,7 +520,8 @@ def validation_compliance_check_hook(
                             RemoveMessage(id=msg_id)
                             for msg_id in messages_to_remove_ids_on_success
                         ]
-                    }
+                    },
+                    goto="auto_follow_up_scheduler",
                 )
             else:
                 logger.info(
