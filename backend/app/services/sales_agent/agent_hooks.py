@@ -184,7 +184,7 @@ async def intelligent_stage_analyzer_hook(
         )
 
     stage_context_message = SystemMessage(
-        content=f"Atualização de Contexto do Sistema:\n"
+        content=f"Adição ao Contexto do Sistema:\n"
         f"- Estágio de Vendas Atual: '{final_stage_for_turn}' (Análise: {analysis_reasoning})\n"
         f"- Foco Sugerido para Próximo Passo: {suggested_focus}\n"
         f"Ajuste sua resposta e ações de acordo.",
@@ -457,9 +457,9 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
 
             retry_instruction_message = SystemMessage(
                 content="Atenção: Sua última mensagem não passou pelo processo de validação ou apresentou alguma inconsistência."
-                "Para garantir a qualidade e a conformidade, estamos retirando essa mensagem por enquanto."
+                "Para garantir a qualidade e a conformidade, estamos retirando essa mensagem por enquanto.\n"
                 "Por favor, revise o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n"
-                "Responda a mensagem do usuário:"
+                "Responda a mensagem do usuário:\n"
                 f"- Usuário: {current_user_input_text}",
                 id=reminder_id,
             )
