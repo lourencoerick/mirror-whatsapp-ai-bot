@@ -184,7 +184,7 @@ async def intelligent_stage_analyzer_hook(
         )
 
     stage_context_message = SystemMessage(
-        content=f"Adição de Contexto do Sistema:\n"
+        content=f"Adição ao Contexto do Sistema:\n"
         f"- Estágio de Vendas Atual: '{final_stage_for_turn}' (Análise: {analysis_reasoning})\n"
         f"- Foco Sugerido para Próximo Passo: {suggested_focus}\n"
         f"Ajuste sua resposta e ações de acordo.",
