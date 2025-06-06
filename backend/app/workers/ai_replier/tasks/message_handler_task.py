@@ -646,6 +646,10 @@ async def handle_ai_reply_request(
                         if (
                             isinstance(msg_lc, AIMessage)
                             and hasattr(msg_lc, "id")
+                            and not (
+                                hasattr(msg_lc, "tool_calls")
+                                and len(msg_lc.tool_calls) > 0
+                            )  # it is not a tool call
                             and msg_lc.id
                         ):
                             if (
