@@ -92,6 +92,7 @@ async def validate_response_and_references(
        or specific offers you are proposing in your `proposed_response_to_user` have
        been checked against available company information (from the Company Profile
        or tool outputs) and are feasible for the company to offer or for you (AI) to execute.
+       If you used the `suggest_objection_response_strategy`, it is not a source of truth, it is just a advisor for you, you have to base your response on the company profile, offering tools, and knowledge base.
        Example: "I have verified that the proposed next steps (e.g., discussing payment plans)
        are consistent with the company's offerings as per the 'get_offering_details_by_id' tool output."
     4. `correct_format_output_declaration`: A statement confirming that you formatted the output—using appropriate line spacing, clear organization, and bullet points where applicable—to ensure the conversation flows naturally and is easy to understand, and that you used the tool’s information to SUPPORT your final messages and not copied and paste the text, i.e., rewrote everything as needed to maintain a smooth dialogue.
