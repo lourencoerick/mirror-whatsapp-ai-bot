@@ -112,9 +112,11 @@ async def validate_response_and_references(
     Args:
         reasoning_steps: Your step-by-step thought process.
         information_sources: Specific sources for all factual claims.
-        proposed_response_to_user: The exact response you plan to send.
         compliance_declaration: Your statement confirming proposed next steps
                                 are aligned with company capabilities and available information.
+        correct_format_output_declaration: Your statement confirming that you formatted the message correctly
+        used_sales_principles_declaration: Your statement confirming that you used the sales principles and followed the communication guidelines
+        proposed_response_to_user: The exact response you plan to send.
         state: (Injected by system) Current conversation state.
         tool_call_id: (Injected by system) ID for this tool invocation.
 
