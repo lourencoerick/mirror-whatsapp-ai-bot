@@ -12,7 +12,6 @@ from app.services.repository import message as message_repo
 from app.services.repository import inbox as inbox_repo
 
 from app.services.repository import evolution_instance as evolution_instance_repo
-from app.services.helper.checkpoint import reset_checkpoint
 from app.services.repository.message import (
     delete_messages_by_conversation,
 )
@@ -200,18 +199,6 @@ class ResponseSender:
             logger.info(
                 f"[sender] Message {message.id} status updated to '{status_from_provider}' based on provider response."
             )
-
-            if message.content.lower().strip() == settings.RESET_MESSAGE_TRIGGER:
-                thread_id_str = str(message.conversation_id)
-
-                # await delete_messages_by_conversation(
-                #     db=db, conversation_id=message.conversation_id
-                # )
-                await reset_checkpoint(db=db, thread_id=thread_id_str)
-
-                logger.info(
-                    "[sender] Deleting messages for testing bot agent from no history."
-                )
 
         except httpx.HTTPError as e:
             message.status = "failed"

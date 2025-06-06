@@ -206,7 +206,7 @@ from app.services.queue.redis_queue import (
     RedisQueue,
 )  # Assuming this is a simple wrapper
 from app.services.helper.websocket import publish_to_conversation_ws
-from app.workers.ai_replier.utils.datetime import calculate_follow_up_delay
+from app.services.helper.checkpoint import reset_checkpoint
 
 # --- Configuration Constants ---
 CONVERSATION_HISTORY_LIMIT = 20
@@ -548,6 +548,8 @@ async def handle_ai_reply_request(
                         # Or, the graph itself should handle a "reset" intent.
                         # For now, let's assume graph handles it or we send a canned response.
                         # This example sends back the reset command as a simple echo.
+                        await reset_checkpoint(db=db, thread_id=str(conversation_id))
+
                         await _process_one_message(
                             db,
                             account_id,
@@ -557,6 +559,7 @@ async def handle_ai_reply_request(
                             conversation,
                             "Conversa resetada! Mande uma nova mensagem, e inicie uma conversa sem histórico.",
                         )
+
                         await db.commit()  # Commit this specific action
                         logger.info(
                             f"{log_prefix} Conversation reset processed and committed."
@@ -643,6 +646,10 @@ async def handle_ai_reply_request(
                         if (
                             isinstance(msg_lc, AIMessage)
                             and hasattr(msg_lc, "id")
+                            and not (
+                                hasattr(msg_lc, "tool_calls")
+                                and len(msg_lc.tool_calls) > 0
+                            )  # it is not a tool call
                             and msg_lc.id
                         ):
                             if (
