@@ -75,19 +75,19 @@ async def intelligent_stage_analyzer_hook(
     state_updates: Dict[str, Any] = {}
     current_messages: List[BaseMessage] = state.messages[:]  # Work with a copy
 
-    first_message = current_messages[0] if current_messages else None
-    if first_message and first_message.id == STATE_CONTEXT_MESSAGE_ID:
-        messages_to_add = current_messages[1:]
-    else:
-        messages_to_add = current_messages
+    # first_message = current_messages[0] if current_messages else None
+    # if first_message and first_message.id == STATE_CONTEXT_MESSAGE_ID:
+    #     messages_to_add = current_messages[1:]
+    # else:
+    #     messages_to_add = current_messages
 
-    stage_context_message = SystemMessage(content="", id=STATE_CONTEXT_MESSAGE_ID)
-    state_updates["messages"] = [
-        RemoveMessage(id=REMOVE_ALL_MESSAGES),
-        stage_context_message,
-        *messages_to_add,
-    ]
-    return state_updates
+    # stage_context_message = SystemMessage(content="", id=STATE_CONTEXT_MESSAGE_ID)
+    # state_updates["messages"] = [
+    #     RemoveMessage(id=REMOVE_ALL_MESSAGES),
+    #     stage_context_message,
+    #     *messages_to_add,
+    # ]
+    # return state_updates
     # Only run analysis if the last message is from a human (new input)
     if not current_messages or not isinstance(current_messages[-1], HumanMessage):
         logger.debug("No new human message, or history empty. Skipping stage analysis.")
@@ -199,7 +199,7 @@ async def intelligent_stage_analyzer_hook(
     stage_context_message = SystemMessage(
         content=f"Adição ao Contexto do Sistema:\n"
         f"- Estágio de Vendas Atual: '{final_stage_for_turn}' (Análise: {analysis_reasoning})\n"
-        f"- Foco Sugerido para Próximo Passo: {suggested_focus}\n"
+        # f"- Foco Sugerido para Próximo Passo: {suggested_focus}\n"
         f"Ajuste sua resposta e ações de acordo.",
         id=STATE_CONTEXT_MESSAGE_ID,  # Assign an ID to this message
     )
