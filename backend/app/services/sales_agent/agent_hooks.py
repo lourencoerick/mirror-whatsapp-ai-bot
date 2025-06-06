@@ -75,6 +75,19 @@ async def intelligent_stage_analyzer_hook(
     state_updates: Dict[str, Any] = {}
     current_messages: List[BaseMessage] = state.messages[:]  # Work with a copy
 
+    first_message = current_messages[0] if current_messages else None
+    if first_message and first_message.id == STATE_CONTEXT_MESSAGE_ID:
+        messages_to_add = current_messages[1:]
+    else:
+        messages_to_add = current_messages
+
+    stage_context_message = SystemMessage(content="", id=STATE_CONTEXT_MESSAGE_ID)
+    state_updates["messages"] = [
+        RemoveMessage(id=REMOVE_ALL_MESSAGES),
+        stage_context_message,
+        *messages_to_add,
+    ]
+    return state_updates
     # Only run analysis if the last message is from a human (new input)
     if not current_messages or not isinstance(current_messages[-1], HumanMessage):
         logger.debug("No new human message, or history empty. Skipping stage analysis.")
@@ -458,6 +471,8 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
             retry_instruction_message = SystemMessage(
                 content="Atenção: Sua última mensagem não passou pelo processo de validação ou apresentou alguma inconsistência."
                 "Para garantir a qualidade e a conformidade, estamos retirando essa mensagem por enquanto.\n"
+                "Você verificou as informações que está fornecendo com as instruções e/ ou dados adquiridos de ferramentas?\n"
+                "Está seguindo os principes de vendas e as regras de comunicações?\n"
                 "Por favor, revise o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n"
                 "Responda a mensagem do usuário:\n"
                 f"- Usuário: {current_user_input_text}",
