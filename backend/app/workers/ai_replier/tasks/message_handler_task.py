@@ -531,6 +531,9 @@ async def handle_ai_reply_request(
 
                     human_message = HumanMessage(content=current_user_input_content)
                     current_input_updates["messages"] = [human_message]
+                    current_input_updates["current_user_input_text"] = (
+                        current_user_input_content
+                    )
                     current_input_updates["pending_follow_up_trigger"] = None
                     current_input_updates["follow_up_attempt_count"] = 0
 
