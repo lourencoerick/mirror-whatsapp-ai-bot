@@ -394,6 +394,7 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
     """
     logger.info("--- Executing post_model_hook: validation_compliance_check_hook ---")
     messages: List[BaseMessage] = state.messages[:]  # Work with a copy
+    current_user_input_text: str = state.current_user_input_text
 
     if not messages:
         logger.debug("ComplianceCheckHook: No messages. Skipping.")
@@ -453,11 +454,22 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                 "You MUST NOW RE-EVALUATE and call 'validate_response_and_references' correctly.",
                 id=reminder_id,
             )
+
+            retry_instruction_message = SystemMessage(
+                content="Atenção: Sua última mensagem não passou pelo processo de validação ou apresentou alguma inconsistência."
+                "Para garantir a qualidade e a conformidade, estamos retirando essa mensagem por enquanto."
+                "Por favor, revise o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n"
+                "Responda a mensagem do usuário:"
+                f"- Usuário: {current_user_input_text}",
+                id=reminder_id,
+            )
+
             messages_to_update_for_retry.append(retry_instruction_message)
 
             logger.info(
                 f"ComplianceCheckHook: Instructing agent to retry. Redirecting to '{MAIN_AGENT_NODE_NAME}'."
             )
+
             return Command(
                 update={"messages": messages_to_update_for_retry},
                 goto=MAIN_AGENT_NODE_NAME,
