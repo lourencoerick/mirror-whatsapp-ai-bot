@@ -1,13 +1,11 @@
 # app/services/sales_agent/agent_graph.py
 
-from typing import List, Callable, Any
+from typing import List, Callable, Any, Literal, Union
+from pydantic import BaseModel
 
 # Langchain & LangGraph
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import (
-    BaseMessage,
-    SystemMessage,
-)
+from langchain_core.messages import BaseMessage, SystemMessage, AnyMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph, END
 from langgraph.utils.runnable import RunnableCallable
@@ -17,7 +15,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from app.api.schemas.company_profile import CompanyProfileSchema
 
 # Agent components
-from .agent_state import AgentState
+from .agent_state import AgentState, TriggerEventType
 from .system_prompts import generate_system_message
 
 # hooks
@@ -65,6 +63,28 @@ def _get_state_value(state: AgentState, key: str, default: Any = None) -> Any:
     )
 
 
+def tools_condition_router(
+    state: Union[list[AnyMessage], dict[str, Any], BaseModel],
+    messages_key: str = "messages",
+) -> Literal["tools", "validation_compliance_check", "auto_follow_up_scheduler"]:
+
+    trigger_event: TriggerEventType = state.trigger_event
+    if isinstance(state, list):
+        ai_message = state[-1]
+    elif isinstance(state, dict) and (messages := state.get(messages_key, [])):
+        ai_message = messages[-1]
+    elif messages := getattr(state, messages_key, []):
+        ai_message = messages[-1]
+    else:
+        raise ValueError(f"No messages found in input state to tool_edge: {state}")
+    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
+        return "tools"
+    elif trigger_event == "user_message":
+        return "validation_compliance_check"
+    else:
+        return "auto_follow_up_scheduler"
+
+
 def create_react_sales_agent_graph(
     company_profile: CompanyProfileSchema,
     model: BaseChatModel,
@@ -108,12 +128,14 @@ def create_react_sales_agent_graph(
 
     graph_builder.set_entry_point("intelligent_stage_analyzer")
     graph_builder.add_edge("intelligent_stage_analyzer", "chatbot")
+
     graph_builder.add_conditional_edges(
         "chatbot",
-        tools_condition,
+        tools_condition_router,
         {
             "tools": "tools",
-            END: "validation_compliance_check",
+            "validation_compliance_check": "validation_compliance_check",
+            "auto_follow_up_scheduler": "auto_follow_up_scheduler",
         },
     )
     graph_builder.add_edge("tools", "chatbot")
