@@ -13,6 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID  # Use UUID for PostgreSQL
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy import text
 import uuid
 
 from app.models.base import BaseModel
@@ -88,6 +89,7 @@ class CompanyProfile(BaseModel):
         JSON,  # Store list as JSON
         nullable=False,
         default=list,
+        server_default=text("'[]'::json"),
         doc="Accepted payment methods.",
     )
     offering_overview = Column(
