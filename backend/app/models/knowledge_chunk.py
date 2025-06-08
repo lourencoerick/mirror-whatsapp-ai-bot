@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, Index
+from sqlalchemy import Column, String, Text, ForeignKey, Integer, Index
 from typing import Optional, Dict, Any
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -66,6 +66,12 @@ class KnowledgeChunk(BaseModel):
         Text, nullable=False, doc="The actual text content of the chunk."
     )
 
+    chunk_index: str = Column(
+        Integer,
+        nullable=False,
+        doc="The index of the chunk grouped by source and document ID.",
+    )
+
     embedding = Column(
         Vector(EMBEDDING_DIMENSION),  # Specify the dimension
         nullable=False,
@@ -81,6 +87,11 @@ class KnowledgeChunk(BaseModel):
     account = relationship("Account", back_populates="knowledge_chunks")
 
     document = relationship("KnowledgeDocument", back_populates="chunks")
+
+    __table_args__ = (
+        # Create a composite index for efficiently fetching neighboring chunks
+        Index("ix_chunk_document_id_chunk_index", "document_id", "chunk_index"),
+    )
 
     def __repr__(self):
         doc_id_str = f", document_id={self.document_id}" if self.document_id else ""

@@ -3,6 +3,7 @@ import asyncio
 from typing import Any, Dict, List, Optional, Tuple, Union, Literal
 from uuid import UUID
 from urllib.parse import urlparse, urlunparse
+from itertools import groupby
 
 import html2text
 
@@ -499,8 +500,8 @@ class KnowledgeIngestionService:
         ingestion_successful = False
 
         try:
-            # --- Update Status to PROCESSING (if tracking) ---
-            if DOCUMENT_REPO_AVAILABLE and document_id:
+            # --- Update Status to PROCESSING ---
+            if document_id:
                 logger.debug(f"Updating document {document_id} status to PROCESSING.")
                 async with self.db_session_factory() as db:
                     await knowledge_document_repo.update_document_status(
@@ -508,110 +509,113 @@ class KnowledgeIngestionService:
                     )
                     await db.commit()
 
-            # --- Step 1: Load Documents ---
-            documents = await self._load_documents(source_type, source_uri, recursive)
-            if not documents:
-                # Loading failed or produced no documents
+            # --- Step 1: Load ALL Documents from the source ---
+            all_loaded_docs = await self._load_documents(
+                source_type, source_uri, recursive
+            )
+            if not all_loaded_docs:
+                error_message = "Failed to load documents or the source is empty."
                 logger.warning(f"No documents loaded from source: {source_identifier}")
-                # Specific error for unsupported file types if applicable
-                if source_type == "file" and not source_uri.lower().endswith(
-                    (".pdf", ".txt")
-                ):  # Example check
-                    error_message = "Unsupported file type provided."
-                else:
-                    error_message = "Failed to load documents or the source is empty."
-                # Treat as failure, but don't raise exception here, let finally handle status
-                final_status = DocumentStatus.FAILED  # Explicitly set failed status
-                # Go directly to finally block
-                return False  # Indicate failure early
-            else:
-                logger.debug(
-                    f"Successfully loaded {len(documents)} documents. Converting for storage..."
-                )
-                loaded_documents_for_db = [
-                    {"page_content": doc.page_content, "metadata": doc.metadata}
-                    for doc in documents
-                ]
+                return False
+
+            loaded_documents_for_db = [
+                {"page_content": doc.page_content, "metadata": doc.metadata}
+                for doc in all_loaded_docs
+            ]
+
+            # --- Group documents by their source metadata ---
+            # This is crucial for websites or sources that yield multiple files.
+            # We group by the 'source' key in the metadata, which LangChain loaders populate.
+            get_source_key = lambda doc: doc.metadata.get("source", "default_source")
+
+            # Sort documents by source to ensure groupby works correctly
+            all_loaded_docs.sort(key=get_source_key)
+
+            grouped_docs = groupby(all_loaded_docs, key=get_source_key)
+
+            all_chunks_to_save: List[Dict[str, Any]] = []
+
+            # --- Process each group of documents (e.g., each webpage) separately ---
+            for source_key, doc_group_iter in grouped_docs:
+                doc_group = list(doc_group_iter)
                 logger.info(
-                    f"Converted {len(loaded_documents_for_db)} documents for 'extracted_content'."
+                    f"Processing document group with source: '{source_key}' ({len(doc_group)} parts)."
                 )
 
-            if not loaded_documents_for_db:
-                ingestion_successful = False
-            else:
-                # --- Step 2: Split into Chunks ---
-                logger.debug(f"Splitting {len(documents)} documents into chunks...")
-                chunks: List[Document]  # Langchain Document
-                if text_splitter_type == "semantic":
-                    chunks = self.semantic_text_splitter.split_documents(documents)
-                else:
-                    chunks = self.text_splitter.split_documents(documents)
+                # --- Step 2: Split into Chunks (for this group only) ---
+                splitter = (
+                    self.semantic_text_splitter
+                    if text_splitter_type == "semantic"
+                    else self.text_splitter
+                )
+                chunks = splitter.split_documents(doc_group)
 
-                logger.info(f"Split into {len(chunks)} chunks.")
                 if not chunks:
                     logger.warning(
-                        "Splitting resulted in zero chunks. Marking as complete with 0 chunks."
+                        f"Splitting resulted in zero chunks for source '{source_key}'. Skipping."
                     )
-                    final_status = DocumentStatus.COMPLETED
-                    error_message = None
-                    processed_chunk_count = 0
-                    ingestion_successful = True
-                    # Não precisa retornar, o finally cuidará
-                else:
-                    # --- Step 3: Generate Embeddings ---
-                    chunk_texts = [chunk.page_content for chunk in chunks]
-                    embeddings = await self._generate_embeddings_in_batches(chunk_texts)
+                    continue
 
-                    # --- Step 4: Prepare Chunk Data for Saving ---
-                    logger.debug("Preparing chunk data for database insertion...")
-                    chunks_to_save: List[Dict[str, Any]] = []
-                    for i, chunk_doc in enumerate(chunks):
-                        metadata = (
-                            chunk_doc.metadata.copy() if chunk_doc.metadata else {}
-                        )
-                        metadata["original_source"] = source_identifier
-                        if "page" in metadata:
-                            metadata["page_number"] = metadata.pop("page")
+                # --- Step 3: Generate Embeddings (for this group's chunks) ---
+                chunk_texts = [chunk.page_content for chunk in chunks]
+                embeddings = await self._generate_embeddings_in_batches(chunk_texts)
 
-                        chunks_to_save.append(
-                            {
-                                "chunk_text": chunk_doc.page_content,
-                                "embedding": embeddings[i],
-                                "source_type": source_type,
-                                "source_identifier": source_identifier,
-                                "metadata_": metadata,
-                                "document_id": document_id,
-                            }
-                        )
-                    processed_chunk_count = len(chunks_to_save)
-                    logger.debug(
-                        f"Prepared {processed_chunk_count} chunks with embeddings."
+                # --- Step 4: Prepare Chunk Data (with correct, resetting index) ---
+                for i, chunk_doc in enumerate(chunks):
+                    metadata = chunk_doc.metadata.copy() if chunk_doc.metadata else {}
+                    # Use the specific source of this group, not the overall identifier
+                    metadata["original_source"] = source_key
+                    if "page" in metadata:
+                        metadata["page_number"] = metadata.pop("page")
+
+                    all_chunks_to_save.append(
+                        {
+                            "chunk_text": chunk_doc.page_content,
+                            "embedding": embeddings[i],
+                            "chunk_index": i,  # Index resets for each new group
+                            "source_type": source_type,
+                            # We use the more specific source_key for the identifier
+                            "source_identifier": source_key,
+                            "metadata_": metadata,
+                            "document_id": document_id,
+                        }
                     )
 
-                    # --- Step 5: Save Chunks to Database ---
-                    logger.debug(
-                        f"Saving {processed_chunk_count} chunks to the repository..."
+            total_processed_chunk_count = len(all_chunks_to_save)
+            logger.info(
+                f"Total chunks prepared from all groups: {total_processed_chunk_count}"
+            )
+
+            if not all_chunks_to_save:
+                logger.warning(
+                    "Processing all groups resulted in zero chunks. Marking as complete."
+                )
+                final_status = DocumentStatus.COMPLETED
+                error_message = None
+                ingestion_successful = True
+            else:
+                # --- Step 5: Save All Prepared Chunks to Database in one go ---
+                logger.debug(
+                    f"Saving {total_processed_chunk_count} total chunks to the repository..."
+                )
+                async with self.db_session_factory() as db:
+                    added_count = await add_chunks(
+                        db, account_id=account_id, chunks_data=all_chunks_to_save
                     )
-                    async with self.db_session_factory() as db:
-                        added_count = await add_chunks(
-                            db, account_id=account_id, chunks_data=chunks_to_save
+                    if added_count != total_processed_chunk_count:
+                        error_message = f"DB save mismatch: Expected {total_processed_chunk_count}, saved {added_count}."
+                        logger.error(error_message)
+                        final_status = DocumentStatus.FAILED
+                        ingestion_successful = False
+                    else:
+                        await db.commit()
+                        logger.success(
+                            f"Successfully ingested and saved {added_count} chunks."
                         )
-                        if added_count != processed_chunk_count:
-                            error_message = (
-                                f"Database save mismatch: Expected {processed_chunk_count} chunks, "
-                                f"but repository reported saving {added_count}."
-                            )
-                            logger.error(error_message)
-                            final_status = DocumentStatus.FAILED
-                            ingestion_successful = False
-                        else:
-                            await db.commit()
-                            logger.success(
-                                f"Successfully ingested and saved {added_count} chunks."
-                            )
-                            final_status = DocumentStatus.COMPLETED
-                            error_message = None
-                            ingestion_successful = True
+                        final_status = DocumentStatus.COMPLETED
+                        error_message = None
+                        ingestion_successful = True
+
         except ValueError as ve:
             logger.error(f"Ingestion failed due to ValueError: {ve}")
             error_message = f"Processing error: {str(ve)[:500]}"
@@ -651,7 +655,9 @@ class KnowledgeIngestionService:
                             and ingestion_successful
                         ):
                             await knowledge_document_repo.update_document_chunk_count(
-                                db, document_id=document_id, count=processed_chunk_count
+                                db,
+                                document_id=document_id,
+                                count=total_processed_chunk_count,
                             )
 
                         await db.commit()
