@@ -5,11 +5,17 @@ from pydantic import BaseModel
 
 # Langchain & LangGraph
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import BaseMessage, SystemMessage, AnyMessage
+from langchain_core.messages import (
+    BaseMessage,
+    SystemMessage,
+    AnyMessage,
+    AIMessage,
+    ToolMessage,
+)
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph, END
 from langgraph.utils.runnable import RunnableCallable
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode
 
 
 from app.api.schemas.company_profile import CompanyProfileSchema
@@ -77,12 +83,46 @@ def tools_condition_router(
         ai_message = messages[-1]
     else:
         raise ValueError(f"No messages found in input state to tool_edge: {state}")
+
     if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
         return "tools"
     elif trigger_event == "user_message":
         return "validation_compliance_check"
     else:
         return "auto_follow_up_scheduler"
+
+
+def tools_outuput_condition_router(
+    state: Union[list[AnyMessage], dict[str, Any], BaseModel],
+    messages_key: str = "messages",
+) -> Literal["chatbot", "validation_compliance_check"]:
+
+    last_message: BaseMessage
+    message_before_last: BaseMessage
+
+    if isinstance(state, list):
+        last_message = state[-1]
+        if len(state) > 1:
+            message_before_last = state[-2]
+    elif isinstance(state, dict) and (messages := state.get(messages_key, [])):
+        last_message = messages[-1]
+        if len(messages) > 1:
+            message_before_last = messages[-2]
+    elif messages := getattr(state, messages_key, []):
+        if len(messages) > 1:
+            message_before_last = messages[-2]
+        last_message = messages[-1]
+    else:
+        raise ValueError(f"No messages found in input state to tool_edge: {state}")
+
+    if (
+        isinstance(last_message, AIMessage)
+        and isinstance(message_before_last, ToolMessage)
+        and (message_before_last.name == "validate_response_and_references")
+    ):
+        return "validation_compliance_check"
+    else:
+        return "chatbot"
 
 
 def create_react_sales_agent_graph(
@@ -110,7 +150,9 @@ def create_react_sales_agent_graph(
         name="prompt",
     )
 
-    model_runnable = prompt_runnable | model.bind_tools(ALL_TOOLS)
+    model_runnable = prompt_runnable | model.bind_tools(
+        ALL_TOOLS, parallel_tool_calls=False
+    )
 
     graph_builder = StateGraph(AgentState)
     graph_builder.add_node(
@@ -138,7 +180,15 @@ def create_react_sales_agent_graph(
             "auto_follow_up_scheduler": "auto_follow_up_scheduler",
         },
     )
-    graph_builder.add_edge("tools", "chatbot")
+
+    graph_builder.add_conditional_edges(
+        "tools",
+        tools_outuput_condition_router,
+        {
+            "chatbot": "chatbot",
+            "validation_compliance_check": "validation_compliance_check",
+        },
+    )
 
     graph_builder.add_edge("auto_follow_up_scheduler", END)
 
