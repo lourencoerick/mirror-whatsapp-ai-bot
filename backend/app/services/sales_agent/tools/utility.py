@@ -3,7 +3,7 @@ from loguru import logger
 from typing_extensions import Annotated
 
 from langchain_core.tools import tool, InjectedToolCallId
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage, BaseMessage, AIMessage
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 
@@ -163,6 +163,7 @@ async def validate_response_and_references(
     # For example, checking if sources are plausible, if reasoning aligns with response, etc.
 
     tool_message_content: str
+
     if validation_passed:
         # If validation passes, the content of the ToolMessage IS the response to be sent to the user.
         # The main agent LLM will see this ToolMessage and should then use its content as the final AIMessage.
@@ -175,12 +176,16 @@ async def validate_response_and_references(
             f"[{tool_name}] Validation 'failed'. Feedback: {feedback_to_agent_llm}"
         )
 
-    state_updates: Dict[str, Any] = {
-        "messages": [
-            ToolMessage(
-                content=tool_message_content, name=tool_name, tool_call_id=tool_call_id
-            )
-        ]
-    }
+    messages_to_add: List[BaseMessage] = [
+        ToolMessage(
+            content=tool_message_content, name=tool_name, tool_call_id=tool_call_id
+        )
+    ]
+
+    # Add AI message with the aproved message
+    if validation_passed:
+        messages_to_add.append(AIMessage(content=proposed_response_to_user))
+
+    state_updates: Dict[str, Any] = {"messages": messages_to_add}
 
     return Command(update=state_updates)
