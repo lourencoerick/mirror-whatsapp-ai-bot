@@ -1,6 +1,7 @@
 from typing import List, Optional, Any
 from typing_extensions import Annotated
 from loguru import logger
+from uuid import UUID
 
 try:
     from app.core.embedding_utils import get_embedding
@@ -16,7 +17,7 @@ except ImportError:
 
 try:
     from app.services.repository.knowledge_chunk import (
-        search_similar_chunks,
+        search_similar_chunks_with_context,
         check_knowledge_chunks_exist_for_account,
     )
     from app.models.knowledge_chunk import KnowledgeChunk
@@ -58,6 +59,80 @@ from ..agent_state import AgentState
 
 RAG_CHUNK_LIMIT_DEFAULT = 3
 RAG_SIMILARITY_THRESHOLD_DEFAULT = 0.5
+
+
+def _format_rag_context(
+    all_chunks: List[KnowledgeChunk], seed_chunk_ids: set[UUID]
+) -> str:
+    """Formats a list of chunks into structured, readable context blocks.
+
+    This function groups chunks into context blocks and labels each part
+    (main, previous, next) to provide clear structure for the LLM.
+
+    Args:
+        all_chunks: The full list of chunks, sorted by relevance and index.
+        seed_chunk_ids: A set of UUIDs of the original "seed" chunks.
+
+    Returns:
+        A formatted string representing the structured context.
+    """
+    if not all_chunks:
+        return ""
+
+    context_blocks = []
+    current_block = []
+
+    # Group chunks into blocks based on contiguity.
+    for i, chunk in enumerate(all_chunks):
+        # A block ends if it's not contiguous with the previous chunk.
+        is_new_block = (
+            i == 0
+            or chunk.document_id != all_chunks[i - 1].document_id
+            or chunk.source_identifier != all_chunks[i - 1].source_identifier
+            or chunk.chunk_index != all_chunks[i - 1].chunk_index + 1
+        )
+        if is_new_block and current_block:
+            context_blocks.append(current_block)
+            current_block = []
+        current_block.append(chunk)
+
+    if current_block:
+        context_blocks.append(current_block)
+
+    # Format each block with clear labels.
+    formatted_parts = ["Contexto relevante encontrado em nossa base de conhecimento:"]
+    for i, block in enumerate(context_blocks):
+        formatted_parts.append(f"\n--- BLOCO DE CONTEXTO {i+1} ---")
+
+        # Find the main chunk in the current block
+        main_chunk_in_block = None
+        for chunk in block:
+            if chunk.id in seed_chunk_ids:
+                main_chunk_in_block = chunk
+                break
+
+        # Sort the block by index for correct narrative order
+        block.sort(key=lambda c: c.chunk_index)
+
+        for chunk in block:
+            label = ""
+            # Label the chunk based on whether it's a seed or its position relative to the seed
+            if chunk.id in seed_chunk_ids:
+                label = "[PRINCIPAL]"
+            elif (
+                main_chunk_in_block
+                and chunk.chunk_index < main_chunk_in_block.chunk_index
+            ):
+                label = "[ANTERIOR]"
+            elif (
+                main_chunk_in_block
+                and chunk.chunk_index > main_chunk_in_block.chunk_index
+            ):
+                label = "[PRÓXIMO]"
+
+            formatted_parts.append(f"{label} {chunk.chunk_text}")
+
+    return "\n".join(formatted_parts)
 
 
 @tool
@@ -186,11 +261,11 @@ async def query_knowledge_base(
             return "Não foi possível processar sua pergunta para a busca no momento."
 
         logger.debug(
-            f"[{tool_name}] Searching for similar chunks (limit={rag_limit}, threshold={rag_threshold})..."
+            f"[{tool_name}] Searching for chunks with context (limit={rag_limit}, threshold={rag_threshold})..."
         )
-        similar_chunks: List[KnowledgeChunk] = []
+
         async with db_session_factory() as db:
-            similar_chunks = await search_similar_chunks(
+            all_context_chunks, seed_chunks = await search_similar_chunks_with_context(
                 db=db,
                 account_id=account_id,
                 query_embedding=query_embedding,
@@ -198,17 +273,18 @@ async def query_knowledge_base(
                 similarity_threshold=rag_threshold,
             )
 
-        if similar_chunks:
+        if all_context_chunks:
             logger.info(
-                f"[{tool_name}] Retrieved {len(similar_chunks)} relevant chunks for query."
+                f"[{tool_name}] Retrieved {len(all_context_chunks)} total chunks for query."
             )
-            context_parts = [
-                "Contexto relevante encontrado em nossa base de conhecimento:"
-            ]
-            for i, chunk in enumerate(similar_chunks):
-                chunk_text = getattr(chunk, "chunk_text", "Conteúdo não disponível.")
-                context_parts.append(f"{i+1}. {chunk_text}")
-            retrieved_context_str = "\n".join(context_parts)
+            # Crie o conjunto de IDs a partir da lista de sementes retornada
+            seed_chunk_ids = {chunk.id for chunk in seed_chunks}
+
+            # Use nosso formatador inteligente
+            retrieved_context_str = _format_rag_context(
+                all_context_chunks, seed_chunk_ids
+            )
+
             logger.debug(
                 f"[{tool_name}] Formatted retrieved context: {retrieved_context_str[:300]}..."
             )
