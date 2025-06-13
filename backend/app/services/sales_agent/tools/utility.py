@@ -182,10 +182,6 @@ async def validate_response_and_references(
         )
     ]
 
-    # Add AI message with the aproved message
-    if validation_passed:
-        messages_to_add.append(AIMessage(content=proposed_response_to_user))
-
     state_updates: Dict[str, Any] = {"messages": messages_to_add}
 
     return Command(update=state_updates)
