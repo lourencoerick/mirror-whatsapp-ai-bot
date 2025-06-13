@@ -471,8 +471,11 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
             retry_instruction_message = SystemMessage(
                 content="Atenção: Sua última mensagem não passou pelo processo de validação ou apresentou alguma inconsistência."
                 "Para garantir a qualidade e a conformidade, estamos retirando essa mensagem por enquanto.\n"
-                "Você verificou as informações que está fornecendo com as instruções e/ ou dados adquiridos de ferramentas?\n"
-                "Está seguindo os principes de vendas e as regras de comunicações?\n"
+                "- Você verificou as informações que está fornecendo com as instruções e/ ou dados adquiridos de ferramentas?\n"
+                "- Está seguindo os principios de vendas e as regras de comunicações descritas nas instruções?\n"
+                "- Conduzindo o cliente da saudação ao fechamento, evitando dizer o preço ou link de compra antnes da qualificação?\n"
+                "- Está evitando repetir informações ditas recentemente para não deixar a conversa repetitiva, a menos que seja uma necessite uma confirmação do cliente?\n"
+                "- Está tentando manter o cliente neste canal, a menos que o cliente  realmente necessite da informação que você não tenha para prosseguir?\n"
                 "Por favor, revise o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n"
                 "Responda a mensagem do usuário:\n"
                 f"- Usuário: {current_user_input_text}",
