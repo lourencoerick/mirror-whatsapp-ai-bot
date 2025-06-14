@@ -11,7 +11,7 @@ import { Element } from 'react-scroll';
  */
 const DemoVideoSection = (): React.ReactElement => {
   
-  const demoVideoId = 'erordBBnEu0';
+  const demoVideoId = 'PwSyrw3BxRs';
 
   return (
     // We use the <Element> component from react-scroll as the section's root.
