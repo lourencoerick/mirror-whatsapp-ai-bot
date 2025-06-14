@@ -1,16 +1,19 @@
 "use client";
 
-import { Element } from "react-scroll";
-import { Button } from "@/components/ui/button";
-import { TypingAnimation } from "@/components/magicui/typing-animation";
-import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
-import { Link as ScrollLink } from "react-scroll";
-import { BetaSignupButton } from "@/components/ui/experiment-button";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import { PlayCircle } from "lucide-react"; // 1. Import the icon
+import { Element, Link as ScrollLink } from "react-scroll";
 
+import { InteractiveGridPattern } from "@/components/magicui/interactive-grid-pattern";
+import { TypingAnimation } from "@/components/magicui/typing-animation";
+import { Button } from "@/components/ui/button";
+import { BetaSignupButton } from "@/components/ui/experiment-button";
 
+/**
+ * The hero section for the main landing page.
+ * It contains the main headline, a short description, and primary calls-to-action.
+ */
 export default function HeroSection() {
-
   return (
     <Element name="hero" className="pt-20 pb-10 bg-background text-foreground">
       <div className="container mx-auto px-4 flex flex-col md:flex-row items-center">
@@ -18,6 +21,7 @@ export default function HeroSection() {
           <TypingAnimation
             className="text-3xl sm:text-4xl lg:text-7xl font-normal mb-4 typing-container"
             as="h1"
+            // The pre-line style is important to respect the `\n` for line breaks.
             style={{ whiteSpace: "pre-line" }}
           >
             {`IA que vende.\nDados que decidem.\nResultados que escalam`}
@@ -32,19 +36,21 @@ export default function HeroSection() {
           <div className="flex flex-col md:flex-row justify-center md:justify-start gap-4">
             <BetaSignupButton aria-label="Inscrição Beta - Hero Section">Começar Agora</BetaSignupButton>
 
+            {/* 2. Update the scroll link to point to the "demo" section */}
             <ScrollLink
-              href="#beneficios"
+              href="#demo"
               activeClass="active"
-              to="beneficios"
+              to="demo"
               spy={true}
               smooth={true}
-              offset={-50} // ajuste se tiver header fixo
+              offset={-50}
               duration={500}
               className="cursor-pointer"
-
             >
-              <Button variant="outline" size="lg" className="cursor-pointer">
-                Saber Mais
+              {/* 3. Change button text and add the icon */}
+              <Button variant="outline" size="lg" className="cursor-pointer w-full">
+                <PlayCircle className="mr-2 h-5 w-5" />
+                Ver Demonstração
               </Button>
             </ScrollLink>
           </div>
