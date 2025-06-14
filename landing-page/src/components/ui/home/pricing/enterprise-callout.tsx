@@ -10,7 +10,7 @@ import React from 'react';
  */
 export function EnterpriseCallout(): React.ReactElement {
   return (
-    <div className="mt-12 rounded-lg border  bg-secondary  p-6 text-center">
+    <div className="mt-12 rounded-lg  bg-secondary  p-6 text-center">
       <h3 className="text-xl font-semibold text-secondary-foreground">Precisa de mais?</h3>
       <p className="mt-2 text-secondary-foreground">
         Oferecemos soluções personalizadas para grandes equipes e demandas de alta escala com suporte dedicado.
