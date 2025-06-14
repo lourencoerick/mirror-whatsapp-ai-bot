@@ -1,16 +1,16 @@
 'use client';
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { NavBarMenu, MobileNavBarMenu } from "@/components/ui/home/navbar-menu";
-import { Menu, X } from 'lucide-react';
-import { inter } from '@/components/ui/fonts';
 import { BetaSignupButton } from "@/components/ui/experiment-button";
-import ThemeToggleButton  from "@/components/ui/home/theme-toggle-button"
+import { inter } from '@/components/ui/fonts';
+import { MobileNavBarMenu, NavBarMenu } from "@/components/ui/home/navbar-menu";
+import ThemeToggleButton from "@/components/ui/home/theme-toggle-button";
 import siteMetadata from '@/data/siteMetadata';
-
+import { Menu, X } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useState } from 'react';
+import { LoginButton } from './login-button'; // 1. Import the new LoginButton
 
 export default function Navbar({ hideSignupButton = false }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -29,7 +29,6 @@ export default function Navbar({ hideSignupButton = false }) {
               height={30}
               className="w-10 h-auto"
             />
-            {/* Vertical separator */}
             <div className="h-8 border-l border-muted mx-2" />
             <span className={`${inter.className} text-lg sm:text-2xl font-bold tracking-wide text-foreground`}>
               {`${siteMetadata.headerTitle}`}
@@ -42,17 +41,18 @@ export default function Navbar({ hideSignupButton = false }) {
               <NavBarMenu />
             </div>
 
-            {/* Buttons */}
+            {/* Desktop Buttons */}
             <div className="flex space-x-2 ml-8 items-center">
-            {!hideSignupButton && <BetaSignupButton />}
-            <ThemeToggleButton />
+              <LoginButton /> {/* 2. Add LoginButton to the desktop view */}
+              {!hideSignupButton && <BetaSignupButton />}
+              <ThemeToggleButton />
             </div>
           </div>
 
           {/* Mobile menu button */}
           <div className="flex lg:hidden items-center gap-x-4">
-          {!hideSignupButton && <BetaSignupButton className="hidden sm:block" />}
-          <ThemeToggleButton />
+            {!hideSignupButton && <BetaSignupButton className="hidden sm:block" />}
+            <ThemeToggleButton />
             <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Expande o menu">
               {mobileMenuOpen ? <X className="h-8 w-8" /> : <Menu className="h-8 w-8" />}
             </Button>
@@ -69,11 +69,12 @@ export default function Navbar({ hideSignupButton = false }) {
 
           {/* Mobile buttons */}
           <div className="pt-4 pb-3 border-t border-muted">
-            <div className="px-4 space-y-2">
-            {!hideSignupButton && (
+            <div className="px-4 flex flex-col space-y-2">
+              <LoginButton /> {/* 3. Add LoginButton to the expanded mobile menu */}
+              {!hideSignupButton && (
                 <BetaSignupButton
                   onClick={() => setMobileMenuOpen(false)}
-                  className="block w-full sm:hidden"
+                  className="w-full" // Changed from block to w-full for consistency
                 />
               )}
             </div>
