@@ -1,6 +1,6 @@
 "use client";
 
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Element } from "react-scroll";
 
 const faqItems = [
@@ -22,7 +22,7 @@ const faqItems = [
     {
         value: "item-4",
         question: "Posso conectar o Vendedor IA ao meu WhatsApp Business?",
-        answer: "Sim! Basta fazer login com o Facebook e conectar sua conta do WhatsApp Business. O processo é rápido e seguro."
+        answer: "Sim! Basta fazer login e conectar sua conta do WhatsApp Business com o Facebook Business ou via QR Code. O processo é rápido e seguro."
     },
     {
         value: "item-5",
@@ -37,13 +37,9 @@ const faqItems = [
     {
         value: "item-7",
         question: "Quanto tempo leva para configurar o Vendedor IA?",
-        answer: "Em menos de 15 minutos ele já estará pronto para atender seus clientes."
+        answer: "Em menos de 5 minutos ele já estará pronto para atender seus clientes."
     },
-    {
-        value: "item-8",
-        question: "Posso integrar com um CRM?",
-        answer: "Sim! Nossa plataforma permite integração com diversos CRMs para que você gerencie melhor seus leads e automatize ainda mais seu processo de vendas."
-    },
+
 ];
 
 

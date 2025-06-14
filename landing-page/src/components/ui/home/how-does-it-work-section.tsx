@@ -1,9 +1,8 @@
 "use client";
 
-import { Element } from "react-scroll";
-import React from 'react';
-import { LogIn, Handshake, Gauge } from 'lucide-react';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import { Gauge, Handshake, LogIn } from 'lucide-react';
+import { Element } from "react-scroll";
 import StepCard from './cards';
 
 
@@ -15,7 +14,7 @@ const steps = [
         icon: <LogIn className="inline align-middle text-muted-foreground" size={25} />,
         description: (
             <>
-                Faça login com sua conta <span className="font-bold">Facebook</span>, e conecte-se ao{' '}
+                Faça login com sua conta <span className="font-bold">Google</span>, e conecte-se ao{' '}
                 <span className="font-bold">Whatsapp Business</span>.<br />
                 <br />Ou cadastre-se com e-mail e senha.
             </>

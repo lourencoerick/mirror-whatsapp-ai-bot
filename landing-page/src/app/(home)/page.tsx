@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import {  scroller } from "react-scroll";
+import { scroller } from "react-scroll";
 
-import HeroSection from "@/components/ui/home/hero-section";
 import BenefitsSection from "@/components/ui/home/benefits-section";
-import HowDoesItWorkSection from "@/components/ui/home/how-does-it-work-section";
-import CTASection from "@/components/ui/home/cta-section";
+import DemoVideoSection from "@/components/ui/home/demo-video-section"; // 1. Import the new component
 import FaqSection from "@/components/ui/home/faq-section";
+import HeroSection from "@/components/ui/home/hero-section";
+import HowDoesItWorkSection from "@/components/ui/home/how-does-it-work-section";
+import PricingSection from "@/components/ui/home/pricing-section";
 
 export default function HomePage() {
   useEffect(() => {
@@ -27,7 +28,8 @@ export default function HomePage() {
       <HeroSection />
       <BenefitsSection />
       <HowDoesItWorkSection />
-      <CTASection />
+      <DemoVideoSection />
+      <PricingSection />
       <FaqSection />
     </main>
   )
