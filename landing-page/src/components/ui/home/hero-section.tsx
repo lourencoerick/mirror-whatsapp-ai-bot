@@ -34,7 +34,7 @@ export default function HeroSection() {
             <span className="font-bold">aumente suas conversões e foque no crescimento de seu negócio.</span>
           </p>
           <div className="flex flex-col md:flex-row justify-center md:justify-start gap-4">
-            <BetaSignupButton aria-label="Inscrição Beta - Hero Section">Começar Agora</BetaSignupButton>
+            <BetaSignupButton aria-label="Inscrição Beta - Hero Section" className='w-full'>Começar Agora</BetaSignupButton>
 
             {/* 2. Update the scroll link to point to the "demo" section */}
             <ScrollLink
