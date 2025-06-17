@@ -94,6 +94,7 @@ export function PlanCard({ plan }: PlanCardProps): React.ReactElement {
               </p>
               <p className="text-4xl font-extrabold text-green-700 dark:text-green-500 mt-1">{plan.betaOffer.priceText}</p>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{plan.betaOffer.offerDescription}</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">(Não é necessário cartão de crédito)</p>
             </div>
           ) : (
             <div>
