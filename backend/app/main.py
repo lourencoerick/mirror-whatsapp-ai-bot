@@ -16,8 +16,9 @@ from app.api.routes import inbox as inbox_routes
 from app.api.routes import contact as contact_routes
 from app.api.routes import me as me_routes
 from app.api.routes import websocket as ws_routes
-from app.api.routes.webhooks import clerk as clerk_routes
 from app.api.routes import evolution_instance as evolution_instance_routes
+from app.api.routes.integrations import google_calendar as google_calendar_routes
+from app.api.routes.webhooks import clerk as clerk_routes
 from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
 from app.api.routes.webhooks.whatsapp_cloud import webhook as whatsapp_cloud_wb_routes
 from app.api.routes.webhooks.stripe import webhook as stripe_wb_routes
@@ -31,6 +32,7 @@ from app.api.routes import dashboard as dashboard_routes
 from app.api.routes import billing as billing_routes
 from app.api.routes import beta_tester as beta_routes
 from app.api.routes import admin_beta as admin_beta_routes
+
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
@@ -254,6 +256,14 @@ app.include_router(
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Evolution Instances"],
     dependencies=common_protected_dependencies,
+)
+
+# --- Integrations Routers ---
+logger.info("Including Integrations routers")
+app.include_router(
+    google_calendar_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["Google Calendar Integration"],
 )
 
 

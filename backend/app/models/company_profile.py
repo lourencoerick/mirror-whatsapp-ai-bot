@@ -6,14 +6,13 @@ from sqlalchemy import (
     Text,
     Integer,
     ForeignKey,
-    DateTime,
     JSON,
-    UniqueConstraint,
+    Boolean,
+    text,
+    sql,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID  # Use UUID for PostgreSQL
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
-from sqlalchemy import text
 import uuid
 
 from app.models.base import BaseModel
@@ -92,6 +91,20 @@ class CompanyProfile(BaseModel):
         server_default=text("'[]'::json"),
         doc="Accepted payment methods.",
     )
+
+    is_scheduling_enabled = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=sql.false(),
+        doc="Indicates if the company uses the scheduling feature.",
+    )
+    scheduling_calendar_id = Column(
+        String,
+        nullable=True,
+        doc="The ID of the Google Calendar selected by the user for scheduling.",
+    )
+
     offering_overview = Column(
         JSON,  # Store list of offering dicts as JSON
         nullable=False,

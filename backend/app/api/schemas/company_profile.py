@@ -1,6 +1,6 @@
 # backend/app/schemas/company_profile.py
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
 from uuid import UUID, uuid4
 from typing import List, Optional, Dict, Any
 import json
@@ -46,12 +46,31 @@ class OfferingInfo(BaseModel):
         ),
     )
 
+    requires_scheduling: bool = Field(
+        default=False,
+        description="If true, this offering requires an appointment to be scheduled.",
+    )
+    duration_minutes: Optional[int] = Field(
+        None,
+        description="The duration of the service in minutes, required if scheduling is needed.",
+        gt=0,
+    )
+
     @field_validator("link", mode="before")
     @classmethod
     def empty_str_to_none(cls, value: Any) -> Optional[Any]:
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
+
+    @model_validator(mode="after")
+    def check_scheduling_duration(self) -> "OfferingInfo":
+        """Ensures that if scheduling is required, duration is also provided."""
+        if self.requires_scheduling and self.duration_minutes is None:
+            raise ValueError(
+                "duration_minutes is required when requires_scheduling is true"
+            )
+        return self
 
 
 class CompanyProfileSchema(BaseModel):
@@ -112,6 +131,15 @@ class CompanyProfileSchema(BaseModel):
     accepted_payment_methods: List[str] = Field(
         default_factory=list,
         description="Accepted payment methods.",
+    )
+
+    is_scheduling_enabled: bool = Field(
+        default=False,
+        description="Indicates if the company uses the scheduling feature.",
+    )
+    scheduling_calendar_id: Optional[str] = Field(
+        default=None,
+        description="The ID of the Google Calendar selected by the user for scheduling.",
     )
 
     offering_overview: List[OfferingInfo] = Field(
