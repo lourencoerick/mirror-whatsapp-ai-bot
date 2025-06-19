@@ -8,6 +8,7 @@ import { StringListInput } from "@/components/custom/single-list-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 
@@ -41,6 +42,8 @@ export function OfferingForm({
       price: initialData?.price || null,
       price_info: initialData?.price_info || "",
       link: initialData?.link || "",
+      requires_scheduling: initialData?.requires_scheduling || false,
+      duration_minutes: initialData?.duration_minutes ?? null,
     },
   });
 
@@ -49,12 +52,15 @@ export function OfferingForm({
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    watch,
   } = form;
+
+  const requiresScheduling = watch("requires_scheduling");
 
   const disabled = isSubmitting || isLoading;
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mx-4">
       <div>
         <Label htmlFor="offering-name" className="mb-1.5 block">
           Nome da Oferta
@@ -175,6 +181,60 @@ export function OfferingForm({
             />
           )}
         />
+      </div>
+
+      <div className="space-y-4 rounded-lg border p-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-medium">Agendamento</h3>
+          <p className="text-sm text-muted-foreground">
+            Configure se esta oferta requer um agendamento para ser concluída.
+          </p>
+        </div>
+        <div className="flex items-center space-x-2 pt-2">
+          <Controller
+            name="requires_scheduling"
+            control={control}
+            render={({ field }) => (
+              <Switch
+                id="requires-scheduling"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                disabled={disabled}
+              />
+            )}
+          />
+          <Label htmlFor="requires-scheduling">Requer agendamento</Label>
+        </div>
+
+        {/* Campo de duração que aparece condicionalmente */}
+        {requiresScheduling && (
+          <div className="pt-2">
+            <Label htmlFor="duration-minutes" className="mb-1.5 block">
+              Duração do Serviço (em minutos)
+            </Label>
+            <Input
+              id="duration-minutes"
+              type="number"
+              min="1" // Corresponde ao .positive() do Zod
+              placeholder="Ex: 45"
+              {...register("duration_minutes", {
+                setValueAs: (value) => {
+                  // Converte string vazia para null, e string de número para número
+                  if (value === "" || value === null || value === undefined)
+                    return null;
+                  const num = parseInt(value, 10);
+                  return isNaN(num) ? null : num;
+                },
+              })}
+              disabled={disabled}
+            />
+            {errors.duration_minutes && (
+              <p className="text-xs text-red-600 mt-1">
+                {errors.duration_minutes.message}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end space-x-2 pt-4">

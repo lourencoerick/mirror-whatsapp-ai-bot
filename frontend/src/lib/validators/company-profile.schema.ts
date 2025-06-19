@@ -4,31 +4,49 @@ import * as z from "zod";
 // Tornamos a maioria dos campos opcionais aqui, pois o PUT pode ser parcial,
 // mas podemos adicionar refinamentos (.min(1)) onde necessário para a UI.
 
-export const offeringValidationSchema = z.object({
-  // Adicionar ID opcional se useFieldArray o gerar e precisarmos dele
-  // id: z.string().optional(), // Depende se useFieldArray adiciona um ID
-  name: z.string().min(1, "Offering name is required").max(255),
-  short_description: z
-    .string()
-    .min(1, "Short description is required")
-    .max(500),
-  key_features: z.array(z.string()).optional().default([]),
-  bonus_items: z.array(z.string()).optional().default([]),
-  price: z
-    .number({
-      invalid_type_error: "Price must be a number.",
-    })
-    .nonnegative({ message: "Price must be zero or a positive number." })
-    .nullable()
-    .optional(),
-  price_info: z.string().max(255).nullable().optional(),
-  link: z
-    .string()
-    .url({ message: "Please enter a valid URL." })
-    .or(z.literal(""))
-    .nullable()
-    .optional(),
-});
+export const offeringValidationSchema = z
+  .object({
+    // Adicionar ID opcional se useFieldArray o gerar e precisarmos dele
+    // id: z.string().optional(), // Depende se useFieldArray adiciona um ID
+    name: z.string().min(1, "Offering name is required").max(255),
+    short_description: z
+      .string()
+      .min(1, "Short description is required")
+      .max(500),
+    key_features: z.array(z.string()).optional().default([]),
+    bonus_items: z.array(z.string()).optional().default([]),
+    price: z
+      .number({
+        invalid_type_error: "Price must be a number.",
+      })
+      .nonnegative({ message: "Price must be zero or a positive number." })
+      .nullable()
+      .optional(),
+    price_info: z.string().max(255).nullable().optional(),
+    link: z
+      .string()
+      .url({ message: "Please enter a valid URL." })
+      .or(z.literal(""))
+      .nullable()
+      .optional(),
+    requires_scheduling: z.boolean().default(false),
+    duration_minutes: z.number().positive().optional().nullable(),
+  })
+  .refine(
+    (data) => {
+      if (
+        data.requires_scheduling &&
+        (data.duration_minutes === null || data.duration_minutes === undefined)
+      ) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "A duração é obrigatória quando o agendamento é necessário.",
+      path: ["duration_minutes"],
+    }
+  );
 
 export const companyProfileValidationSchema = z.object({
   // id: z.string().uuid().optional(), // Geralmente não editável no form
@@ -60,6 +78,8 @@ export const companyProfileValidationSchema = z.object({
     .max(1000),
   key_selling_points: z.array(z.string()).optional(),
   accepted_payment_methods: z.array(z.string()).optional(),
+  is_scheduling_enabled: z.boolean().default(false),
+  scheduling_calendar_id: z.string().optional().nullable(),
   offering_overview: z.array(offeringValidationSchema).optional().default([]), // Usa o schema aninhado
 
   delivery_options: z.array(z.string()).optional(),

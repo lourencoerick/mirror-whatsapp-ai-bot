@@ -16,6 +16,8 @@ import { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner"; // For user notifications
 // UI Components
+import { CalendarSelector } from "@/components/integrations/calendar-selector";
+import { GoogleCalendarConnectButton } from "@/components/integrations/google-calendar-connect-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -54,6 +57,8 @@ import {
   CompanyProfileFormData,
   companyProfileValidationSchema,
 } from "@/lib/validators/company-profile.schema"; // Zod schema and type
+import { useUser } from "@clerk/nextjs";
+
 import { components } from "@/types/api"; // API type definitions
 
 import { JSX } from "react/jsx-runtime";
@@ -94,6 +99,8 @@ export function CompanyProfileForm({
   isResearching,
   onDirtyChange,
 }: CompanyProfileFormProps): JSX.Element {
+  const { user } = useUser();
+
   const form = useForm<CompanyProfileFormData>({
     resolver: zodResolver(companyProfileValidationSchema), // Use Zod for validation
     defaultValues: {
@@ -115,6 +122,8 @@ export function CompanyProfileForm({
       delivery_options: initialData?.delivery_options || [],
       opening_hours: initialData?.opening_hours || "",
       fallback_contact_info: initialData?.fallback_contact_info || "",
+      is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
+      scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
       offering_overview: initialData?.offering_overview || [], // Initialize offerings array
       // Do not include non-editable fields like ID or profile_version here
     },
@@ -126,7 +135,14 @@ export function CompanyProfileForm({
     handleSubmit, // Form submission handler
     formState: { errors, isSubmitting, isDirty }, // Form state for errors and loading
     reset, // Function to reset form values
+    watch,
   } = form;
+
+  // --- Google Calendar  ---
+  const isSchedulingEnabled = watch("is_scheduling_enabled"); // Observa o valor do switch
+  const isGoogleConnected = user?.externalAccounts.some(
+    (acc) => acc.provider === "google"
+  );
 
   // --- Offerings Management State ---
   // `useFieldArray` manages the dynamic list of offerings within the form state
@@ -480,6 +496,65 @@ export function CompanyProfileForm({
                     />
                   )}
                 />
+              </div>
+
+              {/* --- Scheduling section --- */}
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-medium">
+                    Agendamentos via Google Calendar
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Permita que a IA agende compromissos diretamente na sua
+                    agenda do Google.
+                  </p>
+                </div>
+
+                {/* 1. Switch para Habilitar/Desabilitar a feature */}
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="is_scheduling_enabled"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        id="is_scheduling_enabled"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <Label htmlFor="is_scheduling_enabled">
+                    Habilitar agendamentos
+                  </Label>
+                </div>
+
+                {/* 2. Conteúdo condicional que aparece se a feature estiver habilitada */}
+                {isSchedulingEnabled && (
+                  <div className="space-y-4 pt-4 border-t">
+                    {!isGoogleConnected ? (
+                      // Se não estiver conectado, mostra o botão de conexão
+                      <GoogleCalendarConnectButton />
+                    ) : (
+                      // Se estiver conectado, mostra o seletor de calendário
+                      <Controller
+                        name="scheduling_calendar_id"
+                        control={control}
+                        render={({ field }) => (
+                          <CalendarSelector
+                            selectedValue={field.value}
+                            onValueChange={field.onChange}
+                            disabled={formDisabled}
+                          />
+                        )}
+                      />
+                    )}
+                    {errors.scheduling_calendar_id && (
+                      <p className="text-xs text-red-600 mt-1">
+                        {errors.scheduling_calendar_id.message}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* --- Offerings Section (Table + Modal) --- */}

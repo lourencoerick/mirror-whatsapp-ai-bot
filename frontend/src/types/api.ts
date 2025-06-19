@@ -1190,6 +1190,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/integrations/google/calendars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List User's Google Calendars
+         * @description Retrieves a list of Google Calendars the authenticated user has access to, enabling them to select one for scheduling.
+         */
+        get: operations["list_google_calendars_integrations_google_calendars_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks/evolution/{platform_instance_id}": {
         parameters: {
             query?: never;
@@ -1573,6 +1593,16 @@ export interface components {
             use_rag: boolean | null;
         };
         /**
+         * CalendarResponse
+         * @description Schema for a single calendar entry in the list response.
+         */
+        CalendarResponse: {
+            /** Id */
+            id: string;
+            /** Summary */
+            summary: string;
+        };
+        /**
          * ChannelTypeEnum
          * @description Enum for the types of communication channels supported by an Inbox.
          * @enum {string}
@@ -1695,6 +1725,17 @@ export interface components {
              * @description Accepted payment methods.
              */
             accepted_payment_methods?: string[];
+            /**
+             * Is Scheduling Enabled
+             * @description Indicates if the company uses the scheduling feature.
+             * @default false
+             */
+            is_scheduling_enabled: boolean;
+            /**
+             * Scheduling Calendar Id
+             * @description The ID of the Google Calendar selected by the user for scheduling.
+             */
+            scheduling_calendar_id?: string | null;
             /**
              * Offering Overview
              * @description List of key products/services with short details.
@@ -1834,6 +1875,17 @@ export interface components {
              * @description Accepted payment methods.
              */
             accepted_payment_methods?: string[];
+            /**
+             * Is Scheduling Enabled
+             * @description Indicates if the company uses the scheduling feature.
+             * @default false
+             */
+            is_scheduling_enabled: boolean;
+            /**
+             * Scheduling Calendar Id
+             * @description The ID of the Google Calendar selected by the user for scheduling.
+             */
+            scheduling_calendar_id?: string | null;
             /**
              * Offering Overview
              * @description List of key products/services with short details.
@@ -3234,6 +3286,17 @@ export interface components {
              * @description List of additional bonus items or services included for free when purchasing the main offering. These may include templates, e-books, consultations, etc.
              */
             bonus_items?: string[];
+            /**
+             * Requires Scheduling
+             * @description If true, this offering requires an appointment to be scheduled.
+             * @default false
+             */
+            requires_scheduling: boolean;
+            /**
+             * Duration Minutes
+             * @description The duration of the service in minutes, required if scheduling is needed.
+             */
+            duration_minutes?: number | null;
         };
         /**
          * PaginatedContactRead
@@ -6120,6 +6183,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_google_calendars_integrations_google_calendars_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarResponse"][];
+                };
             };
         };
     };
