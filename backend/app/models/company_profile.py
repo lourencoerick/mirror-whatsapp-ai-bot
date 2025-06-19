@@ -105,6 +105,12 @@ class CompanyProfile(BaseModel):
         doc="The ID of the Google Calendar selected by the user for scheduling.",
     )
 
+    availability_rules = Column(
+        JSON,
+        nullable=True,
+        doc="Structured JSON array of availability rules for scheduling.",
+    )
+
     offering_overview = Column(
         JSON,  # Store list of offering dicts as JSON
         nullable=False,

@@ -1,13 +1,21 @@
 # backend/app/schemas/company_profile.py
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator, conint
 from uuid import UUID, uuid4
 from typing import List, Optional, Dict, Any
+from datetime import time
 import json
 
 
 from typing import List, Optional
 from pydantic import BaseModel, Field, HttpUrl
+
+
+class AvailabilityRuleSchema(BaseModel):
+    dayOfWeek: conint(ge=0, le=6)  # 0=Domingo, 6=Sábado
+    isEnabled: bool
+    startTime: time
+    endTime: time
 
 
 class OfferingInfo(BaseModel):
@@ -140,6 +148,10 @@ class CompanyProfileSchema(BaseModel):
     scheduling_calendar_id: Optional[str] = Field(
         default=None,
         description="The ID of the Google Calendar selected by the user for scheduling.",
+    )
+    availability_rules: Optional[List[AvailabilityRuleSchema]] = Field(
+        default=None,
+        description="Structured list of availability rules for scheduling.",
     )
 
     offering_overview: List[OfferingInfo] = Field(
