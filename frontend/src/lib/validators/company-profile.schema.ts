@@ -4,6 +4,24 @@ import * as z from "zod";
 // Tornamos a maioria dos campos opcionais aqui, pois o PUT pode ser parcial,
 // mas podemos adicionar refinamentos (.min(1)) onde necessário para a UI.
 
+export const availabilityRuleValidationSchema = z.object({
+  dayOfWeek: z.number().min(0).max(6),
+  isEnabled: z.boolean(),
+  // Valida o formato "HH:mm" usando uma expressão regular
+  startTime: z
+    .string()
+    .regex(
+      /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+      "Formato de hora inválido (HH:mm)"
+    ),
+  endTime: z
+    .string()
+    .regex(
+      /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+      "Formato de hora inválido (HH:mm)"
+    ),
+});
+
 export const offeringValidationSchema = z
   .object({
     // Adicionar ID opcional se useFieldArray o gerar e precisarmos dele
@@ -80,6 +98,11 @@ export const companyProfileValidationSchema = z.object({
   accepted_payment_methods: z.array(z.string()).optional(),
   is_scheduling_enabled: z.boolean().default(false),
   scheduling_calendar_id: z.string().optional().nullable(),
+  availability_rules: z
+    .array(availabilityRuleValidationSchema)
+    .optional()
+    .nullable(),
+
   offering_overview: z.array(offeringValidationSchema).optional().default([]), // Usa o schema aninhado
 
   delivery_options: z.array(z.string()).optional(),

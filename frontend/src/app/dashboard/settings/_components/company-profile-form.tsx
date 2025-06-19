@@ -1,8 +1,13 @@
 // app/dashboard/settings/_components/CompanyProfileForm.tsx
 "use client";
-
 import { GuidelineInput } from "@/components/custom/guideline-input"; // Custom input for guidelines
 import { StringListInput } from "@/components/custom/single-list-input"; // Custom input for string lists
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { formatCurrencyBRL } from "@/lib/utils/currency-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -63,6 +68,7 @@ import { components } from "@/types/api"; // API type definitions
 
 import { JSX } from "react/jsx-runtime";
 import { OfferingForm } from "./offering-form"; // Sub-form for offerings
+import { WorkingHoursSelector } from "./working-hours-selector";
 
 // Type definitions from the generated API specification
 type CompanyProfileSchemaOutput =
@@ -531,28 +537,82 @@ export function CompanyProfileForm({
                 {/* 2. Conteúdo condicional que aparece se a feature estiver habilitada */}
                 {isSchedulingEnabled && (
                   <div className="space-y-4 pt-4 border-t">
-                    {!isGoogleConnected ? (
-                      // Se não estiver conectado, mostra o botão de conexão
-                      <GoogleCalendarConnectButton />
-                    ) : (
-                      // Se estiver conectado, mostra o seletor de calendário
-                      <Controller
-                        name="scheduling_calendar_id"
-                        control={control}
-                        render={({ field }) => (
-                          <CalendarSelector
-                            selectedValue={field.value}
-                            onValueChange={field.onChange}
-                            disabled={formDisabled}
+                    {/* --- Bloco de Conexão com o Google --- */}
+                    <div className="p-3 border rounded-md bg-slate-50/50">
+                      <h4 className="font-medium mb-2">
+                        1. Conecte sua Agenda
+                      </h4>
+                      {!isGoogleConnected ? (
+                        <GoogleCalendarConnectButton />
+                      ) : (
+                        <div>
+                          <p className="text-sm text-green-700 mb-2">
+                            ✅ Google Calendar Conectado.
+                          </p>
+                          <Controller
+                            name="scheduling_calendar_id"
+                            control={control}
+                            render={({ field }) => (
+                              <CalendarSelector
+                                selectedValue={field.value}
+                                onValueChange={field.onChange}
+                                disabled={formDisabled}
+                              />
+                            )}
                           />
-                        )}
-                      />
-                    )}
-                    {errors.scheduling_calendar_id && (
-                      <p className="text-xs text-red-600 mt-1">
-                        {errors.scheduling_calendar_id.message}
-                      </p>
-                    )}
+                        </div>
+                      )}
+                      {errors.scheduling_calendar_id && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {errors.scheduling_calendar_id.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* --- Bloco de Configuração de Horários --- */}
+                    <div className="p-3 border rounded-md bg-slate-50/50">
+                      <h4 className="font-medium mb-2">
+                        2. Defina sua Disponibilidade
+                      </h4>
+                      <Accordion
+                        type="single"
+                        collapsible
+                        className="w-full"
+                        defaultValue="item-1"
+                      >
+                        <AccordionItem value="item-1">
+                          <AccordionTrigger>
+                            Horários para Agendamento
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-4">
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Defina os dias e horários em que você está
+                              disponível. A IA usará estas regras para oferecer
+                              horários aos seus clientes.
+                            </p>
+                            <Controller
+                              name="availability_rules" // Agora o form gerencia um array de objetos diretamente
+                              control={control}
+                              render={({ field }) => (
+                                // O WorkingHoursSelector agora precisa ser adaptado para receber
+                                // o valor como um array de objetos e o onChange também.
+                                <WorkingHoursSelector
+                                  value={field.value ?? []} // Passa o array, ou um array vazio como padrão
+                                  onChange={field.onChange} // A função onChange do RHF para o array
+                                  disabled={formDisabled}
+                                />
+                              )}
+                            />
+                            {errors.availability_rules && (
+                              <p className="text-xs text-red-600 mt-2">
+                                {errors.availability_rules.message ||
+                                  "Erro nas regras de disponibilidade."}
+                              </p>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
                   </div>
                 )}
               </div>
@@ -720,9 +780,10 @@ export function CompanyProfileForm({
                     </p>
                   )}
                 </div>
+
                 <div>
                   <Label className="mb-1.5 block" htmlFor="opening_hours">
-                    Horário de Funcionamento
+                    Horário de Funcionamento (Informativo)
                   </Label>
                   <Input
                     id="opening_hours"

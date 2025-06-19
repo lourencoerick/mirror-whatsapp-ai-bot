@@ -1190,7 +1190,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/integrations/google/calendars": {
+    "/api/v1/integrations/google/calendars": {
         parameters: {
             query?: never;
             header?: never;
@@ -1201,7 +1201,7 @@ export interface paths {
          * List User's Google Calendars
          * @description Retrieves a list of Google Calendars the authenticated user has access to, enabling them to select one for scheduling.
          */
-        get: operations["list_google_calendars_integrations_google_calendars_get"];
+        get: operations["list_google_calendars_api_v1_integrations_google_calendars_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1425,6 +1425,23 @@ export interface components {
              * @description Complete list of Inbox IDs that should be associated with this agent.
              */
             inbox_ids?: string[];
+        };
+        /** AvailabilityRuleSchema */
+        AvailabilityRuleSchema: {
+            /** Dayofweek */
+            dayOfWeek: number;
+            /** Isenabled */
+            isEnabled: boolean;
+            /**
+             * Starttime
+             * Format: time
+             */
+            startTime: string;
+            /**
+             * Endtime
+             * Format: time
+             */
+            endTime: string;
         };
         /** BetaRequestResponse */
         BetaRequestResponse: {
@@ -1737,6 +1754,11 @@ export interface components {
              */
             scheduling_calendar_id?: string | null;
             /**
+             * Availability Rules
+             * @description Structured list of availability rules for scheduling.
+             */
+            availability_rules?: components["schemas"]["AvailabilityRuleSchema"][] | null;
+            /**
              * Offering Overview
              * @description List of key products/services with short details.
              */
@@ -1886,6 +1908,11 @@ export interface components {
              * @description The ID of the Google Calendar selected by the user for scheduling.
              */
             scheduling_calendar_id?: string | null;
+            /**
+             * Availability Rules
+             * @description Structured list of availability rules for scheduling.
+             */
+            availability_rules?: components["schemas"]["AvailabilityRuleSchema"][] | null;
             /**
              * Offering Overview
              * @description List of key products/services with short details.
@@ -6186,7 +6213,7 @@ export interface operations {
             };
         };
     };
-    list_google_calendars_integrations_google_calendars_get: {
+    list_google_calendars_api_v1_integrations_google_calendars_get: {
         parameters: {
             query?: never;
             header?: never;
