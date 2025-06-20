@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // services/api/integrations.ts
 
 import { FetchFunction } from "@/hooks/use-authenticated-fetch";

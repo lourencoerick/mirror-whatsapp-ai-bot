@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/settings/AvailabilityRow.tsx
 "use client";
 

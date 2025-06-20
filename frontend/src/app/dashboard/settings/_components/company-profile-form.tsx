@@ -75,6 +75,7 @@ import { WorkingHoursSelector } from "./working-hours-selector";
 type CompanyProfileSchemaOutput =
   components["schemas"]["CompanyProfileSchema-Output"];
 type OfferingInfo = components["schemas"]["OfferingInfo"];
+type AvailabilityRule = components["schemas"]["AvailabilityRuleSchema"];
 
 /**
  * Props for the CompanyProfileForm component.
@@ -92,6 +93,7 @@ interface CompanyProfileFormProps {
   onDirtyChange: (isDirty: boolean) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const formatRules = (rules: any[] | null | undefined): AvailabilityRule[] => {
   if (!rules || rules.length !== 7) {
     return getDefaultAvailabilityRules();

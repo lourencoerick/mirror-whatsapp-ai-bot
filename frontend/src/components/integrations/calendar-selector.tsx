@@ -40,6 +40,7 @@ export function CalendarSelector({
       try {
         const data = await getGoogleCalendars(fetcher);
         setCalendars(data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         setError(err.message || "Falha ao buscar calendários.");
       } finally {

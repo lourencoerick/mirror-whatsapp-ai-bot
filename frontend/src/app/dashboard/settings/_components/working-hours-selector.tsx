@@ -1,6 +1,8 @@
 // components/settings/WorkingHoursSelector.tsx
 "use client";
 
+import { type CompanyProfileFormData } from "@/lib/validators/company-profile.schema";
+
 import { components } from "@/types/api";
 import { Control } from "react-hook-form";
 import { AvailabilityRow } from "./availability-row"; // Importar o novo componente
@@ -9,7 +11,7 @@ type AvailabilityRule = components["schemas"]["AvailabilityRuleSchema"];
 
 interface WorkingHoursSelectorProps {
   fields: Array<Record<"id", string> & AvailabilityRule>;
-  control: Control<any>;
+  control: Control<CompanyProfileFormData>;
   disabled?: boolean;
 }
 
