@@ -219,7 +219,7 @@ async def create_appointment(
         logger.warning(f"[{tool_name}] Offering with ID {offering_id_str} not found.")
         return "Não consegui encontrar a oferta com o ID fornecido."
 
-    # 2. A oferta requer agendamento? (Lógica invertida e corrigida)
+    # 2. A oferta requer agendamento?
     if not target_offering.requires_scheduling:
         logger.warning(
             f"[{tool_name}] Offering '{target_offering.name}' does not require scheduling."
