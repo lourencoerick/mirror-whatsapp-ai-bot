@@ -135,7 +135,10 @@ export function CompanyProfileForm({
       sales_tone:
         initialData?.sales_tone || "amigável, prestativo e profissional", // Default tone in pt-BR
       language: initialData?.language || "pt-BR", // Default language
-      communication_guidelines: initialData?.communication_guidelines || [],
+      communication_guidelines: initialData?.communication_guidelines || [
+        "BUSQUE sempre fazer perguntas esclarecedoras",
+        "EVITE inventar informações que não foram fornecidas",
+      ],
       ai_objective:
         initialData?.ai_objective ||
         "Engajar clientes, responder perguntas sobre ofertas e guiá-los para uma compra ou próximo passo.", // Default objective in pt-BR
@@ -257,16 +260,12 @@ export function CompanyProfileForm({
    * @param {OfferingInfo} data - The data submitted from the OfferingForm.
    */
   const handleSaveOffering = (data: OfferingInfo) => {
-    // O tipo aqui deve ser o do formulário
     if (editingOfferingIndex !== null) {
-      // MODO DE EDIÇÃO:
-      // Pegamos o ID original da oferta que está sendo editada.
       const originalOfferingId = offerings[editingOfferingIndex].id;
-
       // Criamos o objeto de dados para salvar, garantindo que o ID original seja mantido.
       const dataToUpdate = {
         ...data,
-        id: originalOfferingId, // <-- A CORREÇÃO CRUCIAL
+        id: originalOfferingId,
         key_features: data.key_features || [],
         bonus_items: data.bonus_items || [],
       };
@@ -274,9 +273,6 @@ export function CompanyProfileForm({
       update(editingOfferingIndex, dataToUpdate);
       toast.success("Oferta atualizada.");
     } else {
-      // MODO DE CRIAÇÃO:
-      // Deixamos o backend gerar um novo UUID.
-      // O `id` no `data` pode ser undefined.
       const dataToAppend = {
         ...data,
         key_features: data.key_features || [],
