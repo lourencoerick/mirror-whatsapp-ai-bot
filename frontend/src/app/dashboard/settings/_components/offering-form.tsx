@@ -25,7 +25,7 @@ interface OfferingFormProps {
   onSubmit: (data: OfferingFormData) => void;
   onCancel: () => void;
   isLoading: boolean;
-  isSchedulingFeatureEnabled: boolean; // <-- Nova prop para receber o status
+  isSchedulingFeatureEnabled: boolean;
 }
 
 export function OfferingForm({
@@ -33,7 +33,7 @@ export function OfferingForm({
   onSubmit,
   onCancel,
   isLoading,
-  isSchedulingFeatureEnabled, // <-- Recebendo a nova prop
+  isSchedulingFeatureEnabled,
 }: OfferingFormProps) {
   const form = useForm<OfferingFormData>({
     resolver: zodResolver(offeringValidationSchema),
@@ -57,7 +57,7 @@ export function OfferingForm({
     handleSubmit,
     formState: { errors, isSubmitting },
     watch,
-    setValue, // <-- Importar setValue para atualizações programáticas
+    setValue,
   } = form;
 
   const requiresScheduling = watch("requires_scheduling");
@@ -74,7 +74,6 @@ export function OfferingForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mx-4">
-      {/* --- Campos de Nome, Descrição, Preço, etc. (sem alterações) --- */}
       <div>
         <Label htmlFor="offering-name" className="mb-1.5 block">
           Nome da Oferta
@@ -194,7 +193,7 @@ export function OfferingForm({
         />
       </div>
 
-      {/* --- SEÇÃO DE AGENDAMENTO ATUALIZADA --- */}
+      {/* --- SEÇÃO DE AGENDAMENTO --- */}
       <div className="space-y-4 rounded-lg border p-4">
         <div className="space-y-1">
           <h3 className="text-base font-medium">Agendamento</h3>
@@ -211,7 +210,7 @@ export function OfferingForm({
                 id="requires-scheduling"
                 checked={field.value}
                 onCheckedChange={field.onChange}
-                disabled={disabled || !isSchedulingFeatureEnabled} // <-- Lógica de desabilitar
+                disabled={disabled || !isSchedulingFeatureEnabled}
               />
             )}
           />
@@ -265,7 +264,7 @@ export function OfferingForm({
         )}
       </div>
 
-      {/* --- Botões de Ação (sem alterações) --- */}
+      {/* --- Botões de Ação --- */}
       <div className="flex justify-end space-x-2 pt-4">
         <Button
           type="button"
