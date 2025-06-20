@@ -4,23 +4,24 @@
 import { FetchFunction } from "@/hooks/use-authenticated-fetch";
 import { components } from "@/types/api";
 
-// Tipos gerados pelo OpenAPI
-type CalendarResponse = components["schemas"]["CalendarResponse"];
+type GoogleIntegrationStatus = components["schemas"]["GoogleIntegrationStatus"];
 
 const API_V1_BASE = "/api/v1";
 
 /**
- * Fetches the list of Google Calendars for the authenticated user.
- * This requires the user to have already connected their Google account.
+ * Fetches the complete status of the Google integration for the current user.
+ * This includes connection status, permission scopes, and a list of calendars if applicable.
  *
  * @param fetcher The authenticated fetch function from the useAuthenticatedFetch hook.
- * @returns A promise that resolves to an array of calendar objects.
- * @throws An error if the API call fails for reasons other than not being found.
+ * @returns A promise that resolves to the GoogleIntegrationStatus object.
+ * @throws An error if the API call fails.
  */
-export const getGoogleCalendars = async (
+export const getGoogleIntegrationStatus = async (
   fetcher: FetchFunction
-): Promise<CalendarResponse[]> => {
-  const endpoint = `${API_V1_BASE}/integrations/google/calendars`;
+): Promise<GoogleIntegrationStatus> => {
+  // O endpoint agora aponta para a nossa nova rota de status.
+  const endpoint = `${API_V1_BASE}/integrations/google/status`;
+
   const response = await fetcher(endpoint, {
     method: "GET",
     headers: { Accept: "application/json" },
@@ -34,9 +35,12 @@ export const getGoogleCalendars = async (
     } catch (e) {
       /* Ignore if response has no body */
     }
-    throw new Error(`Failed to fetch Google Calendars: ${errorDetail}`);
+    // Lançar um erro permite que o React Query gerencie o estado de erro automaticamente.
+    throw new Error(
+      `Failed to fetch Google integration status: ${errorDetail}`
+    );
   }
 
-  const data: CalendarResponse[] = await response.json();
+  const data: GoogleIntegrationStatus = await response.json();
   return data;
 };
