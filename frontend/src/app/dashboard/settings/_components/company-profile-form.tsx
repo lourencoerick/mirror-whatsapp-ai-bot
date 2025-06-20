@@ -61,6 +61,7 @@ import { updateCompanyProfile } from "@/lib/api/company-profile"; // API functio
 import {
   CompanyProfileFormData,
   companyProfileValidationSchema,
+  getDefaultAvailabilityRules,
 } from "@/lib/validators/company-profile.schema"; // Zod schema and type
 import { useUser } from "@clerk/nextjs";
 
@@ -91,6 +92,18 @@ interface CompanyProfileFormProps {
   onDirtyChange: (isDirty: boolean) => void;
 }
 
+const formatRules = (rules: any[] | null | undefined): AvailabilityRule[] => {
+  if (!rules || rules.length !== 7) {
+    return getDefaultAvailabilityRules();
+  }
+  return rules.map((rule) => ({
+    ...rule,
+    // Garante que startTime e endTime estejam no formato HH:mm
+    startTime: rule.startTime ? rule.startTime.substring(0, 5) : "09:00",
+    endTime: rule.endTime ? rule.endTime.substring(0, 5) : "18:00",
+  }));
+};
+
 /**
  * Renders a form for editing the company's profile information,
  * including basic details, AI configuration, communication guidelines,
@@ -111,6 +124,7 @@ export function CompanyProfileForm({
     resolver: zodResolver(companyProfileValidationSchema), // Use Zod for validation
     defaultValues: {
       // Pre-populate the form with initial data or defaults (in pt-BR where applicable)
+
       company_name: initialData?.company_name || "",
       website: initialData?.website || "",
       address: initialData?.address || "",
@@ -130,6 +144,7 @@ export function CompanyProfileForm({
       fallback_contact_info: initialData?.fallback_contact_info || "",
       is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
       scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
+      availability_rules: formatRules(initialData?.availability_rules),
       offering_overview: initialData?.offering_overview || [], // Initialize offerings array
       // Do not include non-editable fields like ID or profile_version here
     },
@@ -160,7 +175,7 @@ export function CompanyProfileForm({
   } = useFieldArray({
     control,
     name: "offering_overview", // Must match the field name in the Zod schema/FormData
-    // keyName: "fieldId" // Optional: Use a different property name for React keys if 'id' conflicts
+    keyName: "fieldId", // Optional: Use a different property name for React keys if 'id' conflicts
   });
 
   // State for controlling the offering add/edit modal (Dialog)
@@ -196,6 +211,9 @@ export function CompanyProfileForm({
         offering_overview: initialData.offering_overview || [],
         opening_hours: initialData.opening_hours || "",
         fallback_contact_info: initialData.fallback_contact_info || "",
+        is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
+        scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
+        availability_rules: formatRules(initialData?.availability_rules),
       });
     }
   }, [initialData, reset]);
@@ -237,23 +255,34 @@ export function CompanyProfileForm({
    * @param {OfferingInfo} data - The data submitted from the OfferingForm.
    */
   const handleSaveOffering = (data: OfferingInfo) => {
-    // Ensure key_features is always an array, even if undefined/null from the form
-    const dataToSave = {
-      ...data,
-      key_features: data.key_features || [],
-      bonus_items: data.bonus_items || [],
-    };
-
+    // O tipo aqui deve ser o do formulário
     if (editingOfferingIndex !== null) {
-      // Update existing offering
-      update(editingOfferingIndex, dataToSave);
+      // MODO DE EDIÇÃO:
+      // Pegamos o ID original da oferta que está sendo editada.
+      const originalOfferingId = offerings[editingOfferingIndex].id;
+
+      // Criamos o objeto de dados para salvar, garantindo que o ID original seja mantido.
+      const dataToUpdate = {
+        ...data,
+        id: originalOfferingId, // <-- A CORREÇÃO CRUCIAL
+        key_features: data.key_features || [],
+        bonus_items: data.bonus_items || [],
+      };
+
+      update(editingOfferingIndex, dataToUpdate);
       toast.success("Oferta atualizada.");
     } else {
-      // Add new offering
-      append(dataToSave);
+      // MODO DE CRIAÇÃO:
+      // Deixamos o backend gerar um novo UUID.
+      // O `id` no `data` pode ser undefined.
+      const dataToAppend = {
+        ...data,
+        key_features: data.key_features || [],
+        bonus_items: data.bonus_items || [],
+      };
+      append(dataToAppend);
       toast.success("Oferta adicionada.");
     }
-    // Close modal and reset editing state
     setIsOfferingModalOpen(false);
     setEditingOfferingIndex(null);
     setOfferingFormData(null);
@@ -307,6 +336,17 @@ export function CompanyProfileForm({
 
   // Disable the entire form if submitting or if background research is active
   const formDisabled = isSubmitting || isResearching;
+
+  const { fields } = useFieldArray({
+    control,
+    name: "availability_rules",
+  });
+
+  // --- ADICIONE ESTE CONSOLE.LOG DE DEPURAÇÃO ---
+  console.log(
+    "CompanyProfileForm: O que está sendo passado para WorkingHoursSelector?",
+    { fields }
+  );
 
   return (
     // Wrap Tooltip usage in a provider if not already present higher up the tree
@@ -590,22 +630,18 @@ export function CompanyProfileForm({
                               disponível. A IA usará estas regras para oferecer
                               horários aos seus clientes.
                             </p>
-                            <Controller
-                              name="availability_rules" // Agora o form gerencia um array de objetos diretamente
+                            {/* A CHAMADA CORRETA: Sem Controller, passando as props certas */}
+                            <WorkingHoursSelector
+                              fields={fields}
                               control={control}
-                              render={({ field }) => (
-                                // O WorkingHoursSelector agora precisa ser adaptado para receber
-                                // o valor como um array de objetos e o onChange também.
-                                <WorkingHoursSelector
-                                  value={field.value ?? []} // Passa o array, ou um array vazio como padrão
-                                  onChange={field.onChange} // A função onChange do RHF para o array
-                                  disabled={formDisabled}
-                                />
-                              )}
+                              disabled={formDisabled}
                             />
+
+                            {/* O erro agora precisa ser lido do objeto de erros do formulário */}
                             {errors.availability_rules && (
                               <p className="text-xs text-red-600 mt-2">
-                                {errors.availability_rules.message ||
+                                {errors.availability_rules.root?.message ||
+                                  errors.availability_rules.message ||
                                   "Erro nas regras de disponibilidade."}
                               </p>
                             )}
@@ -659,7 +695,6 @@ export function CompanyProfileForm({
                         <TableBody>
                           {offerings.map((offering, index) => (
                             <TableRow key={offering.id}>
-                              {" "}
                               {/* Use field.id generated by useFieldArray for stable keys */}
                               <TableCell className="font-medium">
                                 {offering.name}
@@ -858,6 +893,7 @@ export function CompanyProfileForm({
                 onSubmit={handleSaveOffering}
                 onCancel={() => setIsOfferingModalOpen(false)}
                 isLoading={isSubmitting}
+                isSchedulingFeatureEnabled={isSchedulingEnabled}
               />
             </div>
             {/* Note: Cancel/Save buttons are now part of the OfferingForm component */}
