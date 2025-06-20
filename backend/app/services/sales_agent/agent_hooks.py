@@ -268,7 +268,13 @@ async def auto_follow_up_scheduler_hook(
         state.pending_follow_up_trigger
     )
 
-    is_conversation_closed = current_stage in ["closed_won", "closed_lost"]
+    is_conversation_closed = current_stage in [
+        "closed_won",
+        "closed_lost",
+        "appointment_rescheduled",
+        "appointment_booked",
+        "appointment_cancelled",
+    ]
     state_updates: Dict[str, Any] = {}
     last_agent_message_timestamp = time.time()
 
@@ -475,10 +481,13 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                 "- Está seguindo os principios de vendas e as regras de comunicações descritas nas instruções?\n"
                 "- Conduzindo o cliente da saudação ao fechamento, evitando dizer o preço ou link de compra antnes da qualificação?\n"
                 "- Está evitando repetir informações ditas recentemente para não deixar a conversa repetitiva, a menos que seja uma necessite uma confirmação do cliente?\n"
-                "- Está tentando manter o cliente neste canal, a menos que o cliente  realmente necessite da informação que você não tenha para prosseguir?\n"
+                "- Jamais invente informações do cliente, sempre diga a verdade, e siga o que está escrito na seção de instruções.\n"
                 "- Se a mensagem do usuário é off-topic, informe isto a função 'validate_response_and_references', mas não deixa de chamá-la.\n"
-                "Por favor, revise o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n"
-                "Responda a mensagem do usuário:\n"
+                "- Se caso tenha tido um erro ao usar as ferramentas, use 'validate_response_and_references', como sempre, e peça para o cliente entrar em contato mais tarde ou forneça o contato alternativo, se disponível.\n"
+                "- Lembre-se, suas ações são limitadas as ferramentas que possui, então cuidado ao propor medidas ao cliente, certifique-se que possa cumprí-las antes.\n"
+                "- Mantenha o cliente neste canal, a menos que o cliente  realmente necessite da informação que você não tenha para prosseguir.\n"
+                "Por favor, revise o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n\n"
+                "Responda a mensagem do usuário (usando a tool 'validate_response_and_references'):\n"
                 f"- Usuário: {current_user_input_text}",
                 id=reminder_id,
             )

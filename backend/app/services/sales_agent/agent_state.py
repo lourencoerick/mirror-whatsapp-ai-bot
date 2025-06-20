@@ -19,6 +19,10 @@ SalesStageLiteral = Literal[
     "objection_handling",  # Addressing customer concerns or objections.
     "checkout_initiated",  # Customer has confirmed intent to purchase, preparing for payment.
     "checkout_link_sent",  # Payment link or instructions have been provided.
+    "appointment_scheduling_in_progress",  # Cliente pediu para agendar, IA está buscando horários.
+    "appointment_booked",  # Agendamento confirmado e criado no calendário.
+    "appointment_rescheduled",  # Um agendamento existente foi remarcado.
+    "appointment_cancelled",  # Um agendamento foi cancelado.
     "follow_up_scheduled",
     "follow_up_pending",  # A follow-up action has been scheduled and is waiting for its trigger time.
     "follow_up_in_progress",  # A follow-up message has been sent, awaiting customer response or next step.
@@ -115,6 +119,11 @@ class AgentState(BaseModel):
     bot_agent_id: UUID = Field(
         description="Identifier for the specific bot agent configuration being used for this conversation."
     )
+
+    customer_phone: str = Field(
+        description="Customer Phone Number used in the converastion."
+    )
+
     company_profile: CompanyProfileSchema = Field(
         description="The static profile of the company the sales agent is representing. Loaded at the start of the conversation."
     )
@@ -140,6 +149,11 @@ class AgentState(BaseModel):
     current_turn_number: int = Field(
         default=0,
         description="The current turn number in the conversation, incremented with each agent-user exchange.",
+    )
+
+    found_appointments: Optional[List[Dict]] = Field(
+        default=None,
+        description="A list of Google Calendar event dictionaries found by the `find_customer_appointments` tool during the current conversation turn. This is used as a short-term memory to allow follow-up actions like cancelling or updating one of the found appointments. It should be cleared or replaced in each new turn.",
     )
 
     # --- Sales Process ---

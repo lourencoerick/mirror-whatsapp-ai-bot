@@ -2,12 +2,14 @@
 
 import { components } from "@/types/api";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect } from "react"; // Importar useEffect
 import { Controller, useForm } from "react-hook-form";
 
 import { StringListInput } from "@/components/custom/single-list-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 
@@ -23,6 +25,7 @@ interface OfferingFormProps {
   onSubmit: (data: OfferingFormData) => void;
   onCancel: () => void;
   isLoading: boolean;
+  isSchedulingFeatureEnabled: boolean;
 }
 
 export function OfferingForm({
@@ -30,17 +33,21 @@ export function OfferingForm({
   onSubmit,
   onCancel,
   isLoading,
+  isSchedulingFeatureEnabled,
 }: OfferingFormProps) {
   const form = useForm<OfferingFormData>({
     resolver: zodResolver(offeringValidationSchema),
     defaultValues: {
+      id: initialData?.id,
       name: initialData?.name || "",
       short_description: initialData?.short_description || "",
       key_features: initialData?.key_features || [],
       bonus_items: initialData?.bonus_items || [],
-      price: initialData?.price || null,
+      price: initialData?.price ?? null,
       price_info: initialData?.price_info || "",
       link: initialData?.link || "",
+      requires_scheduling: initialData?.requires_scheduling || false,
+      duration_minutes: initialData?.duration_minutes ?? null,
     },
   });
 
@@ -49,12 +56,24 @@ export function OfferingForm({
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    watch,
+    setValue,
   } = form;
 
+  const requiresScheduling = watch("requires_scheduling");
   const disabled = isSubmitting || isLoading;
 
+  // --- LÓGICA DE CONSISTÊNCIA ---
+  // Efeito que observa se a feature principal de agendamento foi desativada.
+  // Se foi, ele força o switch desta oferta para 'false'.
+  useEffect(() => {
+    if (!isSchedulingFeatureEnabled) {
+      setValue("requires_scheduling", false);
+    }
+  }, [isSchedulingFeatureEnabled, setValue]);
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mx-4">
       <div>
         <Label htmlFor="offering-name" className="mb-1.5 block">
           Nome da Oferta
@@ -87,8 +106,8 @@ export function OfferingForm({
         <Input
           id="offering-price-value"
           type="number"
-          step="0.01" // Permite duas casas decimais para centavos
-          min="0" // Corresponde ao .nonnegative() do Zod, para UX
+          step="0.01"
+          min="0"
           placeholder="Ex: 29.90 (deixe em branco ou 0 se gratuito)"
           {...register("price", {
             setValueAs: (value) => {
@@ -111,7 +130,6 @@ export function OfferingForm({
           <p className="text-xs text-red-600 mt-1">{errors.price.message}</p>
         )}
       </div>
-
       <div>
         <Label htmlFor="offering-price" className="mb-1.5 block">
           Informação de Preço
@@ -144,7 +162,6 @@ export function OfferingForm({
           <p className="text-xs text-red-600 mt-1">{errors.link.message}</p>
         )}
       </div>
-
       <div>
         <Controller
           name="key_features"
@@ -160,7 +177,6 @@ export function OfferingForm({
           )}
         />
       </div>
-
       <div>
         <Controller
           name="bonus_items"
@@ -177,6 +193,78 @@ export function OfferingForm({
         />
       </div>
 
+      {/* --- SEÇÃO DE AGENDAMENTO --- */}
+      <div className="space-y-4 rounded-lg border p-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-medium">Agendamento</h3>
+          <p className="text-sm text-muted-foreground">
+            Configure se esta oferta requer um agendamento para ser concluída.
+          </p>
+        </div>
+        <div className="flex items-center space-x-2 pt-2">
+          <Controller
+            name="requires_scheduling"
+            control={control}
+            render={({ field }) => (
+              <Switch
+                id="requires-scheduling"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                disabled={disabled || !isSchedulingFeatureEnabled}
+              />
+            )}
+          />
+          <Label
+            htmlFor="requires-scheduling"
+            className={
+              !isSchedulingFeatureEnabled
+                ? "text-muted-foreground cursor-not-allowed"
+                : ""
+            }
+          >
+            Requer agendamento
+          </Label>
+        </div>
+
+        {/* Mensagem de ajuda que aparece quando a feature principal está desabilitada */}
+        {!isSchedulingFeatureEnabled && (
+          <p className="text-xs text-muted-foreground">
+            Para habilitar esta opção, ative primeiro os agendamentos no perfil
+            da empresa.
+          </p>
+        )}
+
+        {/* O campo de duração agora também verifica se a feature principal está habilitada */}
+        {requiresScheduling && isSchedulingFeatureEnabled && (
+          <div className="pt-2">
+            <Label htmlFor="duration-minutes" className="mb-1.5 block">
+              Duração do Serviço (em minutos)
+            </Label>
+            <Input
+              id="duration-minutes"
+              type="number"
+              min="1"
+              placeholder="Ex: 45"
+              {...register("duration_minutes", {
+                setValueAs: (value) => {
+                  if (value === "" || value === null || value === undefined)
+                    return null;
+                  const num = parseInt(value, 10);
+                  return isNaN(num) ? null : num;
+                },
+              })}
+              disabled={disabled}
+            />
+            {errors.duration_minutes && (
+              <p className="text-xs text-red-600 mt-1">
+                {errors.duration_minutes.message}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* --- Botões de Ação --- */}
       <div className="flex justify-end space-x-2 pt-4">
         <Button
           type="button"

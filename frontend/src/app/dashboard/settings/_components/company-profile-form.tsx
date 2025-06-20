@@ -1,8 +1,13 @@
 // app/dashboard/settings/_components/CompanyProfileForm.tsx
 "use client";
-
 import { GuidelineInput } from "@/components/custom/guideline-input"; // Custom input for guidelines
 import { StringListInput } from "@/components/custom/single-list-input"; // Custom input for string lists
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { formatCurrencyBRL } from "@/lib/utils/currency-utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -16,6 +21,8 @@ import { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner"; // For user notifications
 // UI Components
+import { CalendarSelector } from "@/components/integrations/calendar-selector";
+import { GoogleCalendarConnectButton } from "@/components/integrations/google-calendar-connect-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -53,16 +61,21 @@ import { updateCompanyProfile } from "@/lib/api/company-profile"; // API functio
 import {
   CompanyProfileFormData,
   companyProfileValidationSchema,
+  getDefaultAvailabilityRules,
 } from "@/lib/validators/company-profile.schema"; // Zod schema and type
+import { useUser } from "@clerk/nextjs";
+
 import { components } from "@/types/api"; // API type definitions
 
 import { JSX } from "react/jsx-runtime";
 import { OfferingForm } from "./offering-form"; // Sub-form for offerings
+import { WorkingHoursSelector } from "./working-hours-selector";
 
 // Type definitions from the generated API specification
 type CompanyProfileSchemaOutput =
   components["schemas"]["CompanyProfileSchema-Output"];
 type OfferingInfo = components["schemas"]["OfferingInfo"];
+type AvailabilityRule = components["schemas"]["AvailabilityRuleSchema"];
 
 /**
  * Props for the CompanyProfileForm component.
@@ -80,6 +93,19 @@ interface CompanyProfileFormProps {
   onDirtyChange: (isDirty: boolean) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const formatRules = (rules: any[] | null | undefined): AvailabilityRule[] => {
+  if (!rules || rules.length !== 7) {
+    return getDefaultAvailabilityRules();
+  }
+  return rules.map((rule) => ({
+    ...rule,
+    // Garante que startTime e endTime estejam no formato HH:mm
+    startTime: rule.startTime ? rule.startTime.substring(0, 5) : "09:00",
+    endTime: rule.endTime ? rule.endTime.substring(0, 5) : "18:00",
+  }));
+};
+
 /**
  * Renders a form for editing the company's profile information,
  * including basic details, AI configuration, communication guidelines,
@@ -94,10 +120,13 @@ export function CompanyProfileForm({
   isResearching,
   onDirtyChange,
 }: CompanyProfileFormProps): JSX.Element {
+  const { user } = useUser();
+
   const form = useForm<CompanyProfileFormData>({
     resolver: zodResolver(companyProfileValidationSchema), // Use Zod for validation
     defaultValues: {
       // Pre-populate the form with initial data or defaults (in pt-BR where applicable)
+
       company_name: initialData?.company_name || "",
       website: initialData?.website || "",
       address: initialData?.address || "",
@@ -106,7 +135,10 @@ export function CompanyProfileForm({
       sales_tone:
         initialData?.sales_tone || "amigável, prestativo e profissional", // Default tone in pt-BR
       language: initialData?.language || "pt-BR", // Default language
-      communication_guidelines: initialData?.communication_guidelines || [],
+      communication_guidelines: initialData?.communication_guidelines || [
+        "BUSQUE sempre fazer perguntas esclarecedoras",
+        "EVITE inventar informações que não foram fornecidas",
+      ],
       ai_objective:
         initialData?.ai_objective ||
         "Engajar clientes, responder perguntas sobre ofertas e guiá-los para uma compra ou próximo passo.", // Default objective in pt-BR
@@ -115,6 +147,9 @@ export function CompanyProfileForm({
       delivery_options: initialData?.delivery_options || [],
       opening_hours: initialData?.opening_hours || "",
       fallback_contact_info: initialData?.fallback_contact_info || "",
+      is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
+      scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
+      availability_rules: formatRules(initialData?.availability_rules),
       offering_overview: initialData?.offering_overview || [], // Initialize offerings array
       // Do not include non-editable fields like ID or profile_version here
     },
@@ -126,7 +161,14 @@ export function CompanyProfileForm({
     handleSubmit, // Form submission handler
     formState: { errors, isSubmitting, isDirty }, // Form state for errors and loading
     reset, // Function to reset form values
+    watch,
   } = form;
+
+  // --- Google Calendar  ---
+  const isSchedulingEnabled = watch("is_scheduling_enabled"); // Observa o valor do switch
+  const isGoogleConnected = user?.externalAccounts.some(
+    (acc) => acc.provider === "google"
+  );
 
   // --- Offerings Management State ---
   // `useFieldArray` manages the dynamic list of offerings within the form state
@@ -138,7 +180,7 @@ export function CompanyProfileForm({
   } = useFieldArray({
     control,
     name: "offering_overview", // Must match the field name in the Zod schema/FormData
-    // keyName: "fieldId" // Optional: Use a different property name for React keys if 'id' conflicts
+    keyName: "fieldId", // Optional: Use a different property name for React keys if 'id' conflicts
   });
 
   // State for controlling the offering add/edit modal (Dialog)
@@ -174,6 +216,9 @@ export function CompanyProfileForm({
         offering_overview: initialData.offering_overview || [],
         opening_hours: initialData.opening_hours || "",
         fallback_contact_info: initialData.fallback_contact_info || "",
+        is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
+        scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
+        availability_rules: formatRules(initialData?.availability_rules),
       });
     }
   }, [initialData, reset]);
@@ -215,23 +260,27 @@ export function CompanyProfileForm({
    * @param {OfferingInfo} data - The data submitted from the OfferingForm.
    */
   const handleSaveOffering = (data: OfferingInfo) => {
-    // Ensure key_features is always an array, even if undefined/null from the form
-    const dataToSave = {
-      ...data,
-      key_features: data.key_features || [],
-      bonus_items: data.bonus_items || [],
-    };
-
     if (editingOfferingIndex !== null) {
-      // Update existing offering
-      update(editingOfferingIndex, dataToSave);
+      const originalOfferingId = offerings[editingOfferingIndex].id;
+      // Criamos o objeto de dados para salvar, garantindo que o ID original seja mantido.
+      const dataToUpdate = {
+        ...data,
+        id: originalOfferingId,
+        key_features: data.key_features || [],
+        bonus_items: data.bonus_items || [],
+      };
+
+      update(editingOfferingIndex, dataToUpdate);
       toast.success("Oferta atualizada.");
     } else {
-      // Add new offering
-      append(dataToSave);
+      const dataToAppend = {
+        ...data,
+        key_features: data.key_features || [],
+        bonus_items: data.bonus_items || [],
+      };
+      append(dataToAppend);
       toast.success("Oferta adicionada.");
     }
-    // Close modal and reset editing state
     setIsOfferingModalOpen(false);
     setEditingOfferingIndex(null);
     setOfferingFormData(null);
@@ -285,6 +334,17 @@ export function CompanyProfileForm({
 
   // Disable the entire form if submitting or if background research is active
   const formDisabled = isSubmitting || isResearching;
+
+  const { fields } = useFieldArray({
+    control,
+    name: "availability_rules",
+  });
+
+  // --- ADICIONE ESTE CONSOLE.LOG DE DEPURAÇÃO ---
+  console.log(
+    "CompanyProfileForm: O que está sendo passado para WorkingHoursSelector?",
+    { fields }
+  );
 
   return (
     // Wrap Tooltip usage in a provider if not already present higher up the tree
@@ -482,6 +542,115 @@ export function CompanyProfileForm({
                 />
               </div>
 
+              {/* --- Scheduling section --- */}
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-medium">
+                    Agendamentos via Google Calendar
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Permita que a IA agende compromissos diretamente na sua
+                    agenda do Google.
+                  </p>
+                </div>
+
+                {/* 1. Switch para Habilitar/Desabilitar a feature */}
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="is_scheduling_enabled"
+                    control={control}
+                    render={({ field }) => (
+                      <Switch
+                        id="is_scheduling_enabled"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <Label htmlFor="is_scheduling_enabled">
+                    Habilitar agendamentos
+                  </Label>
+                </div>
+
+                {/* 2. Conteúdo condicional que aparece se a feature estiver habilitada */}
+                {isSchedulingEnabled && (
+                  <div className="space-y-4 pt-4 border-t">
+                    {/* --- Bloco de Conexão com o Google --- */}
+                    <div className="p-3 border rounded-md bg-slate-50/50">
+                      <h4 className="font-medium mb-2">
+                        1. Conecte sua Agenda
+                      </h4>
+                      {!isGoogleConnected ? (
+                        <GoogleCalendarConnectButton />
+                      ) : (
+                        <div>
+                          <p className="text-sm text-green-700 mb-2">
+                            ✅ Google Calendar Conectado.
+                          </p>
+                          <Controller
+                            name="scheduling_calendar_id"
+                            control={control}
+                            render={({ field }) => (
+                              <CalendarSelector
+                                selectedValue={field.value}
+                                onValueChange={field.onChange}
+                                disabled={formDisabled}
+                              />
+                            )}
+                          />
+                        </div>
+                      )}
+                      {errors.scheduling_calendar_id && (
+                        <p className="text-xs text-red-600 mt-1">
+                          {errors.scheduling_calendar_id.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* --- Bloco de Configuração de Horários --- */}
+                    <div className="p-3 border rounded-md bg-slate-50/50">
+                      <h4 className="font-medium mb-2">
+                        2. Defina sua Disponibilidade
+                      </h4>
+                      <Accordion
+                        type="single"
+                        collapsible
+                        className="w-full"
+                        defaultValue="item-1"
+                      >
+                        <AccordionItem value="item-1">
+                          <AccordionTrigger>
+                            Horários para Agendamento
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-4">
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Defina os dias e horários em que você está
+                              disponível. A IA usará estas regras para oferecer
+                              horários aos seus clientes.
+                            </p>
+                            {/* A CHAMADA CORRETA: Sem Controller, passando as props certas */}
+                            <WorkingHoursSelector
+                              fields={fields}
+                              control={control}
+                              disabled={formDisabled}
+                            />
+
+                            {/* O erro agora precisa ser lido do objeto de erros do formulário */}
+                            {errors.availability_rules && (
+                              <p className="text-xs text-red-600 mt-2">
+                                {errors.availability_rules.root?.message ||
+                                  errors.availability_rules.message ||
+                                  "Erro nas regras de disponibilidade."}
+                              </p>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* --- Offerings Section (Table + Modal) --- */}
               <div className="space-y-2 pt-2">
                 <Label className="mb-1.5 block">
@@ -524,7 +693,6 @@ export function CompanyProfileForm({
                         <TableBody>
                           {offerings.map((offering, index) => (
                             <TableRow key={offering.id}>
-                              {" "}
                               {/* Use field.id generated by useFieldArray for stable keys */}
                               <TableCell className="font-medium">
                                 {offering.name}
@@ -645,9 +813,10 @@ export function CompanyProfileForm({
                     </p>
                   )}
                 </div>
+
                 <div>
                   <Label className="mb-1.5 block" htmlFor="opening_hours">
-                    Horário de Funcionamento
+                    Horário de Funcionamento (Informativo)
                   </Label>
                   <Input
                     id="opening_hours"
@@ -722,6 +891,7 @@ export function CompanyProfileForm({
                 onSubmit={handleSaveOffering}
                 onCancel={() => setIsOfferingModalOpen(false)}
                 isLoading={isSubmitting}
+                isSchedulingFeatureEnabled={isSchedulingEnabled}
               />
             </div>
             {/* Note: Cancel/Save buttons are now part of the OfferingForm component */}

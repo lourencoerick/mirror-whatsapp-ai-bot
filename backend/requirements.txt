@@ -56,8 +56,14 @@ trustcall==0.0.39
 tavily-python==0.6.0
 langgraph-checkpoint-postgres==2.0.21
 html2text==2025.4.15
+
 # === Google Cloud Storage ===
 google-cloud-storage
+
+# === Google API ===
+google-api-python-client==2.172.0
+google-auth-httplib2==0.2.0
+
 
 # === Payments ===
 stripe==12.1.0

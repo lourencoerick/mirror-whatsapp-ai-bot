@@ -47,9 +47,20 @@ from .tools.utility import (
     validate_response_and_references,
 )
 
+from .tools.scheduling import (
+    get_available_slots,
+    create_appointment,
+    find_next_available_day,
+    get_current_datetime,
+    update_appointment,
+    cancel_appointment,
+    find_customer_appointments,
+    check_scheduling_status,
+)
+
 
 # List of all tools for the agent
-ALL_TOOLS: List[Callable] = [
+ESSENTIAL_TOOLS: List[Callable] = [
     list_available_offerings,
     get_offering_details_by_id,
     update_shopping_cart,
@@ -58,6 +69,18 @@ ALL_TOOLS: List[Callable] = [
     suggest_objection_response_strategy,
     update_sales_stage,
     validate_response_and_references,
+    check_scheduling_status,
+]
+
+SCHEDULING_TOOLS: List[Callable] = [
+    # scheduling tools
+    get_available_slots,
+    create_appointment,
+    find_next_available_day,
+    get_current_datetime,
+    update_appointment,
+    cancel_appointment,
+    find_customer_appointments,
 ]
 
 
@@ -143,6 +166,11 @@ def create_react_sales_agent_graph(
     """
     company_profile = CompanyProfileSchema.model_validate(company_profile)
 
+    all_tools = ESSENTIAL_TOOLS
+
+    if company_profile.is_scheduling_enabled:
+        all_tools.extend(SCHEDULING_TOOLS)
+
     static_system_prompt_str = generate_system_message(profile=company_profile)
     _system_message: BaseMessage = SystemMessage(content=static_system_prompt_str)
     prompt_runnable = RunnableCallable(
@@ -151,7 +179,7 @@ def create_react_sales_agent_graph(
     )
 
     model_runnable = prompt_runnable | model.bind_tools(
-        ALL_TOOLS, parallel_tool_calls=False
+        all_tools, parallel_tool_calls=False
     )
 
     graph_builder = StateGraph(AgentState)
@@ -162,7 +190,7 @@ def create_react_sales_agent_graph(
     graph_builder.add_node(
         "validation_compliance_check", validation_compliance_check_hook
     )
-    graph_builder.add_node("tools", ToolNode(ALL_TOOLS))
+    graph_builder.add_node("tools", ToolNode(all_tools))
     graph_builder.add_node(
         "chatbot",
         lambda state: {"messages": model_runnable.invoke(state)},

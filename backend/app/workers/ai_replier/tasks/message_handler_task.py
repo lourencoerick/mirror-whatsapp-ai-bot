@@ -453,12 +453,15 @@ async def handle_ai_reply_request(
                 )
 
                 agent_config_db: Optional[BotAgentRead] = None
+                customer_phone: Optional[str] = None
                 if conversation and conversation.inbox_id:
                     agent_data_raw = await bot_agent_repo.get_bot_agent_for_inbox(
                         db, inbox_id=conversation.inbox_id, account_id=account_id
                     )
                     if agent_data_raw:
                         agent_config_db = BotAgentRead.model_validate(agent_data_raw)
+
+                    customer_phone = conversation.contact_inbox.contact.phone_number
 
                 if not profile_db:
                     logger.error(
@@ -581,6 +584,7 @@ async def handle_ai_reply_request(
                     "account_id": str(account_id),
                     "conversation_id": str(conversation_id),
                     "bot_agent_id": str(agent_config_db.id),
+                    "customer_phone": customer_phone,
                     "company_profile": profile_dict,
                     "agent_config": agent_config_dict,
                     "trigger_event": trigger_event_for_graph,
