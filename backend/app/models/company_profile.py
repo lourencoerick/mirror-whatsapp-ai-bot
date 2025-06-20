@@ -105,6 +105,13 @@ class CompanyProfile(BaseModel):
         doc="The ID of the Google Calendar selected by the user for scheduling.",
     )
 
+    scheduling_user_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        doc="The user whose connected calendar is used for scheduling.",
+    )
+
     availability_rules = Column(
         JSON,
         nullable=True,
@@ -142,6 +149,7 @@ class CompanyProfile(BaseModel):
     # Define the relationship to the Account model
     # Assumes your Account model has a 'profile' relationship defined with back_populates='account'
     account = relationship("Account", back_populates="profile")
+    scheduling_user = relationship("User", foreign_keys=[scheduling_user_id])
 
     # --- Constraints ---
     # Ensure account_id is unique if not already handled by 'unique=True' above

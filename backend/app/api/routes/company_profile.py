@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from loguru import logger
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Optional
 
 # SQLAlchemy Session and Models/Schemas
@@ -80,6 +80,8 @@ async def create_or_update_company_profile(
     This performs an 'upsert' operation based on the account ID.
     """
     account_id = auth_context.account.id
+    current_user_id = auth_context.user.id
+
     logger.info(f"Updating/Creating Company Profile for account {account_id}")
 
     # Convert incoming Pydantic schema to dict suitable for DB update/create
@@ -94,6 +96,40 @@ async def create_or_update_company_profile(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid profile data format.",
         ) from dump_err
+
+    new_offerings_list = profile_data_dict.get("offering_overview", [])
+    final_offerings = []
+
+    for offer_data in new_offerings_list:
+        if "id" in offer_data and offer_data["id"]:
+            # Se o ID veio do frontend, nós o mantemos.
+            final_offerings.append(offer_data)
+        else:
+            # Se não veio ID, é uma nova oferta. Geramos um novo ID.
+            offer_data["id"] = str(uuid4())
+            final_offerings.append(offer_data)
+
+    profile_data_dict["offering_overview"] = final_offerings
+
+    if profile_data_dict.get("is_scheduling_enabled"):
+        logger.info(
+            f"Scheduling is enabled. Setting scheduling_user_id to {current_user_id}."
+        )
+        profile_data_dict["scheduling_user_id"] = str(current_user_id)
+    else:
+        if "scheduling_user_id" in profile_data_dict:
+            logger.info("Scheduling is disabled. Clearing scheduling_user_id.")
+            profile_data_dict["scheduling_user_id"] = None
+
+        logger.info(
+            "Scheduling disabled. Ensuring all offerings have requires_scheduling=false."
+        )
+        if (
+            "offering_overview" in profile_data_dict
+            and profile_data_dict["offering_overview"]
+        ):
+            for offer in profile_data_dict["offering_overview"]:
+                offer["requires_scheduling"] = False
 
     saved_profile: Optional[CompanyProfile] = None
     try:

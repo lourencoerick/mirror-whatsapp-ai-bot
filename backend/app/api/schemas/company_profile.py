@@ -145,6 +145,12 @@ class CompanyProfileSchema(BaseModel):
         default=False,
         description="Indicates if the company uses the scheduling feature.",
     )
+
+    scheduling_user_id: Optional[UUID] = Field(
+        default=None,
+        description="The ID of the user which is the owner of the calendar.",
+    )
+
     scheduling_calendar_id: Optional[str] = Field(
         default=None,
         description="The ID of the Google Calendar selected by the user for scheduling.",
