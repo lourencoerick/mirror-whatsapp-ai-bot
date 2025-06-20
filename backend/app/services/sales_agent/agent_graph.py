@@ -55,6 +55,7 @@ from .tools.scheduling import (
     update_appointment,
     cancel_appointment,
     find_customer_appointments,
+    check_scheduling_status,
 )
 
 
@@ -68,6 +69,7 @@ ESSENTIAL_TOOLS: List[Callable] = [
     suggest_objection_response_strategy,
     update_sales_stage,
     validate_response_and_references,
+    check_scheduling_status,
 ]
 
 SCHEDULING_TOOLS: List[Callable] = [
@@ -164,11 +166,11 @@ def create_react_sales_agent_graph(
     """
     company_profile = CompanyProfileSchema.model_validate(company_profile)
 
-    all_tools = (
-        ESSENTIAL_TOOLS + SCHEDULING_TOOLS
-        if company_profile.is_scheduling_enabled
-        else []
-    )
+    all_tools = ESSENTIAL_TOOLS
+
+    if company_profile.is_scheduling_enabled:
+        all_tools.extend(SCHEDULING_TOOLS)
+
     static_system_prompt_str = generate_system_message(profile=company_profile)
     _system_message: BaseMessage = SystemMessage(content=static_system_prompt_str)
     prompt_runnable = RunnableCallable(
