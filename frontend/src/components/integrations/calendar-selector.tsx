@@ -9,60 +9,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
-import { getGoogleCalendars } from "@/lib/api/google-calendar";
-import { components } from "@/types/api";
-import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type components } from "@/types/api";
 
-type CalendarResponse = components["schemas"]["CalendarResponse"];
+type Calendar = NonNullable<
+  components["schemas"]["GoogleIntegrationStatus"]["calendars"]
+>[number];
 
 interface CalendarSelectorProps {
   selectedValue: string | null | undefined;
   onValueChange: (value: string) => void;
+  calendars: Calendar[];
   disabled?: boolean;
 }
 
 export function CalendarSelector({
   selectedValue,
   onValueChange,
+  calendars,
   disabled,
 }: CalendarSelectorProps) {
-  const fetcher = useAuthenticatedFetch();
-  const [calendars, setCalendars] = useState<CalendarResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchCals = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await getGoogleCalendars(fetcher);
-        setCalendars(data);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (err: any) {
-        setError(err.message || "Falha ao buscar calendários.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchCals();
-  }, [fetcher]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center text-sm">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando
-        calendários...
-      </div>
-    );
-  }
-
-  if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
-  }
-
   return (
     <div>
       <Label className="mb-1.5 block" htmlFor="calendar-select">
@@ -70,8 +35,8 @@ export function CalendarSelector({
       </Label>
       <Select
         onValueChange={onValueChange}
-        defaultValue={selectedValue ?? ""}
-        disabled={disabled}
+        value={selectedValue ?? ""}
+        disabled={disabled || calendars.length === 0}
       >
         <SelectTrigger id="calendar-select">
           <SelectValue placeholder="Selecione um calendário..." />

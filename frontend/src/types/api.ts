@@ -1190,6 +1190,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/google/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Google Integration Status
+         * @description Checks the full status of the Google integration for the current user,
+         *     including connection status, permission scopes, and available calendars.
+         */
+        get: operations["get_google_integration_status_api_v1_integrations_google_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/integrations/google/calendars": {
         parameters: {
             query?: never;
@@ -1749,6 +1770,11 @@ export interface components {
              */
             is_scheduling_enabled: boolean;
             /**
+             * Scheduling User Id
+             * @description The ID of the user which is the owner of the calendar.
+             */
+            scheduling_user_id?: string | null;
+            /**
              * Scheduling Calendar Id
              * @description The ID of the Google Calendar selected by the user for scheduling.
              */
@@ -1903,6 +1929,11 @@ export interface components {
              * @default false
              */
             is_scheduling_enabled: boolean;
+            /**
+             * Scheduling User Id
+             * @description The ID of the user which is the owner of the calendar.
+             */
+            scheduling_user_id?: string | null;
             /**
              * Scheduling Calendar Id
              * @description The ID of the Google Calendar selected by the user for scheduling.
@@ -2913,6 +2944,19 @@ export interface components {
             server_url: string;
             /** Apikey */
             apikey: string;
+        };
+        /** GoogleIntegrationStatus */
+        GoogleIntegrationStatus: {
+            /** Is Connected */
+            is_connected: boolean;
+            /** Has All Permissions */
+            has_all_permissions: boolean;
+            /** Calendars */
+            calendars?: {
+                [key: string]: string;
+            }[] | null;
+            /** Error Message */
+            error_message?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -6210,6 +6254,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_google_integration_status_api_v1_integrations_google_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoogleIntegrationStatus"];
+                };
             };
         };
     };

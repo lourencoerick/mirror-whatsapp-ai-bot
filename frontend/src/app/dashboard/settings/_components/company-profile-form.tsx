@@ -23,6 +23,7 @@ import { toast } from "sonner"; // For user notifications
 // UI Components
 import { CalendarSelector } from "@/components/integrations/calendar-selector";
 import { GoogleCalendarConnectButton } from "@/components/integrations/google-calendar-connect-button";
+import { ReauthorizeGoogleButton } from "@/components/integrations/reauhorize-google-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -70,6 +71,9 @@ import { components } from "@/types/api"; // API type definitions
 import { JSX } from "react/jsx-runtime";
 import { OfferingForm } from "./offering-form"; // Sub-form for offerings
 import { WorkingHoursSelector } from "./working-hours-selector";
+
+import { getGoogleIntegrationStatus } from "@/lib/api/google-calendar";
+import { useQuery } from "@tanstack/react-query";
 
 // Type definitions from the generated API specification
 type CompanyProfileSchemaOutput =
@@ -122,6 +126,13 @@ export function CompanyProfileForm({
 }: CompanyProfileFormProps): JSX.Element {
   const { user } = useUser();
 
+  const { data: googleStatus, isLoading: isLoadingStatus } = useQuery({
+    queryKey: ["googleIntegrationStatus"],
+    queryFn: () => getGoogleIntegrationStatus(fetcher),
+    // Só executa a query se o usuário estiver logado
+    enabled: !!user,
+  });
+
   const form = useForm<CompanyProfileFormData>({
     resolver: zodResolver(companyProfileValidationSchema), // Use Zod for validation
     defaultValues: {
@@ -166,9 +177,6 @@ export function CompanyProfileForm({
 
   // --- Google Calendar  ---
   const isSchedulingEnabled = watch("is_scheduling_enabled"); // Observa o valor do switch
-  const isGoogleConnected = user?.externalAccounts.some(
-    (acc) => acc.provider === "google"
-  );
 
   // --- Offerings Management State ---
   // `useFieldArray` manages the dynamic list of offerings within the form state
@@ -580,31 +588,46 @@ export function CompanyProfileForm({
                       <h4 className="font-medium mb-2">
                         1. Conecte sua Agenda
                       </h4>
-                      {!isGoogleConnected ? (
+
+                      {isLoadingStatus && (
+                        <div>Verificando status da conexão...</div>
+                      )}
+
+                      {/* Estado 1: Não conectado */}
+                      {googleStatus && !googleStatus.is_connected && (
                         <GoogleCalendarConnectButton />
-                      ) : (
-                        <div>
-                          <p className="text-sm text-green-700 mb-2">
-                            ✅ Google Calendar Conectado.
-                          </p>
-                          <Controller
-                            name="scheduling_calendar_id"
-                            control={control}
-                            render={({ field }) => (
-                              <CalendarSelector
-                                selectedValue={field.value}
-                                onValueChange={field.onChange}
-                                disabled={formDisabled}
-                              />
-                            )}
-                          />
-                        </div>
                       )}
-                      {errors.scheduling_calendar_id && (
-                        <p className="text-xs text-red-600 mt-1">
-                          {errors.scheduling_calendar_id.message}
-                        </p>
-                      )}
+
+                      {/* Estado 2: Conectado, mas sem permissões */}
+                      {googleStatus &&
+                        googleStatus.is_connected &&
+                        !googleStatus.has_all_permissions && (
+                          <ReauthorizeGoogleButton />
+                        )}
+
+                      {/* Estado 3: Tudo certo! */}
+                      {googleStatus &&
+                        googleStatus.is_connected &&
+                        googleStatus.has_all_permissions && (
+                          <div>
+                            <p className="text-sm text-green-700 mb-2">
+                              ✅ Google Calendar Conectado com todas as
+                              permissões.
+                            </p>
+                            <Controller
+                              name="scheduling_calendar_id"
+                              control={control}
+                              render={({ field }) => (
+                                <CalendarSelector
+                                  selectedValue={field.value}
+                                  onValueChange={field.onChange}
+                                  disabled={formDisabled}
+                                  calendars={googleStatus.calendars || []}
+                                />
+                              )}
+                            />
+                          </div>
+                        )}
                     </div>
 
                     {/* --- Bloco de Configuração de Horários --- */}
