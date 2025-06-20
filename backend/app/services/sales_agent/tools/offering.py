@@ -58,6 +58,10 @@ async def list_available_offerings(
         offer_detail = f"\n\n**Offering Name:** {offer.name}"
         offer_detail += f"\n  **ID (internal information):** {str(offer.id)} "  # Crucial for follow-up questions
         offer_detail += f"\n  **Summary:** {offer.short_description}"
+
+        if hasattr(offer, "requires_scheduling") and offer.requires_scheduling:
+            offer_detail += f"\n  **Required Scheduling:** {offer.requires_scheduling}"
+
         # Optionally add price if you want a brief price indication here
         price_display = ""
 
@@ -69,6 +73,7 @@ async def list_available_offerings(
 
         if price_display:
             offer_detail += f"\n  **Price Indication:** {price_display}"
+
         summary_parts.append(offer_detail)
 
     logger.info(f"[{tool_name}] Found {len(offering_overview_list)} offerings to list.")
