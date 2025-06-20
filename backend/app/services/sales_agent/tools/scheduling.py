@@ -46,7 +46,7 @@ async def check_scheduling_status(
 
     if profile and profile.is_scheduling_enabled:
         logger.info(f"[{tool_name}] Result: Scheduling is ENABLED.")
-        return "Yes, scheduling is enabled. Now, check if the offer id allows a appointement scheduling."
+        return "Yes, scheduling is enabled. Now, check if the offering id allows a appointement scheduling."
     else:
         logger.info(f"[{tool_name}] Result: Scheduling is DISABLED.")
         return "No, scheduling is currently disabled for the company. This means that you have to guide the customer to the checkout link, using the sales principles."
@@ -214,11 +214,24 @@ async def create_appointment(
         (o for o in profile.offering_overview if o.id == offering_uuid), None
     )
 
-    if not target_offering or not target_offering.duration_minutes:
+    # 1. A oferta existe?
+    if not target_offering:
+        logger.warning(f"[{tool_name}] Offering with ID {offering_id_str} not found.")
+        return "Não consegui encontrar a oferta com o ID fornecido."
+
+    # 2. A oferta requer agendamento? (Lógica invertida e corrigida)
+    if not target_offering.requires_scheduling:
         logger.warning(
-            f"[{tool_name}] Offering {offering_id_str} not found or has no duration."
+            f"[{tool_name}] Offering '{target_offering.name}' does not require scheduling."
         )
-        return "Não consegui encontrar a oferta ou a duração do serviço para criar o agendamento."
+        return f"A oferta '{target_offering.name}' não precisa de agendamento."
+
+    # 3. A oferta tem uma duração definida?
+    if not target_offering.duration_minutes:
+        logger.warning(
+            f"[{tool_name}] Offering '{target_offering.name}' has no duration set."
+        )
+        return f"A oferta '{target_offering.name}' está configurada para agendamento, mas não tem uma duração definida. Não consigo prosseguir."
 
     # --- 2. Lidar com Fuso Horário e Calcular Horário de Término ---
     # Assumimos um fuso horário padrão para a empresa. Idealmente, isso viria do CompanyProfile.
