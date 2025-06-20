@@ -21,27 +21,35 @@ from app.services.google_calendar.google_calendar_service import GoogleCalendarS
 from app.api.schemas.company_profile import OfferingInfo
 
 
-class CreateAppointmentArgs(BaseModel):
-    """Input schema for the create_appointment tool."""
+@tool
+async def check_scheduling_status(
+    state: Annotated[AgentState, InjectedState],
+) -> str:
+    """
+    Checks if the scheduling feature is enabled for the company.
 
-    appointment_datetime_str: str = Field(
-        ...,
-        description='The exact start date and time for the appointment, in "YYYY-MM-DD HH:MM" format.',
-    )
-    offering_id_str: str = Field(
-        ..., description="The unique ID of the offering being scheduled."
-    )
-    customer_email: EmailStr = Field(
-        ...,
-        description="The email address of the customer for the appointment invitation and confirmation.",
-    )
-    customer_name: Optional[str] = Field(
-        None, description="The full name of the customer. Optional, but good to have."
-    )
-    customer_notes: Optional[str] = Field(
-        None,
-        description="Optional notes about the customer or the appointment (e.g., 'allergic to X', 'prefers Y').",
-    )
+    Use this as the very first step before attempting any scheduling-related action
+    (like finding available slots or creating an appointment). This tool provides a
+    simple Yes/No answer. If the answer is 'No', you should inform the user that
+    scheduling is not available and do not proceed with other scheduling tools.
+
+    Args:
+        state: The current agent state, used to access the company profile.
+
+    Returns:
+        A string, either "Yes, scheduling is enabled." or "No, scheduling is currently disabled.".
+    """
+    tool_name = "check_scheduling_status"
+    logger.info(f"--- Executing Tool: {tool_name} ---")
+
+    profile = state.company_profile
+
+    if profile and profile.is_scheduling_enabled:
+        logger.info(f"[{tool_name}] Result: Scheduling is ENABLED.")
+        return "Yes, scheduling is enabled. Now, check if the offer id allows a appointement scheduling."
+    else:
+        logger.info(f"[{tool_name}] Result: Scheduling is DISABLED.")
+        return "No, scheduling is currently disabled for the company. This means that you have to guide the customer to the checkout link, using the sales principles."
 
 
 @tool
