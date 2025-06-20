@@ -1,34 +1,37 @@
-// components/integrations/ReauthorizeGoogleButton.tsx
 "use client";
 
+import { GoogleIcon } from "@/components/icons/google-icon";
+import { Button } from "@/components/ui/button";
 import { useUser } from "@clerk/nextjs";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
 
-import { GoogleIcon } from "@/components/icons/google-icon";
-import { Button } from "@/components/ui/button";
-
-/**
- * A component that prompts the user to re-authorize Google connection
- * to grant missing permissions (like calendar access).
- */
 export function ReauthorizeGoogleButton() {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleReconnect = async () => {
     if (!user) return;
+    const googleAccount = user.externalAccounts.find(
+      (ea) => ea.provider === "google"
+    );
+    if (!googleAccount) {
+      console.error("Conta Google não encontrada");
+      return;
+    }
     setIsLoading(true);
     try {
-      // Chamar a mesma função de conexão força o fluxo de re-consentimento
-      // para obter os novos escopos de calendário.
-      await user.createExternalAccount({
-        strategy: "oauth_google",
-        redirectUrl: "/dashboard/settings", // Deve ser a mesma URL
+      const reauth = await googleAccount.reauthorize({
+        redirectUrl: "/dashboard/settings",
+        additionalScopes: ["https://www.googleapis.com/auth/calendar.events"],
+        oidcPrompt: "consent",
       });
+      if (reauth.verification?.externalVerificationRedirectURL) {
+        window.location.href =
+          reauth.verification.externalVerificationRedirectURL.href;
+      }
     } catch (err) {
-      console.error("Clerk OAuth re-auth error:", err);
-      // O erro será tratado no componente pai se necessário
+      console.error("Erro no reauthorize:", err);
       setIsLoading(false);
     }
   };
