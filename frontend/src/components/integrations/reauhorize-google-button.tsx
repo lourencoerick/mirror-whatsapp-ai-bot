@@ -23,7 +23,10 @@ export function ReauthorizeGoogleButton() {
     try {
       const reauth = await googleAccount.reauthorize({
         redirectUrl: "/dashboard/settings",
-        additionalScopes: ["https://www.googleapis.com/auth/calendar.events"],
+        additionalScopes: [
+          "https://www.googleapis.com/auth/calendar.events",
+          "https://www.googleapis.com/auth/calendar.readonly",
+        ],
         oidcPrompt: "consent",
       });
       if (reauth.verification?.externalVerificationRedirectURL) {
