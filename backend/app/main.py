@@ -3,6 +3,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from loguru import logger
 import stripe
@@ -117,6 +118,8 @@ app.router.lifespan_context = lifespan_manager
 
 
 # --- Middleware ---
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 # CORS Middleware (Essential for frontend interaction)
 allowed_origins_str = (
     settings.FRONTEND_ALLOWED_ORIGINS
