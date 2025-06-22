@@ -27,6 +27,7 @@ from .simulation.persona import Persona
 from .knowledge_chunk import KnowledgeChunk
 from .knowledge_document import KnowledgeDocument
 from .usage_event import UsageEvent
+from .google_oauth_token import GoogleOAuthToken
 
 __all__ = [
     "AccessToken",
@@ -58,4 +59,5 @@ __all__ = [
     "KnowledgeDocument",
     "Persona",
     "UsageEvent",
+    "GoogleOAuthToken",
 ]

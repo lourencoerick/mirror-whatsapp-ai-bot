@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     EVOLUTION_API_KEY: str = "your-api-key"
     EVOLUTION_API_SHARED_URL: str = "http://localhost:8080"
     SECRET_KEY_FOR_ENCRYPTION: str = Field(..., env="SECRET_KEY_FOR_ENCRYPTION")
+    SESSION_SECRET_KEY: str = Field(..., env="SESSION_SECRET_KEY")
 
     # --- Clerk ---
     CLERK_WEBHOOK_SECRET: str = "your-secret-key"
@@ -87,6 +88,17 @@ class Settings(BaseSettings):
 
     # --- Meta ---
     META_APP_SECRET: str = "your-meta-secret"
+
+    # --- Google OAuth Settings (for reference, managed by Clerk) ---
+    GOOGLE_CLIENT_ID: str = "your-google-client-id"
+    GOOGLE_CLIENT_SECRET: str = "your-google-secret-key"
+    GOOGLE_AUTH_SCOPES: List[str] = [
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
+        "openid",
+    ]
 
     # --- Sendgrid ---
     SENDGRID_API_KEY: str = "your-secret-key"

@@ -3,6 +3,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from loguru import logger
 import stripe
 from typing import Optional
@@ -32,7 +33,7 @@ from app.api.routes import dashboard as dashboard_routes
 from app.api.routes import billing as billing_routes
 from app.api.routes import beta_tester as beta_routes
 from app.api.routes import admin_beta as admin_beta_routes
-
+from app.api.routes import google_auth as google_auth_routes
 
 # Import Dependencies and Context
 from app.core.dependencies.auth import get_auth_context, AuthContext
@@ -134,6 +135,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SESSION_SECRET_KEY,
+    same_site="lax",  # 'lax' é um bom padrão. 'none' exige https.
+    https_only=True,  # Para desenvolvimento local com HTTP. Mude para True em produção.
+)
+
+
 common_protected_dependencies = [Depends(require_active_subscription)]
 
 # --- API Routers (v1) ---
@@ -145,6 +154,11 @@ logger.info(f"Including API routers under prefix: {api_v1_prefix}")
 app.include_router(
     auth_routes.router, prefix=f"{api_v1_prefix}/auth", tags=["v1 - Auth"]
 )
+
+app.include_router(
+    google_auth_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Google Auth"]
+)
+
 
 app.include_router(
     billing_routes.router, prefix=f"{api_v1_prefix}", tags=["v1 - Billing"]

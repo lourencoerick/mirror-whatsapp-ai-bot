@@ -9,7 +9,8 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
+from typing import Optional
 from app.models.base import BaseModel
 
 
@@ -66,4 +67,8 @@ class User(BaseModel):
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan",
+    )
+
+    google_oauth_token: Mapped[Optional["GoogleOAuthToken"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
     )
