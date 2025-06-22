@@ -102,6 +102,7 @@ export function useAuthenticatedFetch(): FetchFunction {
         const response = await fetch(fullUrl, {
           ...options, // Include method, body, etc.
           headers: headers, // Pass the configured headers
+          credentials: "include",
         });
 
         const responseInfo = `[useAuthenticatedFetch] Response Status: ${response.status} for ${fullUrl}`;
