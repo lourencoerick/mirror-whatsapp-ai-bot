@@ -9,14 +9,17 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 import pytz
 
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+
 # Importações do Google
 import google.oauth2.credentials
 from googleapiclient.discovery import build, Resource
 from googleapiclient.errors import HttpError
 
 # Nossas importações
-from clerk_backend_api import Clerk
-
+from app.services.repository import google_token as token_repo
+from app.core.security import decrypt_logical_token
 from app.config import get_settings, Settings
 from app.models.company_profile import CompanyProfile
 from app.models.user import User
@@ -48,61 +51,75 @@ class GoogleCalendarService:
     def __init__(self):
         pass
 
-    async def _get_clerk_id_from_db(self, db: AsyncSession, user_id: UUID) -> str:
-        """
-        Fetches the Clerk User ID from our database using our internal User ID.
-        The database session is injected into this method.
-        """
-        logger.debug(f"Fetching Clerk ID for internal user_id: {user_id}")
-        # Usamos await db.get para a busca assíncrona
-        user = await db.get(User, user_id)
-
-        # Assumindo que o campo 'uid' no seu modelo User armazena o clerk_user_id
-        if not user or not user.uid:
-            logger.error(
-                f"User or Clerk ID (uid) not found in DB for user_id: {user_id}"
-            )
-            raise HTTPException(
-                status_code=404, detail=f"Usuário ou ID de integração não encontrado."
-            )
-
-        logger.debug(f"Found Clerk ID: {user.uid}")
-        return user.uid
-
     async def _get_google_token(self, db: AsyncSession, user_id: UUID) -> str:
         """
-        Retrieves the Google OAuth access token for a user, identified by our internal UUID.
+        Retrieves a valid Google OAuth access token for a user by using the
+        stored refresh token.
+
+        This method fetches the encrypted refresh token from our database,
+        decrypts it, and if the access token is expired, uses the refresh
+        token to obtain a new one from Google.
         """
-        try:
-            clerk_user_id = await self._get_clerk_id_from_db(db, user_id)
+        logger.debug(f"Getting Google token for user {user_id} from internal storage.")
 
-            async with Clerk(bearer_auth=settings.CLERK_SECRET_KEY) as clerk:
-                token_list = await clerk.users.get_o_auth_access_token_async(
-                    user_id=clerk_user_id, provider="google"
-                )
-
-            if not token_list:
-                raise HTTPException(
-                    status_code=404, detail="Token do Google não encontrado."
-                )
-
-            token_info = token_list[0]
-            access_token = token_info.token
-
-            if not access_token:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Token de acesso não encontrado na resposta do Clerk.",
-                )
-
-            return access_token
-        except HTTPException as e:
-            raise e
-        except Exception as e:
-            logger.exception(f"Error fetching Google token for user_id {user_id}: {e}")
+        # 1. Buscar o registro do token no nosso banco de dados
+        stored_token_record = await token_repo.get_google_token_by_user_id(db, user_id)
+        if not stored_token_record:
+            logger.error(f"No Google token record found in DB for user {user_id}.")
             raise HTTPException(
-                status_code=500,
-                detail="Ocorreu um erro interno ao buscar as credenciais do Google.",
+                status_code=404,
+                detail="Conexão com o Google não encontrada para este usuário.",
+            )
+
+        # 2. Descriptografar o refresh token
+        try:
+            refresh_token = decrypt_logical_token(
+                stored_token_record.encrypted_refresh_token
+            )
+        except Exception as e:
+            logger.exception(f"Failed to decrypt refresh token for user {user_id}.")
+            raise HTTPException(
+                status_code=500, detail="Erro de segurança ao processar credenciais."
+            ) from e
+
+        # 3. Usar a biblioteca do Google para gerenciar o token e a renovação
+        try:
+            # Criamos um objeto de credenciais com as informações que temos
+            credentials = Credentials(
+                token=None,  # Não temos um access token inicial
+                refresh_token=refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=settings.GOOGLE_CLIENT_ID,
+                client_secret=settings.GOOGLE_CLIENT_SECRET,
+                scopes=stored_token_record.scopes,
+            )
+
+            # A mágica acontece aqui: .refresh() usa o refresh_token para obter um novo access_token
+            # A biblioteca é inteligente e só fará a chamada de rede se o access_token
+            # não existir ou estiver expirado.
+            if not credentials.valid:
+                logger.info(
+                    f"Google token for user {user_id} is invalid or expired. Refreshing..."
+                )
+                # Usamos um Request para o transporte HTTP
+                auth_request = Request()
+                await asyncio.to_thread(credentials.refresh, auth_request)
+
+            if not credentials.token:
+                raise ValueError("Failed to refresh access token.")
+
+            logger.success(
+                f"Successfully obtained valid Google access token for user {user_id}."
+            )
+            return credentials.token
+
+        except Exception as e:
+            logger.exception(f"Failed to refresh Google token for user {user_id}: {e}")
+            # Se a renovação falhar (ex: permissão revogada pelo usuário no Google),
+            # o usuário precisa se reconectar.
+            raise HTTPException(
+                status_code=403,  # Forbidden
+                detail="Não foi possível renovar a autorização com o Google. Por favor, conecte sua conta novamente.",
             ) from e
 
     async def list_user_calendars(
