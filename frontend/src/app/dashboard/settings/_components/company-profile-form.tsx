@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // app/dashboard/settings/_components/CompanyProfileForm.tsx
 "use client";
 import { GuidelineInput } from "@/components/custom/guideline-input"; // Custom input for guidelines
@@ -126,11 +127,17 @@ export function CompanyProfileForm({
 }: CompanyProfileFormProps): JSX.Element {
   const { user } = useUser();
 
-  const { data: googleStatus, isLoading: isLoadingStatus } = useQuery({
+  const {
+    data: googleStatus,
+    isLoading: isLoadingStatus,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ["googleIntegrationStatus"],
     queryFn: () => getGoogleIntegrationStatus(fetcher),
-    // Só executa a query se o usuário estiver logado
     enabled: !!user,
+    refetchOnWindowFocus: true,
+    staleTime: 60 * 1000,
   });
 
   const form = useForm<CompanyProfileFormData>({
