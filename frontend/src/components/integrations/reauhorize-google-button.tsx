@@ -2,49 +2,39 @@
 
 import { GoogleIcon } from "@/components/icons/google-icon";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@clerk/nextjs";
+import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
+import { getGoogleAuthorizeUrl } from "@/lib/api/google-calendar";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 export function ReauthorizeGoogleButton() {
-  const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const queryClient = useQueryClient();
+  const fetcher = useAuthenticatedFetch();
 
   const handleReconnect = async () => {
-    if (!user) return;
-    const googleAccount = user.externalAccounts.find(
-      (ea) => ea.provider === "google"
-    );
-    if (!googleAccount) {
-      console.error("Conta Google não encontrada");
-      return;
-    }
-    await queryClient.invalidateQueries({
-      queryKey: ["googleIntegrationStatus"],
-    });
-
     setIsLoading(true);
     try {
-      const reauth = await googleAccount.reauthorize({
-        redirectUrl: "/dashboard/settings",
-        additionalScopes: [
-          "https://www.googleapis.com/auth/calendar.events",
-          "https://www.googleapis.com/auth/calendar.readonly",
-        ],
-        oidcPrompt: "consent",
+      // 1. Invalida o cache, como antes.
+      await queryClient.invalidateQueries({
+        queryKey: ["googleIntegrationStatus"],
       });
-      if (reauth.verification?.externalVerificationRedirectURL) {
-        window.location.href =
-          reauth.verification.externalVerificationRedirectURL.href;
+      // 2. Chama nosso backend para obter a URL de autorização.
+      const { authorization_url } = await getGoogleAuthorizeUrl(fetcher);
+
+      // 3. Redireciona o usuário para a URL do Google.
+      if (authorization_url) {
+        window.location.href = authorization_url;
+      } else {
+        throw new Error("Não foi possível obter a URL de autorização.");
       }
     } catch (err) {
-      console.error("Erro no reauthorize:", err);
+      console.error("Erro ao iniciar a re-autorização:", err);
       setIsLoading(false);
+      // Mostrar um erro para o usuário
     }
   };
-
   return (
     <div className="p-3 border border-yellow-300 bg-yellow-50 rounded-md space-y-2">
       <div className="flex items-center font-medium text-yellow-800">
