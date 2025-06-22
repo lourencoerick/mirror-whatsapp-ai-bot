@@ -160,6 +160,7 @@ async def create_appointment(
     customer_email: str,
     customer_name: str,
     state: Annotated[AgentState, InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
     customer_notes: Optional[str] = None,
 ) -> str:
     """
@@ -199,7 +200,14 @@ async def create_appointment(
         or not profile.scheduling_calendar_id
     ):
         logger.warning(f"[{tool_name}] Scheduling is not enabled or fully configured.")
-        return "Desculpe, a funcionalidade de agendamento não está configurada para criar o evento."
+        tool_messsage = "Desculpe, a funcionalidade de agendamento não está configurada para criar o evento."
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=tool_messsage, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
     try:
         # Converte a string de data/hora para um objeto datetime "naive" (sem fuso horário)
@@ -207,7 +215,14 @@ async def create_appointment(
         offering_uuid = UUID(offering_id_str)
     except (ValueError, TypeError):
         logger.warning(f"[{tool_name}] Invalid datetime or UUID format provided.")
-        return "Por favor, forneça uma data e hora válidas (AAAA-MM-DD HH:MM) e um ID de oferta válido."
+        tool_messsage = "Por favor, forneça uma data e hora válidas (AAAA-MM-DD HH:MM) e um ID de oferta válido."
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=tool_messsage, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
     # Encontrar a oferta e sua duração
     target_offering: Optional[OfferingInfo] = next(
@@ -217,21 +232,42 @@ async def create_appointment(
     # 1. A oferta existe?
     if not target_offering:
         logger.warning(f"[{tool_name}] Offering with ID {offering_id_str} not found.")
-        return "Não consegui encontrar a oferta com o ID fornecido."
+        tool_messsage = "Não consegui encontrar a oferta com o ID fornecido."
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=tool_messsage, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
     # 2. A oferta requer agendamento?
     if not target_offering.requires_scheduling:
         logger.warning(
             f"[{tool_name}] Offering '{target_offering.name}' does not require scheduling."
         )
-        return f"A oferta '{target_offering.name}' não precisa de agendamento."
+        tool_messsage = f"A oferta '{target_offering.name}' não precisa de agendamento."
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=tool_messsage, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
     # 3. A oferta tem uma duração definida?
     if not target_offering.duration_minutes:
         logger.warning(
             f"[{tool_name}] Offering '{target_offering.name}' has no duration set."
         )
-        return f"A oferta '{target_offering.name}' está configurada para agendamento, mas não tem uma duração definida. Não consigo prosseguir."
+        tool_messsage = f"A oferta '{target_offering.name}' está configurada para agendamento, mas não tem uma duração definida. Não consigo prosseguir."
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=tool_messsage, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
     # --- 2. Lidar com Fuso Horário e Calcular Horário de Término ---
     # Assumimos um fuso horário padrão para a empresa. Idealmente, isso viria do CompanyProfile.
@@ -251,7 +287,14 @@ async def create_appointment(
         logger.warning(
             f"[{tool_name}] Attempted to schedule in the past: {appointment_datetime_str}"
         )
-        return f"Não é possível criar um agendamento para uma data ou hora que já passou. Por favor, peça ao cliente para escolher uma data e horário futuros. Data e Horário de agora: {company_timezone}"
+        tool_messsage = f"Não é possível criar um agendamento para uma data ou hora que já passou. Por favor, peça ao cliente para escolher uma data e horário futuros. Data e Horário de agora: {company_timezone}"
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=tool_messsage, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
     # --- 3. Executar o Serviço ---
     try:
@@ -270,7 +313,15 @@ async def create_appointment(
             logger.warning(
                 f"Slot {aware_start_time} is no longer available. Aborting creation."
             )
-            return "Ah, que pena! Parece que alguém acabou de agendar neste horário ou é um horário indisponível da empresa. Resumindo, Ele não está mais disponível. Poderia escolher outro da lista, por favor?"
+            tool_messsage = "Ah, que pena! Parece que alguém acabou de agendar neste horário ou é um horário indisponível da empresa. Resumindo, Ele não está mais disponível. Poderia escolher outro da lista, por favor?"
+
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(content=tool_messsage, tool_call_id=tool_call_id)
+                    ]
+                }
+            )
 
         event_title = f"{target_offering.name} - {customer_name or customer_email}"
         event_description = (
@@ -298,11 +349,27 @@ async def create_appointment(
         logger.success(
             f"[{tool_name}] Appointment successfully created. Link: {event_link}"
         )
-        return f"Agendamento confirmado com sucesso para {aware_start_time.strftime('%d/%m/%Y às %H:%M')}! Um convite foi criado na agenda."
+        tool_messsage = f"Agendamento confirmado com sucesso para {aware_start_time.strftime('%d/%m/%Y às %H:%M')}! Um convite foi criado na agenda."
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=tool_messsage, tool_call_id=tool_call_id)
+                ],
+                "current_sales_stage": "appointment_booked",
+            }
+        )
 
     except Exception as e:
         logger.exception(f"[{tool_name}] Error creating appointment: {e}")
-        return "Desculpe, ocorreu um erro ao tentar confirmar seu agendamento. Por favor, tente novamente."
+        error_message = "Desculpe, ocorreu um erro ao tentar confirmar seu agendamento. Por favor, tente novamente."
+
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=error_message, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
 
 @tool
@@ -639,6 +706,7 @@ async def cancel_appointment(
                     tool_call_id=tool_call_id,
                 )
             ],
+            "current_sales_stage": "appointment_cancelled",
         }
         return Command(update=state_updates)
 
@@ -663,6 +731,7 @@ async def cancel_appointment(
 async def update_appointment(
     event_id: str,
     new_datetime_str: str,
+    tool_call_id: Annotated[str, InjectedToolCallId],
     state: Annotated[AgentState, InjectedState],
 ) -> str:
     """
@@ -693,7 +762,14 @@ async def update_appointment(
         or not profile.scheduling_user_id
         or not profile.scheduling_calendar_id
     ):
-        return "A funcionalidade de agendamento não está configurada."
+        error_message = "A funcionalidade de agendamento não está configurada."
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=error_message, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
     # --- VERIFICAÇÃO DE SEGURANÇA ---
     found_events = state.found_appointments
@@ -701,13 +777,27 @@ async def update_appointment(
         logger.warning(
             f"[{tool_name}] Security check failed. Event ID '{event_id}' not found in state."
         )
-        return "Erro: Para remarcar, primeiro encontre seus agendamentos (via 'find_customer_appointments') e forneça o ID correto."
+        error_message = "Erro: Para remarcar, primeiro encontre seus agendamentos (via 'find_customer_appointments') e forneça o ID correto."
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=error_message, tool_call_id=tool_call_id)
+                ]
+            }
+        )
 
     try:
         # --- LÓGICA DE CÁLCULO DE DURAÇÃO E HORÁRIOS ---
         original_event = next((e for e in found_events if e["id"] == event_id), None)
         if not original_event:  # Segurança extra
-            return "Erro interno: não foi possível encontrar os detalhes do evento original."
+            error_message = "Erro interno: não foi possível encontrar os detalhes do evento original."
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(content=error_message, tool_call_id=tool_call_id)
+                    ]
+                }
+            )
 
         # Extrai os horários originais para calcular a duração
         original_start = datetime.fromisoformat(original_event["start"]["dateTime"])
@@ -739,7 +829,14 @@ async def update_appointment(
             logger.warning(
                 f"Slot {aware_new_start} is no longer available. Aborting update."
             )
-            return "Ah, que pena! Parece que este novo horário foi ocupado. Ele não está mais disponível. Por favor, peça para ver os horários livres novamente."
+            tool_message = "Ah, que pena! Parece que este novo horário foi ocupado. Ele não está mais disponível. Por favor, peça para ver os horários livres novamente."
+            return Command(
+                update={
+                    "messages": [
+                        ToolMessage(content=tool_message, tool_call_id=tool_call_id)
+                    ]
+                }
+            )
 
         async with AsyncSessionLocal() as db:
             await calendar_service.update_event_time(
@@ -755,10 +852,27 @@ async def update_appointment(
         logger.success(
             f"[{tool_name}] Event {event_id} rescheduled successfully to {new_time_formatted}."
         )
-        return f"Agendamento remarcado com sucesso para {new_time_formatted}! Os participantes foram notificados."
+        tool_message = f"Agendamento remarcado com sucesso para {new_time_formatted}! Os participantes foram notificados."
+
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=tool_message, tool_call_id=tool_call_id)
+                ],
+                "current_sales_stage": "appointment_rescheduled",
+            }
+        )
 
     except Exception as e:
         logger.exception(f"[{tool_name}] Error updating appointment: {e}")
         if isinstance(e, HTTPException):
             return f"Não foi possível remarcar o agendamento: {e.detail}"
-        return "Ocorreu um erro ao tentar remarcar o agendamento."
+        error_message = "Ocorreu um erro ao tentar remarcar o agendamento."
+
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(content=error_message, tool_call_id=tool_call_id)
+                ]
+            }
+        )
