@@ -140,6 +140,10 @@ export function CompanyProfileForm({
     staleTime: 60 * 1000,
   });
 
+  const isGoogleConnected = user?.externalAccounts.some(
+    (acc) => acc.provider === "google"
+  );
+
   const form = useForm<CompanyProfileFormData>({
     resolver: zodResolver(companyProfileValidationSchema), // Use Zod for validation
     defaultValues: {
@@ -354,12 +358,6 @@ export function CompanyProfileForm({
     control,
     name: "availability_rules",
   });
-
-  // --- ADICIONE ESTE CONSOLE.LOG DE DEPURAÇÃO ---
-  console.log(
-    "CompanyProfileForm: O que está sendo passado para WorkingHoursSelector?",
-    { fields }
-  );
 
   return (
     // Wrap Tooltip usage in a provider if not already present higher up the tree
@@ -601,13 +599,13 @@ export function CompanyProfileForm({
                       )}
 
                       {/* Estado 1: Não conectado */}
-                      {googleStatus && !googleStatus.is_connected && (
-                        <GoogleCalendarConnectButton />
-                      )}
+                      {googleStatus &&
+                        !googleStatus.is_connected &&
+                        !isGoogleConnected && <GoogleCalendarConnectButton />}
 
                       {/* Estado 2: Conectado, mas sem permissões */}
                       {googleStatus &&
-                        googleStatus.is_connected &&
+                        (googleStatus.is_connected || isGoogleConnected) &&
                         !googleStatus.has_all_permissions && (
                           <ReauthorizeGoogleButton />
                         )}

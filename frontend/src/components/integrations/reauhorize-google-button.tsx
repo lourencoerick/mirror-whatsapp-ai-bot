@@ -3,12 +3,14 @@
 import { GoogleIcon } from "@/components/icons/google-icon";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@clerk/nextjs";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
 
 export function ReauthorizeGoogleButton() {
   const { user } = useUser();
   const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleReconnect = async () => {
     if (!user) return;
@@ -19,6 +21,10 @@ export function ReauthorizeGoogleButton() {
       console.error("Conta Google não encontrada");
       return;
     }
+    await queryClient.invalidateQueries({
+      queryKey: ["googleIntegrationStatus"],
+    });
+
     setIsLoading(true);
     try {
       const reauth = await googleAccount.reauthorize({
