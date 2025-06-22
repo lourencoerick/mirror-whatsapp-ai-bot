@@ -63,7 +63,7 @@ google-cloud-storage
 # === Google API ===
 google-api-python-client==2.172.0
 google-auth-httplib2==0.2.0
-
+google_auth_oauthlib==1.2.2 
 
 # === Payments ===
 stripe==12.1.0
