@@ -645,7 +645,7 @@ export function CompanyProfileForm({
                         2. Defina sua Disponibilidade
                       </h4>
                       <div>
-                        <Label htmlFor="min-notice-hours">
+                        <Label className="mb-1.5" htmlFor="min-notice-hours">
                           Antecedência Mínima (em horas)
                         </Label>
                         <Input

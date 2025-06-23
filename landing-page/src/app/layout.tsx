@@ -1,11 +1,11 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import Footer from "@/components/ui/home/footer";
+import { WhatsAppButton } from "@/components/ui/whatsapp-button";
 import siteMetadata from '@/data/siteMetadata';
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-
 
 import { Toaster } from "@/components/ui/sonner";
 
@@ -121,6 +121,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          <WhatsAppButton />
           <Footer />
         </ThemeProvider>
         <Toaster position="top-right" />
