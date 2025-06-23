@@ -84,7 +84,7 @@ export default function PoliticaDePrivacidadePage() {
             , incluindo os requisitos de Uso Limitado.
           </p>
           <p className="mt-2 text-blue-900">
-            Especificamente, os modelos de IA da nossa aplicação interagem com os dados do Google Calendar com o único propósito de fornecer a funcionalidade de "Agendamento Automatizado". As informações obtidas (status de livre/ocupado) são usadas exclusivamente para encontrar disponibilidade e gerenciar os agendamentos que você autoriza. Estes dados <strong>não são e nunca serão</strong> usados para treinar nossos modelos de IA, veicular anúncios ou qualquer outro propósito fora da funcionalidade principal da aplicação.
+            Especificamente, os modelos de IA da nossa aplicação interagem com os dados do Google Calendar com o único propósito de fornecer a funcionalidade de Agendamento Automatizado. As informações obtidas (status de livre/ocupado) são usadas exclusivamente para encontrar disponibilidade e gerenciar os agendamentos que você autoriza. Estes dados <strong>não são e nunca serão</strong> usados para treinar nossos modelos de IA, veicular anúncios ou qualquer outro propósito fora da funcionalidade principal da aplicação.
           </p>
         </section>
 
