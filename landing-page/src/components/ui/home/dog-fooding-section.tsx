@@ -33,7 +33,7 @@ const DogfoodingSection = (): React.ReactElement => {
       <div className="container mx-auto px-6">
         <div className="text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            A Prova Definitiva: Compre de um Robô
+            A Prova Definitiva: Compre de nosso Vendedor IA
           </h2>
           <p className="text-lg max-w-3xl mx-auto mb-12">
             Cansado de promessas? Nós também. Por isso, a IA que vai te atender
