@@ -19,7 +19,7 @@ const DogfoodingSection = (): React.ReactElement => {
   const whatsAppNumber = process.env.NEXT_PUBLIC_SALES_WHATSAPP_NUMBER || "5511941986775";
   // Mensagem específica para sabermos que o lead veio desta seção
   const preFilledMessage =
-    "Olá! Vi a seção 'Compre de um Robô' e quero testar a IA.";
+    "Olá! Vi a seção 'Veja em ação' e gostaria de saber mais sobre a plataforma.";
 
   const whatsAppLink = `https://wa.me/${whatsAppNumber}?text=${encodeURIComponent(
     preFilledMessage
