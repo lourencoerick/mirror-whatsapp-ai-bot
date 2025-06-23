@@ -39,6 +39,12 @@ const faqItems = [
         question: "Quanto tempo leva para configurar o Vendedor IA?",
         answer: "Em menos de 5 minutos ele já estará pronto para atender seus clientes."
     },
+    {
+        value: "item-8",
+        question: "O Vendedor IA também é capaz de agendar compromissos e realizar follow-ups?",
+        answer: "Sim! Nossa solução de inteligência artificial se integra diretamente ao seu Google Agenda, agendando compromissos de forma automática e enviando follow-ups inteligentes que conduzem o cliente do primeiro “oi” até o link de checkout com eficiência e naturalidade."
+    },
+
 
 ];
 
