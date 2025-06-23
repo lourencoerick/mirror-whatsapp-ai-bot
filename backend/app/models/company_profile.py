@@ -4,6 +4,7 @@ from sqlalchemy import (
     Column,
     String,
     Text,
+    Float,
     Integer,
     ForeignKey,
     JSON,
@@ -111,6 +112,14 @@ class CompanyProfile(BaseModel):
         nullable=True,
         doc="The user whose connected calendar is used for scheduling.",
     )
+
+    scheduling_min_notice_hours = Column(
+        Float,
+        nullable=False,
+        default=2.0,
+        server_default=text("2.0"),
+        doc="Minimum notice time in hours required for a new appointment (can be a fraction, e.g., 0.5 for 30 minutes)."
+    )    
 
     availability_rules = Column(
         JSON,

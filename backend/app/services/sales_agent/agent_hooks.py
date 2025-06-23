@@ -476,17 +476,19 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
 
             retry_instruction_message = SystemMessage(
                 content="Atenção: Sua última mensagem não passou pelo processo de validação ou apresentou alguma inconsistência."
-                "Para garantir a qualidade e a conformidade, estamos retirando essa mensagem por enquanto.\n"
+                "Para garantir a qualidade e a conformidade, estamos retirando essa mensagem por enquanto. Aqui estão as verificações importantes:\n"
                 "- Você verificou as informações que está fornecendo com as instruções e/ ou dados adquiridos de ferramentas?\n"
                 "- Está seguindo os principios de vendas e as regras de comunicações descritas nas instruções?\n"
                 "- Conduzindo o cliente da saudação ao fechamento, evitando dizer o preço ou link de compra antnes da qualificação?\n"
                 "- Está evitando repetir informações ditas recentemente para não deixar a conversa repetitiva, a menos que seja uma necessite uma confirmação do cliente?\n"
                 "- Jamais invente informações do cliente, sempre diga a verdade, e siga o que está escrito na seção de instruções.\n"
-                "- Se a mensagem do usuário é off-topic, informe isto a função 'validate_response_and_references', mas não deixa de chamá-la.\n"
+                "- Jamais passe links sem a url.\n"
+                "- Se está em um processo de agendamento, não mude horário ou dia, antes de confirmar com o cliente.\n"
+                "- Se a mensagem do usuário é off-topic, informe isto a função 'validate_response_and_references', mas não deixe de chamá-la.\n"
                 "- Se caso tenha tido um erro ao usar as ferramentas, use 'validate_response_and_references', como sempre, e peça para o cliente entrar em contato mais tarde ou forneça o contato alternativo, se disponível.\n"
-                "- Lembre-se, suas ações são limitadas as ferramentas que possui, então cuidado ao propor medidas ao cliente, certifique-se que possa cumprí-las antes.\n"
+                "- Lembre-se, suas ações são limitadas às ferramentas que possui, então cuidado ao propor medidas ao cliente, certifique-se que possa cumprí-las antes.\n"
                 "- Mantenha o cliente neste canal, a menos que o cliente  realmente necessite da informação que você não tenha para prosseguir.\n"
-                "Por favor, revise o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n\n"
+                "REVISE o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n\n"
                 "Responda a mensagem do usuário (usando a tool 'validate_response_and_references'):\n"
                 f"- Usuário: {current_user_input_text}",
                 id=reminder_id,

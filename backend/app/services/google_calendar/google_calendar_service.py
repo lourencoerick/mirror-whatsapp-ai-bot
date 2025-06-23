@@ -165,10 +165,11 @@ class GoogleCalendarService:
         target_date: date,
         duration_minutes: int,
         availability_rules: List[Dict],
+        min_notice_hours: float,
     ) -> List[str]:
         """
-        Calculates available time slots for a specific day, ensuring slots
-        for the current day are only in the future and aligned to a grid.
+        Calculates available time slots, correctly applying the minimum notice
+        period and rounding up to the next clean slot interval.
 
         Args:
             db: The async database session.
@@ -177,6 +178,7 @@ class GoogleCalendarService:
             target_date: The specific date to check for availability.
             duration_minutes: The duration of the appointment in minutes.
             availability_rules: The structured working hours from the CompanyProfile.
+            min_notice_hours: The minimum notice period in hours required for a booking.
 
         Returns:
             A list of available time slots in "HH:MM" format for the company's timezone.
@@ -185,12 +187,11 @@ class GoogleCalendarService:
         service = _build_google_calendar_client(token=access_token)
 
         # 1. Determinar a regra do dia
-        target_weekday = (target_date.weekday() + 1) % 7  # Converte para Domingo=0
+        target_weekday = (target_date.weekday() + 1) % 7
         rule_for_day = next(
             (rule for rule in availability_rules if rule.dayOfWeek == target_weekday),
             None,
         )
-
         if not rule_for_day or not rule_for_day.isEnabled:
             return []
 
@@ -202,21 +203,18 @@ class GoogleCalendarService:
 
         work_start_time = rule_for_day.startTime
         work_end_time = rule_for_day.endTime
-
         work_start_local = company_timezone.localize(
             datetime.combine(target_date, work_start_time)
         )
         work_end_local = company_timezone.localize(
             datetime.combine(target_date, work_end_time)
         )
-
         work_start_utc = work_start_local.astimezone(pytz.utc)
         work_end_utc = work_end_local.astimezone(pytz.utc)
 
         # 3. Chamar a API freeBusy do Google
         time_min_utc_str = datetime.combine(target_date, time.min).isoformat() + "Z"
         time_max_utc_str = datetime.combine(target_date, time.max).isoformat() + "Z"
-
         freebusy_body = {
             "timeMin": time_min_utc_str,
             "timeMax": time_max_utc_str,
@@ -243,32 +241,26 @@ class GoogleCalendarService:
         # 4. Calcular os slots, operando inteiramente em UTC
         available_slots = []
         now_utc = datetime.now(pytz.utc)
+        earliest_booking_time_utc = now_utc + timedelta(hours=min_notice_hours)
 
-        # O ponteiro começa no início do expediente (em UTC)
+        # O ponteiro começa no início do expediente
         current_slot_start_utc = work_start_utc
 
-        # Se o dia for hoje, ajusta o ponteiro para começar a partir de agora
-        if target_date == now_utc.date() and now_utc > current_slot_start_utc:
-            current_slot_start_utc = now_utc
+        # Ajusta o ponteiro para o futuro se a antecedência mínima for maior
+        if earliest_booking_time_utc > current_slot_start_utc:
+            current_slot_start_utc = earliest_booking_time_utc
+
+        # --- LÓGICA DE ARREDONDAMENTO REFINADA ---
+        # Arredonda o horário de início para o próximo intervalo de slot (ex: 15 min)
+        slot_interval_minutes = 15
+        minutes_past_interval = current_slot_start_utc.minute % slot_interval_minutes
+        if minutes_past_interval > 0:
+            minutes_to_add = slot_interval_minutes - minutes_past_interval
+            current_slot_start_utc += timedelta(minutes=minutes_to_add)
+
+        current_slot_start_utc = current_slot_start_utc.replace(second=0, microsecond=0)
 
         appointment_duration = timedelta(minutes=duration_minutes)
-
-        # Arredonda o horário de início para o próximo intervalo de slot (ex: 15 min)
-        # para evitar oferecer horários que estão a apenas 1-2 minutos no futuro.
-        slot_interval_minutes = 15
-        if target_date == now_utc.date():
-            minutes_past_interval = (
-                current_slot_start_utc.minute % slot_interval_minutes
-            )
-            if minutes_past_interval > 0:
-                minutes_to_add = slot_interval_minutes - minutes_past_interval
-                current_slot_start_utc += timedelta(minutes=minutes_to_add)
-
-            # Zera segundos e microssegundos para alinhamento perfeito
-            current_slot_start_utc = current_slot_start_utc.replace(
-                second=0, microsecond=0
-            )
-
         busy_events_utc = [
             (datetime.fromisoformat(b["start"]), datetime.fromisoformat(b["end"]))
             for b in busy_intervals_data
@@ -281,17 +273,20 @@ class GoogleCalendarService:
             while (
                 current_slot_start_utc + appointment_duration <= free_interval_end_utc
             ):
-                if (
+                is_within_working_hours = (
                     current_slot_start_utc >= work_start_utc
                     and (current_slot_start_utc + appointment_duration) <= work_end_utc
-                ):
+                )
+                is_after_notice_period = (
+                    current_slot_start_utc >= earliest_booking_time_utc
+                )
 
+                if is_within_working_hours and is_after_notice_period:
                     slot_in_company_tz = current_slot_start_utc.astimezone(
                         company_timezone
                     )
                     available_slots.append(slot_in_company_tz.strftime("%H:%M"))
 
-                # Avança o ponteiro pelo tamanho da duração do serviço
                 current_slot_start_utc += appointment_duration
 
             if busy_end_utc > current_slot_start_utc:
@@ -306,10 +301,12 @@ class GoogleCalendarService:
         calendar_id: str,
         start_time: datetime,
         end_time: datetime,
+        min_notice_hours: float,
         event_id_to_ignore: Optional[str] = None,
     ) -> bool:
         """
-        Checks if a specific time slot is free in a calendar.
+        Checks if a specific time slot is free in a calendar and respects
+        the minimum notice period.
 
         Args:
             db: The async database session.
@@ -317,12 +314,35 @@ class GoogleCalendarService:
             calendar_id: The ID of the Google Calendar to check.
             start_time: The start datetime of the slot to check (timezone-aware).
             end_time: The end datetime of the slot to check (timezone-aware).
-            event_id_to_ignore: (For updates) The ID of an existing event to ignore
-                                during the free/busy check.
+            min_notice_hours: The minimum notice period in hours.
+            event_id_to_ignore: (For updates) The ID of an existing event to ignore.
 
         Returns:
             True if the slot is available, False otherwise.
         """
+
+        slot_interval_minutes = 15
+        # Verificamos se o minuto do horário de início é um múltiplo do nosso intervalo.
+        # Ex: 0, 15, 30, 45 são válidos para um intervalo de 15.
+        if start_time.minute % slot_interval_minutes != 0:
+            logger.warning(
+                f"Slot availability check failed: "
+                f"Start time {start_time} does not align with the {slot_interval_minutes}-minute grid."
+            )
+            return False  # O horário não está na grade, então não está disponível.
+
+        # 1. Verificação de antecedência
+        now_utc = datetime.now(pytz.utc)
+        earliest_booking_time_utc = now_utc + timedelta(hours=min_notice_hours)
+
+        if start_time < earliest_booking_time_utc:
+            logger.warning(
+                f"Slot availability check failed: Start time {start_time} is before "
+                f"minimum notice time {earliest_booking_time_utc}."
+            )
+            return False
+
+        # 2. Verificação de conflitos no Google Calendar
         access_token = await self._get_google_token(db=db, user_id=user_id)
         service = _build_google_calendar_client(token=access_token)
 
@@ -338,18 +358,22 @@ class GoogleCalendarService:
             freebusy_result = await asyncio.to_thread(freebusy_request.execute)
             busy_intervals = freebusy_result["calendars"][calendar_id].get("busy", [])
 
-            # Se estamos atualizando um evento, não queremos que ele se veja como "ocupado".
             if event_id_to_ignore:
                 busy_intervals = [
                     b for b in busy_intervals if b.get("id") != event_id_to_ignore
                 ]
 
-            # Se a lista de intervalos ocupados estiver vazia, o slot está livre.
             return not busy_intervals
 
+        except (HttpError, KeyError) as e:
+            # Se a API do Google der um erro ou a chave 'busy' não existir,
+            # é mais seguro assumir que o slot não está disponível.
+            logger.warning(f"Google API issue checking slot for user {user_id}: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Error checking slot availability for user {user_id}: {e}")
-            # Em caso de erro na API, assumimos por segurança que o slot NÃO está livre.
+            logger.error(
+                f"Unexpected error checking slot availability for user {user_id}: {e}"
+            )
             return False
 
     async def create_appointment(

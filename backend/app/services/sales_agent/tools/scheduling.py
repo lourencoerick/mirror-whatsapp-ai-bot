@@ -134,6 +134,7 @@ async def get_available_slots(
                 target_date=target_date,
                 duration_minutes=target_offering.duration_minutes,
                 availability_rules=profile.availability_rules or [],
+                min_notice_hours=profile.scheduling_min_notice_hours,
             )
 
         if not available_slots:
@@ -307,6 +308,7 @@ async def create_appointment(
                 calendar_id=profile.scheduling_calendar_id,
                 start_time=aware_start_time,
                 end_time=aware_end_time,
+                min_notice_hours=profile.scheduling_min_notice_hours,
             )
 
         if not is_available:
@@ -457,6 +459,7 @@ async def find_next_available_day(
                     target_date=current_date_to_check,
                     duration_minutes=target_offering.duration_minutes,
                     availability_rules=profile.availability_rules or [],
+                    min_notice_hours=profile.scheduling_min_notice_hours,
                 )
 
                 if available_slots:
@@ -822,6 +825,7 @@ async def update_appointment(
                 calendar_id=profile.scheduling_calendar_id,
                 start_time=aware_new_start,
                 end_time=aware_new_end,
+                min_notice_hours=profile.scheduling_min_notice_hours,
                 event_id_to_ignore=event_id,
             )
 
