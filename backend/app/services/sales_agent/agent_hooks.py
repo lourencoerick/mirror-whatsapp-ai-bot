@@ -482,6 +482,7 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                 "- Conduzindo o cliente da saudação ao fechamento, evitando dizer o preço ou link de compra antnes da qualificação?\n"
                 "- Está evitando repetir informações ditas recentemente para não deixar a conversa repetitiva, a menos que seja uma necessite uma confirmação do cliente?\n"
                 "- Jamais invente informações do cliente, sempre diga a verdade, e siga o que está escrito na seção de instruções.\n"
+                "- Jamais passe links sem a url.\n"
                 "- Se a mensagem do usuário é off-topic, informe isto a função 'validate_response_and_references', mas não deixa de chamá-la.\n"
                 "- Se caso tenha tido um erro ao usar as ferramentas, use 'validate_response_and_references', como sempre, e peça para o cliente entrar em contato mais tarde ou forneça o contato alternativo, se disponível.\n"
                 "- Lembre-se, suas ações são limitadas as ferramentas que possui, então cuidado ao propor medidas ao cliente, certifique-se que possa cumprí-las antes.\n"
