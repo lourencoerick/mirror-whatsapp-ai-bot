@@ -16,7 +16,7 @@ import { Element } from "react-scroll";
  */
 const DogfoodingSection = (): React.ReactElement => {
   // 4. Reutilize a mesma lógica para construir o link do WhatsApp
-  const whatsAppNumber = process.env.NEXT_PUBLIC_SALES_WHATSAPP_NUMBER;
+  const whatsAppNumber = process.env.NEXT_PUBLIC_SALES_WHATSAPP_NUMBER || "5511941986775";
   // Mensagem específica para sabermos que o lead veio desta seção
   const preFilledMessage =
     "Olá! Vi a seção 'Compre de um Robô' e quero testar a IA.";

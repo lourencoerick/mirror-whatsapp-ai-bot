@@ -9,7 +9,7 @@ import { FaWhatsapp } from "react-icons/fa";
  */
 export function WhatsAppButton() {
   // Let's get the phone number from environment variables for security and flexibility
-  const whatsAppNumber = process.env.NEXT_PUBLIC_SALES_WHATSAPP_NUMBER;
+  const whatsAppNumber = process.env.NEXT_PUBLIC_SALES_WHATSAPP_NUMBER || "5511941986775";
   const preFilledMessage = "Olá! Vi o site de vocês e gostaria de saber mais sobre a plataforma.";
 
   if (!whatsAppNumber) {
