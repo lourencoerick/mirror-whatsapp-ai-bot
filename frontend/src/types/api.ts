@@ -56,6 +56,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/google/auth/authorize-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Google Authorize Url
+         * @description Generates the Google OAuth2 authorization URL for the frontend to use.
+         *     It also generates and stores a 'state' token in the user's session
+         *     for CSRF protection during the callback.
+         */
+        get: operations["get_google_authorize_url_api_v1_google_auth_authorize_url_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/google/auth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Google Oauth Callback
+         * @description Handles the OAuth2 callback from Google. This endpoint is intended to be
+         *     used as the redirect_uri for a flow initiated by Clerk on the frontend.
+         *     It exchanges the authorization code for a refresh token, encrypts it,
+         *
+         *     and stores it in the database.
+         */
+        get: operations["google_oauth_callback_api_v1_google_auth_callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/create-checkout-session": {
         parameters: {
             query?: never;
@@ -1199,30 +1245,10 @@ export interface paths {
         };
         /**
          * Get Google Integration Status
-         * @description Checks the full status of the Google integration for the current user,
-         *     including connection status, permission scopes, and available calendars.
+         * @description Checks the status of the Google integration for the current user by
+         *     querying our internal token storage.
          */
         get: operations["get_google_integration_status_api_v1_integrations_google_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/integrations/google/calendars": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List User's Google Calendars
-         * @description Retrieves a list of Google Calendars the authenticated user has access to, enabling them to select one for scheduling.
-         */
-        get: operations["list_google_calendars_api_v1_integrations_google_calendars_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1631,16 +1657,6 @@ export interface components {
             use_rag: boolean | null;
         };
         /**
-         * CalendarResponse
-         * @description Schema for a single calendar entry in the list response.
-         */
-        CalendarResponse: {
-            /** Id */
-            id: string;
-            /** Summary */
-            summary: string;
-        };
-        /**
          * ChannelTypeEnum
          * @description Enum for the types of communication channels supported by an Inbox.
          * @enum {string}
@@ -1779,6 +1795,12 @@ export interface components {
              * @description The ID of the Google Calendar selected by the user for scheduling.
              */
             scheduling_calendar_id?: string | null;
+            /**
+             * Scheduling Min Notice Hours
+             * @description Minimum notice time in hours (e.g., 0.5 for 30 mins).
+             * @default 2
+             */
+            scheduling_min_notice_hours: number;
             /**
              * Availability Rules
              * @description Structured list of availability rules for scheduling.
@@ -1939,6 +1961,12 @@ export interface components {
              * @description The ID of the Google Calendar selected by the user for scheduling.
              */
             scheduling_calendar_id?: string | null;
+            /**
+             * Scheduling Min Notice Hours
+             * @description Minimum notice time in hours (e.g., 0.5 for 30 mins).
+             * @default 2
+             */
+            scheduling_min_notice_hours: number;
             /**
              * Availability Rules
              * @description Structured list of availability rules for scheduling.
@@ -4126,6 +4154,59 @@ export interface operations {
             };
         };
     };
+    get_google_authorize_url_api_v1_google_auth_authorize_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    google_oauth_callback_api_v1_google_auth_callback_get: {
+        parameters: {
+            query?: {
+                state?: string;
+                code?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_checkout_session_endpoint_api_v1_billing_create_checkout_session_post: {
         parameters: {
             query?: never;
@@ -6273,26 +6354,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoogleIntegrationStatus"];
-                };
-            };
-        };
-    };
-    list_google_calendars_api_v1_integrations_google_calendars_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalendarResponse"][];
                 };
             };
         };

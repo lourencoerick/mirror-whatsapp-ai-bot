@@ -171,6 +171,8 @@ export function CompanyProfileForm({
       fallback_contact_info: initialData?.fallback_contact_info || "",
       is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
       scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
+      scheduling_min_notice_hours:
+        initialData?.scheduling_min_notice_hours || 0.25,
       availability_rules: formatRules(initialData?.availability_rules),
       offering_overview: initialData?.offering_overview || [], // Initialize offerings array
       // Do not include non-editable fields like ID or profile_version here
@@ -237,6 +239,8 @@ export function CompanyProfileForm({
         fallback_contact_info: initialData.fallback_contact_info || "",
         is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
         scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
+        scheduling_min_notice_hours:
+          initialData?.scheduling_min_notice_hours || 0.25,
         availability_rules: formatRules(initialData?.availability_rules),
       });
     }
@@ -640,6 +644,30 @@ export function CompanyProfileForm({
                       <h4 className="font-medium mb-2">
                         2. Defina sua Disponibilidade
                       </h4>
+                      <div>
+                        <Label htmlFor="min-notice-hours">
+                          Antecedência Mínima (em horas)
+                        </Label>
+                        <Input
+                          id="min-notice-hours"
+                          type="number"
+                          step="0.25" // Permite incrementos de 15 minutos (0.25, 0.5, 0.75, 1.0)
+                          placeholder="Ex: 2,5 (para 2 horas e 30 minutos)"
+                          {...register("scheduling_min_notice_hours", {
+                            valueAsNumber: true,
+                          })}
+                          disabled={formDisabled}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Use virgula para decimais. Ex: 0,5 para 30 minutos,
+                          1,5 para 1h30.
+                        </p>
+                        {errors.scheduling_min_notice_hours && (
+                          <p className="text-xs text-red-600 mt-1">
+                            {errors.scheduling_min_notice_hours.message}
+                          </p>
+                        )}
+                      </div>
                       <Accordion
                         type="single"
                         collapsible

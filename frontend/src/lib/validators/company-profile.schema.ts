@@ -123,6 +123,10 @@ export const companyProfileValidationSchema = z
     accepted_payment_methods: z.array(z.string()).optional(),
     is_scheduling_enabled: z.boolean().default(false),
     scheduling_calendar_id: z.string().optional().nullable(),
+    scheduling_min_notice_hours: z
+      .number()
+      .positive("Deve ser um número positivo.")
+      .min(0.25, "A antecedência mínima é de 15 minutos (0.25 horas)."),
     availability_rules: availabilityRulesArraySchema.optional().nullable(),
 
     offering_overview: z.array(offeringValidationSchema).optional().default([]), // Usa o schema aninhado
