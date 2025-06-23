@@ -5,6 +5,7 @@ import { scroller } from "react-scroll";
 
 import BenefitsSection from "@/components/ui/home/benefits-section";
 import DemoVideoSection from "@/components/ui/home/demo-video-section"; // 1. Import the new component
+import DogfoodingSection from "@/components/ui/home/dog-fooding-section";
 import FaqSection from "@/components/ui/home/faq-section";
 import HeroSection from "@/components/ui/home/hero-section";
 import HowDoesItWorkSection from "@/components/ui/home/how-does-it-work-section";
@@ -29,6 +30,7 @@ export default function HomePage() {
       <BenefitsSection />
       <HowDoesItWorkSection />
       <DemoVideoSection />
+      <DogfoodingSection />
       <PricingSection />
       <FaqSection />
     </main>
