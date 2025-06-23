@@ -19,7 +19,11 @@ const plans: Plan[] = [
     description: 'Perfeito para autônomos e pequenos negócios que estão começando a automatizar.',
     features: [
       '1 número de WhatsApp',
-      '1 vendedor IA',
+      'Atendimento 24/7',
+      'Contorno de objeções em tempo real',
+      'Qualificação automática de leads',
+      'Fechamento inteligente de vendas',
+      'Follow-ups automáticos',  
       'Inclui 500 mensagens de IA',
       'Suporte por email',
     ],
@@ -39,10 +43,15 @@ const plans: Plan[] = [
     usagePriceText: '+ R$0,50 por mensagem IA excedente',
     description: 'Ideal para negócios em crescimento que precisam de mais poder e integrações.',
     features: [
-      '3 números de WhatsApp',
-      '1 vendedor IA',
+      'até 3 números de WhatsApp',
+      'Atendimento 24/7',
+      'Contorno de objeções em tempo real',
+      'Qualificação automática de leads',
+      'Fechamento inteligente de vendas',
+      'Follow-ups automáticos',
+      'Agendamento via Google Calendar',
       'Inclui 1.000 mensagens de IA',
-      'Suporte prioritário por WhatsApp',
+      'Suporte prioritário por WhatsApp',      
     ],
     ctaText: 'Escolher Pro', // Default text (for post-beta)
     betaOffer: { // This object activates beta mode
