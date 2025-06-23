@@ -155,6 +155,13 @@ class CompanyProfileSchema(BaseModel):
         default=None,
         description="The ID of the Google Calendar selected by the user for scheduling.",
     )
+
+    scheduling_min_notice_hours: float = Field(
+        default=2.0,
+        ge=0,
+        description="Minimum notice time in hours (e.g., 0.5 for 30 mins).",
+    )
+
     availability_rules: Optional[List[AvailabilityRuleSchema]] = Field(
         default=None,
         description="Structured list of availability rules for scheduling.",
