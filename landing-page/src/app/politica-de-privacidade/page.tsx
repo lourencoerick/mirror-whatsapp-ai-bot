@@ -69,6 +69,25 @@ export default function PoliticaDePrivacidadePage() {
           </ul>
         </section>
 
+        <section className="mb-8 p-4 border border-blue-200 bg-blue-50 rounded-lg">
+          <h2 className="text-xl font-semibold mb-2 text-blue-800">Divulgação de Uso dos Serviços de API do Google</h2>
+          <p className="text-blue-900">
+            O uso e a transferência pela Lambda Labs para qualquer outro aplicativo de informações recebidas das APIs do Google seguirão a{" "}
+            <a
+              href="https://developers.google.com/terms/api-services-user-data-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium underline hover:text-blue-700"
+            >
+              Política de Dados do Usuário dos Serviços de API do Google
+            </a>
+            , incluindo os requisitos de Uso Limitado.
+          </p>
+          <p className="mt-2 text-blue-900">
+            Especificamente, os modelos de IA da nossa aplicação interagem com os dados do Google Calendar com o único propósito de fornecer a funcionalidade de "Agendamento Automatizado". As informações obtidas (status de livre/ocupado) são usadas exclusivamente para encontrar disponibilidade e gerenciar os agendamentos que você autoriza. Estes dados <strong>não são e nunca serão</strong> usados para treinar nossos modelos de IA, veicular anúncios ou qualquer outro propósito fora da funcionalidade principal da aplicação.
+          </p>
+        </section>
+
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-2">4. Segurança</h2>
           <p className="mb-2">
