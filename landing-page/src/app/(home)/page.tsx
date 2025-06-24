@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { scroller } from "react-scroll";
 
+import AudienceSection from "@/components/ui/home/audience-section";
 import BenefitsSection from "@/components/ui/home/benefits-section";
 import DemoVideoSection from "@/components/ui/home/demo-video-section"; // 1. Import the new component
 import DogfoodingSection from "@/components/ui/home/dog-fooding-section";
@@ -27,10 +28,11 @@ export default function HomePage() {
   return (
     <main className="flex min-h-screen flex-col">
       <HeroSection />
+      <AudienceSection />
       <BenefitsSection />
+      <DogfoodingSection />
       <HowDoesItWorkSection />
       <DemoVideoSection />
-      <DogfoodingSection />
       <PricingSection />
       <FaqSection />
     </main>
