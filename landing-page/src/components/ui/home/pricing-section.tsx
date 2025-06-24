@@ -51,6 +51,7 @@ const plans: Plan[] = [
       'Follow-ups automáticos',
       'Agendamento via Google Calendar',
       'Inclui 1.000 mensagens de IA',
+      'Onboarding assistido',
       'Suporte prioritário por WhatsApp',      
     ],
     ctaText: 'Escolher Pro', // Default text (for post-beta)
