@@ -89,7 +89,7 @@ export default function PoliticaDePrivacidadePage() {
             4. Política de Uso de Dados da API do Google
           </h2>
           <p className="mb-2 italic">
-            Lambda Labs' use and transfer to any other app of information
+            Lambda Labs&apos; use and transfer to any other app of information
             received from Google APIs will adhere to the{" "}
             <a
               href="https://developers.google.com/terms/api-services-user-data-policy"
