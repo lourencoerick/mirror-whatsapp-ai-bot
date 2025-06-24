@@ -63,7 +63,7 @@ const DogfoodingSection = (): React.ReactElement => {
                 <div>
                   <h3 className="font-bold text-xl mb-1">Prova em Tempo Real</h3>
                   <p>
-                    Você não vai agendar uma demo, você vai vivê-la. Sinta na
+                    Você não precisará agendar uma demo, você vai vivê-la. Sinta na
                     prática a experiência que seus clientes terão. Rápido,
                     inteligente e sem pressão.
                   </p>
@@ -75,7 +75,7 @@ const DogfoodingSection = (): React.ReactElement => {
                 </span>
                 <div>
                   <h3 className="font-bold text-xl mb-1">
-                    Comemos nossa própria ração
+                    Sem Rodeios
                   </h3>
                   <p>
                     Cada lead nosso é atendido pela mesma IA que estamos te
