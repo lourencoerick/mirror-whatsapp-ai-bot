@@ -18,7 +18,7 @@ export default function PoliticaDePrivacidadePage() {
           Política de Privacidade – Lambda Labs
         </h1>
         <p className="text-sm text-gray-500 mb-8">
-          Última atualização: 23 de junho de 2025
+          Última atualização: 24 de junho de 2025
         </p>
 
         <p className="mb-6">
@@ -83,29 +83,54 @@ export default function PoliticaDePrivacidadePage() {
           </ul>
         </section>
 
-        {/* ----- INÍCIO DA MUDANÇA PRINCIPAL ----- */}
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-2">
             4. Política de Uso de Dados da API do Google
           </h2>
           <p className="mb-2 italic">
-            Lambda Labs&apos; use and transfer to any other app of information
-            received from Google APIs will adhere to the{" "}
-            <a
-              href="https://developers.google.com/terms/api-services-user-data-policy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium underline hover:text-blue-600"
-            >
-              Google API Services User Data Policy
-            </a>
-            , including the Limited Use requirements.
+            The use of raw or derived user data received from Workspace APIs will adhere to the Google User Data Policy, including the Limited Use requirements.
+           <ul className="list-disc pl-6 space-y-1">
+            <li>
+             <a
+                href="https://developers.google.com/workspace/workspace-api-user-data-developer-policy?hl=pt-br"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline hover:text-blue-600"
+              >
+                Google Workspace User Data and Developer Policy
+              </a>
+              , including{" "}
+              
+              <a
+                href="https://developers.google.com/workspace/workspace-api-user-data-developer-policy?hl=pt-br#limited-use"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline hover:text-blue-600"
+              >
+                the Limited Use of user data
+              </a> 
+              {" "}requirements.
+            </li>
+            <li>
+              Photos API User Data and Developer Policy (for Photos APIs), including{" "}
+              <a
+                href="https://developers.google.com/photos/support/api-policy#limited_use_of_user_data"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium underline hover:text-blue-600"
+              >
+                the Limited Use of user data
+              </a> 
+              {" "}requirements.
+            </li>
+          </ul>
+   
           </p>
-          <p className="mb-4">
-            (Tradução: O uso e a transferência pela Lambda Labs para qualquer
-            outro aplicativo de informações recebidas das APIs do Google
-            aderirão à Política de Dados do Usuário dos Serviços de API do
-            Google, incluindo os requisitos de Uso Limitado.)
+          <p className="mb-4 text-sm">
+            (Tradução: O uso de dados crus ou tratados
+            recebidas das APIs do Google para qualquer outro aplicativo aderirão
+            à Política de Dados do Usuário dos Serviços de API do Google,
+            incluindo os requisitos de Uso Limitado.)
           </p>
           <p>
             Especificamente, nossa plataforma acessa os dados do Google Calendar
@@ -117,7 +142,6 @@ export default function PoliticaDePrivacidadePage() {
             outro propósito fora da funcionalidade principal da aplicação.
           </p>
         </section>
-        {/* ----- FIM DA MUDANÇA PRINCIPAL ----- */}
 
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-2">5. Segurança</h2>
