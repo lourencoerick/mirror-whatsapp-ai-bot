@@ -63,9 +63,9 @@ const DogfoodingSection = (): React.ReactElement => {
                 <div>
                   <h3 className="font-bold text-xl mb-1">Prova em Tempo Real</h3>
                   <p>
-                    Você não precisará agendar uma demo, você vai vivê-la. Sinta na
-                    prática a experiência que seus clientes terão. Rápido,
-                    inteligente e sem pressão.
+                    Você não precisará agendar uma demo, você pode vivê-la. Sinta na
+                    prática a experiência que seus clientes terão. Rápido, inteligente e sem pressão.<br/><br/>
+                    Use o vendendor IA para <span className="font-bold">entender melhor nosso produto</span> ou para <span className="font-bold">agendar uma conversa</span> para entendermos melhor o seu caso.
                   </p>
                 </div>
               </li>
