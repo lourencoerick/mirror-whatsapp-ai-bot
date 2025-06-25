@@ -49,8 +49,9 @@ export function trackGoogleAdsConversion(callback?: () => void): void {
     return;
   }
 
-  (window as any).gtag("event", "conversion", {
-    send_to: "AW-16914772618/VzaiCJzk26gaEIrly4E_",
+  (window as any).gtag("event", "click_beta_signup", {
+    send_to: ["AW-16914772618/VzaiCJzk26gaEIrly4E_", "G-8N395BDYFG/click_beta_signup"],
+    
     event_callback: callback,
   });
 }
