@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from '@/lib/analytics';
 import { Check, Loader2 } from 'lucide-react';
 import React, { useState } from 'react';
 import { toast } from 'sonner';
@@ -26,46 +27,61 @@ interface PlanCardProps {
 export function PlanCard({ plan }: PlanCardProps): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
 
-  /**
-   * Handles the call-to-action, redirecting to beta sign-up page
-   * or to a standard checkout flow.
+   /**
+   * Handles the call-to-action, tracks the event in analytics, and then
+   * redirects to sign-up or a standard checkout flow.
    */
   const handleCtaClick = () => {
     setIsLoading(true);
 
-    if (plan.betaOffer) {
-      // --- BETA SIGN-UP LOGIC (UPDATED) ---
-      toast.info("Redirecionando para inscrição...", {
-        description: "Você está um passo mais perto de automatizar suas vendas!",
-      });
-      
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-      if (!appUrl) {
-          console.error("A variável de ambiente NEXT_PUBLIC_APP_URL não está definida.");
-          toast.error("Erro de configuração", { description: "Não foi possível encontrar a URL de inscrição." });
-          setIsLoading(false);
-          return;
+    // 2. Define the action that should happen AFTER the event has been tracked.
+    // This function will be our callback.
+    const proceedToNextStep = () => {
+      if (plan.betaOffer) {
+        toast.info("Redirecionando para inscrição...", {
+          description: "Você está um passo mais perto de automatizar suas vendas!",
+        });
+        
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+        if (!appUrl) {
+            console.error("A variável de ambiente NEXT_PUBLIC_APP_URL não está definida.");
+            toast.error("Erro de configuração", { description: "Não foi possível encontrar a URL de inscrição." });
+            setIsLoading(false);
+            return;
+        }
+
+        const signUpUrl = `${appUrl}/sign-up?offer_id=${plan.id}`;
+        
+        // The redirect now happens inside the callback.
+        // The timeout is purely for UX to let the user read the toast.
+        setTimeout(() => {
+          window.location.href = signUpUrl;
+        }, 1500);
+
+      } else {
+        console.log(`Initiating checkout for plan: "${plan.name}" with Stripe Price ID: ${plan.stripePriceId}`);
+        toast.success("Redirecionando para o pagamento...", {
+          description: `Você selecionou o plano ${plan.name}.`,
+        });
+        // Your Stripe checkout logic would go here.
+        // For now, we just simulate it and reset the loading state.
+        setTimeout(() => setIsLoading(false), 2000);
       }
+    };
 
-      // We use `plan.id` as the offer_id for the sign-up URL.
-      const signUpUrl = `${appUrl}/sign-up?offer_id=${plan.id}`;
-      console.log(`Redirecting to beta sign-up URL: ${signUpUrl}`);
-
-      // The timeout gives the user a moment to read the toast message.
-      setTimeout(() => {
-        window.location.href = signUpUrl;
-        // No need to reset isLoading, as the page will navigate away.
-      }, 1500);
-
-    } else {
-      // --- STANDARD CHECKOUT LOGIC ---
-      console.log(`Initiating checkout for plan: "${plan.name}" with Stripe Price ID: ${plan.stripePriceId}`);
-      toast.success("Redirecionando para o pagamento...", {
-        description: `Você selecionou o plano ${plan.name}.`,
-      });
-      // Your Stripe checkout logic would go here.
-      setTimeout(() => setIsLoading(false), 2000);
-    }
+    // 3. Track the event with rich, contextual parameters.
+    trackEvent(
+      'select_item', // A specific event name for this action.
+      {
+        // We send a wealth of data for analysis.
+        item_id: plan.id,
+        item_name: plan.name,
+        item_variant: plan.betaOffer ? 'beta' : 'standard',
+        is_featured: String(plan.isFeatured), // GA works best with string values for dimensions.
+        location: 'pricing_section',
+      },
+      proceedToNextStep // Pass our action as the callback.
+    );
   };
 
   const ctaButtonText = plan.betaOffer ? plan.betaCtaText : plan.ctaText;

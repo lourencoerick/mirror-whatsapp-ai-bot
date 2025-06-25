@@ -39,19 +39,63 @@ export async function setGoogleAnalyticsUserData(userData: { name: string; email
 }
 
 /**
- * Reports a conversion event to Google Ads.
- * @param {Function} [callback] An optional callback function to run after the event is sent.
+ * Represents the user-provided parameters for a Google Analytics event.
+ * These are the custom dimensions and metrics for an event.
  */
-export function trackGoogleAdsConversion(callback?: () => void): void {
-  if (typeof window === "undefined" || typeof (window as any).gtag !== 'function') {
-    console.warn("gtag function not found. Running callback directly.");
-    if (callback) callback();
+type GtagEventParams = {
+  [key: string]: string | number | undefined;
+};
+
+/**
+ * Defines the complete payload structure for a gtag event call.
+ * This type is compatible with all possible properties, including the
+ * specific 'event_callback' function and 'send_to' string, as well as
+ * the dynamic user-provided parameters.
+ */
+interface GtagPayload {
+  event_callback?: () => void;
+  send_to?: string | string[];
+  // This index signature allows for any other string keys with values
+  // that are common in GA event tracking.
+  [key: string]: string | number | undefined | (() => void) | string[];
+}
+
+/**
+ * Sends a generic event to all configured analytics platforms (GA, Google Ads).
+ * This is our central tracking function.
+ *
+ * @param {string} eventName - The name of the event (e.g., 'conversion_signup').
+ * @param {GtagEventParams} params - An object of key-value pairs for event context.
+ * @param {Function} [callback] - An optional callback to run after the event is sent.
+ * @param {boolean} [isAdsConversion=false] - Set to true to also send this event as a Google Ads conversion.
+ */
+export const trackEvent = (
+  eventName: string,
+  params: GtagEventParams,
+  callback?: () => void,
+  isAdsConversion: boolean = false
+): void => {
+
+  const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "G-8N395BDYFG";
+  const ADS_CONVERSION_ID = process.env.NEXT_PUBLIC_ADS_CONVERSION_ID || "AW-16914772618/VzaiCJzk26gaEIrly4E_";
+
+  if (typeof window === 'undefined' || typeof window.gtag !== 'function' || !GA_ID) {
+    console.warn('GA tracking is disabled or not configured. Running callback directly.');
+    if (callback) {
+      callback();
+    }
     return;
   }
 
-  (window as any).gtag("event", "click_beta_signup", {
-    send_to: ["AW-16914772618/VzaiCJzk26gaEIrly4E_", "G-8N395BDYFG/click_beta_signup"],
-    
+  // This object is now correctly typed as GtagPayload.
+  const eventPayload: GtagPayload = {
+    ...params,
     event_callback: callback,
-  });
-}
+  };
+
+  if (isAdsConversion && ADS_CONVERSION_ID) {
+    eventPayload.send_to = [GA_ID, ADS_CONVERSION_ID];;
+  }
+
+  window.gtag('event', eventName, eventPayload);
+};
