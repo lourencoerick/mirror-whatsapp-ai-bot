@@ -3,8 +3,8 @@
 
 import { Button } from "@/components/ui/button"; // <--- 1. Importe o componente Button do Shadcn
 import PhoneMockup from "@/components/ui/phone-mockup";
+import { trackEvent } from "@/lib/analytics";
 import Image from "next/image";
-import Link from "next/link"; // <--- 2. Importe o Link do Next.js
 import React from "react";
 import { FaWhatsapp } from "react-icons/fa"; // <--- 3. Importe o ícone do WhatsApp
 import { Element } from "react-scroll";
@@ -24,6 +24,27 @@ const DogfoodingSection = (): React.ReactElement => {
   const whatsAppLink = `https://wa.me/${whatsAppNumber}?text=${encodeURIComponent(
     preFilledMessage
   )}`;
+
+  /**
+   * Handles the WhatsApp button click by tracking the event and then opening the link.
+   */
+  const handleWhatsAppClick = () => {
+    // This function will be the callback, executed after the event is tracked.
+    const openWhatsAppLink = () => {
+      // Use window.open for external links, especially with target="_blank" behavior.
+      window.open(whatsAppLink, '_blank', 'noopener,noreferrer');
+    };
+
+    // Track the lead generation event with contextual parameters.
+    trackEvent(
+      'generate_lead', // Use GA's recommended event name for lead generation.
+      {
+        lead_type: 'whatsapp', // Custom parameter to specify the type of lead.
+        location: 'proof_section', // The section where the click occurred.
+      },
+      openWhatsAppLink // Pass the navigation logic as the callback.
+    );
+  };
 
   return (
     <Element
@@ -104,13 +125,16 @@ const DogfoodingSection = (): React.ReactElement => {
         </div>
 
         {/* ----- INÍCIO DA MUDANÇA: BOTÃO DE CTA ----- */}
-        <div className="text-center mt-16">
+       <div className="text-center mt-16">
           {whatsAppNumber && (
-            <Button asChild size="lg" className="shadow-lg bg-green-500 text-slate-100 hover:hover:bg-green-600">
-              <Link href={whatsAppLink} target="_blank" rel="noopener noreferrer">
-                <FaWhatsapp className="mr-3 h-6 w-6" />
-                Fale agora com nosso Vendedor IA
-              </Link>
+            // We now use a standard Button with our onClick handler.
+            <Button
+              onClick={handleWhatsAppClick}
+              size="lg"
+              className="shadow-lg bg-green-500 text-slate-100 hover:bg-green-600"
+            >
+              <FaWhatsapp className="mr-3 h-6 w-6" />
+              Fale agora com nosso Vendedor IA
             </Button>
           )}
         </div>

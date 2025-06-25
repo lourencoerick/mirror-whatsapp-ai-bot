@@ -1,7 +1,8 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { trackGoogleAdsConversion } from '@/lib/analytics';
+import { trackEvent } from '@/lib/analytics';
+
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -30,11 +31,18 @@ export function BetaSignupButton() {
     }
     
     const signUpUrl = `${appUrl}/sign-up`;
+    // This is the callback function that will run after the event is tracked.
+    const redirectUser = () => {
+      window.location.href = signUpUrl;
+    };    
 
     // Track the conversion and redirect as the callback function.
-    trackGoogleAdsConversion(() => {
-      window.location.href = signUpUrl;
-    });
+    trackEvent(
+      'signup_click', // 1. A clear, descriptive event name.
+      { location: 'main_cta' }, // 2. Contextual parameters for richer data.
+      redirectUser, // 3. The callback function to execute after tracking.
+      true // 4. The explicit flag indicating this is a Google Ads conversion.
+    );
   };
 
   return (
