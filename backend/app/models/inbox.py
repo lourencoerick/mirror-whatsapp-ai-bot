@@ -112,6 +112,10 @@ class Inbox(BaseModel):
     )
     events = relationship("Event", back_populates="inbox", cascade="all, delete-orphan")
 
+    api_keys = relationship(
+        "ApiKey", back_populates="inbox", cascade="all, delete-orphan"
+    )
+
     __table_args__ = (
         Index("inboxes_account_id_index", "account_id"),
         UniqueConstraint(
