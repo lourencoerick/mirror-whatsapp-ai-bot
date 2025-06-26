@@ -532,6 +532,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inboxes/{inbox_id}/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Api Keys For Inbox
+         * @description List all API keys for a specific inbox.
+         */
+        get: operations["list_api_keys_for_inbox_api_v1_inboxes__inbox_id__api_keys_get"];
+        put?: never;
+        /**
+         * Generate New Api Key
+         * @description Generate a new API key for a specific inbox.
+         */
+        post: operations["generate_new_api_key_api_v1_inboxes__inbox_id__api_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inboxes/{inbox_id}/api-keys/{api_key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Api Key
+         * @description Revoke (delete) an API key.
+         */
+        delete: operations["revoke_api_key_api_v1_inboxes__inbox_id__api_keys__api_key_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contacts": {
         parameters: {
             query?: never;
@@ -1257,6 +1301,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sheets/trigger-conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trigger a Conversation from Google Sheets
+         * @description Receives a webhook from a configured Google Sheet to start a new
+         *     conversation with a contact via a specific Inbox.
+         *
+         *     This endpoint is secured by an API key which must have the
+         *     `sheets:trigger` scope.
+         */
+        post: operations["trigger_from_sheets_api_v1_sheets_trigger_conversation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/webhooks/evolution/{platform_instance_id}": {
         parameters: {
             query?: never;
@@ -1472,6 +1540,86 @@ export interface components {
              * @description Complete list of Inbox IDs that should be associated with this agent.
              */
             inbox_ids?: string[];
+        };
+        /**
+         * ApiKeyCreate
+         * @description Schema for creating a new API key.
+         */
+        ApiKeyCreate: {
+            /**
+             * Name
+             * @description A user-friendly name for the key.
+             */
+            name: string;
+            /**
+             * Scopes
+             * @description A list of permission scopes for the key.
+             */
+            scopes: string[];
+        };
+        /**
+         * ApiKeyRead
+         * @description Schema for displaying an API key safely (without the secret).
+         */
+        ApiKeyRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /**
+             * Last Four
+             * @description The last four characters of the key for identification.
+             */
+            last_four: string;
+            /** Scopes */
+            scopes: string[];
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * ApiKeyReadWithSecret
+         * @description Schema for returning the full, raw API key upon creation.
+         *     This should only be used ONCE, immediately after generating the key.
+         */
+        ApiKeyReadWithSecret: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /**
+             * Last Four
+             * @description The last four characters of the key for identification.
+             */
+            last_four: string;
+            /** Scopes */
+            scopes: string[];
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Raw Key
+             * @description The full, secret API key. Display this only once.
+             */
+            raw_key: string;
         };
         /** AvailabilityRuleSchema */
         AvailabilityRuleSchema: {
@@ -3199,6 +3347,28 @@ export interface components {
             message: string;
         };
         /**
+         * InitialContextSchema
+         * @description Defines the structure for the initial context data provided by an integration.
+         */
+        InitialContextSchema: {
+            /**
+             * Source
+             * @description The source of the lead (e.g., 'Google Sheet: Vendas Q4').
+             */
+            source: string;
+            /**
+             * Product Of Interest
+             * @description The product or service the contact is interested in.
+             */
+            product_of_interest: string;
+            /**
+             * Notes
+             * @description Any additional notes about the lead.
+             * @default
+             */
+            notes: string;
+        };
+        /**
          * JobStatusEnum
          * @description Possible statuses for an Arq job.
          * @enum {string}
@@ -3849,6 +4019,31 @@ export interface components {
              * @description Status message indicating the task was queued.
              */
             message: string;
+        };
+        /**
+         * SheetsTriggerPayload
+         * @description Pydantic schema for validating the payload from the Google Sheets trigger.
+         *     This is the contract our API expects from the Apps Script.
+         */
+        SheetsTriggerPayload: {
+            /**
+             * Contact Phone
+             * @description The contact's phone number, including country code.
+             */
+            contact_phone: string;
+            /**
+             * Contact Name
+             * @description The name of the contact.
+             */
+            contact_name: string;
+            /**
+             * Contact Email
+             * Format: email
+             * @description The email of the contact.
+             */
+            contact_email: string;
+            /** @description Contextual information about the lead. */
+            initial_context: components["schemas"]["InitialContextSchema"];
         };
         /**
          * SimulationDetailsResponse
@@ -4882,6 +5077,102 @@ export interface operations {
             header?: never;
             path: {
                 inbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_api_keys_for_inbox_api_v1_inboxes__inbox_id__api_keys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyRead"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_new_api_key_api_v1_inboxes__inbox_id__api_keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyReadWithSecret"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_key_api_v1_inboxes__inbox_id__api_keys__api_key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                inbox_id: string;
+                api_key_id: string;
             };
             cookie?: never;
         };
@@ -6354,6 +6645,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GoogleIntegrationStatus"];
+                };
+            };
+        };
+    };
+    trigger_from_sheets_api_v1_sheets_trigger_conversation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SheetsTriggerPayload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
