@@ -1,7 +1,7 @@
 # backend/app/schemas/integrations.py
 
 from pydantic import BaseModel, Field, EmailStr
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 class InitialContextSchema(BaseModel):
@@ -33,8 +33,10 @@ class SheetsTriggerPayload(BaseModel):
         ..., description="The name of the contact.", examples=["Ana Souza"]
     )
 
-    contact_email: EmailStr = Field(
-        ..., description="The email of the contact.", examples=["ana@exempl.com"]
+    contact_email: Optional[EmailStr] = Field(
+        default=None,
+        description="The email of the contact.",
+        examples=["ana@exempl.com"],
     )
     initial_context: InitialContextSchema = Field(
         ..., description="Contextual information about the lead."
