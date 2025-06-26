@@ -15,7 +15,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { KeyRound, PlusCircle, Terminal, Trash2 } from "lucide-react";
+import {
+  KeyRound,
+  PlusCircle,
+  RefreshCw,
+  Terminal,
+  Trash2,
+} from "lucide-react";
 
 import { GenerateApiKeyDialog } from "./generate-api-key-dialog";
 import { RevokeApiKeyDialog } from "./revoke-api-key-dialog";
@@ -26,12 +32,13 @@ interface ApiKeysManagerProps {
 
 /**
  * A self-contained component to manage API keys for a specific inbox.
- * It handles listing, generating, and revoking API keys.
+ * It handles listing, generating, and revoking API keys with robust state management.
  */
 export function ApiKeysManager({ inboxId }: ApiKeysManagerProps) {
   const fetcher = useAuthenticatedFetch();
   const [keys, setKeys] = useState<ApiKeyRead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefetching, setIsRefetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // State for controlling the dialogs
@@ -40,37 +47,50 @@ export function ApiKeysManager({ inboxId }: ApiKeysManagerProps) {
   const [isRevokeDialogOpen, setIsRevokeDialogOpen] = useState(false);
 
   /**
-   * Fetches the list of API keys from the server and updates the component's state.
+   * Fetches or re-fetches the list of API keys from the server.
+   * Manages different loading states for initial load vs. subsequent updates.
+   * @param {boolean} isInitialLoad - True if it's the first load, false for updates.
    */
-  const fetchApiKeys = useCallback(async () => {
-    if (!inboxId) return;
-    // Only show the main skeleton on the very first load.
-    if (keys.length === 0) setIsLoading(true);
-    setError(null);
-    try {
-      const data = await apiKeyService.listApiKeys(inboxId, fetcher);
-      setKeys(data);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load API keys.";
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [inboxId, fetcher, keys.length]);
+  const fetchApiKeys = useCallback(
+    async (isInitialLoad = false) => {
+      if (!inboxId) return;
 
-  // Initial data fetch when the component mounts.
+      if (isInitialLoad) {
+        setIsLoading(true);
+      } else {
+        setIsRefetching(true);
+      }
+      setError(null);
+
+      try {
+        const data = await apiKeyService.listApiKeys(inboxId, fetcher);
+        setKeys(data);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load API keys.";
+        setError(message);
+      } finally {
+        if (isInitialLoad) {
+          setIsLoading(false);
+        } else {
+          setIsRefetching(false);
+        }
+      }
+    },
+    [inboxId, fetcher]
+  );
+
+  // Effect for the initial data load. Runs only when inboxId changes.
   useEffect(() => {
-    fetchApiKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inboxId]); // We only want this to run when inboxId changes.
+    fetchApiKeys(true);
+  }, [fetchApiKeys]);
 
   /**
-   * Callback function passed to child dialogs.
-   * It triggers a re-fetch of the API keys to update the list.
+   * Callback function passed to child dialogs after a successful action.
+   * It ensures dialogs are closed and then triggers a re-fetch of the API keys.
    */
   const handleKeyListChanged = () => {
-    fetchApiKeys();
+    fetchApiKeys(false); // Trigger a background refetch
   };
 
   /**
@@ -109,13 +129,28 @@ export function ApiKeysManager({ inboxId }: ApiKeysManagerProps) {
                 outros serviços.
               </CardDescription>
             </div>
-            <Button
-              onClick={() => setIsGenerateDialogOpen(true)}
-              className="w-full sm:w-auto"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Gerar Nova Chave
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => fetchApiKeys(false)}
+                disabled={isRefetching}
+                title="Atualizar lista de chaves"
+              >
+                {isRefetching ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+              </Button>
+              <Button
+                onClick={() => setIsGenerateDialogOpen(true)}
+                className="flex-grow"
+              >
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Gerar Nova Chave
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -149,6 +184,7 @@ export function ApiKeysManager({ inboxId }: ApiKeysManagerProps) {
                     size="icon"
                     onClick={() => handleRevokeClick(key)}
                     title={`Revogar chave ${key.name}`}
+                    disabled={isRefetching}
                   >
                     <Trash2 className="h-4 w-4" />
                     <span className="sr-only">Revogar</span>
