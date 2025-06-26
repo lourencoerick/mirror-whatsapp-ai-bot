@@ -1,6 +1,6 @@
 # backend/app/services/repository/api_key.py
 
-from typing import Optional, List
+from typing import Optional, List, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -31,7 +31,7 @@ async def find_api_key_by_hashed_key(
 
     stmt = (
         select(ApiKey)
-        .options(joinedload(ApiKey.inbox).joinedload(Inbox.company_profile))
+        .options(joinedload(ApiKey.inbox))
         .where(ApiKey.hashed_key == hashed_key)
     )
     result = await db.execute(stmt)
@@ -45,7 +45,7 @@ async def find_api_key_by_hashed_key(
 
 async def create_api_key_for_inbox(
     db: AsyncSession, *, inbox: Inbox, key_data: ApiKeyCreate
-) -> (ApiKey, str):
+) -> Tuple[ApiKey, str]:
     """Creates a new API key for a given inbox.
 
     Args:
