@@ -70,6 +70,7 @@ ESSENTIAL_TOOLS: List[Callable] = [
     update_sales_stage,
     validate_response_and_references,
     check_scheduling_status,
+    get_current_datetime,
 ]
 
 SCHEDULING_TOOLS: List[Callable] = [
@@ -77,7 +78,6 @@ SCHEDULING_TOOLS: List[Callable] = [
     get_available_slots,
     create_appointment,
     find_next_available_day,
-    get_current_datetime,
     update_appointment,
     cancel_appointment,
     find_customer_appointments,
@@ -168,7 +168,6 @@ def create_react_sales_agent_graph(
 
     all_tools: List[str] = []
     all_tools.extend(ESSENTIAL_TOOLS)
-
 
     if company_profile.is_scheduling_enabled:
         all_tools.extend(SCHEDULING_TOOLS)
