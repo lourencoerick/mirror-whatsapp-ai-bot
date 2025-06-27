@@ -197,6 +197,8 @@ async def get_or_create_conversation(
         additional_attributes=additional_attributes,
     )
 
+    conversation.contact_inbox = contact_inbox
+
     db.add(conversation)
     # Only flush to generate any necessary defaults; commit and refresh are handled by the upper layer.
     await db.flush()
