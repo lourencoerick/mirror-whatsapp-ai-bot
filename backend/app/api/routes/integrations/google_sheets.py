@@ -12,6 +12,7 @@ from app.core.arq_manager import (
 )
 from app.config import get_settings, Settings
 from app.models import Inbox
+from app.core.wake_workers import wake_worker
 
 settings: Settings = get_settings()
 
@@ -51,6 +52,10 @@ async def trigger_from_sheets(
     )
 
     # 2. Enfileirar a tarefa para o worker
+    await wake_worker(settings.MESSAGE_CONSUMER_WORKER_INTERNAL_URL)
+    await wake_worker(settings.AI_REPLIER_INTERNAL_URL)
+    await wake_worker(settings.RESPONSE_SENDER_WORKER_INTERNAL_URL)
+
     await arq_pool.enqueue_job(
         "process_incoming_message_task",
         arq_payload.model_dump(mode="json"),
