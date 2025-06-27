@@ -167,7 +167,7 @@ async def validate_response_and_references(
     if validation_passed:
         # If validation passes, the content of the ToolMessage IS the response to be sent to the user.
         # The main agent LLM will see this ToolMessage and should then use its content as the final AIMessage.
-        tool_message_content = proposed_response_to_user
+        tool_message_content = proposed_response_to_user.replace("\\n", "\n")
         logger.info(f"[{tool_name}] Validation 'passed'. Approved response for user.")
     else:
         # If validation fails, the ToolMessage contains feedback for the LLM to revise.
@@ -181,6 +181,10 @@ async def validate_response_and_references(
             content=tool_message_content, name=tool_name, tool_call_id=tool_call_id
         )
     ]
+
+    # Add AI message with the aproved message
+    if validation_passed:
+        messages_to_add.append(AIMessage(content=tool_message_content))
 
     state_updates: Dict[str, Any] = {"messages": messages_to_add}
 
