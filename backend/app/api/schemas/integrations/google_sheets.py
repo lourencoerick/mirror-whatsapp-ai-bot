@@ -1,6 +1,6 @@
 # backend/app/schemas/integrations.py
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import Dict, Any, Optional
 
 
@@ -41,3 +41,10 @@ class SheetsTriggerPayload(BaseModel):
     initial_context: InitialContextSchema = Field(
         ..., description="Contextual information about the lead."
     )
+
+    @field_validator("contact_email", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, value: Any) -> Optional[Any]:
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
