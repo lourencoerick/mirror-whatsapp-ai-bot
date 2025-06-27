@@ -5,6 +5,8 @@ from app.database import AsyncSessionLocal  # Sua factory de sessão SQLAlchemy
 from loguru import logger
 from pydantic import ValidationError  # Para capturar erros de validação do Pydantic
 from typing import Optional, List
+from uuid import UUID, uuid4
+from datetime import datetime, timezone
 
 # Schemas
 from app.api.schemas.queue_payload import (
@@ -28,13 +30,15 @@ from app.services.parser.message_processing import process_incoming_message_logi
 
 from app.services.debounce.message_debounce import MessageDebounceService
 
+from app.services.repository import conversation as conversation_repo
+
 
 async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
     """
     ARQ task to process an incoming message enqueued by a webhook endpoint.
 
     This task:
-    1. Validates the ArqIncomingMessagePayload received from the queue.
+    1. Validates the IncomingMessagePayload received from the queue.
     2. Extracts the 'external_raw_message' (which is Meta's 'value' object for Cloud API).
     3. Validates this 'value' object.
     4. Iterates over individual messages within the 'value' object.
@@ -93,7 +97,56 @@ async def process_incoming_message_task(ctx: dict, arq_payload_dict: dict):
 
             internal_dto_list: List[InternalIncomingMessageDTO] = []
 
-            if arq_payload.source_api == "simulation":
+            if arq_payload.source_api == "integration_trigger":
+                logger.info(
+                    f"{log_prefix} Processing a new 'integration_trigger' source."
+                )
+                if arq_payload.integration_trigger_payload:
+                    trigger_payload = arq_payload.integration_trigger_payload
+                    inbox_id = UUID(arq_payload.business_identifier)
+
+                    # 1. Usar nosso novo repo para obter a conversa
+                    conversation = await conversation_repo.find_or_create_conversation_by_contact_details(
+                        db=db,
+                        inbox_id=inbox_id,
+                        contact_phone=trigger_payload.contact_phone,
+                        contact_name=trigger_payload.contact_name,
+                    )
+
+                    # 2. Construir a mensagem sintética
+                    synthetic_message_text = (
+                        f"Início de conversa via integração.\n"
+                        f"Nome do Lead: {trigger_payload.contact_name}\n"
+                        f"Fonte: {trigger_payload.initial_context.source}\n"
+                        f"Produto de Interesse: {trigger_payload.initial_context.product_of_interest}\n"
+                        f"Observações: {trigger_payload.initial_context.notes}"
+                    )
+
+                    # 3. Construir o DTO padronizado
+                    internal_dto = InternalIncomingMessageDTO(
+                        account_id=conversation.account_id,
+                        inbox_id=conversation.inbox_id,
+                        contact_id=conversation.contact_inbox.contact_id,
+                        conversation_id=conversation.id,
+                        external_message_id=f"trigger_{uuid4().hex}",  # ID sintético e único
+                        sender_identifier=trigger_payload.contact_phone,
+                        message_content=synthetic_message_text,
+                        internal_content_type="text",
+                        message_timestamp=datetime.now(timezone.utc),
+                        raw_message_attributes={"source": "integration_trigger"},
+                        source_api="integration_trigger",
+                        is_private=True,  # Marcamos como uma nota interna do sistema
+                    )
+                    internal_dto_list.append(internal_dto)
+                    logger.info(
+                        f"{log_prefix} Successfully built DTO for integration trigger."
+                    )
+                else:
+                    logger.error(
+                        f"{log_prefix} 'integration_trigger_payload' is missing for source_api='integration_trigger'."
+                    )
+
+            elif arq_payload.source_api == "simulation":
                 if arq_payload.internal_dto_partial_data:
                     try:
                         internal_dto = InternalIncomingMessageDTO.model_validate(
