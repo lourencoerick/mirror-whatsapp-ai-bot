@@ -75,6 +75,7 @@ async def intelligent_stage_analyzer_hook(
 
     state_updates: Dict[str, Any] = {}
     current_messages: List[BaseMessage] = state.messages[:]  # Work with a copy
+    profile = state.company_profile
 
     # first_message = current_messages[0] if current_messages else None
     # if first_message and first_message.id == STATE_CONTEXT_MESSAGE_ID:
@@ -118,6 +119,16 @@ async def intelligent_stage_analyzer_hook(
         suggested_focus = "Proceda com base no estágio atual e no bom senso."
     else:
         original_sales_stage = state.current_sales_stage
+        business_description = profile.business_description
+
+        communication_rules = [
+            "Diretrizes de Comunicação:",
+        ]
+        if profile.communication_guidelines:
+            communication_rules += [f"- {g}" for g in profile.communication_guidelines]
+
+        communication_guidelines = "\n".join(communication_rules)
+
         recent_messages_for_analysis = messages_for_llm_input[-5:]
 
         available_stages_str = ", ".join(get_args(SalesStageLiteral))
@@ -134,6 +145,10 @@ async def intelligent_stage_analyzer_hook(
                         
                     Em seu passo estratégico, **avalie cuidadosamente se é o momento ideal para fornecer informações de preço ou o link de compra diretamente, ou se antes seria melhor qualificar melhor o cliente**. 
                     Caso ainda seja necessário coletar dados, oriente o agente a fazer perguntas de qualificação e diga expressamente para não fornecer o preço ainda, a menos q o cliente insista.
+
+                    Descrição do negócio: {business_description}
+
+                    Diretrizes de comunicação da empresa: {communication_guidelines}
 
                     Os estágios de vendas disponíveis são: {available_stages_str}.
                     O estágio atual conhecido é: {original_sales_stage}.
@@ -165,6 +180,8 @@ async def intelligent_stage_analyzer_hook(
         try:
             analysis_result: StageAnalysisOutput = await analysis_chain.ainvoke(
                 {
+                    "business_description": business_description,
+                    "communication_guidelines": communication_guidelines,
                     "recent_messages_formatted": formatted_recent_messages,
                     "original_sales_stage": original_sales_stage,
                     "available_stages_str": available_stages_str,
@@ -295,6 +312,7 @@ async def auto_follow_up_scheduler_hook(
 
     current_stage: Optional[SalesStageLiteral] = state.current_sales_stage
     current_trigger_event: Optional[str] = state.trigger_event
+
     # Get pending_follow_up_trigger as a dict if it was stored as such
     existing_pending_trigger_dict: Optional[Dict[str, Any]] = (
         state.pending_follow_up_trigger
@@ -526,6 +544,7 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                     "- Keep the customer in this channel unless they truly need another channel to proceed.\n"
                     "- Communicate via WhatsApp concisely, using no more than 3 to 5 sentences and bullet points, if needed.\n"
                     f"- Consider the Senior Sales Representative’s analysis to guide your response: '{intelligent_stage_analyzer_message.content}'.\n"
+                    "- USE the communications rules of the company \n"
                     "Review the content based on your instructions and correctly call `validate_response_and_references` before sending again. Thank you!\n\n"
                     "Respond to the user's message using the `validate_response_and_references` tool:\n"
                     f"- User: {current_user_input_text}"
