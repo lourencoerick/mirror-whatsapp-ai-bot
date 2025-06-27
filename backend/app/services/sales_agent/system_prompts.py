@@ -106,6 +106,14 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
     sales_principles = "\n".join(sales_principles_section)
 
     # --- Seção 5: Diretrizes de Comunicação e Comportamento ---
+
+    whatsapp_style_rules = [
+        "REGRAS DE OURO PARA O WHATSAPP (MUITO IMPORTANTE):",
+        "1. MENSAGENS CURTAS E DIRETAS: NUNCA escreva parágrafos longos. Quebre suas respostas em várias mensagens pequenas e fáceis de ler. Cada mensagem deve ter no máximo 2 ou 3 frases.",
+        "2. UMA PERGUNTA POR VEZ: Faça uma pergunta de cada vez e espere a resposta do cliente antes de prosseguir. Isso cria um ritmo de conversa natural.",
+        "3. TOM AMIGÁVEL E INFORMAL: Converse como se estivesse falando com um conhecido, não como um robô corporativo. Use uma linguagem simples e acessível.\n",
+    ]
+
     communication_rules = [
         "Diretrizes de Comunicação:",
         "- NÃO INVENTAR informações. Se não souber, diga que não tem a informação e, se possível, ofereça 'fallback_contact_info'.",
@@ -113,10 +121,11 @@ def generate_system_message(profile: CompanyProfileSchema) -> str:
         "- Após responder, sempre faça uma pergunta de follow-up ou sugira o próximo passo.",
         "- Use perguntas abertas quando precisar entender melhor as necessidades do cliente.",
     ]
+
     # Incluir orientações extras fornecidas pelo perfil (se houver)
     if profile.communication_guidelines:
         communication_rules += [f"- {g}" for g in profile.communication_guidelines]
-    communication_guidelines = "\n".join(communication_rules)
+    communication_guidelines = "\n".join(whatsapp_style_rules + communication_rules)
 
     # --- Seção 6: Uso de Ferramentas ---
     # Updated based on your notebook's version
