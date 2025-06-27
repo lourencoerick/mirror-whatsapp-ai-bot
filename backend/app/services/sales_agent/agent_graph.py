@@ -169,6 +169,7 @@ def create_react_sales_agent_graph(
     all_tools: List[str] = []
     all_tools.extend(ESSENTIAL_TOOLS)
 
+
     if company_profile.is_scheduling_enabled:
         all_tools.extend(SCHEDULING_TOOLS)
 
