@@ -353,6 +353,7 @@ async def handle_ai_reply_request(
     conversation_id: UUID,
     user_input_content: Optional[str] = None,
     event_type: Optional[str] = None,  # e.g., "user_message", "follow_up_timeout"
+    trigger_message_id: Optional[UUID] = None,
     follow_up_attempt_count: Optional[int] = 0,
     follow_up_reason_context: Optional[str] = None,
     **kwargs,
@@ -381,12 +382,17 @@ async def handle_ai_reply_request(
     )
 
     is_follow_up_trigger = event_type == "follow_up_timeout"
+    is_integration_trigger = event_type == "integration_trigger"
 
     if is_follow_up_trigger:
         log_prefix = (
             f"{log_prefix_base}[FollowUpTrigger|Attempt:{follow_up_attempt_count}]"
         )
         logger.info(f"{log_prefix} Starting task for follow-up.")
+
+    elif is_integration_trigger:
+        log_prefix = f"{log_prefix_base}[IntegrationTrigger|MsgID:{trigger_message_id}]"
+        logger.info(f"{log_prefix} Starting task triggered by integration.")
     elif user_input_content:
         log_prefix = f"{log_prefix_base}[MsgTrigger]"
         logger.info(f"{log_prefix} Starting task triggered by message.")
@@ -527,6 +533,43 @@ async def handle_ai_reply_request(
                     )
                     logger.info(
                         f"{log_prefix} Event type FOLLOW_UP_TIMEOUT. Attempt: {follow_up_attempt_count}. Added directive."
+                    )
+
+                elif is_integration_trigger:
+                    trigger_event_for_graph = "integration_trigger"
+
+                    # 1. Obter o conteúdo da mensagem sintética que criamos
+                    #    O user_input_content contém nossa mensagem estruturada
+                    synthetic_message_content = user_input_content or ""
+
+                    # 2. Construir a SystemMessage de instrução
+
+                    system_directive_content = (
+                        "SYSTEM DIRECTIVE: This is a new conversation initiated by an external integration.\n"
+                        "The context below was provided by the system, not the user.\n\n"
+                        f"{synthetic_message_content}\n\n"
+                        "Your primary goal is to proactively start the conversation based on this context. "
+                        "Greet the user by name and immediately reference their interest or the provided context. "
+                        "Be concise; our communication is via WhatsApp—people don’t like receiving long messages. "
+                        "Use active voice and strong action verbs (e.g., “Quero te mostrar…”). "
+                        "Highlight the immediate benefit up front. "
+                        "Conclude with a concise follow-up question inviting the user to ask for more details—aim for phrasing similar to “Posso te explicar melhor?”. "
+                        "Keep it to at most three short sentences."
+                    )
+
+                    integration_directive_message = SystemMessage(
+                        content=system_directive_content
+                    )
+
+                    current_input_updates["messages"] = [integration_directive_message]
+                    current_input_updates["current_user_input_text"] = (
+                        None  # Não há input direto do usuário
+                    )
+                    current_input_updates["pending_follow_up_trigger"] = None
+                    current_input_updates["follow_up_attempt_count"] = 0
+
+                    logger.info(
+                        f"{log_prefix} Event type INTEGRATION_TRIGGER. Added directive to graph input."
                     )
 
                 elif user_input_content:

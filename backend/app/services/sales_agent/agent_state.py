@@ -8,7 +8,7 @@ from langchain_core.messages import BaseMessage
 from app.api.schemas.company_profile import CompanyProfileSchema
 from app.api.schemas.bot_agent import BotAgentRead
 
-TriggerEventType = Literal["user_message", "follow_up_timeout"]
+TriggerEventType = Literal["user_message", "follow_up_timeout", "integration_trigger"]
 
 SalesStageLiteral = Literal[
     "initial_contact",  # First interaction with the customer.
