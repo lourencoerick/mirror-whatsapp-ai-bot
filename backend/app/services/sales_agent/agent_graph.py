@@ -210,16 +210,16 @@ def create_react_sales_agent_graph(
         },
     )
 
-    graph_builder.add_edge("tools", "chatbot")
+    # graph_builder.add_edge("tools", "chatbot")
 
-    # graph_builder.add_conditional_edges(
-    #     "tools",
-    #     tools_outuput_condition_router,
-    #     {
-    #         "chatbot": "chatbot",
-    #         "validation_compliance_check": "validation_compliance_check",
-    #     },
-    # )
+    graph_builder.add_conditional_edges(
+        "tools",
+        tools_outuput_condition_router,
+        {
+            "chatbot": "chatbot",
+            "validation_compliance_check": "validation_compliance_check",
+        },
+    )
 
     graph_builder.add_edge("auto_follow_up_scheduler", END)
 
