@@ -198,17 +198,23 @@ async def intelligent_stage_analyzer_hook(
         )
 
     num_samples = 100
-    list_of_message_templates: List[Dict[str, str]] = MESSAGE_TEMPLATES.get(analyzed_sales_stage)
+    list_of_message_templates: List[Dict[str, str]] = MESSAGE_TEMPLATES.get(
+        analyzed_sales_stage
+    )
     inspiration_list_str: str = ""
-    
+
     if list_of_message_templates:
         actual_sample_size = min(len(list_of_message_templates), num_samples)
 
-        selected_templates = random.sample(list_of_message_templates, actual_sample_size)
+        selected_templates = random.sample(
+            list_of_message_templates, actual_sample_size
+        )
         templates_bullet_points = []
         for item in selected_templates:
             template_str = item.get("template", "")
-            intent_str = item.get("intent")  # .get() retorna None se a chave não existir
+            intent_str = item.get(
+                "intent"
+            )  # .get() retorna None se a chave não existir
 
             if intent_str:
                 # Formato: - (Intenção: nome_da_intencao) "Template da frase"
@@ -511,6 +517,7 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                     "- Never fabricate customer information; always tell the truth and adhere to the instructions section.\n"
                     "- Do not send links without presenting the full URL.\n"
                     "- Keep the original date and time in scheduling until confirmed with the customer.\n"
+                    "- NEVER confirm a appointment without call the create_appointment tool successfully before.\n"
                     "- If the user's message is off-topic, log this to the `validate_response_and_references` function and then call it.\n"
                     "- In case of tool errors, invoke `validate_response_and_references` and instruct the customer to contact us later or provide an alternative contact if available.\n"
                     "- Acknowledge that your actions are limited to the available tools; propose only measures you can fulfill.\n"
