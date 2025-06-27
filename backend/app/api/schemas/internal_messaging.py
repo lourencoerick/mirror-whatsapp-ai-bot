@@ -49,8 +49,13 @@ class InternalIncomingMessageDTO(BaseModel):
         description="Raw or platform-specific attributes from the original message.",
     )
 
-    source_api: Literal["whatsapp_cloud", "whatsapp_evolution", "simulation"] = Field(
-        ..., description="Source API of the message, for reference."
+    source_api: Literal[
+        "whatsapp_cloud", "whatsapp_evolution", "simulation", "integration_trigger"
+    ] = Field(..., description="Source API of the message, for reference.")
+
+    is_private: bool = Field(
+        default=False,
+        description="If true, this message is a system-generated note or event, not a real message from the contact.",
     )
 
     class Config:
@@ -70,5 +75,6 @@ class InternalIncomingMessageDTO(BaseModel):
                     "whatsapp_context": {"from": "16505550000", "id": "wamid.PREVIOUS"}
                 },
                 "source_api": "whatsapp_cloud",
+                "is_private": "False",
             }
         }
