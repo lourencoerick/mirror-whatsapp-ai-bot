@@ -510,6 +510,7 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                     "Your unvalidated message is being retracted. "
                     "You MUST NOW RE-EVALUATE and call 'validate_response_and_references' correctly.\n"
                     "To ensure quality and compliance, we are retracting this message for now. Here are the required checks:\n"
+                    "- When discussing the company or its services, USE the vocabulary from the company profile and the available tools.\n"
                     "- Verify the information provided against the instructions and/or data obtained from tools.\n"
                     "- Follow the sales principles and communication rules described in the instructions.\n"
                     "- Guide the customer from greeting to closing, avoiding mentioning price or purchase link before qualification.\n"
