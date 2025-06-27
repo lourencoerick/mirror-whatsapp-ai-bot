@@ -15,6 +15,7 @@ from app.config import get_settings, Settings
 
 settings: Settings = get_settings()
 
+
 # Database
 try:
     from sqlalchemy.ext.asyncio import (
