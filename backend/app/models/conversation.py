@@ -103,6 +103,20 @@ class Conversation(BaseModel):
         MutableDict.as_mutable(JSONB), default=dict, nullable=True
     )
 
+    ping_pong_count = Column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default=text("0"),
+        doc="Counts consecutive agent messages without a significant user delay, to prevent bot loops.",
+    )
+
+    last_agent_message_timestamp = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        doc="Timestamp of the last message sent by our agent in this conversation.",
+    )
+
     account = relationship(
         "Account",
         back_populates="conversations",

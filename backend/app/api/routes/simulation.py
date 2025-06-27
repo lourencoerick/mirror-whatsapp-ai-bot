@@ -15,6 +15,7 @@ from app.models.account import Account
 from app.models.message import Message
 
 from app.models.user import User
+from app.models.conversation import ConversationStatusEnum
 from app.services.repository import conversation as conversation_repo
 from app.services.repository import bot_agent as bot_agent_repo
 from app.services.helper.checkpoint import reset_checkpoint
@@ -325,6 +326,8 @@ async def reset_simulation_state(  # Nome mais claro
         raise HTTPException(
             status_code=400, detail="Operação permitida apenas em simulações."
         )
+
+    conversation.status = ConversationStatusEnum.BOT
 
     # --- 2. Executar Comandos DELETE SQL ---
     # Nomes das tabelas e colunas baseados no código fonte do AsyncPostgresSaver

@@ -208,6 +208,12 @@ from app.services.queue.redis_queue import (
 from app.services.helper.websocket import publish_to_conversation_ws
 from app.services.helper.checkpoint import reset_checkpoint
 
+from app.workers.ai_replier.utils.circuit_breaker import (
+    check_and_update_ping_pong_circuit_breaker,
+    PingPongLimitExceeded,
+)
+from app.models.conversation import ConversationStatusEnum
+
 # --- Configuration Constants ---
 CONVERSATION_HISTORY_LIMIT = 20
 METER_EVENT_NAME_AI_MESSAGE = "generated_ia_messages"
@@ -484,6 +490,24 @@ async def handle_ai_reply_request(
                         f"{log_prefix} No active BotAgent configuration found for inbox {conversation.inbox_id}. Skipping AI reply."
                     )
                     return f"No BotAgent for inbox {conversation.inbox_id}"
+
+                try:
+                    await check_and_update_ping_pong_circuit_breaker(
+                        db=db, conversation=conversation, log_prefix=log_prefix
+                    )
+                except PingPongLimitExceeded:
+                    # A função já logou o aviso e commitou a mudança de status.
+                    # Apenas saímos da tarefa de forma limpa.
+                    await _process_one_message(
+                        db,
+                        account_id,
+                        task_id,
+                        agent_config_db,
+                        {},
+                        conversation,
+                        "Parece que estamos com dificuldades para nos comunicar. Por favor, aguarde um momento enquanto eu conecto você com um de nossos especialistas para continuar a conversa.",
+                    )
+                    return "Circuit breaker tripped. AI reply aborted."
 
                 compiled_reply_graph = create_react_sales_agent_graph(
                     model=llm_primary_client,
