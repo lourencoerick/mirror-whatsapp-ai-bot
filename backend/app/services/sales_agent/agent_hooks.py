@@ -2,6 +2,7 @@
 from typing import Dict, Any, List, Optional, get_args
 import time
 from datetime import timedelta
+import random
 from loguru import logger
 
 from langchain_core.messages import (
@@ -16,7 +17,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.types import Command
-
+from .message_templates import MESSAGE_TEMPLATES
 
 from app.workers.ai_replier.utils.datetime import calculate_follow_up_delay
 
@@ -196,10 +197,35 @@ async def intelligent_stage_analyzer_hook(
             f"Sales stage '{original_sales_stage}' confirmed by pre-model hook analysis."
         )
 
+    num_samples = 100
+    list_of_message_templates: List[Dict[str, str]] = MESSAGE_TEMPLATES[
+        analyzed_sales_stage
+    ]
+
+    actual_sample_size = min(len(list_of_message_templates), num_samples)
+
+    selected_templates = random.sample(list_of_message_templates, actual_sample_size)
+    templates_bullet_points = []
+    for item in selected_templates:
+        template_str = item.get("template", "")
+        intent_str = item.get("intent")  # .get() retorna None se a chave não existir
+
+        if intent_str:
+            # Formato: - (Intenção: nome_da_intencao) "Template da frase"
+            templates_bullet_points.append(
+                f'- (Intenção: {intent_str}) "{template_str}"'
+            )
+        else:
+            # Fallback para frases sem intenção definida
+            templates_bullet_points.append(f'- "{template_str}"')
+
+    inspiration_list_str = "\n".join(templates_bullet_points)
+
     stage_context_message = SystemMessage(
         content=f"Adição ao Contexto do Sistema:\n"
         f"- Estágio de Vendas Atual: '{final_stage_for_turn}' (Análise: {analysis_reasoning})\n"
-        # f"- Foco Sugerido para Próximo Passo: {suggested_focus}\n"
+        f"- Foco Sugerido para Próximo Passo: {suggested_focus}\n"
+        f"- INSPIRATION (Use estas frases como base, adaptando-as ao contexto da empresa e da conversa):\n {inspiration_list_str}\n"
         f"Ajuste sua resposta e ações de acordo.",
         id=STATE_CONTEXT_MESSAGE_ID,  # Assign an ID to this message
     )
@@ -420,6 +446,10 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
         return None
 
     # --- Part 1: Compliance Check & Forced Retry ---
+    intelligent_stage_analyzer_message = next(
+        (m for m in messages if m.id == STATE_CONTEXT_MESSAGE_ID), None
+    )
+
     last_message = messages[-1]
     last_message_id = getattr(last_message, "id", None)
 
@@ -466,31 +496,31 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                 messages_to_update_for_retry.append(RemoveMessage(id=last_message_id))
 
             reminder_id = f"{COMPLIANCE_HOOK_REMINDER_ID_PREFIX}{uuid4().hex[:8]}"
-            retry_instruction_message = SystemMessage(
-                content="SYSTEM ALERT: CRITICAL PROTOCOL VIOLATION. "
-                "You attempted to send a message without prior validation or your response mismatched. "
-                "Your unvalidated message is being retracted. "
-                "You MUST NOW RE-EVALUATE and call 'validate_response_and_references' correctly.",
-                id=reminder_id,
-            )
 
             retry_instruction_message = SystemMessage(
-                content="Atenção: Sua última mensagem não passou pelo processo de validação ou apresentou alguma inconsistência."
-                "Para garantir a qualidade e a conformidade, estamos retirando essa mensagem por enquanto. Aqui estão as verificações importantes:\n"
-                "- Você verificou as informações que está fornecendo com as instruções e/ ou dados adquiridos de ferramentas?\n"
-                "- Está seguindo os principios de vendas e as regras de comunicações descritas nas instruções?\n"
-                "- Conduzindo o cliente da saudação ao fechamento, evitando dizer o preço ou link de compra antnes da qualificação?\n"
-                "- Está evitando repetir informações ditas recentemente para não deixar a conversa repetitiva, a menos que seja uma necessite uma confirmação do cliente?\n"
-                "- Jamais invente informações do cliente, sempre diga a verdade, e siga o que está escrito na seção de instruções.\n"
-                "- Jamais passe links sem a url.\n"
-                "- Se está em um processo de agendamento, não mude horário ou dia, antes de confirmar com o cliente.\n"
-                "- Se a mensagem do usuário é off-topic, informe isto a função 'validate_response_and_references', mas não deixe de chamá-la.\n"
-                "- Se caso tenha tido um erro ao usar as ferramentas, use 'validate_response_and_references', como sempre, e peça para o cliente entrar em contato mais tarde ou forneça o contato alternativo, se disponível.\n"
-                "- Lembre-se, suas ações são limitadas às ferramentas que possui, então cuidado ao propor medidas ao cliente, certifique-se que possa cumprí-las antes.\n"
-                "- Mantenha o cliente neste canal, a menos que o cliente  realmente necessite da informação que você não tenha para prosseguir.\n"
-                "REVISE o conteúdo com base em suas `instruções` e chame a função 'validate_response_and_references' corretamente antes de enviar novamente. Obrigado!\n\n"
-                "Responda a mensagem do usuário (usando a tool 'validate_response_and_references'):\n"
-                f"- Usuário: {current_user_input_text}",
+                content=(
+                    "SYSTEM ALERT: CRITICAL PROTOCOL VIOLATION. "
+                    "You attempted to send a message without prior validation or your response mismatched. "
+                    "Your unvalidated message is being retracted. "
+                    "You MUST NOW RE-EVALUATE and call 'validate_response_and_references' correctly.\n"
+                    "To ensure quality and compliance, we are retracting this message for now. Here are the required checks:\n"
+                    "- Verify the information provided against the instructions and/or data obtained from tools.\n"
+                    "- Follow the sales principles and communication rules described in the instructions.\n"
+                    "- Guide the customer from greeting to closing, avoiding mentioning price or purchase link before qualification.\n"
+                    "- Avoid repeating information already shared unless confirmation from the customer is required.\n"
+                    "- Never fabricate customer information; always tell the truth and adhere to the instructions section.\n"
+                    "- Do not send links without presenting the full URL.\n"
+                    "- Keep the original date and time in scheduling until confirmed with the customer.\n"
+                    "- If the user's message is off-topic, log this to the `validate_response_and_references` function and then call it.\n"
+                    "- In case of tool errors, invoke `validate_response_and_references` and instruct the customer to contact us later or provide an alternative contact if available.\n"
+                    "- Acknowledge that your actions are limited to the available tools; propose only measures you can fulfill.\n"
+                    "- Keep the customer in this channel unless they truly need another channel to proceed.\n"
+                    "- Communicate via WhatsApp concisely, using no more than 3 to 5 sentences and bullet points, if needed.\n"
+                    f"- Consider the Senior Sales Representative’s analysis to guide your response: '{intelligent_stage_analyzer_message.content}'.\n"
+                    "Review the content based on your instructions and correctly call `validate_response_and_references` before sending again. Thank you!\n\n"
+                    "Respond to the user's message using the `validate_response_and_references` tool:\n"
+                    f"- User: {current_user_input_text}"
+                ),
                 id=reminder_id,
             )
 
