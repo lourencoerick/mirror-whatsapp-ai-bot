@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, Integer, Index
+from sqlalchemy import Column, String, Text, ForeignKey, Integer, Index, text
 from typing import Optional, Dict, Any
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from sqlalchemy.orm import relationship
@@ -69,6 +69,7 @@ class KnowledgeChunk(BaseModel):
     chunk_index: str = Column(
         Integer,
         nullable=False,
+        server_default=text("0"),
         doc="The index of the chunk grouped by source and document ID.",
     )
 

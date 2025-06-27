@@ -3,6 +3,8 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Literal, Optional
 
+from .integrations.google_sheets import SheetsTriggerPayload
+
 
 class IncomingMessagePayload(BaseModel):
     """
@@ -10,9 +12,9 @@ class IncomingMessagePayload(BaseModel):
     Contains raw data from the source platform.
     """
 
-    source_api: Literal["whatsapp_cloud", "whatsapp_evolution", "simulation"] = Field(
-        ..., description="Identifies the API source of the message."
-    )
+    source_api: Literal[
+        "whatsapp_cloud", "whatsapp_evolution", "simulation", "integration_trigger"
+    ] = Field(..., description="Identifies the API source of the message.")
 
     # Identifier of your business entity in the source platform.
     # For WhatsApp Cloud: the phone_number_id of your business that received the message.
@@ -32,6 +34,11 @@ class IncomingMessagePayload(BaseModel):
     internal_dto_partial_data: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Data for InternalIncomingMessageDTO used in simulation environment",
+    )
+
+    integration_trigger_payload: Optional[SheetsTriggerPayload] = Field(
+        None,
+        description="The validated payload from an integration trigger, like Google Sheets.",
     )
 
     class Config:

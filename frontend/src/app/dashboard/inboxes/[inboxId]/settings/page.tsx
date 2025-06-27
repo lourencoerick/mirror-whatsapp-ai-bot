@@ -1,8 +1,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ApiKeysManager } from "@/components/ui/inbox/api-keys-manager";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLayoutContext } from "@/contexts/layout-context";
 import { useAuthenticatedFetch } from "@/hooks/use-authenticated-fetch";
 import * as evolutionInstanceService from "@/lib/api/evolution-instance";
@@ -333,13 +335,98 @@ export default function EditInboxPage() {
   }, [inboxData, webhookBaseUrl]);
 
   if (isLoading) {
-    /* ... Skeleton ... */
+    // Skeleton structure remains the same
+    return (
+      <div className="px-4 py-6 md:px-6 lg:px-8 space-y-6">
+        {/* General Settings Skeleton */}
+        <Card className="w-full max-w-2xl mx-auto">
+          <CardHeader>
+            <Skeleton className="h-6 w-1/2 mb-2" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            {/* NEW: Add skeleton for Select */}
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-end gap-2">
+            <Skeleton className="h-10 w-20" />
+            <Skeleton className="h-10 w-24" />
+          </CardFooter>
+        </Card>
+        {/* Connection Card Skeleton */}
+        <Card className="w-full max-w-2xl mx-auto">
+          <CardHeader>
+            <Skeleton className="h-6 w-1/3 mb-2" />
+            <Skeleton className="h-4 w-full" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
+
   if (error && !inboxData) {
-    /* ... Error ao Carregar ... */
+    // UPDATE: Reverted user-facing text to pt-BR
+    return (
+      <div className="px-4 py-6 md:px-6 lg:px-8">
+        <Alert variant="destructive">
+          <Terminal className="h-4 w-4" />
+          <AlertTitle>Erro ao Carregar a Caixa de Entrada</AlertTitle>
+          <AlertDescription>
+            {error}
+            <Button
+              variant="link"
+              size="sm"
+              onClick={fetchAndSetInboxData}
+              className="ml-2 p-0 h-auto"
+            >
+              Tentar novamente
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              className="ml-4"
+            >
+              Voltar para a Lista
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
   }
+
   if (!inboxData) {
-    /* ... Caixa de Entrada Não Encontrada ... */
+    // UPDATE: Reverted user-facing text to pt-BR
+    return (
+      <div className="px-4 py-6 md:px-6 lg:px-8">
+        <Alert>
+          <Terminal className="h-4 w-4" />
+          <AlertTitle>Caixa de Entrada Não Encontrada</AlertTitle>
+          <AlertDescription>
+            A caixa de entrada solicitada não pôde ser encontrada ou você pode
+            não ter permissão para visualizá-la.
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              className="ml-4"
+            >
+              Voltar para a Lista
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
   return (
@@ -607,6 +694,7 @@ export default function EditInboxPage() {
           </CardContent>
         </Card>
       )}
+      {inboxId && <ApiKeysManager inboxId={inboxId} />}
     </div>
   );
 }

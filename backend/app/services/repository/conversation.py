@@ -7,6 +7,9 @@ from typing import Optional, List
 from loguru import logger
 from app.api.schemas.conversation import ConversationSearchResult, MessageSnippet
 from app.api.schemas.contact import ContactBase
+from app.api.schemas.contact import ContactCreate as ContactCreateSchema
+from app.services.helper.contact import normalize_phone_number
+from app.services.repository import contact as contact_repo
 from app.models.message import Message
 from app.models.conversation import Conversation, ConversationStatusEnum
 from app.models.contact_inbox import ContactInbox
@@ -118,7 +121,11 @@ async def find_conversation(
         Optional[Conversation]: The conversation if found, otherwise None.
     """
     result = await db.execute(
-        select(Conversation).filter_by(
+        select(Conversation)
+        .options(
+            joinedload(Conversation.contact_inbox).joinedload(ContactInbox.contact)
+        )
+        .filter_by(
             account_id=account_id,
             inbox_id=inbox_id,
             contact_inbox_id=contact_inbox_id,
@@ -189,6 +196,7 @@ async def get_or_create_conversation(
         status=status,
         additional_attributes=additional_attributes,
     )
+
     db.add(conversation)
     # Only flush to generate any necessary defaults; commit and refresh are handled by the upper layer.
     await db.flush()
@@ -846,3 +854,77 @@ async def update_status_for_bot_conversations_in_inbox(
             f"from {current_status.value} to {new_status.value}: {e}"
         )
         raise  # Re-lançar para rollback na camada superior
+
+
+async def find_or_create_conversation_by_contact_details(
+    db: AsyncSession, *, inbox_id: UUID, contact_phone: str, contact_name: str
+) -> Conversation:
+    """
+    Finds or creates a conversation based on contact details for a specific inbox.
+    This encapsulates the logic of finding/creating the contact, contact_inbox,
+    and finally the conversation itself.
+
+    Args:
+        db: The asynchronous database session.
+        inbox_id: The ID of the inbox where the conversation belongs.
+        contact_phone: The phone number of the contact.
+        contact_name: The name of the contact.
+
+    Returns:
+        The existing or newly created Conversation object.
+
+    Raises:
+        Exception: If the inbox is not found.
+    """
+    log_prefix = f"Repo(find_or_create_convo_by_details|Inbox:{inbox_id}):"
+
+    # 1. Obter o Inbox e o Account ID
+    inbox = await db.get(Inbox, inbox_id)
+    if not inbox:
+        logger.error(f"{log_prefix} Inbox with ID {inbox_id} not found.")
+        raise ValueError(f"Inbox not found: {inbox_id}")
+    account_id = inbox.account_id
+
+    # 2. Normalizar o telefone e encontrar/criar o Contato
+    normalized_phone = normalize_phone_number(
+        contact_phone, is_simulation=inbox.is_simulation
+    )
+    contact = await contact_repo.find_contact_by_identifier(
+        db=db, identifier=normalized_phone, account_id=account_id
+    )
+    if not contact:
+        contact_create_data = ContactCreateSchema(
+            phone_number=normalized_phone, name=contact_name
+        )
+        contact = await contact_repo.create_contact(
+            db=db, contact_data=contact_create_data, account_id=account_id
+        )
+        logger.info(
+            f"{log_prefix} Created new Contact {contact.id} for {normalized_phone}"
+        )
+
+    # 3. Obter/Criar o ContactInbox
+    contact_inbox = await contact_repo.get_or_create_contact_inbox(
+        db=db,
+        account_id=account_id,
+        contact_id=contact.id,
+        inbox_id=inbox.id,
+        source_id=f"contact_{contact.id}",  # Um source_id genérico para o contato
+    )
+
+    # 4. Obter/Criar a Conversa
+    initial_status = inbox.initial_conversation_status or ConversationStatusEnum.PENDING
+    conversation = (
+        await get_or_create_conversation(  # Reutiliza a função que você já tem
+            db=db,
+            account_id=account_id,
+            inbox_id=inbox.id,
+            contact_inbox_id=contact_inbox.id,
+            status=initial_status,
+        )
+    )
+
+    logger.info(
+        f"{log_prefix} Ensured conversation {conversation.id} exists for contact {contact.id}"
+    )
+    return conversation

@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import Dict, Any  # Any para o payload_from_debounce
 from loguru import logger
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.arq_manager import get_arq_pool  # Para enfileirar tarefas ARQ
 from app.config import get_settings  # Para nomes de fila e outras configs
 from app.database import (
@@ -11,6 +11,7 @@ from app.services.repository import (
     conversation as conversation_repo,
 )  # Para buscar a conversa
 from app.models.conversation import ConversationStatusEnum  # Para comparar o status
+from app.models.message import Message as MessageModel
 
 settings = get_settings()
 
@@ -110,4 +111,78 @@ async def enqueue_ai_processing_task(payload_from_debounce: Dict[str, Any]):
     except Exception as e:
         logger.exception(
             f"[EnqueueAIProcessing] Failed to enqueue 'handle_ai_reply_request' for ConvID {conversation_id}: {e}"
+        )
+
+
+async def enqueue_ai_processing_for_trigger(
+    db: AsyncSession,
+    trigger_message: MessageModel,
+):
+    """
+    Checks conversation status and enqueues the 'handle_ai_reply_request' task
+    for a conversation initiated by an integration trigger, bypassing debounce.
+
+    Args:
+        db: The active database session from the processing logic.
+        trigger_message: The synthetic Message object created by the integration flow.
+    """
+    conversation_id = trigger_message.conversation_id
+    account_id = trigger_message.account_id
+
+    log_prefix = f"[EnqueueAIForTrigger] ConvID: {conversation_id}:"
+    logger.info(
+        f"{log_prefix} Received request for trigger message ID {trigger_message.id}."
+    )
+
+    # 1. Verificar o status da conversa (reutilizando a mesma lógica de negócio)
+    conversation = await conversation_repo.find_conversation_by_id(
+        db, account_id=account_id, conversation_id=conversation_id
+    )
+    if not conversation:
+        logger.warning(
+            f"{log_prefix} Conversation not found. Skipping AI task enqueue."
+        )
+        return
+
+    if conversation.status != ConversationStatusEnum.BOT:
+        logger.info(
+            f"{log_prefix} Conversation status is '{conversation.status.value}'. "
+            "AI reply is not applicable. Skipping AI task enqueue."
+        )
+        return
+
+    logger.info(f"{log_prefix} Conversation status is BOT. Proceeding to enqueue task.")
+
+    # 2. Se o status for BOT, enfileirar a tarefa para o AI Replier
+    arq_pool = get_arq_pool()
+    if not arq_pool:
+        logger.error(f"{log_prefix} ARQ pool not available. Cannot enqueue AI task.")
+        return
+
+    # Payload para a tarefa ARQ 'handle_ai_reply_request'
+    arq_task_payload = {
+        "account_id": account_id,
+        "conversation_id": conversation_id,
+        "user_input_content": trigger_message.content,  # O conteúdo da nossa mensagem sintética
+        "event_type": "integration_trigger",  # Novo tipo de evento para clareza
+        "trigger_message_id": trigger_message.id,  # Passamos o ID da mensagem sintética
+    }
+
+    try:
+        job = await arq_pool.enqueue_job(
+            "handle_ai_reply_request",
+            _queue_name=settings.AI_REPLY_QUEUE_NAME,
+            **arq_task_payload,
+        )
+        if job:
+            logger.info(
+                f"{log_prefix} Successfully enqueued 'handle_ai_reply_request'. ARQ Job ID: {job.job_id}"
+            )
+        else:
+            logger.error(
+                f"{log_prefix} Failed to enqueue job. arq_pool.enqueue_job returned None."
+            )
+    except Exception as e:
+        logger.exception(
+            f"{log_prefix} Failed to enqueue 'handle_ai_reply_request': {e}"
         )

@@ -39,7 +39,11 @@ from app.services.debounce.message_debounce import (
     MessageDebounceService,
 )
 
-from app.services.queue.utils.enqueue import enqueue_ai_processing_task
+
+from app.services.queue.utils.enqueue import (
+    enqueue_ai_processing_task,
+    enqueue_ai_processing_for_trigger,
+)
 
 
 async def process_incoming_message_logic(
@@ -84,6 +88,7 @@ async def process_incoming_message_logic(
             content=internal_message.message_content,
             content_type=internal_message.internal_content_type,
             content_attributes=internal_message.raw_message_attributes,
+            private=internal_message.is_private,
         )
 
         # --- 2. Get or Create Message (Idempotent) ---
@@ -178,8 +183,10 @@ async def process_incoming_message_logic(
         )
 
         # --- DEBOUNCE SERVICE CALL  ---
+        logger.debug(f"Message: {db_message}")
         should_trigger_ai_debounce = (
             db_message.direction == "in"
+            and not db_message.private
             and internal_message.internal_content_type == "text"
             and internal_message.message_content
             and conversation.status
@@ -189,6 +196,12 @@ async def process_incoming_message_logic(
                 ConversationStatusEnum.PENDING,
                 ConversationStatusEnum.HUMAN_ACTIVE,
             ]
+        )
+
+        should_trigger_ai_immediately = (
+            db_message.direction == "in"
+            and db_message.private  # Verifica se É uma nota interna
+            and conversation.status == ConversationStatusEnum.BOT
         )
 
         if should_trigger_ai_debounce:
@@ -214,6 +227,14 @@ async def process_incoming_message_logic(
                 logger.warning(
                     f"{log_prefix} Conditions met for AI debounce, but debounce_service was not available/provided. Skipping debounce."
                 )
+
+        elif should_trigger_ai_immediately:
+            logger.info(
+                f"{log_prefix} Private trigger message detected. Bypassing debounce and enqueuing AI task immediately."
+            )
+            # Chama diretamente a nossa nova função de enfileiramento da "pista rápida"
+            await enqueue_ai_processing_for_trigger(db=db, trigger_message=db_message)
+
         else:
             logger.info(
                 f"{log_prefix} Conditions not met for AI debounce for this message."

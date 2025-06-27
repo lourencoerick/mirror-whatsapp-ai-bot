@@ -67,7 +67,9 @@ class Inbox(BaseModel):
     whatsapp_cloud_config_id = Column(
         UUID(as_uuid=True),
         ForeignKey(
-            "whatsapp_cloud_configs.id", name="fk_inbox_whatsapp_cloud_config_id"
+            "whatsapp_cloud_configs.id",
+            name="fk_inbox_whatsapp_cloud_config_id",
+            ondelete="CASCADE",
         ),
         nullable=True,
         unique=True,  # A WhatsApp Cloud config should only be tied to one inbox
@@ -85,6 +87,9 @@ class Inbox(BaseModel):
         back_populates="inbox",  # We'll add 'inbox' to WhatsAppCloudConfig
         foreign_keys=[whatsapp_cloud_config_id],
         uselist=False,  # One-to-one relationship
+        cascade="all, delete-orphan",
+        single_parent=True,
+        passive_deletes=True,
     )
 
     account = relationship(
@@ -111,6 +116,10 @@ class Inbox(BaseModel):
         "Webhook", back_populates="inbox", cascade="all, delete-orphan"
     )
     events = relationship("Event", back_populates="inbox", cascade="all, delete-orphan")
+
+    api_keys = relationship(
+        "ApiKey", back_populates="inbox", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("inboxes_account_id_index", "account_id"),

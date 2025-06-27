@@ -15,10 +15,12 @@ from app.api.routes import auth as auth_routes
 from app.api.routes import message as message_routes
 from app.api.routes import conversation as conversation_routes
 from app.api.routes import inbox as inbox_routes
+from app.api.routes import api_key as api_key_routes
 from app.api.routes import contact as contact_routes
 from app.api.routes import me as me_routes
 from app.api.routes import websocket as ws_routes
 from app.api.routes import evolution_instance as evolution_instance_routes
+from app.api.routes.integrations import google_sheets as google_sheets_routes
 from app.api.routes.integrations import google_calendar as google_calendar_routes
 from app.api.routes.webhooks import clerk as clerk_routes
 from app.api.routes.webhooks.evolution import webhook as evolution_wb_routes
@@ -204,6 +206,13 @@ app.include_router(
     dependencies=common_protected_dependencies,
 )
 app.include_router(
+    api_key_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["v1 - Inboxes Api Keys"],
+    dependencies=common_protected_dependencies,
+)
+
+app.include_router(
     contact_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["v1 - Contacts"],
@@ -281,6 +290,12 @@ app.include_router(
     google_calendar_routes.router,
     prefix=f"{api_v1_prefix}",
     tags=["Google Calendar Integration"],
+)
+
+app.include_router(
+    google_sheets_routes.router,
+    prefix=f"{api_v1_prefix}",
+    tags=["Google Sheets Integration"],
 )
 
 
