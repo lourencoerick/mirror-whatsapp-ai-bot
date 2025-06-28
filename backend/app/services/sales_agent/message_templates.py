@@ -1,6 +1,20 @@
 from typing import Dict, List
 
 MESSAGE_TEMPLATES: Dict[str, List[Dict[str, str]]] = {
+    "initial_contact": [
+        {
+            "template": "Oi, {customer_name}, tudo bem? Aqui é o {ai_name} da {company_name}. Pode me contar o que te trouxe aqui?",
+            "intent": "introduction_with_known_name",
+        },
+        {
+            "template": "Olá! Meu nome é {your_name}, sou especialista de produto aqui na {company_name}. Para começarmos, como posso te chamar?",
+            "intent": "introduction_and_ask_name",
+        },
+        {
+            "template": "Oi, tudo bem? Eu sou o {your_name}, da equipe {company_name}. Com quem eu tenho o prazer de falar hoje?",
+            "intent": "introduction_and_ask_name",
+        },
+    ],
     "discovery": [
         {
             "template": "Oi {nome}, tudo bem? Aqui é {seu nome} da {nome da empresa} e vi que você acabou de acessar nosso site, foi isso mesmo?",
