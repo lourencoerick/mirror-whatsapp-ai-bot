@@ -304,7 +304,7 @@ export default function DashboardOverviewPage() {
             <SelectItem value="hour">Por Hora</SelectItem>
           </SelectContent>
         </Select>
-        {/* <Button
+        <Button
           onClick={handleApplyFilters}
           disabled={globalIsLoading || !dateRange?.from || !dateRange?.to}
           className="w-full sm:w-auto"
@@ -313,7 +313,7 @@ export default function DashboardOverviewPage() {
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : null}
           Aplicar
-        </Button> */}
+        </Button>
       </div>
 
       {globalIsLoading && (
