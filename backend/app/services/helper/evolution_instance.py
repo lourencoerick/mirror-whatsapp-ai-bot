@@ -32,6 +32,8 @@ async def create_logical_evolution_instance(
         "token": logical_token,
         "qrcode": False,
         "integration": "WHATSAPP-BAILEYS",
+        "rejectCall": True,
+        "groupsIgnore": True,
         "webhook": {
             "url": webhook_url,
             "events": ["QRCODE_UPDATED", "MESSAGES_UPSERT", "CONNECTION_UPDATE"],
