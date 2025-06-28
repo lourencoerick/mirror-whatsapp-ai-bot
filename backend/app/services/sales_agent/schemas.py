@@ -21,6 +21,11 @@ class StageAnalysisOutput(BaseModel):
     suggested_next_focus: str = Field(
         description="A concise suggestion for the main sales agent on what to focus on next or a logical next step, given the current stage and conversation."
     )
+
+    communication_rules_declaration: str = Field(
+        description="A statement from you confirming that your suggestions follow communication rules described  'Diretrizes de Comunicação'. This is important and critical—it’s how you represent the company and respect its authority."
+    )
+
     model_config = {"validate_assignment": True}
 
 
