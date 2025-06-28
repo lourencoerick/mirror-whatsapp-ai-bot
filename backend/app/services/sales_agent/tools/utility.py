@@ -100,8 +100,8 @@ async def validate_response_and_references(
     4. `correct_format_output_declaration`: A statement confirming that you formatted the output—using appropriate line spacing, clear organization, and bullet points where applicable—to ensure the conversation flows naturally and is easy to understand, and that you used the tool’s information to SUPPORT your final messages and not copied and paste the text, i.e., rewrote everything as needed to maintain a smooth dialogue.
     5. `used_sales_principles_declaration`: A statement from you confirming that you are using the communication rules and the sales principles provided in the instructions, and that you are being proactive and engaging the customer toward the next step of the sale without sharing princing and checkout information before qualifying the lead, unless that the customer insists.
     6. `schedule_rule_declaration`: A statement from you confirming that before confirm the appointment to the customer, you have user the create_appointment tool sucessfuly before, if aplicable.
-    7. `communication_rules_declaration`: A statement from you confirming that you are using the communication rules described in the instruções section of the company profile. This is important—it’s how you represent the company and respect its authority.
-    8. `proposed_response_to_user`: The complete, final message text you intend to
+    7. `communication_rules_declaration`: A statement from you confirming that you are using the communication rules described "Company Profile: 'Diretrizes de Comunicação'". This is important—it’s how you represent the company and respect its authority.
+    8. `proposed_response_to_user`: after rethinking and analyzing your initial answer, update and provide the complete, final message text you intend to
        send to the user.
 
     This tool will review your preparation.
