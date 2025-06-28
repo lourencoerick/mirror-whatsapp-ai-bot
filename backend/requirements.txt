@@ -68,6 +68,7 @@ google_auth_oauthlib==1.2.2
 # === Payments ===
 stripe==12.1.0
 
+
 # === Logging ===
 loguru>=0.5.3
 
