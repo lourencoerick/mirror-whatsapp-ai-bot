@@ -164,6 +164,7 @@ export function CompanyProfileForm({
       ai_objective:
         initialData?.ai_objective ||
         "Engajar clientes, responder perguntas sobre ofertas e guiá-los para uma compra ou próximo passo.", // Default objective in pt-BR
+      sales_focus: initialData?.sales_focus || "",
       key_selling_points: initialData?.key_selling_points || [],
       accepted_payment_methods: initialData?.accepted_payment_methods || [],
       delivery_options: initialData?.delivery_options || [],
@@ -231,6 +232,7 @@ export function CompanyProfileForm({
         ai_objective:
           initialData.ai_objective ||
           "Engajar clientes, responder perguntas sobre ofertas e guiá-los para uma compra ou próximo passo.",
+        sales_focus: initialData?.sales_focus || "",
         key_selling_points: initialData.key_selling_points || [],
         accepted_payment_methods: initialData.accepted_payment_methods || [],
         delivery_options: initialData.delivery_options || [],
@@ -488,6 +490,34 @@ export function CompanyProfileForm({
                     {errors.ai_objective.message}
                   </p>
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Coluna da Esquerda: Público-Alvo */}
+                <div className="space-y-2">
+                  <Label htmlFor="target_audience">Público-Alvo</Label>
+                  <Textarea
+                    id="target_audience"
+                    placeholder={`Descreva seu cliente ideal. Isso ajuda a IA a ajustar sua linguagem e exemplos.
+Ex: Pequenos empresários, profissionais de marketing, jovens em busca do primeiro emprego.`}
+                    {...form.register("target_audience")}
+                    className="min-h-[100px]"
+                  />
+                </div>
+
+                {/* Coluna da Direita: Foco de Vendas */}
+                <div className="space-y-2">
+                  <Label htmlFor="sales_focus">
+                    Foco Estratégico de Vendas
+                  </Label>
+                  <Textarea
+                    id="sales_focus"
+                    placeholder={`Descreva a abordagem emocional que a IA deve usar para vender benefícios.
+Ex: Foque nos sonhos do cliente (comprar uma casa, viajar), não nos produtos. O produto é a ferramenta para realizar o sonho.`}
+                    {...form.register("sales_focus")}
+                    className="min-h-[100px]"
+                  />
+                </div>
               </div>
 
               {/* --- Custom Input Fields --- */}

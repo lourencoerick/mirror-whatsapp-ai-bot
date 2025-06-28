@@ -119,6 +119,7 @@ export const companyProfileValidationSchema = z
       .string()
       .min(1, { message: "AI objective is required." })
       .max(1000),
+    sales_focus: z.string().max(1000).optional(),
     key_selling_points: z.array(z.string()).optional(),
     accepted_payment_methods: z.array(z.string()).optional(),
     is_scheduling_enabled: z.boolean().default(false),
