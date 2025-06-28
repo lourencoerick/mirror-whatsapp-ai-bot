@@ -464,7 +464,12 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
     logger.info("--- Executing post_model_hook: validation_compliance_check_hook ---")
     messages: List[BaseMessage] = state.messages[:]  # Work with a copy
     current_user_input_text: str = state.current_user_input_text
-
+    profile = state.company_profile
+    communication_rules = [
+        "Diretrizes de Comunicação:",
+    ]
+    if profile.communication_guidelines:
+        communication_rules += [f"- {g}" for g in profile.communication_guidelines]
     if not messages:
         logger.debug("ComplianceCheckHook: No messages. Skipping.")
         return None
@@ -544,7 +549,7 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                     "- Keep the customer in this channel unless they truly need another channel to proceed.\n"
                     "- Communicate via WhatsApp concisely, using no more than 3 to 5 sentences and bullet points, if needed.\n"
                     f"- Consider the Senior Sales Representative’s analysis to guide your response: '{intelligent_stage_analyzer_message.content}'.\n"
-                    "- USE the communications rules of the company \n"
+                    f"- Reformulate your response respecting the 'Diretrizes de Comunicação' of the company\n:{communication_rules} \n"
                     "Review the content based on your instructions and correctly call `validate_response_and_references` before sending again. Thank you!\n\n"
                     "Respond to the user's message using the `validate_response_and_references` tool:\n"
                     f"- User: {current_user_input_text}"
