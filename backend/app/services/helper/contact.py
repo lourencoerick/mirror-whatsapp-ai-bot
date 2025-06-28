@@ -30,7 +30,9 @@ def normalize_phone_number(
         return None
     try:
         parsed_number = phonenumbers.parse(phone_number, account_country_code)
-        if not phonenumbers.is_valid_number(parsed_number):
+        if not phonenumbers.is_valid_number(
+            parsed_number
+        ) and not phonenumbers.is_possible_number(parsed_number):
             logger.error(f"Invalid phone number provided: {phone_number}")
             return None
         e164_format = phonenumbers.format_number(
