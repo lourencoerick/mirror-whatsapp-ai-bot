@@ -131,6 +131,11 @@ class CompanyProfileSchema(BaseModel):
         description="Main goal of the AI (e.g., close sales, qualify leads, provide product info).",
     )
 
+    sales_focus: Optional[str] = Field(
+        default=None,
+        description="The core emotional driver to focus on during sales conversations. This guides the AI to sell benefits over features (e.g., 'Focus on the client's life dreams, not on investment products').",
+    )
+
     key_selling_points: List[str] = Field(
         default_factory=list,
         description="Unique selling propositions (USPs) or differentiators.",
