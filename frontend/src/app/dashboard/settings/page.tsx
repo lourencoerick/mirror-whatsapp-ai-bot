@@ -585,7 +585,7 @@ export default function SettingsPage(): JSX.Element {
   const isAgentTabDisabled = isLoadingAgentInitial && !agentData;
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <div className="container mx-auto p-4 md:p-6 lg:px-20 lg:py-8 space-y-6">
       {pollingJobId && (
         <Alert
           variant={
