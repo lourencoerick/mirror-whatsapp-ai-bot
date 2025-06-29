@@ -83,7 +83,7 @@ class CompanyProfile(BaseModel):
     sales_focus = Column(
         Text,
         nullable=True,
-        doc="Mhe core emotional driver to focus on during sales conversations. This guides the AI to sell benefits over features (e.g., 'Focus on the client's life dreams, not on investment products').",
+        doc="The core emotional driver to focus on during sales conversations. This guides the AI to sell benefits over features (e.g., 'Focus on the client's life dreams, not on investment products').",
     )
 
     key_selling_points = Column(
