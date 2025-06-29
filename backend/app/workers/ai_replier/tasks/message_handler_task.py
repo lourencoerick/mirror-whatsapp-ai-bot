@@ -512,6 +512,7 @@ async def handle_ai_reply_request(
                 compiled_reply_graph = create_react_sales_agent_graph(
                     model=llm_primary_client,
                     company_profile=profile_db,
+                    bot_agent=agent_config_db,
                     checkpointer=checkpointer,
                 )
                 logger.debug(f"{log_prefix} Reply graph compiled with checkpointer.")
@@ -541,8 +542,23 @@ async def handle_ai_reply_request(
                     )
 
                     follow_up_directive_message = SystemMessage(
-                        content=f"SYSTEM DIRECTIVE: This turn is a scheduled follow-up (Attempt: {follow_up_attempt_count}) regarding '{reason_from_payload}'. Your primary goal is to re-engage the user. Craft a suitable follow-up message.",
-                        # tool_call_id="follow_up_timeout",
+                        content=f"""
+                        SYSTEM DIRECTIVE:
+                        You are a friendly and professional assistant. Your task is to send a follow-up message (Attempt: {follow_up_attempt_count}).
+
+                        YOUR RULES FOR THIS FOLLOW-UP:
+                        1.  **FOLLOW THE COMMUNICATION RULES:** you must use the communications rules described on the company profile".
+                        2.  **BE PROPORTIONAL:** If the context is just a simple greeting, your follow-up message must be equally simple and short.
+                        3.  **BE BRIEF AND INVITING:** Keep the message short, friendly, and aim to re-engage the user to continue the conversation from where it left off.
+                        4.  **AVOID REPETITION AND VARY YOUR APPROACH:** Do not repeat phrases from previous turns. Specifically, avoid generic closing questions like "How can I help you today?". Instead, try different re-engagement tactics. For example:
+                            - Gently ask if they saw the previous message.
+                            - Simply send a friendly check-in.
+                            - Briefly reference the last point of the conversation.
+
+                        Your primary goal is to re-engage the user.
+                        
+                        Craft the ideal follow-up message following all the rules above and regarding {reason_from_payload}.
+                        """
                     )
                     current_input_updates["messages"] = [follow_up_directive_message]
 
@@ -573,7 +589,8 @@ async def handle_ai_reply_request(
                         "The context below was provided by the system, not the user.\n\n"
                         f"{synthetic_message_content}\n\n"
                         "Your primary goal is to proactively start the conversation based on this context. "
-                        "Greet the user by name and immediately reference their interest or the provided context. "
+                        "Greet the user by name, introduce yourself and immediately reference their interest or the provided context. "
+                        "Seek to connect with the person before presenting any product, service, or appointment opportunity. "
                         "Be concise; our communication is via WhatsApp—people don’t like receiving long messages. "
                         "Use active voice and strong action verbs (e.g., “Quero te mostrar…”). "
                         "Highlight the immediate benefit up front. "
@@ -837,7 +854,7 @@ async def handle_ai_reply_request(
                             bot_agent_id=bot_agent_id_to_schedule,
                             follow_up_attempt_count_for_this_job=attempt_count_for_next_follow_up,
                             origin_agent_message_timestamp=origin_ts_for_job,
-                            _defer_by=timedelta(seconds=defer_seconds),
+                            _defer_by=timedelta(seconds=10),
                         )
                         logger.info(
                             f"{log_prefix} Enqueued 'schedule_conversation_follow_up' for ConvID {conversation_id}."
