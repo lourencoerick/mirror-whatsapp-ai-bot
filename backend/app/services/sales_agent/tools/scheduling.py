@@ -108,6 +108,19 @@ async def get_available_slots(
         logger.warning(f"[{tool_name}] User requested a past date: {target_date_str}.")
         return "Não é possível agendar para uma data que já passou. Por favor, escolha hoje ou uma data futura."
 
+    booking_horizon_days = profile.booking_horizon_days
+    limit_date = today + timedelta(days=booking_horizon_days)
+
+    if target_date > limit_date:
+        logger.warning(
+            f"[{tool_name}] User requested date {target_date_str} which is beyond the "
+            f"{booking_horizon_days}-day booking horizon (limit: {limit_date})."
+        )
+        return (
+            f"Desculpe, só é possível agendar com até {booking_horizon_days} dias de antecedência. "
+            f"Por favor, escolha uma data até {limit_date.strftime('%d/%m/%Y')}."
+        )
+
     # Encontrar a oferta e sua duração
     target_offering: Optional[OfferingInfo] = next(
         (o for o in profile.offering_overview if o.id == offering_uuid), None
@@ -309,6 +322,7 @@ async def create_appointment(
                 start_time=aware_start_time,
                 end_time=aware_end_time,
                 min_notice_hours=profile.scheduling_min_notice_hours,
+                booking_horizon_days=profile.booking_horizon_days,
             )
 
         if not is_available:
@@ -828,6 +842,7 @@ async def update_appointment(
                 start_time=aware_new_start,
                 end_time=aware_new_end,
                 min_notice_hours=profile.scheduling_min_notice_hours,
+                booking_horizon_days=profile.booking_horizon_days,
                 event_id_to_ignore=event_id,
             )
 
