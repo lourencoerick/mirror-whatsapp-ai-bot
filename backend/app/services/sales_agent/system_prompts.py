@@ -197,7 +197,7 @@ def generate_system_message(
         company,
         accepted_payment_methods,
         "\n--- Seu Papel e Objetivos ---",
-        objective_statement,
+        objective_section_parts,
         key_selling_points_list if profile.key_selling_points else "",
         "\n--- Nossas Ofertas e Serviços ---",
         offerings_summary,
