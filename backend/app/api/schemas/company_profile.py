@@ -161,6 +161,13 @@ class CompanyProfileSchema(BaseModel):
         description="The ID of the Google Calendar selected by the user for scheduling.",
     )
 
+    booking_horizon_days: int = Field(
+        default=7,
+        description="The number of days into the future that a customer can book an appointment.",
+        gt=0,  # Must be a positive integer (greater than 0)
+        le=365,  # Let's set a reasonable upper limit (less than or equal to 365)
+    )
+
     scheduling_min_notice_hours: float = Field(
         default=2.0,
         ge=0,

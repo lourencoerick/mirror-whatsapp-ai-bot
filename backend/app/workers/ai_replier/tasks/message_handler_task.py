@@ -854,7 +854,7 @@ async def handle_ai_reply_request(
                             bot_agent_id=bot_agent_id_to_schedule,
                             follow_up_attempt_count_for_this_job=attempt_count_for_next_follow_up,
                             origin_agent_message_timestamp=origin_ts_for_job,
-                            _defer_by=timedelta(seconds=10),
+                            _defer_by=timedelta(seconds=defer_seconds),
                         )
                         logger.info(
                             f"{log_prefix} Enqueued 'schedule_conversation_follow_up' for ConvID {conversation_id}."

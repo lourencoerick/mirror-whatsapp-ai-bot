@@ -113,6 +113,14 @@ class CompanyProfile(BaseModel):
         doc="The ID of the Google Calendar selected by the user for scheduling.",
     )
 
+    booking_horizon_days = Column(
+        Integer,
+        default=7,
+        nullable=False,
+        server_default=text("7"),
+        doc="The number of days into the future that a customer can book an appointment.",
+    )
+
     scheduling_user_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),

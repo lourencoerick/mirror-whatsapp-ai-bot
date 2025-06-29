@@ -302,6 +302,7 @@ class GoogleCalendarService:
         start_time: datetime,
         end_time: datetime,
         min_notice_hours: float,
+        booking_horizon_days: int,
         event_id_to_ignore: Optional[str] = None,
     ) -> bool:
         """
@@ -339,6 +340,17 @@ class GoogleCalendarService:
             logger.warning(
                 f"Slot availability check failed: Start time {start_time} is before "
                 f"minimum notice time {earliest_booking_time_utc}."
+            )
+            return False
+
+        # . Verificação da janela máxima de agendamento
+        latest_booking_time_utc = now_utc + timedelta(days=booking_horizon_days)
+        # Comparamos apenas a data para ser mais flexível. Se o horizonte é de 7 dias,
+        # o cliente pode agendar para qualquer horário no 7º dia.
+        if start_time.date() > latest_booking_time_utc.date():
+            logger.warning(
+                f"Slot availability check failed: Start time {start_time} is beyond "
+                f"the {booking_horizon_days}-day booking horizon from {now_utc}."
             )
             return False
 
