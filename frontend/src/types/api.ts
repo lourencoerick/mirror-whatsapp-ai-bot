@@ -1301,7 +1301,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/sheets/trigger-conversation": {
+    "/api/v1/integrations/sheets/trigger-conversation": {
         parameters: {
             query?: never;
             header?: never;
@@ -1311,14 +1311,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Trigger a Conversation from Google Sheets
-         * @description Receives a webhook from a configured Google Sheet to start a new
-         *     conversation with a contact via a specific Inbox.
-         *
-         *     This endpoint is secured by an API key which must have the
-         *     `sheets:trigger` scope.
+         * Accept and Enqueue a Trigger from Google Sheets
+         * @description Receives a webhook from a configured Google Sheet, validates it,
+         *     and enqueues a task for asynchronous processing.
          */
-        post: operations["trigger_from_sheets_api_v1_sheets_trigger_conversation_post"];
+        post: operations["trigger_from_sheets_api_v1_integrations_sheets_trigger_conversation_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1918,6 +1915,11 @@ export interface components {
              */
             ai_objective: string;
             /**
+             * Sales Focus
+             * @description The core emotional driver to focus on during sales conversations. This guides the AI to sell benefits over features (e.g., 'Focus on the client's life dreams, not on investment products').
+             */
+            sales_focus?: string | null;
+            /**
              * Key Selling Points
              * @description Unique selling propositions (USPs) or differentiators.
              */
@@ -2083,6 +2085,11 @@ export interface components {
              * @default Engaje os clientes, responda perguntas sobre as ofertas e oriente-os para uma compra ou próximo passo.
              */
             ai_objective: string;
+            /**
+             * Sales Focus
+             * @description The core emotional driver to focus on during sales conversations. This guides the AI to sell benefits over features (e.g., 'Focus on the client's life dreams, not on investment products').
+             */
+            sales_focus?: string | null;
             /**
              * Key Selling Points
              * @description Unique selling propositions (USPs) or differentiators.
@@ -4038,10 +4045,9 @@ export interface components {
             contact_name: string;
             /**
              * Contact Email
-             * Format: email
              * @description The email of the contact.
              */
-            contact_email: string;
+            contact_email?: string | null;
             /** @description Contextual information about the lead. */
             initial_context: components["schemas"]["InitialContextSchema"];
         };
@@ -6649,7 +6655,7 @@ export interface operations {
             };
         };
     };
-    trigger_from_sheets_api_v1_sheets_trigger_conversation_post: {
+    trigger_from_sheets_api_v1_integrations_sheets_trigger_conversation_post: {
         parameters: {
             query?: never;
             header?: never;

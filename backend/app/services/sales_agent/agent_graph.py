@@ -19,6 +19,7 @@ from langgraph.prebuilt import ToolNode
 
 
 from app.api.schemas.company_profile import CompanyProfileSchema
+from app.api.schemas.bot_agent import BotAgentRead
 
 # Agent components
 from .agent_state import AgentState, TriggerEventType
@@ -151,6 +152,7 @@ def tools_outuput_condition_router(
 def create_react_sales_agent_graph(
     company_profile: CompanyProfileSchema,
     model: BaseChatModel,
+    bot_agent: BotAgentRead,
     checkpointer: BaseCheckpointSaver,
 ) -> Callable:
     """
@@ -165,6 +167,7 @@ def create_react_sales_agent_graph(
         A compiled LangGraph agent (Callable).
     """
     company_profile = CompanyProfileSchema.model_validate(company_profile)
+    bot_agent = BotAgentRead.model_validate(bot_agent)
 
     all_tools: List[str] = []
     all_tools.extend(ESSENTIAL_TOOLS)
@@ -172,7 +175,9 @@ def create_react_sales_agent_graph(
     if company_profile.is_scheduling_enabled:
         all_tools.extend(SCHEDULING_TOOLS)
 
-    static_system_prompt_str = generate_system_message(profile=company_profile)
+    static_system_prompt_str = generate_system_message(
+        profile=company_profile, bot_agent_name=bot_agent.name
+    )
     _system_message: BaseMessage = SystemMessage(content=static_system_prompt_str)
     prompt_runnable = RunnableCallable(
         lambda state: [_system_message] + _get_state_value(state, "messages"),

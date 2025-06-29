@@ -119,15 +119,6 @@ async def intelligent_stage_analyzer_hook(
         suggested_focus = "Proceda com base no estágio atual e no bom senso."
     else:
         original_sales_stage = state.current_sales_stage
-        business_description = profile.business_description
-
-        communication_rules = [
-            "Diretrizes de Comunicação:",
-        ]
-        if profile.communication_guidelines:
-            communication_rules += [f"- {g}" for g in profile.communication_guidelines]
-
-        communication_guidelines = "\n".join(communication_rules)
 
         recent_messages_for_analysis = messages_for_llm_input[-5:]
 
@@ -137,27 +128,58 @@ async def intelligent_stage_analyzer_hook(
             [
                 (
                     "system",
-                    f"""
-                    Você é um analista sênior de operações de vendas. Suas tarefas são:
-                        1. Determinar o estágio atual de vendas de uma conversa com base nas mensagens recentes e no estágio atual conhecido.
-                        2. Fornecer uma breve justificativa para sua determinação de estágio.
-                        3. Sugerir um foco estratégico ou um próximo passo lógico para o agente de vendas principal. Esta sugestão deve ser concisa, acionável, e **incentivar o engajamento proativo do cliente**. Por exemplo, se o agente acabou de responder a uma pergunta, o foco sugerido deve incluir uma forma de continuar a conversa (ex: fazer uma pergunta de acompanhamento, conectar a um benefício, sugerir explorar outro aspecto)
-                        
-                    Em seu passo estratégico, **avalie cuidadosamente se é o momento ideal para fornecer informações de preço ou o link de compra diretamente, ou se antes seria melhor qualificar melhor o cliente**. 
-                    Caso ainda seja necessário coletar dados, oriente o agente a fazer perguntas de qualificação e diga expressamente para não fornecer o preço ainda, a menos q o cliente insista.
+                    """
+                    # PERSONA: Analista de Vendas Sênior
 
-                    Descrição do negócio: {business_description}
+                    Você é um especialista em psicologia de vendas e análise de conversas. Sua função é atuar como um "anjo da guarda" para o agente de vendas principal, fornecendo insights estratégicos antes de cada resposta.
+                    
+                    Lembre-se é importante que o agente se conecte com o cliente, de modo a ter uma conversa natural e fluida, como se estivesse conversando com um amigo, ou seja, saber com quem o cliente está falando é importante, seu nome.
+                    
+                    Comunique-se em pt-BR.
+                    ---
+                    # CONTEXTO DA EMPRESA
+                    - **Descrição do Negócio:** {business_description}
+                    - **Público-Alvo:** {target_audience}
+                    - **Foco Estratégico de Vendas:** {sales_focus}
+                    - **Diretrizes de Comunicação:**
+                    {communication_guidelines}
 
-                    Diretrizes de comunicação da empresa: {communication_guidelines}
+                    ---
+                    # SUA MISSÃO
+                    Com base no histórico da conversa e no contexto da empresa, você deve realizar 3 tarefas e retornar a resposta em formato JSON:
 
-                    Os estágios de vendas disponíveis são: {available_stages_str}.
-                    O estágio atual conhecido é: {original_sales_stage}.
+                    1.  **`determined_sales_stage`**: Analise a conversa e determine o estágio de vendas mais apropriado.
+                        - Estágios Disponíveis: {available_stages_str}
+                        - Estágio Atual Conhecido: {original_sales_stage}
 
-                    Analise as seguintes mensagens recentes. Envie sua resposta no formato JSON especificado.
-                    SEMPRE oriente o agente a verificar se é possível realizar a ação ou oferecer algo.
+                    2.  **`reasoning`**: Forneça uma justificativa curta e objetiva para sua escolha de estágio.
 
-                    Conversa recente:
-                    {{recent_messages_formatted}}""",
+                    3.  **`suggested_next_focus`**: Crie uma sugestão estratégica e acionável para o agente de vendas.
+                        - **REGRA 1**: A sugestão deve SEMPRE incentivar o engajamento, geralmente terminando com uma pergunta ou um convite à ação.
+                        - **REGRA 2**: Avalie criticamente se é hora de falar de preço. Se o cliente não estiver qualificado, instrua o agente a focar em qualificação primeiro.
+                        - **REGRA 3**: A sugestão deve ser concisa e alinhada com o "Foco Estratégico de Vendas".
+
+                    ---
+                    # EXEMPLO DE UMA BOA ANÁLISE
+
+                    **Conversa:**
+                    HUMAN: Oi, vi o anúncio de vocês. Quanto custa?
+
+                    **Sua Análise JSON:**
+                    {{
+                    "determined_sales_stage": "discovery",
+                    "reasoning": "O cliente está no primeiro contato e foi direto ao preço, indicando que ainda não entende o valor da solução. É cedo demais para o checkout.",
+                    "suggested_next_focus": "Agradeça o interesse, mas evite dar o preço imediatamente. Conecte-se com o cliente primeiro, perguntando o que no anúncio mais chamou sua atenção para entender a necessidade dele."
+                    }}
+
+                    ---
+                    # ANÁLISE REQUERIDA
+
+                    Analise a conversa recente abaixo e forneça sua análise no formato JSON.
+
+                    **Conversa Recente:**
+                    {recent_messages_formatted}
+                    """,
                 ),
             ]
         )
@@ -180,13 +202,21 @@ async def intelligent_stage_analyzer_hook(
         try:
             analysis_result: StageAnalysisOutput = await analysis_chain.ainvoke(
                 {
-                    "business_description": business_description,
-                    "communication_guidelines": communication_guidelines,
+                    "business_description": profile.business_description,
+                    "target_audience": profile.target_audience or "Não especificado",
+                    "sales_focus": profile.sales_focus
+                    or "Focar em resolver o problema do cliente.",
+                    "communication_guidelines": (
+                        "\n".join([f"- {g}" for g in profile.communication_guidelines])
+                        if profile.communication_guidelines
+                        else "Nenhuma diretriz específica."
+                    ),
                     "recent_messages_formatted": formatted_recent_messages,
                     "original_sales_stage": original_sales_stage,
                     "available_stages_str": available_stages_str,
                 }
             )
+
             analyzed_sales_stage = analysis_result.determined_sales_stage
             analysis_reasoning = analysis_result.reasoning
             suggested_focus = analysis_result.suggested_next_focus
@@ -465,11 +495,16 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
     messages: List[BaseMessage] = state.messages[:]  # Work with a copy
     current_user_input_text: str = state.current_user_input_text
     profile = state.company_profile
+
     communication_rules = [
-        "Diretrizes de Comunicação:",
+        "Diretrizes de Comunicação (para relembrar):",
+        "- EVITE A TODO CUSTO jargões técnicos inicialmente, entenda - implicitamente por meio da conversa - o nível de vocabulário de seu interlocutor.",
     ]
+    # Incluir orientações extras fornecidas pelo perfil (se houver)
     if profile.communication_guidelines:
         communication_rules += [f"- {g}" for g in profile.communication_guidelines]
+    communication_guidelines = "\n".join(communication_rules)
+
     if not messages:
         logger.debug("ComplianceCheckHook: No messages. Skipping.")
         return None
@@ -549,7 +584,7 @@ async def validation_compliance_check_hook(state: AgentState) -> Optional[Comman
                     "- Keep the customer in this channel unless they truly need another channel to proceed.\n"
                     "- Communicate via WhatsApp concisely, using no more than 3 to 5 sentences and bullet points, if needed.\n"
                     f"- Consider the Senior Sales Representative’s analysis to guide your response: '{intelligent_stage_analyzer_message.content}'.\n"
-                    f"- Reformulate your response respecting the 'Diretrizes de Comunicação' of the company\n:{communication_rules} \n"
+                    f"- Reformulate your response respecting the 'Diretrizes de Comunicação' of the company:\n{communication_guidelines} \n"
                     "Review the content based on your instructions and correctly call `validate_response_and_references` before sending again. Thank you!\n\n"
                     "Respond to the user's message using the `validate_response_and_references` tool:\n"
                     f"- User: {current_user_input_text}"

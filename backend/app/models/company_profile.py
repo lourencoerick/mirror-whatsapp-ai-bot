@@ -79,6 +79,13 @@ class CompanyProfile(BaseModel):
         default="Engage customers, answer questions about offerings, and guide them towards a purchase or next step.",
         doc="Main goal of the AI.",
     )
+
+    sales_focus = Column(
+        Text,
+        nullable=True,
+        doc="The core emotional driver to focus on during sales conversations. This guides the AI to sell benefits over features (e.g., 'Focus on the client's life dreams, not on investment products').",
+    )
+
     key_selling_points = Column(
         JSON,  # Store list as JSON
         nullable=False,
@@ -118,8 +125,8 @@ class CompanyProfile(BaseModel):
         nullable=False,
         default=2.0,
         server_default=text("2.0"),
-        doc="Minimum notice time in hours required for a new appointment (can be a fraction, e.g., 0.5 for 30 minutes)."
-    )    
+        doc="Minimum notice time in hours required for a new appointment (can be a fraction, e.g., 0.5 for 30 minutes).",
+    )
 
     availability_rules = Column(
         JSON,
