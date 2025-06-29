@@ -1946,6 +1946,12 @@ export interface components {
              */
             scheduling_calendar_id?: string | null;
             /**
+             * Booking Horizon Days
+             * @description The number of days into the future that a customer can book an appointment.
+             * @default 7
+             */
+            booking_horizon_days: number;
+            /**
              * Scheduling Min Notice Hours
              * @description Minimum notice time in hours (e.g., 0.5 for 30 mins).
              * @default 2
@@ -2116,6 +2122,12 @@ export interface components {
              * @description The ID of the Google Calendar selected by the user for scheduling.
              */
             scheduling_calendar_id?: string | null;
+            /**
+             * Booking Horizon Days
+             * @description The number of days into the future that a customer can book an appointment.
+             * @default 7
+             */
+            booking_horizon_days: number;
             /**
              * Scheduling Min Notice Hours
              * @description Minimum notice time in hours (e.g., 0.5 for 30 mins).

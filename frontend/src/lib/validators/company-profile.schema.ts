@@ -128,6 +128,18 @@ export const companyProfileValidationSchema = z
       .number()
       .positive("Deve ser um número positivo.")
       .min(0.25, "A antecedência mínima é de 15 minutos (0.25 horas)."),
+    booking_horizon_days: z
+      .number({
+        invalid_type_error: "Deve ser um número.",
+      })
+      .int({ message: "Deve ser um número inteiro." })
+      .min(1, {
+        message: "A janela de agendamento deve ser de no mínimo 1 dia.",
+      })
+      .max(365, {
+        message: "A janela de agendamento não pode exceder 365 dias.",
+      })
+      .default(7),
     availability_rules: availabilityRulesArraySchema.optional().nullable(),
 
     offering_overview: z.array(offeringValidationSchema).optional().default([]), // Usa o schema aninhado

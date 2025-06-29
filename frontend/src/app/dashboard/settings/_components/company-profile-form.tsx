@@ -172,6 +172,7 @@ export function CompanyProfileForm({
       fallback_contact_info: initialData?.fallback_contact_info || "",
       is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
       scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
+      booking_horizon_days: initialData?.booking_horizon_days || 7,
       scheduling_min_notice_hours:
         initialData?.scheduling_min_notice_hours || 0.25,
       availability_rules: formatRules(initialData?.availability_rules),
@@ -241,6 +242,7 @@ export function CompanyProfileForm({
         fallback_contact_info: initialData.fallback_contact_info || "",
         is_scheduling_enabled: initialData?.is_scheduling_enabled || false,
         scheduling_calendar_id: initialData?.scheduling_calendar_id || null,
+        booking_horizon_days: initialData?.booking_horizon_days || 7,
         scheduling_min_notice_hours:
           initialData?.scheduling_min_notice_hours || 0.25,
         availability_rules: formatRules(initialData?.availability_rules),
@@ -674,29 +676,57 @@ Ex: Foque nos sonhos do cliente (comprar uma casa, viajar), não nos produtos. O
                       <h4 className="font-medium mb-2">
                         2. Defina sua Disponibilidade
                       </h4>
-                      <div>
-                        <Label className="mb-1.5" htmlFor="min-notice-hours">
-                          Antecedência Mínima (em horas)
-                        </Label>
-                        <Input
-                          id="min-notice-hours"
-                          type="number"
-                          step="0.25" // Permite incrementos de 15 minutos (0.25, 0.5, 0.75, 1.0)
-                          placeholder="Ex: 2,5 (para 2 horas e 30 minutos)"
-                          {...register("scheduling_min_notice_hours", {
-                            valueAsNumber: true,
-                          })}
-                          disabled={formDisabled}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Use virgula para decimais. Ex: 0,5 para 30 minutos,
-                          1,5 para 1h30.
-                        </p>
-                        {errors.scheduling_min_notice_hours && (
-                          <p className="text-xs text-red-600 mt-1">
-                            {errors.scheduling_min_notice_hours.message}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        {/* Coluna 1: Antecedência Mínima */}
+                        <div className="space-y-1">
+                          <Label htmlFor="min-notice-hours">
+                            Antecedência Mínima (em horas)
+                          </Label>
+                          <Input
+                            id="min-notice-hours"
+                            type="number"
+                            step="0.25"
+                            placeholder="Ex: 2,5"
+                            {...register("scheduling_min_notice_hours", {
+                              valueAsNumber: true,
+                            })}
+                            disabled={formDisabled}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Use vírgula para decimais. Ex: 0,5 para 30 min.
                           </p>
-                        )}
+                          {errors.scheduling_min_notice_hours && (
+                            <p className="text-xs text-red-600 mt-1">
+                              {errors.scheduling_min_notice_hours.message}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Coluna 2: Janela de Agendamento */}
+                        <div className="space-y-1">
+                          <Label htmlFor="booking-horizon-days">
+                            Janela de Agendamento (em dias)
+                          </Label>
+                          <Input
+                            id="booking-horizon-days"
+                            type="number"
+                            min="1"
+                            max="365"
+                            placeholder="Ex: 7"
+                            {...register("booking_horizon_days", {
+                              valueAsNumber: true,
+                            })}
+                            disabled={formDisabled}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Até quantos dias no futuro clientes podem marcar.
+                          </p>
+                          {errors.booking_horizon_days && (
+                            <p className="text-xs text-red-600 mt-1">
+                              {errors.booking_horizon_days.message}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <Accordion
                         type="single"
