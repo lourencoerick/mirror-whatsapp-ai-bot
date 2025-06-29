@@ -3,7 +3,7 @@ from typing import Dict, List
 MESSAGE_TEMPLATES: Dict[str, List[Dict[str, str]]] = {
     "initial_contact": [
         {
-            "template": "Oi, {customer_name}, tudo bem? Aqui é o {ai_name} da {company_name}. Pode me contar o que te trouxe aqui?",
+            "template": "Oi, {customer_name}, tudo bem? Aqui é o {your_name} da {company_name}. Pode me contar o que te trouxe aqui?",
             "intent": "introduction_with_known_name",
         },
         {
