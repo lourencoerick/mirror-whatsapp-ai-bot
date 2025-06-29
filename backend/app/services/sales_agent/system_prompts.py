@@ -79,7 +79,7 @@ def generate_system_message(
 
         {get_execution_context_string()}
 
-        Instruções:\n\n
+        INSTRUÇÕES:\n\n
     """
 
     persona_intro = (
