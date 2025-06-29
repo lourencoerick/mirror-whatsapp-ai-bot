@@ -436,7 +436,9 @@ async def find_next_available_day(
 
     # --- 2. Lógica de Busca Iterativa ---
     calendar_service = GoogleCalendarService()
-    search_limit_days = 30  # Limite para não buscar indefinidamente
+    search_limit_days = (
+        profile.booking_horizon_days
+    )  # Limite para não buscar indefinidamente
 
     logger.info(
         f"[{tool_name}] Starting search for next available day from {start_date} for the next {search_limit_days} days."
