@@ -65,19 +65,17 @@ def generate_system_message(
         accepted_payment_methods = f"Meios de pagamento aceitos:\n{payment_method_str}"
 
     # --- Seção 3: Objetivos e Estratégia de Vendas do AI ---
-    objective_section_parts = [
-        "\n--- Seu Papel, Objetivos e Estratégia de Abordagem ---"
-    ]
+    objective_section = ["\n--- Seu Papel, Objetivos e Estratégia de Abordagem ---"]
 
     objective_statement = f"Seu principal objetivo como AI é: {profile.ai_objective}."
-    objective_section_parts.append(objective_statement)
+    objective_section.append(objective_statement)
 
     if profile.sales_focus:
         focus_instruction = (
             f"\nPara alcançar esse objetivo, sua abordagem deve ser focada em: {profile.sales_focus}. "
             "Conecte-se com o cliente nesse nível, em vez de focar apenas nos aspectos técnicos do produto."
         )
-        objective_section_parts.append(focus_instruction)
+        objective_section.append(focus_instruction)
 
     key_selling_points_list = ""
     if profile.key_selling_points:
@@ -197,7 +195,7 @@ def generate_system_message(
         company,
         accepted_payment_methods,
         "\n--- Seu Papel e Objetivos ---",
-        objective_section_parts,
+        objective_section,
         key_selling_points_list if profile.key_selling_points else "",
         "\n--- Nossas Ofertas e Serviços ---",
         offerings_summary,
